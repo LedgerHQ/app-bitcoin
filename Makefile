@@ -15,8 +15,9 @@
 #  limitations under the License.
 #*******************************************************************************
 
-APPNAME = BTC 
-
+APPNAME = "Bitcoin"
+TARGET_ID = 0x31100002 #Nano S
+#TARGET_ID = 0x31000002 #Blue
 
 ################
 # Default rule #
@@ -42,17 +43,16 @@ PROG     := token
 
 CONFIG_PRODUCTIONS := bin/$(PROG)
 
-SOURCE_PATH   := src $(BOLOS_SDK)/src src_usb 
+SOURCE_PATH   := src $(BOLOS_SDK)/src $(dir $(shell find $(BOLOS_SDK)/lib_stusb* | grep "\.c$$"))
 SOURCE_FILES  := $(foreach path, $(SOURCE_PATH),$(shell find $(path) | grep -E "\.c$$|\.s") )
-INCLUDES_PATH := src_usb $(dir $(shell find src_usb/ | grep "\.h$$")) include src $(BOLOS_SDK)/include $(BOLOS_SDK)/include/arm
+INCLUDES_PATH := $(dir $(shell find $(BOLOS_SDK)/lib_stusb* | grep "\.h$$")) include src $(BOLOS_SDK)/include $(BOLOS_SDK)/include/arm
 
 ### platform definitions
 DEFINES := ST31 gcc __IO=volatile
 
 DEFINES   += OS_IO_SEPROXYHAL IO_SEPROXYHAL_BUFFER_SIZE_B=300
 DEFINES   += HAVE_BAGL HAVE_PRINTF 
-DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=7 IO_HID_EP_LENGTH=64
-DEFINES	  += HAVE_BLE
+DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=6 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
 
 DEFINES   += LEDGER_MAJOR_VERSION=1 LEDGER_MINOR_VERSION=0 LEDGER_PATCH_VERSION=0 TCS_LOADER_PATCH_VERSION=0
 
@@ -72,6 +72,7 @@ CFLAGS_SHARED   += -fdata-sections -ffunction-sections -funsigned-char -fshort-e
 CFLAGS_SHARED   += -mno-unaligned-access 
 CFLAGS_SHARED   += -Wno-unused-parameter -Wno-duplicate-decl-specifier
 
+#CFLAGS_SHARED   += --analyze
 CFLAGS_SHARED   += -fropi --target=armv6m-none-eabi
 #CFLAGS   += -finline-limit-0 -funsigned-bitfields 
 
@@ -98,7 +99,7 @@ LDFLAGS  += -mno-unaligned-access
 LDFLAGS  += -Tscript.ld  -Wl,--gc-sections -Wl,-Map,debug/$(PROG).map,--cref
 LDLIBS   += -Wl,--library-path -Wl,$(GCCPATH)/../lib/armv6-m/
 #LDLIBS   += -Wl,--start-group 
-LDLIBS   += -lm -lgcc -lc  
+LDLIBS   += -lm -lgcc -lc 
 #LDLIBS   += -Wl,--end-group
 # -mno-unaligned-access 
 #-pg --coverage
@@ -126,10 +127,11 @@ log = $(if $(strip $(VERBOSE)),$1,@$1)
 default: prepare bin/$(PROG)
 
 load: 
-	python -m ledgerblue.loadApp --appFlags 0xC0 --fileName bin/$(PROG).hex --appName $(APPNAME) 
+	python -m ledgerblue.loadApp --targetId $(TARGET_ID) --appFlags 0xC0 --fileName bin/$(PROG).hex --appName $(APPNAME) --icon `python $(BOLOS_SDK)/icon.py 16 16 icon.gif hexbitmaponly` --path ""
+#--path "44'/0'"
 
 delete:
-	python -m ledgerblue.deleteApp --appName $(APPNAME)
+	python -m ledgerblue.deleteApp --targetId $(TARGET_ID) --appName $(APPNAME)
 
 bin/$(PROG): $(OBJECT_FILES) script.ld
 	@echo "[LINK] 	$@"

@@ -52,6 +52,7 @@ struct btchip_transaction_summary_s {
     unsigned char payToScriptHashVersion;
     unsigned char authorizationHash[32];
     btchip_transaction_summary_data_t summarydata;
+    unsigned short messageLength;
 };
 typedef struct btchip_transaction_summary_s btchip_transaction_summary_t;
 

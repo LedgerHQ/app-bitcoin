@@ -180,6 +180,9 @@ struct btchip_context_s {
     /** Length of the outgoing command */
     unsigned short outLength;
 
+    /** IO flags to reply with at the end of an APDU handler */
+    unsigned char io_flags;
+
     /** Status Word of the response */
     unsigned short sw;
 
@@ -188,6 +191,9 @@ struct btchip_context_s {
 
     // was previously in NVRAM
     btchip_transaction_summary_t transactionSummary;
+
+
+    unsigned short hashedMessageLength;
 
     union {
         btchip_tmp_output_t output;

@@ -151,9 +151,6 @@ unsigned short btchip_apdu_sign_message(void);
 unsigned short btchip_apdu_get_random(void);
 unsigned short btchip_apdu_get_firmware_version(void);
 
-unsigned short btchip_apdu_set_user_keycard(void);
-unsigned short btchip_apdu_setup_secure_screen(void);
-
 unsigned short btchip_apdu_set_alternate_coin_version(void);
 
 #endif

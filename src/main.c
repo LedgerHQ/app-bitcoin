@@ -25,38 +25,48 @@
 
 #include "btchip_bagl_extensions.h"
 
-void io_usb_enable(unsigned char enabled);
-void os_boot(void);
-
 unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
-
-volatile unsigned char uiDoneAfterDraw;
-volatile unsigned char uiDone;
-volatile unsigned char transactionVerified;
-volatile unsigned int current_element;
-volatile bagl_element_t *active_screen;
-volatile unsigned int active_screen_element_count;
-volatile bagl_element_t *active_screen2;
-volatile unsigned int active_screen2_element_count;
-volatile unsigned char display_changed;
-volatile enum {
-    BAGL_BTCHIP_IDLE,
-    BAGL_BTCHIP_VERIFY,
-} btchip_ui_mode = BAGL_BTCHIP_IDLE;
 
 volatile char fullAmount[20];     // full amount
 volatile char addressSummary[20]; // beginning of the output address ... end of
                                   // the address
+volatile char feesAmount[20];     // fees
 volatile char address1[20];       // full first part of the output address
 volatile char address2[20];       // full last part of the output address
 
-volatile unsigned char generalStatus;
+unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e);
+unsigned int io_seproxyhal_touch_verify_ok(const bagl_element_t *e);
+unsigned int
+io_seproxyhal_touch_message_signature_verify_cancel(const bagl_element_t *e);
+unsigned int
+io_seproxyhal_touch_message_signature_verify_ok(const bagl_element_t *e);
+unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e);
 
-unsigned int io_seproxyhal_touch_verify_cancel(bagl_element_t *e);
-unsigned int io_seproxyhal_touch_verify_ok(bagl_element_t *e);
-unsigned int io_seproxyhal_touch_exit(bagl_element_t *e);
+ux_state_t ux;
 
-static const bagl_element_t const bagl_ui_erase_all[] = {
+// display stepped screens
+unsigned int ux_step;
+unsigned int ux_step_count;
+unsigned int ui_stepper_prepro(const bagl_element_t *element) {
+    if (element->component.userid > 0) {
+        return (ux_step == element->component.userid - 1);
+    }
+    return 1;
+}
+
+const unsigned char hex_digits[] = {'0', '1', '2', '3', '4', '5', '6', '7',
+                                    '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+
+void array_hexstr(char *strbuf, const void *bin, unsigned int len) {
+    while (len--) {
+        *strbuf++ = hex_digits[((*((char *)bin)) >> 4) & 0xF];
+        *strbuf++ = hex_digits[(*((char *)bin)) & 0xF];
+        bin = (const void *)((unsigned int)bin + 1);
+    }
+    *strbuf = 0; // EOS
+}
+
+static const bagl_element_t const ui_idle_blue[] = {
     {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 480, 0, 0, BAGL_FILL, 0xf9f9f9, 0xf9f9f9,
       0, 0},
      NULL,
@@ -66,9 +76,7 @@ static const bagl_element_t const bagl_ui_erase_all[] = {
      NULL,
      NULL,
      NULL},
-};
 
-static const bagl_element_t const bagl_ui_idle[] = {
     // type                                 id    x    y    w    h    s  r  fill
     // fg        bg        font icon   text, out, over, touch
     {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 60, 0, 0, BAGL_FILL, 0x1d2028, 0x1d2028,
@@ -118,13 +126,121 @@ static const bagl_element_t const bagl_ui_idle[] = {
      0,
      0x37ae99,
      0xF9F9F9,
-     (bagl_element_callback_t)io_seproxyhal_touch_exit,
+     io_seproxyhal_touch_exit,
      NULL,
      NULL},
 
 };
 
-bagl_element_t const bagl_ui_verify[] = {
+unsigned int ui_idle_blue_button(unsigned int button_mask,
+                                 unsigned int button_mask_counter) {
+    return 0;
+}
+
+const bagl_element_t ui_idle_nanos[] = {
+    // type                               userid    x    y   w    h  str rad
+    // fill      fg        bg      fid iid  txt   touchparams...       ]
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_ICON, 0x01, 17, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_BITCOIN_BADGE},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x01, 38, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_REGULAR_11px, 0},
+     "Use wallet to",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x01, 39, 26, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_REGULAR_11px, 0},
+     "view accounts",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_ICON, 0x01, 118, 14, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_DOWN},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_ICON, 0x02, 29, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_DASHBOARD_BADGE},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    //{{BAGL_LABELINE                       , 0x02,   0,   3, 128,  32, 0, 0, 0
+    //, 0xFFFFFF, 0x000000,
+    //BAGL_FONT_OPEN_SANS_REGULAR_11px|BAGL_FONT_ALIGNMENT_CENTER, 0  }, "view
+    //accounts", 0, 0, 0, NULL, NULL, NULL },
+    {{BAGL_LABELINE, 0x02, 50, 19, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
+     "Quit app",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_ICON, 0x02, 3, 14, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_UP},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+};
+unsigned int ui_idle_nanos_button(unsigned int button_mask,
+                                  unsigned int button_mask_counter);
+
+unsigned int ui_idle_nanos_state;
+unsigned int ui_idle_nanos_prepro(const bagl_element_t *element) {
+    if (element->component.userid > 0) {
+        return (ui_idle_nanos_state == element->component.userid - 1);
+    }
+    return 1;
+}
+
+bagl_element_t const ui_verify_blue[] = {
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 480, 0, 0, BAGL_FILL, 0xf9f9f9, 0xf9f9f9,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
     // type                                 id    x    y    w    h    s  r  fill
     // fg        bg        font icon   text, out, over, touch
     {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 60, 0, 0, BAGL_FILL, 0x1d2028, 0x1d2028,
@@ -155,7 +271,7 @@ bagl_element_t const bagl_ui_verify[] = {
      0,
      0x37ae99,
      0xF9F9F9,
-     (bagl_element_callback_t)io_seproxyhal_touch_verify_cancel,
+     io_seproxyhal_touch_verify_cancel,
      NULL,
      NULL},
     {{BAGL_BUTTON | BAGL_FLAG_TOUCHABLE, 0x00, 165, 385, 120, 40, 0, 6,
@@ -167,7 +283,7 @@ bagl_element_t const bagl_ui_verify[] = {
      0,
      0x37ae99,
      0xF9F9F9,
-     (bagl_element_callback_t)io_seproxyhal_touch_verify_ok,
+     io_seproxyhal_touch_verify_ok,
      NULL,
      NULL},
 
@@ -227,57 +343,611 @@ bagl_element_t const bagl_ui_verify[] = {
      NULL},
 };
 
-// override point, but nothing more to do
-void io_seproxyhal_display(const bagl_element_t *element) {
-    display_changed = 1;
-    io_seproxyhal_display_default((bagl_element_t *)element);
+unsigned int ui_verify_blue_button(unsigned int button_mask,
+                                   unsigned int button_mask_counter) {
+    return 0;
 }
 
-void display_init(void) {
-    uiDone = 0;
-    uiDoneAfterDraw = 0;
-    display_changed = 0;
-    active_screen2 = NULL;
-}
+const bagl_element_t ui_verify_nanos[] = {
+    // type                               userid    x    y   w    h  str rad
+    // fill      fg        bg      fid iid  txt   touchparams...       ]
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
 
-void displayHome(void) {
-    btchip_ui_mode = BAGL_BTCHIP_IDLE;
-    current_element = 0;
-    active_screen_element_count = sizeof(bagl_ui_idle) / sizeof(bagl_element_t);
-    active_screen = (bagl_element_t *)bagl_ui_idle;
-    io_seproxyhal_display(&bagl_ui_erase_all[0]);
-}
+    {{BAGL_ICON, 0x00, 3, 12, 7, 7, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CROSS},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_ICON, 0x00, 117, 13, 8, 6, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CHECK},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
 
-// off
-unsigned int io_seproxyhal_touch_exit(bagl_element_t *e) {
+    {{BAGL_ICON, 0x01, 21, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_TRANSACTION_BADGE},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x01, 42, 12, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
+     "Confirm",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x01, 43, 26, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
+     "transaction",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x02, 0, 12, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Amount",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x02, 23, 26, 82, 11, 0x80 | 10, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 26},
+     fullAmount,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x03, 0, 12, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Recipient address",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x03, 0, 26, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x04, 0, 12, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Fees",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x04, 23, 26, 82, 11, 0x80 | 10, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 26},
+     feesAmount,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
     /*
-    G_io_seproxyhal_spi_buffer[0] = SEPROXYHAL_TAG_DEVICE_OFF;
-    G_io_seproxyhal_spi_buffer[1] = 0;
-    G_io_seproxyhal_spi_buffer[2] = 0;
-    io_seproxyhal_spi_send(G_io_seproxyhal_spi_buffer, 3);
+    {{BAGL_LABELINE                       , 0x03,   0,  26, 128,  11, 0, 0, 0
+    , 0xFFFFFF, 0x000000,
+    BAGL_FONT_OPEN_SANS_REGULAR_11px|BAGL_FONT_ALIGNMENT_CENTER, 0  }, address1,
+    0, 0, 0, NULL, NULL, NULL },
+    {{BAGL_LABELINE                       , 0x04,   0,  26, 128,  11, 0, 0, 0
+    , 0xFFFFFF, 0x000000,
+    BAGL_FONT_OPEN_SANS_REGULAR_11px|BAGL_FONT_ALIGNMENT_CENTER, 0  }, address2,
+    0, 0, 0, NULL, NULL, NULL },
     */
+
+};
+unsigned int ui_verify_nanos_button(unsigned int button_mask,
+                                    unsigned int button_mask_counter);
+
+bagl_element_t const ui_verify_p2sh_blue[] = {
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 480, 0, 0, BAGL_FILL, 0xf9f9f9, 0xf9f9f9,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    // type                                 id    x    y    w    h    s  r  fill
+    // fg        bg        font icon   text, out, over, touch
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 60, 0, 0, BAGL_FILL, 0x1d2028, 0x1d2028,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABEL, 0x00, 20, 0, 320, 60, 0, 0, BAGL_FILL, 0xFFFFFF, 0x1d2028,
+      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_MIDDLE, 0},
+     "Ledger Blue",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_BUTTON | BAGL_FLAG_TOUCHABLE, 0x00, 35, 385, 120, 40, 0, 6,
+      BAGL_FILL, 0xcccccc, 0xF9F9F9,
+      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER |
+          BAGL_FONT_ALIGNMENT_MIDDLE,
+      0},
+     "CANCEL",
+     0,
+     0x37ae99,
+     0xF9F9F9,
+     io_seproxyhal_touch_verify_cancel,
+     NULL,
+     NULL},
+    {{BAGL_BUTTON | BAGL_FLAG_TOUCHABLE, 0x00, 165, 385, 120, 40, 0, 6,
+      BAGL_FILL, 0x41ccb4, 0xF9F9F9,
+      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER |
+          BAGL_FONT_ALIGNMENT_MIDDLE,
+      0},
+     "CONFIRM",
+     0,
+     0x37ae99,
+     0xF9F9F9,
+     io_seproxyhal_touch_verify_ok,
+     NULL,
+     NULL},
+
+    {{BAGL_LABEL, 0x00, 0, 147, 320, 32, 0, 0, 0, 0x000000, 0xF9F9F9,
+      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "CONFIRM P2SH TRANSACTION",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+};
+
+unsigned int ui_verify_p2sh_blue_button(unsigned int button_mask,
+                                        unsigned int button_mask_counter) {
+    return 0;
+}
+
+const bagl_element_t ui_verify_p2sh_nanos[] = {
+    // type                               userid    x    y   w    h  str rad
+    // fill      fg        bg      fid iid  txt   touchparams...       ]
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_ICON, 0x00, 3, 12, 7, 7, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CROSS},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_ICON, 0x00, 117, 13, 8, 6, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CHECK},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_ICON, 0x01, 32, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_TRANSACTION_BADGE},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x01, 53, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
+     "Confirm",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x01, 53, 26, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
+     "P2SH",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+};
+unsigned int ui_verify_p2sh_nanos_button(unsigned int button_mask,
+                                         unsigned int button_mask_counter);
+
+// display or not according to step, and adjust delay
+unsigned int ui_verify_prepro(const bagl_element_t *element) {
+    if (element->component.userid > 0) {
+        unsigned int display = (ux_step == element->component.userid - 1);
+        if (display) {
+            switch (element->component.userid) {
+            case 1:
+                io_seproxyhal_setup_ticker(2000);
+                break;
+            case 2:
+                io_seproxyhal_setup_ticker(MAX(
+                    3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
+                break;
+            case 3:
+                io_seproxyhal_setup_ticker(3000);
+                break;
+            case 4:
+                io_seproxyhal_setup_ticker(MAX(
+                    3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
+                break;
+            }
+        }
+        return display;
+    }
+    return 1;
+}
+
+bagl_element_t const ui_verify_message_signature_blue[] = {
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 480, 0, 0, BAGL_FILL, 0xf9f9f9, 0xf9f9f9,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    // type                                 id    x    y    w    h    s  r  fill
+    // fg        bg        font icon   text, out, over, touch
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 60, 0, 0, BAGL_FILL, 0x1d2028, 0x1d2028,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABEL, 0x00, 20, 0, 320, 60, 0, 0, BAGL_FILL, 0xFFFFFF, 0x1d2028,
+      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_MIDDLE, 0},
+     "Ledger Blue",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_BUTTON | BAGL_FLAG_TOUCHABLE, 0x00, 35, 385, 120, 40, 0, 6,
+      BAGL_FILL, 0xcccccc, 0xF9F9F9,
+      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER |
+          BAGL_FONT_ALIGNMENT_MIDDLE,
+      0},
+     "CANCEL",
+     0,
+     0x37ae99,
+     0xF9F9F9,
+     io_seproxyhal_touch_message_signature_verify_cancel,
+     NULL,
+     NULL},
+    {{BAGL_BUTTON | BAGL_FLAG_TOUCHABLE, 0x00, 165, 385, 120, 40, 0, 6,
+      BAGL_FILL, 0x41ccb4, 0xF9F9F9,
+      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER |
+          BAGL_FONT_ALIGNMENT_MIDDLE,
+      0},
+     "CONFIRM",
+     0,
+     0x37ae99,
+     0xF9F9F9,
+     io_seproxyhal_touch_message_signature_verify_ok,
+     NULL,
+     NULL},
+
+    {{BAGL_LABEL, 0x00, 0, 147, 320, 32, 0, 0, 0, 0x000000, 0xF9F9F9,
+      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "CONFIRM SIGNATURE",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABEL, 0x00, 0, 185, 320, 32, 0, 0, 0, 0x000000, 0xF9F9F9,
+      BAGL_FONT_OPEN_SANS_LIGHT_16px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+};
+
+unsigned int
+ui_verify_message_signature_blue_button(unsigned int button_mask,
+                                        unsigned int button_mask_counter) {
+    return 0;
+}
+
+const bagl_element_t ui_verify_message_signature_nanos[] = {
+    // type                               userid    x    y   w    h  str rad
+    // fill      fg        bg      fid iid  txt   touchparams...       ]
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_ICON, 0x00, 3, 12, 7, 7, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CROSS},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_ICON, 0x00, 117, 13, 8, 6, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CHECK},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_ICON, 0x01, 28, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_TRANSACTION_BADGE},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x01, 50, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
+     "Sign the",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x01, 49, 26, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
+     "message",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x02, 0, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Message hash",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x02, 0, 26, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+};
+unsigned int
+ui_verify_message_signature_nanos_button(unsigned int button_mask,
+                                         unsigned int button_mask_counter);
+
+unsigned int ui_verify_message_prepro(const bagl_element_t *element) {
+    if (element->component.userid > 0) {
+        switch (element->component.userid) {
+        case 1:
+            io_seproxyhal_setup_ticker(2000);
+            break;
+        case 2:
+            io_seproxyhal_setup_ticker(3000);
+            break;
+        }
+        return (ux_step == element->component.userid - 1);
+    }
+    return 1;
+}
+
+void ui_idle(void) {
+    if (os_seph_features() &
+        SEPROXYHAL_TAG_SESSION_START_EVENT_FEATURE_SCREEN_BIG) {
+        UX_DISPLAY(ui_idle_blue, NULL);
+    } else {
+        ui_idle_nanos_state = 0; // start by displaying the idle first screen
+        UX_DISPLAY(ui_idle_nanos, ui_idle_nanos_prepro);
+    }
+}
+
+unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e) {
     // go back to the home screen
     os_sched_exit(0);
     return 0; // DO NOT REDRAW THE BUTTON
 }
 
-// verify cancel
-unsigned int io_seproxyhal_touch_verify_cancel(bagl_element_t *e) {
-    transactionVerified = 0;
-    uiDoneAfterDraw = 1;
-    displayHome();
+unsigned int ui_idle_nanos_button(unsigned int button_mask,
+                                  unsigned int button_mask_counter) {
+    switch (button_mask) {
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT: // UP
+        if (ui_idle_nanos_state == 1) {
+            ui_idle_nanos_state = 0;
+            UX_DISPLAY(ui_idle_nanos, ui_idle_nanos_prepro);
+        }
+        break;
+
+    case BUTTON_EVT_RELEASED | BUTTON_RIGHT: // DOWN
+        if (ui_idle_nanos_state == 0) {
+            ui_idle_nanos_state = 1;
+            UX_DISPLAY(ui_idle_nanos, ui_idle_nanos_prepro);
+        }
+        break;
+
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT: // EXIT
+        if (ui_idle_nanos_state == 1) {
+            io_seproxyhal_touch_exit(NULL);
+        }
+        break;
+    }
+    return 0;
+}
+
+unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e) {
+    // user denied the transaction, tell the USB side
+    btchip_bagl_user_action(0);
+    // redraw ui
+    ui_idle();
     return 0; // DO NOT REDRAW THE BUTTON
 }
 
-// verify ok
-unsigned int io_seproxyhal_touch_verify_ok(bagl_element_t *e) {
-    transactionVerified = 1;
-    uiDoneAfterDraw = 1;
-    displayHome();
+unsigned int io_seproxyhal_touch_verify_ok(const bagl_element_t *e) {
+    // user accepted the transaction, tell the USB side
+    btchip_bagl_user_action(1);
+    // redraw ui
+    ui_idle();
     return 0; // DO NOT REDRAW THE BUTTON
 }
 
-void reset(void) {
+unsigned int
+io_seproxyhal_touch_message_signature_verify_cancel(const bagl_element_t *e) {
+    // user denied the transaction, tell the USB side
+    btchip_bagl_user_action_message_signing(0);
+    // redraw ui
+    ui_idle();
+    return 0; // DO NOT REDRAW THE BUTTON
+}
+
+unsigned int
+io_seproxyhal_touch_message_signature_verify_ok(const bagl_element_t *e) {
+    // user accepted the transaction, tell the USB side
+    btchip_bagl_user_action_message_signing(1);
+    // redraw ui
+    ui_idle();
+    return 0; // DO NOT REDRAW THE BUTTON
+}
+
+unsigned int ui_verify_nanos_button(unsigned int button_mask,
+                                    unsigned int button_mask_counter) {
+    switch (button_mask) {
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT:
+        io_seproxyhal_touch_verify_cancel(NULL);
+        break;
+
+    case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
+        io_seproxyhal_touch_verify_ok(NULL);
+        break;
+    }
+    return 0;
+}
+
+unsigned int ui_verify_p2sh_nanos_button(unsigned int button_mask,
+                                         unsigned int button_mask_counter) {
+    switch (button_mask) {
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT:
+        io_seproxyhal_touch_verify_cancel(NULL);
+        break;
+
+    case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
+        io_seproxyhal_touch_verify_ok(NULL);
+        break;
+    }
+    return 0;
+}
+
+unsigned int
+ui_verify_message_signature_nanos_button(unsigned int button_mask,
+                                         unsigned int button_mask_counter) {
+    switch (button_mask) {
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT:
+        io_seproxyhal_touch_message_signature_verify_cancel(NULL);
+        break;
+
+    case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
+        io_seproxyhal_touch_message_signature_verify_ok(NULL);
+        break;
+    }
+    return 0;
+}
+
+// override point, but nothing more to do
+void io_seproxyhal_display(const bagl_element_t *element) {
+    io_seproxyhal_display_default((bagl_element_t *)element);
 }
 
 unsigned short io_exchange_al(unsigned char channel, unsigned short tx_len) {
@@ -293,7 +963,7 @@ unsigned short io_exchange_al(unsigned char channel, unsigned short tx_len) {
             if (channel & IO_RESET_AFTER_REPLIED) {
                 reset();
             }
-            return 0; // nothing recPeived from the master so far (it's a tx
+            return 0; // nothing received from the master so far (it's a tx
                       // transaction)
         } else {
             return io_seproxyhal_spi_recv(G_io_apdu_buffer,
@@ -306,130 +976,43 @@ unsigned short io_exchange_al(unsigned char channel, unsigned short tx_len) {
     return 0;
 }
 
-unsigned int usb_enable_request;
 unsigned char io_event(unsigned char channel) {
     // nothing done with the event, throw an error on the transport layer if
     // needed
-    unsigned int offset = 0;
 
-    // just reply "amen"
-    // add a "pairing ok" tag if necessary
     // can't have more than one tag in the reply, not supported yet.
     switch (G_io_seproxyhal_spi_buffer[0]) {
-    case SEPROXYHAL_TAG_BLE_PAIRING_ATTEMPT_EVENT:
-        G_io_seproxyhal_spi_buffer[offset++] = SEPROXYHAL_TAG_PAIRING_STATUS;
-        G_io_seproxyhal_spi_buffer[offset++] = 0;
-        G_io_seproxyhal_spi_buffer[offset++] = 1;
-        G_io_seproxyhal_spi_buffer[offset++] = 1;
-        io_seproxyhal_spi_send(G_io_seproxyhal_spi_buffer, offset);
-        break;
-
     case SEPROXYHAL_TAG_FINGER_EVENT:
-        // TOUCH & RELEASE
-        display_changed = 0; // detect screen display requests, to determine if
-                             // general status is required or not
-        io_seproxyhal_touch((const bagl_element_t *)active_screen,
-                            active_screen_element_count,
-                            (G_io_seproxyhal_spi_buffer[4] << 8) |
-                                (G_io_seproxyhal_spi_buffer[5] & 0xFF),
-                            (G_io_seproxyhal_spi_buffer[6] << 8) |
-                                (G_io_seproxyhal_spi_buffer[7] & 0xFF),
-                            // map events
-                            G_io_seproxyhal_spi_buffer[3]);
-        if (!display_changed) {
-            goto general_status;
-        }
+        UX_FINGER_EVENT(G_io_seproxyhal_spi_buffer);
         break;
 
-#ifdef HAVE_BLE
-    // Make automatically discoverable again when disconnected
-
-    case SEPROXYHAL_TAG_BLE_CONNECTION_EVENT:
-        if (G_io_seproxyhal_spi_buffer[3] == 0) {
-            // TODO : cleaner reset sequence
-            // first disable BLE before turning it off
-            G_io_seproxyhal_spi_buffer[0] = SEPROXYHAL_TAG_BLE_RADIO_POWER;
-            G_io_seproxyhal_spi_buffer[1] = 0;
-            G_io_seproxyhal_spi_buffer[2] = 1;
-            G_io_seproxyhal_spi_buffer[3] = 0;
-            io_seproxyhal_spi_send(G_io_seproxyhal_spi_buffer, 4);
-            // send BLE power on (default parameters)
-            G_io_seproxyhal_spi_buffer[0] = SEPROXYHAL_TAG_BLE_RADIO_POWER;
-            G_io_seproxyhal_spi_buffer[1] = 0;
-            G_io_seproxyhal_spi_buffer[2] = 1;
-            G_io_seproxyhal_spi_buffer[3] = 3; // ble on & advertise
-            io_seproxyhal_spi_send(G_io_seproxyhal_spi_buffer, 5);
-        }
-        goto general_status;
-#endif        
-
-    case SEPROXYHAL_TAG_SESSION_START_EVENT:
-#ifdef HAVE_BLE    
-        // send BLE power on (default parameters)
-        G_io_seproxyhal_spi_buffer[0] = SEPROXYHAL_TAG_BLE_RADIO_POWER;
-        G_io_seproxyhal_spi_buffer[1] = 0;
-        G_io_seproxyhal_spi_buffer[2] = 1;
-        G_io_seproxyhal_spi_buffer[3] = 3; // ble on & advertise
-        io_seproxyhal_spi_send(G_io_seproxyhal_spi_buffer, 4);
-#endif        
-
-        // request usb startup after display done
-        usb_enable_request = 1;
-
-        display_init();
-
-        // display the home (erase the loader screen is mandatory, and not done
-        // by the loader)
-        displayHome();
-        // goto general_status;
+    case SEPROXYHAL_TAG_BUTTON_PUSH_EVENT:
+        UX_BUTTON_PUSH_EVENT(G_io_seproxyhal_spi_buffer);
         break;
 
     case SEPROXYHAL_TAG_DISPLAY_PROCESSED_EVENT:
-        if (active_screen2 != NULL) {
-            if (current_element < active_screen2_element_count) {
-                // continue displaying element if any to be processed again
-                io_seproxyhal_display(
-                    (const bagl_element_t *)&active_screen2[current_element++]);
-                break;
-            } else {
-                active_screen2 = NULL;
-                current_element = active_screen_element_count;
-            }
+        if (UX_DISPLAYED()) {
+            // TODO perform actions after all screen elements have been
+            // displayed
         } else {
-            if (current_element < active_screen_element_count) {
-                // continue displaying element if any to be processed again
-                io_seproxyhal_display(
-                    (const bagl_element_t *)&active_screen[current_element++]);
-                break;
-            }
+            UX_DISPLAY_PROCESSED_EVENT();
         }
-        if (usb_enable_request) {
-            // enable usb support
-            io_usb_enable(1);
+        break;
 
-            usb_enable_request = 0;
-        }
-        if (uiDoneAfterDraw) {
-            // Top level handle the general status along with the APDU response
-            uiDoneAfterDraw = 0;
-            uiDone = 1;
-            break;
-        }
-        // no break is intentional: always a general status after display event
-        generalStatus = 1;
+    case SEPROXYHAL_TAG_TICKER_EVENT:
+        // prepare next screen
+        ux_step = (ux_step + 1) % ux_step_count;
+        // redisplay screen
+        UX_REDISPLAY();
+        break;
 
     default:
-    general_status:
-        // send a general status last command
-        offset = 0;
-        G_io_seproxyhal_spi_buffer[offset++] = SEPROXYHAL_TAG_GENERAL_STATUS;
-        G_io_seproxyhal_spi_buffer[offset++] = 0;
-        G_io_seproxyhal_spi_buffer[offset++] = 2;
-        G_io_seproxyhal_spi_buffer[offset++] =
-            SEPROXYHAL_TAG_GENERAL_STATUS_LAST_COMMAND >> 8;
-        G_io_seproxyhal_spi_buffer[offset++] =
-            SEPROXYHAL_TAG_GENERAL_STATUS_LAST_COMMAND;
-        io_seproxyhal_spi_send(G_io_seproxyhal_spi_buffer, offset);
+        break;
+    }
+
+    // close the event if not done previously (by a display or whatever)
+    if (!io_seproxyhal_spi_is_status_sent()) {
+        io_seproxyhal_general_status();
     }
 
     // command has been processed, DO NOT reset the current APDU transport
@@ -443,6 +1026,12 @@ uint8_t prepare_full_output(unsigned int outputPos) {
     unsigned int currentPos = 0;
     unsigned char amount[8], totalOutputAmount[8], fees[8];
     char tmp[100];
+    if (btchip_context_D.transactionContext.consumeP2SH) {
+        fullAmount[0] = '\0';
+        feesAmount[0] = '\0';
+        strcpy(addressSummary, "P2SH");
+        return 1;
+    }
     // Parse output
     os_memset(totalOutputAmount, 0, sizeof(totalOutputAmount));
     numberOutputs = btchip_context_D.currentOutput[offset++];
@@ -476,7 +1065,7 @@ uint8_t prepare_full_output(unsigned int outputPos) {
     if (transaction_amount_sub_be(
             fees, btchip_context_D.transactionContext.transactionAmount,
             totalOutputAmount)) {
-        screen_printf("Error : Fees not consistant");
+        screen_printf("Error : Fees not consistent");
         goto error;
     }
     // Format validation message
@@ -510,17 +1099,26 @@ uint8_t prepare_full_output(unsigned int outputPos) {
                 address1[18] = '\0';
                 os_memmove((void *)address2, tmp + 18, strlen(tmp) - 18);
                 address2[strlen(tmp) - 18] = '\0';
+
+                os_memset(addressSummary, 0, sizeof(addressSummary));
                 os_memmove((void *)addressSummary, tmp, 5);
-                os_memmove((void *)(addressSummary + 5), " ... ", 5);
-                os_memmove((void *)(addressSummary + 10), tmp + strlen(tmp) - 4,
+                os_memmove((void *)(addressSummary + 5), "...", 3);
+                os_memmove((void *)(addressSummary + 8), tmp + strlen(tmp) - 4,
                            4);
-                addressSummary[14] = '\0';
+
                 // Prepare amount
                 // TODO : match current coin version
-                btchip_context_D.tmp = (unsigned char *)fullAmount;
+
+                strcpy(fullAmount, "BTC ");
+                btchip_context_D.tmp = (unsigned char *)fullAmount + 4;
                 textSize = btchip_convert_hex_amount_to_displayable(amount);
-                os_memmove((void *)(fullAmount + textSize), " BTC", 4);
                 fullAmount[textSize + 4] = '\0';
+
+                // prepare fee display
+                strcpy(feesAmount, "BTC ");
+                btchip_context_D.tmp = (unsigned char *)feesAmount + 4;
+                textSize = btchip_convert_hex_amount_to_displayable(fees);
+                feesAmount[textSize + 4] = '\0';
                 break;
             }
         } else {
@@ -534,70 +1132,113 @@ error:
     return 0;
 }
 
-uint8_t btchip_bagl_confirm_full_output(unsigned int outputPos) {
-    uiDone = 0;
-    uiDoneAfterDraw = 0;
-    transactionVerified = 0;
+#define HASH_LENGTH 4
+uint8_t prepare_message_signature() {
+    unsigned char hash[32];
+    cx_hash(&btchip_context_D.transactionHashAuthorization.header, CX_LAST,
+            hash, 0, hash);
+    array_hexstr(addressSummary, hash, HASH_LENGTH / 2);
+    addressSummary[HASH_LENGTH / 2 * 2] = '.';
+    addressSummary[HASH_LENGTH / 2 * 2 + 1] = '.';
+    addressSummary[HASH_LENGTH / 2 * 2 + 2] = '.';
+    array_hexstr(addressSummary + HASH_LENGTH / 2 * 2 + 3,
+                 hash + 32 - HASH_LENGTH / 2, HASH_LENGTH / 2);
+    return 1;
+}
+
+// reset interface
+void btchip_bagl_idle(void) {
+    // here shall wait until all ui is displayed
+    // ui_idle();
+}
+
+unsigned int btchip_bagl_confirm_full_output(unsigned int outputPos) {
+    // TODO : remove when supporting multi output
+    if (btchip_context_D.transactionContext.consumeP2SH) {
+        if (os_seph_features() &
+            SEPROXYHAL_TAG_SESSION_START_EVENT_FEATURE_SCREEN_BIG) {
+            UX_DISPLAY(ui_verify_p2sh_blue, NULL);
+        } else {
+            // no preprocessing
+            UX_DISPLAY(ui_verify_p2sh_nanos, NULL);
+        }
+        return 1;
+    }
+
     if (!prepare_full_output(outputPos)) {
         return 0;
     }
-    btchip_ui_mode = BAGL_BTCHIP_VERIFY;
-    current_element = 0;
-    active_screen_element_count =
-        sizeof(bagl_ui_verify) / sizeof(bagl_element_t);
-    active_screen = (bagl_element_t *)bagl_ui_verify;
-    io_seproxyhal_display(&bagl_ui_erase_all[0]);
-    // Loop on the UI, general status will be sent when all components are
-    // displayed
-    while (!uiDone) {
-        unsigned int rx_len;
-        rx_len = io_seproxyhal_spi_recv(G_io_seproxyhal_spi_buffer,
-                                        sizeof(G_io_seproxyhal_spi_buffer), 0);
-        if ((rx_len - 3) != (unsigned int)U2(G_io_seproxyhal_spi_buffer[1],
-                                             G_io_seproxyhal_spi_buffer[2])) {
-            continue;
-        }
-        io_event(CHANNEL_SPI);
+
+    if (os_seph_features() &
+        SEPROXYHAL_TAG_SESSION_START_EVENT_FEATURE_SCREEN_BIG) {
+        UX_DISPLAY(ui_verify_blue, NULL);
+    } else {
+        ux_step = 0;
+        ux_step_count = 4;
+        UX_DISPLAY(ui_verify_nanos, ui_verify_prepro);
     }
-    return transactionVerified;
+    return 1;
 }
 
-void main_continue(void) {
-    // ensure exception will work as planned
-    os_boot();
+void btchip_bagl_confirm_message_signature() {
+    if (!prepare_message_signature()) {
+        return;
+    }
+    if (os_seph_features() &
+        SEPROXYHAL_TAG_SESSION_START_EVENT_FEATURE_SCREEN_BIG) {
+        UX_DISPLAY(ui_verify_message_signature_blue, NULL);
+    } else {
+        ux_step = 0;
+        ux_step_count = 2;
+        UX_DISPLAY(ui_verify_message_signature_nanos, ui_verify_message_prepro);
+    }
+}
 
-    BEGIN_TRY {
-        TRY {
-            io_seproxyhal_init();
-
-            screen_printf("ST31_APP booted.\n");
-
-            // fake the session start event
-            G_io_seproxyhal_spi_buffer[0] = SEPROXYHAL_TAG_SESSION_START_EVENT;
-            G_io_seproxyhal_spi_buffer[1] = 0;
-            G_io_seproxyhal_spi_buffer[2] = 1;
-            G_io_seproxyhal_spi_buffer[3] = 0;
-            io_event(CHANNEL_SPI);
-
-            btchip_context_init();
-
-            app_main();
+void app_exit(void) {
+    BEGIN_TRY_L(exit) {
+        TRY_L(exit) {
+            os_sched_exit(-1);
         }
-        CATCH_ALL {
-            for (;;)
-                ;
-        }
-        FINALLY {
+        FINALLY_L(exit) {
         }
     }
-    END_TRY;
+    END_TRY_L(exit);
 }
 
 __attribute__((section(".boot"))) int main(void) {
     // exit critical section
     __asm volatile("cpsie i");
 
-    main_continue();
+    // ensure exception will work as planned
+    os_boot();
+
+    UX_INIT();
+
+    BEGIN_TRY {
+        TRY {
+            io_seproxyhal_init();
+
+            btchip_context_init();
+
+            USB_power(1);
+
+#ifdef HAVE_BLE
+            BLE_power(1, "Ledger Wallet");
+#endif // HAVE_BLE
+
+            ui_idle();
+
+            app_main();
+        }
+        CATCH_ALL {
+            // exit :)
+        }
+        FINALLY {
+        }
+    }
+    END_TRY;
+
+    app_exit();
 
     return 0;
 }

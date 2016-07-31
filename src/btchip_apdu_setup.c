@@ -30,6 +30,8 @@ void btchip_autosetup() {
     unsigned char tmp[16];
     os_memset(&config, 0, sizeof(btchip_config_t));
     config.options |= BTCHIP_OPTION_DETERMINISTIC_SIGNATURE;
+    config.options |= BTCHIP_OPTION_SKIP_2FA_P2SH; // TODO : remove when
+                                                   // supporting multi output
     SB_SET(config.supportedModes, BTCHIP_MODE_WALLET);
     SB_SET(config.operationMode, BTCHIP_MODE_WALLET);
 #ifdef HAVE_DEFAULT_TESTNET

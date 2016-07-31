@@ -47,13 +47,9 @@ extern unsigned char const WIDE TWOPOWER[8];
 
 #define APDU_DEVELOPER_MODE_LENGTH 0
 
-#define APDU_BASE_LENGTH 14
+#define APDU_BASE_LENGTH 13
 
-#define DISPATCHER_APDUS                                                       \
-    APDU_BASE_LENGTH + APDU_DEBUG_LENGTH + APDU_NFCPAYMENT_LENGTH +            \
-        APDU_BIP70_LENGTH + APDU_MOFN_LENGTH + APDU_KEYCARD_LENGTH +           \
-        APDU_PORTABLE_LENGTH + APDU_KEYBOARD_LENGTH +                          \
-        APDU_LEGACY_SETUP_LENGTH + APDU_DEVELOPER_MODE_LENGTH
+#define DISPATCHER_APDUS 13
 
 typedef unsigned short (*WIDE apduProcessingFunction)(void);
 

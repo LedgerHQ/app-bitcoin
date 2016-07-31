@@ -30,6 +30,7 @@ void app_main(void) {
 
     // first exchange, no out length :) only wait the apdu
     btchip_context_D.outLength = 0;
+    btchip_context_D.io_flags = 0;
     for (;;) {
         unsigned char cla;
         unsigned char ins;
@@ -41,11 +42,19 @@ void app_main(void) {
 
         // receive the whole apdu using the 7 bytes headers (ledger transport)
         btchip_context_D.inLength =
-            io_exchange(CHANNEL_APDU | 0,
+            io_exchange(CHANNEL_APDU | btchip_context_D.io_flags,
                         // use the previous outlength as the reply
                         btchip_context_D.outLength);
+
+        // if was still waiting for a user action and receives a new apdu, then
+        // display back the idle screen
+        if (btchip_context_D.io_flags & IO_ASYNCH_REPLY) {
+            btchip_bagl_idle();
+        }
+
         // nothing to reply for now
         btchip_context_D.outLength = 0;
+        btchip_context_D.io_flags = 0;
 
         BEGIN_TRY {
             TRY {
