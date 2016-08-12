@@ -132,7 +132,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     keyLength,                                        // INLEN
                     transactionSummary->summarydata.changeAddress + 1 // OUT
                     );
-// Commit to persistent memory if necessary
+                // Commit to persistent memory if necessary
                 os_memmove(
                     btchip_context_D.tmpCtx.output.changeAddress,
                     transactionSummary->summarydata.changeAddress,

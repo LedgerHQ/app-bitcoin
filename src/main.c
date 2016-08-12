@@ -47,12 +47,6 @@ ux_state_t ux;
 // display stepped screens
 unsigned int ux_step;
 unsigned int ux_step_count;
-unsigned int ui_stepper_prepro(const bagl_element_t *element) {
-    if (element->component.userid > 0) {
-        return (ux_step == element->component.userid - 1);
-    }
-    return 1;
-}
 
 const unsigned char hex_digits[] = {'0', '1', '2', '3', '4', '5', '6', '7',
                                     '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};

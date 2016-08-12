@@ -192,7 +192,6 @@ struct btchip_context_s {
     // was previously in NVRAM
     btchip_transaction_summary_t transactionSummary;
 
-
     unsigned short hashedMessageLength;
 
     union {

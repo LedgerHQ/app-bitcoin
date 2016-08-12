@@ -18,6 +18,7 @@
 APPNAME = "Bitcoin"
 TARGET_ID = 0x31100002 #Nano S
 #TARGET_ID = 0x31000002 #Blue
+APP_LOAD_PARAMS=--appFlags 0x40 --path "" --curve secp256k1
 
 ################
 # Default rule #
@@ -76,8 +77,7 @@ CFLAGS_SHARED   += -Wno-unused-parameter -Wno-duplicate-decl-specifier
 CFLAGS_SHARED   += -fropi --target=armv6m-none-eabi
 #CFLAGS   += -finline-limit-0 -funsigned-bitfields 
 
-CFLAGS_NONOPT := -O0 $(CFLAGS_SHARED)
-CFLAGS_OPT := -O3 $(CFLAGS_SHARED)
+CFLAGS += -O3 -Os $(CFLAGS_SHARED)
 
 AS     := $(GCCPATH)/arm-none-eabi-gcc
 AFLAGS += -ggdb2 -O3 -Os -mcpu=cortex-m0 -fno-common -mtune=cortex-m0
@@ -96,7 +96,7 @@ LDFLAGS  += -fno-common -ffunction-sections -fdata-sections -fwhole-program -nos
 LDFLAGS  += -mno-unaligned-access
 #LDFLAGS  += -nodefaultlibs
 #LDFLAGS  += -nostdlib -nostdinc
-LDFLAGS  += -Tscript.ld  -Wl,--gc-sections -Wl,-Map,debug/$(PROG).map,--cref
+LDFLAGS  += -T$(BOLOS_SDK)/script.ld  -Wl,--gc-sections -Wl,-Map,debug/$(PROG).map,--cref
 LDLIBS   += -Wl,--library-path -Wl,$(GCCPATH)/../lib/armv6-m/
 #LDLIBS   += -Wl,--start-group 
 LDLIBS   += -lm -lgcc -lc 
@@ -127,16 +127,16 @@ log = $(if $(strip $(VERBOSE)),$1,@$1)
 default: prepare bin/$(PROG)
 
 load: 
-	python -m ledgerblue.loadApp --targetId $(TARGET_ID) --appFlags 0xC0 --fileName bin/$(PROG).hex --appName $(APPNAME) --icon `python $(BOLOS_SDK)/icon.py 16 16 icon.gif hexbitmaponly` --path "" --apilevel 4
+	python -m ledgerblue.loadApp --targetId $(TARGET_ID) --fileName bin/$(PROG).hex --appName $(APPNAME) --icon `python $(BOLOS_SDK)/icon.py 16 16 icon.gif hexbitmaponly` $(APP_LOAD_PARAMS)
 #--path "44'/0'"
 
 load_release:
-	python -m ledgerblue.loadApp --targetId $(TARGET_ID) --appFlags 0xC0 --fileName bin/$(PROG).hex --appName $(APPNAME) --icon `python $(BOLOS_SDK)/icon.py 16 16 icon.gif hexbitmaponly` --path "" --signature 30440220596b7da7e93d00e0d9df615ad2d8e0ff1bca590e1f2300529575ddcfbed3c5ae02207ee0e0f40d051ca0718c0304201dff14d2f88acecd1a2a4495ba09bf0717f8d3 --apilevel 4
+	python -m ledgerblue.loadApp --targetId $(TARGET_ID) --fileName bin/$(PROG).hex --appName $(APPNAME) --icon `python $(BOLOS_SDK)/icon.py 16 16 icon.gif hexbitmaponly` $(APP_LOAD_PARAMS) --signature 304402205b11da64c45e747c3b1a95c171b7c92a84104d9041d633cb502347b0b0251811022002c0010a041d9d5a6b024f4beaf2d095dd974fabafd9acd6918c6b49038a7cd4
 
 delete:
 	python -m ledgerblue.deleteApp --targetId $(TARGET_ID) --appName $(APPNAME)
 
-bin/$(PROG): $(OBJECT_FILES) script.ld
+bin/$(PROG): $(OBJECT_FILES) $(BOLOS_SDK)/script.ld
 	@echo "[LINK] 	$@"
 	$(call log,$(call link_cmdline,$(OBJECT_FILES) $(LDLIBS),$@))
 	$(call log,$(GCCPATH)/arm-none-eabi-objcopy -O ihex -S bin/$(PROG) bin/$(PROG).hex)
@@ -166,9 +166,7 @@ link_cmdline = $(LD) $(LDFLAGS) -o $(2) $(1)
 dep_cmdline = $(CC) -M $(CFLAGS) $(addprefix -D,$(2)) $(addprefix -I,$(1)) $(3) | sed 's/\($*\)\.o[ :]*/obj\/\1.o: /g' | sed -e 's/[:\t ][^ ]\+\.c//g' > dep/$(basename $(notdir $(4))).d 2>/dev/null
 
 # cc_cmdline(include,defines,src,dest)	Macro that is used to format arguments for the compiler
-cc_cmdline = $(CC) -c $(CFLAGS_NONOPT) $(addprefix -D,$(2)) $(addprefix -I,$(1)) -o $(4) $(3)
-
-cc_cmdline_opt = $(CC) -c $(CFLAGS_OPT) $(addprefix -D,$(2)) $(addprefix -I,$(1)) -o $(4) $(3)
+cc_cmdline = $(CC) -c $(CFLAGS) $(addprefix -D,$(2)) $(addprefix -I,$(1)) -o $(4) $(3)
 
 as_cmdline = $(AS) -c $(AFLAGS) $(addprefix -D,$(2)) $(addprefix -I,$(1)) -o $(4) $(3)
 
