@@ -18,7 +18,7 @@
 APPNAME = "Bitcoin"
 TARGET_ID = 0x31100002 #Nano S
 #TARGET_ID = 0x31000002 #Blue
-APP_LOAD_PARAMS=--appFlags 0x40 --path "" --curve secp256k1
+APP_LOAD_PARAMS=--appFlags 0x50 --path "" --curve secp256k1
 
 ################
 # Default rule #
