@@ -3,7 +3,7 @@
 #define __BTCHIP_BAGL_H__
 
 // btchip asking the UI
-unsigned int btchip_bagl_confirm_full_output(unsigned int outputPos);
+unsigned int btchip_bagl_confirm_full_output();
 
 // UI response to btchip to finish the exchange
 void btchip_bagl_user_action(unsigned char confirming);

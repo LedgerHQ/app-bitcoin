@@ -485,6 +485,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
         discardTransaction:
             btchip_context_D.transactionContext.transactionState =
                 BTCHIP_TRANSACTION_NONE;
+            btchip_context_D.outLength = 0;
         }
         FINALLY {
             btchip_apdu_hash_input_finalize_full_reset();
@@ -495,14 +496,16 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
 }
 
 unsigned short btchip_apdu_hash_input_finalize_full() {
-    unsigned char p2 = G_io_apdu_buffer[ISO_OFFSET_P2];
     unsigned short sw = btchip_apdu_hash_input_finalize_full_internal(
         &btchip_context_D.transactionSummary);
     if (btchip_context_D.io_flags & IO_ASYNCH_REPLY) {
         // if the UI reject the processing of the request, then reply
         // immediately
-        if (!btchip_bagl_confirm_full_output(p2)) {
+        if (!btchip_bagl_confirm_full_output()) {
             btchip_context_D.io_flags &= ~IO_ASYNCH_REPLY;
+            btchip_context_D.transactionContext.transactionState =
+                BTCHIP_TRANSACTION_NONE;
+            btchip_context_D.outLength = 0;
             sw = BTCHIP_SW_INCORRECT_DATA;
         }
     }

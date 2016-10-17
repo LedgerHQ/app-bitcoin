@@ -1043,20 +1043,21 @@ unsigned char io_event(unsigned char channel) {
     return 1;
 }
 
-uint8_t prepare_full_output(unsigned int outputPos) {
+uint8_t prepare_full_output() {
     unsigned int offset = 0;
     int numberOutputs;
     int i;
     unsigned int currentPos = 0;
     unsigned char amount[8], totalOutputAmount[8], fees[8];
     char tmp[100];
+    unsigned char outputPos = 0, changeFound = 0;
     if (btchip_context_D.transactionContext.consumeP2SH) {
         fullAmount[0] = '\0';
         feesAmount[0] = '\0';
         strcpy(addressSummary, "P2SH");
         return 1;
     }
-    // Parse output
+    // Parse output, locate the change output location
     os_memset(totalOutputAmount, 0, sizeof(totalOutputAmount));
     numberOutputs = btchip_context_D.currentOutput[offset++];
     if (numberOutputs > 3) {
@@ -1066,6 +1067,7 @@ uint8_t prepare_full_output(unsigned int outputPos) {
     for (i = 0; i < numberOutputs; i++) {
         unsigned char nullAmount = 1;
         unsigned int j;
+        unsigned char isOpReturn, isP2sh;
         for (j = 0; j < 8; j++) {
             if (btchip_context_D.currentOutput[offset + j] != 0) {
                 nullAmount = 0;
@@ -1075,16 +1077,39 @@ uint8_t prepare_full_output(unsigned int outputPos) {
         btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset, 8);
         transaction_amount_add_be(totalOutputAmount, totalOutputAmount, amount);
         offset += 8; // skip amount
+        isOpReturn = btchip_output_script_is_op_return(
+            btchip_context_D.currentOutput + offset);
+        isP2sh = btchip_output_script_is_p2sh(btchip_context_D.currentOutput +
+                                              offset);
         if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                              offset) &&
-            !btchip_output_script_is_p2sh(btchip_context_D.currentOutput +
-                                          offset) &&
-            !(nullAmount && btchip_output_script_is_op_return(
-                                btchip_context_D.currentOutput + offset))) {
+            !isP2sh && !(nullAmount && isOpReturn)) {
             screen_printf("Error : Unrecognized input script");
             goto error;
         }
+        if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {
+            unsigned char addressOffset =
+                (isP2sh ? OUTPUT_SCRIPT_P2SH_PRE_LENGTH
+                        : OUTPUT_SCRIPT_REGULAR_PRE_LENGTH);
+            if (os_memcmp(btchip_context_D.currentOutput + offset +
+                              addressOffset,
+                          btchip_context_D.tmpCtx.output.changeAddress + 1,
+                          20) == 0) {
+                if (changeFound) {
+                    screen_printf("Error : Multiple change output found");
+                    goto error;
+                }
+                changeFound = 1;
+            } else {
+                outputPos = currentPos;
+            }
+        }
         offset += 1 + btchip_context_D.currentOutput[offset];
+        currentPos++;
+    }
+    if (btchip_context_D.tmpCtx.output.changeInitialized && !changeFound) {
+        screen_printf("Error : change output not found");
+        goto error;
     }
     if (transaction_amount_sub_be(
             fees, btchip_context_D.transactionContext.transactionAmount,
@@ -1093,6 +1118,7 @@ uint8_t prepare_full_output(unsigned int outputPos) {
         goto error;
     }
     // Format validation message
+    currentPos = 0;
     offset = 1;
     btchip_context_D.tmp = (unsigned char *)tmp;
     for (i = 0; i < numberOutputs; i++) {
@@ -1185,7 +1211,7 @@ void btchip_bagl_idle(void) {
     // ui_idle();
 }
 
-unsigned int btchip_bagl_confirm_full_output(unsigned int outputPos) {
+unsigned int btchip_bagl_confirm_full_output() {
     // TODO : remove when supporting multi output
     if (btchip_context_D.transactionContext.consumeP2SH) {
         if (os_seph_features() &
@@ -1198,7 +1224,7 @@ unsigned int btchip_bagl_confirm_full_output(unsigned int outputPos) {
         return 1;
     }
 
-    if (!prepare_full_output(outputPos)) {
+    if (!prepare_full_output()) {
         return 0;
     }
 
