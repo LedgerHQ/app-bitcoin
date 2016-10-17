@@ -15,7 +15,6 @@
 #  limitations under the License.
 #*******************************************************************************
 
-APPNAME = "Bitcoin"
 TARGET_ID = 0x31100002 #Nano S
 #TARGET_ID = 0x31000002 #Blue
 APP_LOAD_PARAMS=--appFlags 0x50 --path "" --curve secp256k1
@@ -33,7 +32,7 @@ all: default
 .SUFFIXES:
 MAKEFLAGS += -r
 
-SHELL =       /bin/bash
+SHELL = /bin/bash
 #.ONESHELL:
 
 
@@ -44,8 +43,14 @@ PROG     := token
 
 CONFIG_PRODUCTIONS := bin/$(PROG)
 
+GLYPH_FILES := $(addprefix glyphs/,$(sort $(notdir $(shell find glyphs/))))
+GLYPH_DEST := src/glyphs.c
+$(GLYPH_DEST): $(GLYPH_FILES) $(BOLOS_SDK)/icon.py
+	-rm $@
+	if [ ! -z "$(GLYPH_FILES)" ] ; then for gif in $(GLYPH_FILES) ; do python $(BOLOS_SDK)/icon.py $$gif | grep -v "bitmap}," ; done > $(GLYPH_DEST) ; fi
+
 SOURCE_PATH   := src $(BOLOS_SDK)/src $(dir $(shell find $(BOLOS_SDK)/lib_stusb* | grep "\.c$$"))
-SOURCE_FILES  := $(foreach path, $(SOURCE_PATH),$(shell find $(path) | grep -E "\.c$$|\.s") )
+SOURCE_FILES  := $(foreach path, $(SOURCE_PATH),$(shell find $(path) | grep -E "\.c$$|\.s") ) $(GLYPH_DEST)
 INCLUDES_PATH := $(dir $(shell find $(BOLOS_SDK)/lib_stusb* | grep "\.h$$")) include src $(BOLOS_SDK)/include $(BOLOS_SDK)/include/arm
 
 ### platform definitions
@@ -55,7 +60,42 @@ DEFINES   += OS_IO_SEPROXYHAL IO_SEPROXYHAL_BUFFER_SIZE_B=300
 DEFINES   += HAVE_BAGL HAVE_PRINTF 
 DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=6 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
 
-DEFINES   += LEDGER_MAJOR_VERSION=1 LEDGER_MINOR_VERSION=0 LEDGER_PATCH_VERSION=0 TCS_LOADER_PATCH_VERSION=0
+DEFINES   += LEDGER_MAJOR_VERSION=1 LEDGER_MINOR_VERSION=1 LEDGER_PATCH_VERSION=0 TCS_LOADER_PATCH_VERSION=0
+
+ifndef COIN
+COIN = bitcoin
+endif
+
+ifeq ($(COIN), bitcoin-testnet)
+# Bitcoin testnet
+DEFINES  += BTCHIP_P2PKH_VERSION=111 BTCHIP_P2SH_VERSION=196 BTCHIP_COINID=\"Bitcoin\" BTCHIP_COINID_SHORT=\"TEST\" COIN_BITCOIN_TESTNET
+APPNAME ="Bitcoin"
+ICONNAME=icon_bitcoin.gif
+else ifeq ($(COIN), bitcoin)
+# Bitcoin mainnet
+DEFINES   += BTCHIP_P2PKH_VERSION=0 BTCHIP_P2SH_VERSION=5 BTCHIP_COINID=\"Bitcoin\" BTCHIP_COINID_SHORT=\"BTC\" COIN_BITCOIN
+APPNAME ="Bitcoin"
+ICONNAME=icon_bitcoin.gif
+SIGNATURE=3045022100d7a784ba23f5eac9c82a8c132274d62de921039ccd6cc6ac24614a35329d20ae0220759dc74de0b509608a0e0d82e0ae5d0a07028c7411bf7e3368e7fe290360b274
+else ifeq ($(COIN), litecoin)
+# Litecoin
+DEFINES   += BTCHIP_P2PKH_VERSION=48 BTCHIP_P2SH_VERSION=5 BTCHIP_COINID=\"Litecoin\" BTCHIP_COINID_SHORT=\"LTC\" COIN_LITECOIN
+APPNAME ="Litecoin"
+ICONNAME=icon_litecoin.gif
+SIGNATURE=3045022100f2b8109a13ac96dfd78403647bbb07e654579ea4b1b80b9bff7eb0ea5b083c6002204b1ae026ff40dbc19fcaef86e2d1d189241d7bc0d23ee95dc8718e84fe041f5d
+else ifeq ($(COIN), dogecoin)
+# Doge
+DEFINES   += BTCHIP_P2PKH_VERSION=30 BTCHIP_P2SH_VERSION=22 BTCHIP_COINID=\"Dogecoin\" BTCHIP_COINID_SHORT=\"DOGE\" COIN_DOGE
+APPNAME ="Dogecoin"
+ICONNAME=icon_doge.gif
+else ifeq ($(COIN), dash)
+# Dash
+DEFINES   += BTCHIP_P2PKH_VERSION=76 BTCHIP_P2SH_VERSION=16 BTCHIP_COINID=\"DarkCoin\" BTCHIP_COINID_SHORT=\"DASH\" COIN_DASH
+APPNAME ="Dash"
+ICONNAME=icon_dash.gif
+else
+$(error Unsupported COIN - use bitcoin-testnet, bitcoin, litecoin, dogecoin, dash) 
+endif
 
 ##############
 # Compiler #
@@ -114,9 +154,9 @@ ifeq ($(filter clean,$(MAKECMDGOALS)),)
 endif
 
 clean:
-	rm -fr obj bin debug dep
+	rm -fr obj bin debug dep $(GLYPH_DEST)
 
-prepare:
+prepare: $(GLYPH_DEST)
 	@mkdir -p bin obj debug dep
 
 .SECONDEXPANSION:
@@ -126,12 +166,11 @@ log = $(if $(strip $(VERBOSE)),$1,@$1)
 
 default: prepare bin/$(PROG)
 
-load: 
-	python -m ledgerblue.loadApp --targetId $(TARGET_ID) --fileName bin/$(PROG).hex --appName $(APPNAME) --icon `python $(BOLOS_SDK)/icon.py 16 16 icon.gif hexbitmaponly` $(APP_LOAD_PARAMS)
-#--path "44'/0'"
+load:
+	python -m ledgerblue.loadApp --targetId $(TARGET_ID) --fileName bin/$(PROG).hex --appName $(APPNAME) --icon `python $(BOLOS_SDK)/icon.py 16 16 $(ICONNAME) hexbitmaponly` $(APP_LOAD_PARAMS)
 
 load_release:
-	python -m ledgerblue.loadApp --targetId $(TARGET_ID) --fileName bin/$(PROG).hex --appName $(APPNAME) --icon `python $(BOLOS_SDK)/icon.py 16 16 icon.gif hexbitmaponly` $(APP_LOAD_PARAMS) --signature 304402205b11da64c45e747c3b1a95c171b7c92a84104d9041d633cb502347b0b0251811022002c0010a041d9d5a6b024f4beaf2d095dd974fabafd9acd6918c6b49038a7cd4
+	python -m ledgerblue.loadApp --targetId $(TARGET_ID) --fileName bin/$(PROG).hex --appName $(APPNAME) --icon `python $(BOLOS_SDK)/icon.py 16 16 $(ICONNAME) hexbitmaponly` $(APP_LOAD_PARAMS) --signature $(SIGNATURE)
 
 delete:
 	python -m ledgerblue.deleteApp --targetId $(TARGET_ID) --appName $(APPNAME)
