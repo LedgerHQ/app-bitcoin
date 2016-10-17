@@ -1051,6 +1051,11 @@ uint8_t prepare_full_output() {
     unsigned char amount[8], totalOutputAmount[8], fees[8];
     char tmp[100];
     unsigned char outputPos = 0, changeFound = 0;
+    if (btchip_context_D.transactionContext.relaxed &&
+        !btchip_context_D.transactionContext.consumeP2SH) {
+        screen_printf("Error : Mixed inputs");
+        goto error;
+    }
     if (btchip_context_D.transactionContext.consumeP2SH) {
         fullAmount[0] = '\0';
         feesAmount[0] = '\0';
