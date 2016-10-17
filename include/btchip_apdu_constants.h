@@ -58,6 +58,7 @@
 #define BTCHIP_INS_SET_USER_KEYCARD 0x10
 #define BTCHIP_INS_SETUP_SECURE_SCREEN 0x12
 #define BTCHIP_INS_SET_ALTERNATE_COIN_VER 0x14
+#define BTCHIP_INS_GET_COIN_VER 0x16
 
 #define BTCHIP_INS_STORE_TRUST_ROOT_BIP70 0x30
 #define BTCHIP_INS_CREATE_CERTIFICATE_BIP70 0x32
@@ -152,5 +153,6 @@ unsigned short btchip_apdu_get_random(void);
 unsigned short btchip_apdu_get_firmware_version(void);
 
 unsigned short btchip_apdu_set_alternate_coin_version(void);
+unsigned short btchip_apdu_get_coin_version(void);
 
 #endif

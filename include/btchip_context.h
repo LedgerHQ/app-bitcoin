@@ -24,6 +24,8 @@
 #include "btchip_filesystem_tx.h"
 
 #define MAX_OUTPUT_TO_CHECK 500
+#define MAX_COIN_ID 10
+#define MAX_SHORT_COIN_ID 4
 
 #define MAGIC_TRUSTED_INPUT 0x32
 #define MAGIC_DEV_KEY 0x01
@@ -143,6 +145,14 @@ struct btchip_context_s {
     unsigned char payToAddressVersion;
     /** Current Pay To Script Hash version */
     unsigned char payToScriptHashVersion;
+    /** Current Coin ID */
+    unsigned char coinId[MAX_COIN_ID];
+    /** Current short Coin ID */
+    unsigned char shortCoinId[MAX_SHORT_COIN_ID];
+    /** Current Coin ID length */
+    unsigned char coinIdLength;
+    /** Current short Coin ID length */
+    unsigned char shortCoinIdLength;
 
     /** Non protected transaction context */
 
@@ -191,6 +201,7 @@ struct btchip_context_s {
 
     // was previously in NVRAM
     btchip_transaction_summary_t transactionSummary;
+
 
     unsigned short hashedMessageLength;
 

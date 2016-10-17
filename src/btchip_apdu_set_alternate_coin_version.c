@@ -18,9 +18,25 @@
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
 
+#define P1_VERSION_ONLY 0x00
+#define P1_VERSION_COINID 0x01
+
 unsigned short btchip_apdu_set_alternate_coin_version() {
-    if (G_io_apdu_buffer[ISO_OFFSET_LC] != 0x02) {
-        return BTCHIP_SW_INCORRECT_LENGTH;
+    uint8_t offset = ISO_OFFSET_CDATA;
+    unsigned char p1 = G_io_apdu_buffer[ISO_OFFSET_P1];
+    if ((p1 != P1_VERSION_ONLY) && (p1 != P1_VERSION_COINID)) {
+        return BTCHIP_SW_INCORRECT_P1_P2;
+    }
+
+    if (p1 == P1_VERSION_ONLY) {
+        if (G_io_apdu_buffer[ISO_OFFSET_LC] != 0x02) {
+            return BTCHIP_SW_INCORRECT_LENGTH;
+        }
+    } else {
+        if (G_io_apdu_buffer[ISO_OFFSET_LC] >
+            4 + MAX_COIN_ID + MAX_SHORT_COIN_ID) {
+            return BTCHIP_SW_INCORRECT_LENGTH;
+        }
     }
 
     SB_CHECK(N_btchip.bkp.config.operationMode);
@@ -34,9 +50,23 @@ unsigned short btchip_apdu_set_alternate_coin_version() {
         return BTCHIP_SW_SECURITY_STATUS_NOT_SATISFIED;
     }
 
-    btchip_context_D.payToAddressVersion = G_io_apdu_buffer[ISO_OFFSET_CDATA];
-    btchip_context_D.payToScriptHashVersion =
-        G_io_apdu_buffer[ISO_OFFSET_CDATA + 1];
+    btchip_context_D.payToAddressVersion = G_io_apdu_buffer[offset++];
+    btchip_context_D.payToScriptHashVersion = G_io_apdu_buffer[offset++];
+    if (p1 == P1_VERSION_COINID) {
+        uint8_t coinIdLength = G_io_apdu_buffer[offset];
+        uint8_t shortCoinIdLength = G_io_apdu_buffer[offset + 1 + coinIdLength];
+        if ((coinIdLength > MAX_COIN_ID) ||
+            (shortCoinIdLength > MAX_SHORT_COIN_ID)) {
+            return BTCHIP_SW_INCORRECT_DATA;
+        }
+        os_memmove(btchip_context_D.coinId, G_io_apdu_buffer + offset + 1,
+                   coinIdLength);
+        btchip_context_D.coinIdLength = coinIdLength;
+        offset += 1 + coinIdLength;
+        os_memmove(btchip_context_D.shortCoinId, G_io_apdu_buffer + offset + 1,
+                   shortCoinIdLength);
+        btchip_context_D.shortCoinIdLength = shortCoinIdLength;
+    }
 
     return BTCHIP_SW_OK;
 }

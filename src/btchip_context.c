@@ -44,6 +44,14 @@ void btchip_context_init() {
             N_btchip.bkp.config.payToAddressVersion;
         btchip_context_D.payToScriptHashVersion =
             N_btchip.bkp.config.payToScriptHashVersion;
+        btchip_context_D.coinIdLength = N_btchip.bkp.config.coinIdLength;
+        os_memmove(btchip_context_D.coinId, N_btchip.bkp.config.coinId,
+                   N_btchip.bkp.config.coinIdLength);
+        btchip_context_D.shortCoinIdLength =
+            N_btchip.bkp.config.shortCoinIdLength;
+        os_memmove(btchip_context_D.shortCoinId,
+                   N_btchip.bkp.config.shortCoinId,
+                   N_btchip.bkp.config.shortCoinIdLength);
         SB_CHECK(N_btchip.bkp.config.operationMode);
     }
     if (!N_btchip.storageInitialized) {

@@ -144,7 +144,8 @@ const bagl_element_t ui_idle_nanos[] = {
      NULL,
      NULL},
 
-    {{BAGL_ICON, 0x01, 17, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+#ifdef COIN_BITCOIN
+    {{BAGL_ICON, 0x01, 12, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
       BAGL_GLYPH_ICON_BITCOIN_BADGE},
      NULL,
      0,
@@ -153,8 +154,9 @@ const bagl_element_t ui_idle_nanos[] = {
      NULL,
      NULL,
      NULL},
-    {{BAGL_LABELINE, 0x01, 38, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
-      BAGL_FONT_OPEN_SANS_REGULAR_11px, 0},
+#endif // COIN_BITCOIN
+    {{BAGL_LABELINE, 0x01, 33, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
      "Use wallet to",
      0,
      0,
@@ -162,8 +164,8 @@ const bagl_element_t ui_idle_nanos[] = {
      NULL,
      NULL,
      NULL},
-    {{BAGL_LABELINE, 0x01, 39, 26, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
-      BAGL_FONT_OPEN_SANS_REGULAR_11px, 0},
+    {{BAGL_LABELINE, 0x01, 34, 26, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
      "view accounts",
      0,
      0,
@@ -986,10 +988,38 @@ unsigned char io_event(unsigned char channel) {
 
     case SEPROXYHAL_TAG_DISPLAY_PROCESSED_EVENT:
         if (UX_DISPLAYED()) {
-            // TODO perform actions after all screen elements have been
-            // displayed
+        UX_DISPLAYED_:
+#ifdef COIN_LITECOIN
+            // extra elements per screen, only for idle screen
+            if (ux.elements == ui_idle_nanos && ui_idle_nanos_state == 0) {
+                // could be used to perform extra print after an array has been
+                // displayed
+                switch (ux.elements_count - ux.elements_current) {
+                case 0: {
+                    extern unsigned int const C_icon_litecoin_colors[];
+                    extern unsigned char const C_icon_litecoin_bitmap[];
+                    io_seproxyhal_display_bitmap(12, 9, 14, 14,
+                                                 C_icon_litecoin_colors, 1,
+                                                 C_icon_litecoin_bitmap);
+                    break;
+                }
+
+                // case 1: // next extra element
+                // case 2: // next next extra element ...
+
+                default:
+                    break;
+                }
+                ux.elements_current++;
+            }
+#endif // COIN_LITECOIN
+            ;
         } else {
             UX_DISPLAY_PROCESSED_EVENT();
+            // nothing displayed, then it's likely the end of the screen
+            if (!io_seproxyhal_spi_is_status_sent()) {
+                goto UX_DISPLAYED_;
+            }
         }
         break;
 
@@ -1101,18 +1131,27 @@ uint8_t prepare_full_output(unsigned int outputPos) {
                            4);
 
                 // Prepare amount
-                // TODO : match current coin version
 
-                strcpy(fullAmount, "BTC ");
-                btchip_context_D.tmp = (unsigned char *)fullAmount + 4;
+                os_memmove(fullAmount, btchip_context_D.shortCoinId,
+                           btchip_context_D.shortCoinIdLength);
+                fullAmount[btchip_context_D.shortCoinIdLength] = ' ';
+                btchip_context_D.tmp =
+                    (unsigned char *)(fullAmount +
+                                      btchip_context_D.shortCoinIdLength + 1);
                 textSize = btchip_convert_hex_amount_to_displayable(amount);
-                fullAmount[textSize + 4] = '\0';
+                fullAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
+                    '\0';
 
                 // prepare fee display
-                strcpy(feesAmount, "BTC ");
-                btchip_context_D.tmp = (unsigned char *)feesAmount + 4;
+                os_memmove(feesAmount, btchip_context_D.shortCoinId,
+                           btchip_context_D.shortCoinIdLength);
+                feesAmount[btchip_context_D.shortCoinIdLength] = ' ';
+                btchip_context_D.tmp =
+                    (unsigned char *)(feesAmount +
+                                      btchip_context_D.shortCoinIdLength + 1);
                 textSize = btchip_convert_hex_amount_to_displayable(fees);
-                feesAmount[textSize + 4] = '\0';
+                feesAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
+                    '\0';
                 break;
             }
         } else {

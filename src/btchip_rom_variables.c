@@ -40,9 +40,8 @@ unsigned char const BASE58ALPHABET[] = {
     'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'm',
     'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'};
 
-unsigned char const SIGNMAGIC[] = {0x18, 'B', 'i', 't', 'c', 'o', 'i', 'n', ' ',
-                                   'S',  'i', 'g', 'n', 'e', 'd', ' ', 'M', 'e',
-                                   's',  's', 'a', 'g', 'e', ':', '\n'};
+unsigned char const SIGNMAGIC[] = {' ', 'S', 'i', 'g', 'n', 'e', 'd', ' ', 'M',
+                                   'e', 's', 's', 'a', 'g', 'e', ':', '\n'};
 
 unsigned char const TWOPOWER[] = {0x01, 0x02, 0x04, 0x08,
                                   0x10, 0x20, 0x40, 0x80};
@@ -61,6 +60,7 @@ unsigned char const DISPATCHER_CLA[] = {
     BTCHIP_CLA, // btchip_apdu_get_random,
     BTCHIP_CLA, // btchip_apdu_get_firmware_version,
     BTCHIP_CLA, // btchip_apdu_set_alternate_coin_version
+    BTCHIP_CLA, // btchip_apdu_get_coin_version
 };
 
 unsigned char const DISPATCHER_INS[] = {
@@ -77,6 +77,7 @@ unsigned char const DISPATCHER_INS[] = {
     BTCHIP_INS_GET_RANDOM,               // btchip_apdu_get_random,
     BTCHIP_INS_GET_FIRMWARE_VERSION,     // btchip_apdu_get_firmware_version,
     BTCHIP_INS_SET_ALTERNATE_COIN_VER, // btchip_apdu_set_alternate_coin_version
+    BTCHIP_INS_GET_COIN_VER,           // btchip_apdu_get_coin_version
 };
 
 unsigned char const DISPATCHER_DATA_IN[] = {
@@ -93,6 +94,7 @@ unsigned char const DISPATCHER_DATA_IN[] = {
     0, // btchip_apdu_get_random,
     0, // btchip_apdu_get_firmware_version,
     1, // btchip_apdu_set_alternate_coin_version
+    0, // btchip_apdu_get_coin_version
 };
 
 apduProcessingFunction const DISPATCHER_FUNCTIONS[] = {
@@ -109,4 +111,5 @@ apduProcessingFunction const DISPATCHER_FUNCTIONS[] = {
     btchip_apdu_get_random,
     btchip_apdu_get_firmware_version,
     btchip_apdu_set_alternate_coin_version,
+    btchip_apdu_get_coin_version,
 };

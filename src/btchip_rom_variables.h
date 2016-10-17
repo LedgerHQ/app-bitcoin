@@ -17,7 +17,7 @@
 
 #include "btchip_internal.h"
 
-#define SIGNMAGIC_LENGTH 25
+#define SIGNMAGIC_LENGTH 17
 
 extern unsigned char const WIDE HEXDIGITS[16];
 extern unsigned char const WIDE BASE58TABLE[128];
@@ -49,7 +49,7 @@ extern unsigned char const WIDE TWOPOWER[8];
 
 #define APDU_BASE_LENGTH 13
 
-#define DISPATCHER_APDUS 13
+#define DISPATCHER_APDUS 14
 
 typedef unsigned short (*WIDE apduProcessingFunction)(void);
 
