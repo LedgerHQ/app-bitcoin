@@ -44,6 +44,7 @@ void btchip_context_init() {
             N_btchip.bkp.config.payToAddressVersion;
         btchip_context_D.payToScriptHashVersion =
             N_btchip.bkp.config.payToScriptHashVersion;
+        btchip_context_D.coinFamily = N_btchip.bkp.config.coinFamily;
         btchip_context_D.coinIdLength = N_btchip.bkp.config.coinIdLength;
         os_memmove(btchip_context_D.coinId, N_btchip.bkp.config.coinId,
                    N_btchip.bkp.config.coinIdLength);

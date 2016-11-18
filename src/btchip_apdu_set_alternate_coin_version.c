@@ -29,12 +29,12 @@ unsigned short btchip_apdu_set_alternate_coin_version() {
     }
 
     if (p1 == P1_VERSION_ONLY) {
-        if (G_io_apdu_buffer[ISO_OFFSET_LC] != 0x02) {
+        if (G_io_apdu_buffer[ISO_OFFSET_LC] != 0x05) {
             return BTCHIP_SW_INCORRECT_LENGTH;
         }
     } else {
         if (G_io_apdu_buffer[ISO_OFFSET_LC] >
-            4 + MAX_COIN_ID + MAX_SHORT_COIN_ID) {
+            7 + MAX_COIN_ID + MAX_SHORT_COIN_ID) {
             return BTCHIP_SW_INCORRECT_LENGTH;
         }
     }
@@ -50,8 +50,20 @@ unsigned short btchip_apdu_set_alternate_coin_version() {
         return BTCHIP_SW_SECURITY_STATUS_NOT_SATISFIED;
     }
 
-    btchip_context_D.payToAddressVersion = G_io_apdu_buffer[offset++];
-    btchip_context_D.payToScriptHashVersion = G_io_apdu_buffer[offset++];
+    switch (G_io_apdu_buffer[offset + 4]) {
+    case BTCHIP_FAMILY_BITCOIN:
+        break;
+    default:
+        return BTCHIP_SW_INCORRECT_DATA;
+    }
+
+    btchip_context_D.payToAddressVersion =
+        (G_io_apdu_buffer[offset] << 8) | (G_io_apdu_buffer[offset + 1]);
+    offset += 2;
+    btchip_context_D.payToScriptHashVersion =
+        (G_io_apdu_buffer[offset] << 8) | (G_io_apdu_buffer[offset + 1]);
+    offset += 2;
+    btchip_context_D.coinFamily = G_io_apdu_buffer[offset++];
     if (p1 == P1_VERSION_COINID) {
         uint8_t coinIdLength = G_io_apdu_buffer[offset];
         uint8_t shortCoinIdLength = G_io_apdu_buffer[offset + 1 + coinIdLength];

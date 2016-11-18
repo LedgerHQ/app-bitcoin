@@ -36,6 +36,7 @@ void btchip_autosetup() {
     SB_SET(config.operationMode, BTCHIP_MODE_WALLET);
     config.payToAddressVersion = BTCHIP_P2PKH_VERSION;
     config.payToScriptHashVersion = BTCHIP_P2SH_VERSION;
+    config.coinFamily = BTCHIP_COIN_FAMILY;
     config.coinIdLength = strlen(BTCHIP_COINID);
     os_memmove(config.coinId, BTCHIP_COINID, config.coinIdLength);
     config.shortCoinIdLength = strlen(BTCHIP_COINID_SHORT);

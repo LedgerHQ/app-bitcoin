@@ -31,12 +31,17 @@ enum btchip_supported_modes_e {
     BTCHIP_SUPPORTED_MODE_DEVELOPER = 0x08
 };
 
+enum btchip_family_e {
+    BTCHIP_FAMILY_BITCOIN = 0x01,
+};
+
 struct btchip_config_s {
     secu8 supportedModes;
     secu8 operationMode;
     unsigned char options;
-    unsigned char payToAddressVersion;
-    unsigned char payToScriptHashVersion;
+    unsigned short payToAddressVersion;
+    unsigned short payToScriptHashVersion;
+    unsigned char coinFamily;
     /** Current Coin ID */
     unsigned char coinId[MAX_COIN_ID];
     /** Current short Coin ID */

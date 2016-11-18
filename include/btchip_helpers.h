@@ -49,7 +49,7 @@ void btchip_public_key_hash160(unsigned char WIDE *in, unsigned short inlen,
                                unsigned char *out);
 unsigned short btchip_public_key_to_encoded_base58(
     unsigned char WIDE *in, unsigned short inlen, unsigned char *out,
-    unsigned short outlen, unsigned char version, unsigned char alreadyHashed);
+    unsigned short outlen, unsigned short version, unsigned char alreadyHashed);
 
 unsigned short btchip_decode_base58_address(unsigned char WIDE *in,
                                             unsigned short inlen,
@@ -72,8 +72,6 @@ void btchip_signverify_finalhash(void WIDE *keyContext, unsigned char sign,
 
 void btchip_transaction_add_output(unsigned char *hash160Address,
                                    unsigned char *amount, unsigned char p2sh);
-unsigned char btchip_address_isP2SH(unsigned char version);
-unsigned char btchip_address_isValid(unsigned char version);
 unsigned char btchip_rng_u8_modulo(unsigned char modulo);
 unsigned char btchip_secure_memcmp(const void WIDE *buf1, const void WIDE *buf2,
                                    unsigned short length);

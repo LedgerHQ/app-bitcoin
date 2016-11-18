@@ -146,28 +146,35 @@ void btchip_public_key_hash160(unsigned char WIDE *in, unsigned short inlen,
 
 unsigned short btchip_public_key_to_encoded_base58(
     unsigned char WIDE *in, unsigned short inlen, unsigned char *out,
-    unsigned short outlen, unsigned char version, unsigned char alreadyHashed) {
-    unsigned char tmpBuffer[25];
+    unsigned short outlen, unsigned short version,
+    unsigned char alreadyHashed) {
+    unsigned char tmpBuffer[26];
     unsigned char checksumBuffer[32];
     cx_sha256_t hash;
+    unsigned char versionSize = (version > 255 ? 2 : 1);
 
     if (!alreadyHashed) {
         L_DEBUG_BUF(("To hash\n", in, inlen));
-        btchip_public_key_hash160(in, inlen, tmpBuffer + 1);
-        L_DEBUG_BUF(("Hash160\n", (tmpBuffer + 1), 20));
-        tmpBuffer[0] = version;
+        btchip_public_key_hash160(in, inlen, tmpBuffer + versionSize);
+        L_DEBUG_BUF(("Hash160\n", (tmpBuffer + versionSize), 20));
+        if (version > 255) {
+            tmpBuffer[0] = (version >> 8);
+            tmpBuffer[1] = version;
+        } else {
+            tmpBuffer[0] = version;
+        }
     } else {
-        os_memmove(tmpBuffer, in, 21);
+        os_memmove(tmpBuffer, in, 20 + versionSize);
     }
 
     cx_sha256_init(&hash);
-    cx_hash(&hash.header, CX_LAST, tmpBuffer, 21, checksumBuffer);
+    cx_hash(&hash.header, CX_LAST, tmpBuffer, 20 + versionSize, checksumBuffer);
     cx_sha256_init(&hash);
     cx_hash(&hash.header, CX_LAST, checksumBuffer, 32, checksumBuffer);
 
     L_DEBUG_BUF(("Checksum\n", checksumBuffer, 4));
-    os_memmove(tmpBuffer + 21, checksumBuffer, 4);
-    return btchip_encode_base58(tmpBuffer, sizeof(tmpBuffer), out, outlen);
+    os_memmove(tmpBuffer + 20 + versionSize, checksumBuffer, 4);
+    return btchip_encode_base58(tmpBuffer, 24 + versionSize, out, outlen);
 }
 
 void btchip_swap_bytes(unsigned char *target, unsigned char *source,
@@ -244,16 +251,6 @@ void btchip_transaction_add_output(unsigned char *hash160Address,
     btchip_context_D.tmp += 20;
     os_memmove(btchip_context_D.tmp, (void *)post, sizePost);
     btchip_context_D.tmp += sizePost;
-}
-
-unsigned char btchip_address_isP2SH(unsigned char version) {
-    return ((btchip_context_D.payToScriptHashVersion != 0) &&
-            (version == btchip_context_D.payToScriptHashVersion));
-}
-
-unsigned char btchip_address_isValid(unsigned char version) {
-    return ((version == btchip_context_D.payToAddressVersion) ||
-            btchip_address_isP2SH(version));
 }
 
 void btchip_signverify_finalhash(void WIDE *keyContext, unsigned char sign,

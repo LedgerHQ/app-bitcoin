@@ -989,18 +989,42 @@ unsigned char io_event(unsigned char channel) {
     case SEPROXYHAL_TAG_DISPLAY_PROCESSED_EVENT:
         if (UX_DISPLAYED()) {
         UX_DISPLAYED_:
-#ifdef COIN_LITECOIN
+#if defined(COIN_LITECOIN) || defined(COIN_DASH) || defined(COIN_DOGE) ||      \
+    defined(COIN_ZCASH) 
             // extra elements per screen, only for idle screen
             if (ux.elements == ui_idle_nanos && ui_idle_nanos_state == 0) {
                 // could be used to perform extra print after an array has been
                 // displayed
                 switch (ux.elements_count - ux.elements_current) {
                 case 0: {
+#ifdef COIN_LITECOIN
                     extern unsigned int const C_icon_litecoin_colors[];
                     extern unsigned char const C_icon_litecoin_bitmap[];
                     io_seproxyhal_display_bitmap(12, 9, 14, 14,
                                                  C_icon_litecoin_colors, 1,
                                                  C_icon_litecoin_bitmap);
+#endif
+#ifdef COIN_DOGE
+                    extern unsigned int const C_icon_doge_colors[];
+                    extern unsigned char const C_icon_doge_bitmap[];
+                    io_seproxyhal_display_bitmap(12, 9, 14, 14,
+                                                 C_icon_doge_colors, 1,
+                                                 C_icon_doge_bitmap);
+#endif
+#ifdef COIN_ZCASH
+                    extern unsigned int const C_icon_zcash_colors[];
+                    extern unsigned char const C_icon_zcash_bitmap[];
+                    io_seproxyhal_display_bitmap(12, 9, 14, 14,
+                                                 C_icon_zcash_colors, 1,
+                                                 C_icon_zcash_bitmap);
+#endif
+#ifdef COIN_DASH
+                    extern unsigned int const C_icon_dash_colors[];
+                    extern unsigned char const C_icon_dash_bitmap[];
+                    io_seproxyhal_display_bitmap(12, 9, 14, 14,
+                                                 C_icon_dash_colors, 1,
+                                                 C_icon_dash_bitmap);
+#endif
                     break;
                 }
 
@@ -1012,7 +1036,7 @@ unsigned char io_event(unsigned char channel) {
                 }
                 ux.elements_current++;
             }
-#endif // COIN_LITECOIN
+#endif // COIN_LITECOIN || COIN_DASH || COIN_DOGE || COIN_ZCASH 
             ;
         } else {
             UX_DISPLAY_PROCESSED_EVENT();
@@ -1129,25 +1153,36 @@ uint8_t prepare_full_output() {
     for (i = 0; i < numberOutputs; i++) {
         if (!btchip_output_script_is_op_return(btchip_context_D.currentOutput +
                                                offset + 8)) {
+            unsigned char versionSize;
             int addressOffset;
-            unsigned char address[21];
+            unsigned char address[22];
+            unsigned short version;
             btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset,
                               8);
             offset += 8;
             if (btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                                 offset)) {
                 addressOffset = offset + 4;
-                address[0] = N_btchip.bkp.config.payToAddressVersion;
+                version = btchip_context_D.payToAddressVersion;
             } else {
                 addressOffset = offset + 3;
-                address[0] = N_btchip.bkp.config.payToScriptHashVersion;
+                version = btchip_context_D.payToScriptHashVersion;
             }
-            os_memmove(address + 1,
+            if (version > 255) {
+                versionSize = 2;
+                address[0] = (version >> 8);
+                address[1] = version;
+            } else {
+                versionSize = 1;
+                address[0] = version;
+            }
+            os_memmove(address + versionSize,
                        btchip_context_D.currentOutput + addressOffset, 20);
             if (currentPos == outputPos) {
                 unsigned short textSize;
                 textSize = btchip_public_key_to_encoded_base58(
-                    address, 21, (unsigned char *)tmp, sizeof(tmp), 0, 1);
+                    address, 20 + versionSize, (unsigned char *)tmp,
+                    sizeof(tmp), version, 1);
                 tmp[textSize] = '\0';
                 // Prepare address
                 os_memmove((void *)address1, tmp, 18);

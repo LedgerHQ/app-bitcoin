@@ -142,9 +142,11 @@ struct btchip_context_s {
     btchip_transaction_context_t transactionContext;
 
     /** Current Pay To Address version */
-    unsigned char payToAddressVersion;
+    unsigned short payToAddressVersion;
     /** Current Pay To Script Hash version */
-    unsigned char payToScriptHashVersion;
+    unsigned short payToScriptHashVersion;
+    /** Current coin family */
+    unsigned char coinFamily;
     /** Current Coin ID */
     unsigned char coinId[MAX_COIN_ID];
     /** Current short Coin ID */
@@ -201,7 +203,6 @@ struct btchip_context_s {
 
     // was previously in NVRAM
     btchip_transaction_summary_t transactionSummary;
-
 
     unsigned short hashedMessageLength;
 
