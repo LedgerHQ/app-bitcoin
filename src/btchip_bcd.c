@@ -30,6 +30,7 @@ btchip_convert_hex_amount_to_displayable(unsigned char WIDE *amount) {
     unsigned char j;
     unsigned char nscratch = SCRATCH_SIZE;
     unsigned char smin = nscratch - 2;
+    unsigned char comma = 0;
 
     for (i = 0; i < SCRATCH_SIZE; i++) {
         scratch[i] = 0;
@@ -66,7 +67,6 @@ btchip_convert_hex_amount_to_displayable(unsigned char WIDE *amount) {
     if (targetOffset == 0) {
         btchip_context_D.tmp[targetOffset++] = '0';
     }
-    btchip_context_D.tmp[targetOffset++] = '.';
     workOffset = offset;
     for (i = 0; i < 8; i++) {
         unsigned char allZero = 1;
@@ -80,10 +80,11 @@ btchip_convert_hex_amount_to_displayable(unsigned char WIDE *amount) {
         if (allZero) {
             break;
         }
+        if (!comma) {
+            btchip_context_D.tmp[targetOffset++] = '.';
+            comma = 1;
+        }
         btchip_context_D.tmp[targetOffset++] = scratch[offset++] + '0';
-    }
-    if (targetOffset == 2) {
-        targetOffset--; // only 0
     }
     return targetOffset;
 }
