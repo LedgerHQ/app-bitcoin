@@ -66,6 +66,8 @@ typedef struct btchip_storage_s {
     unsigned char config_valid;
     btchip_backup_area_t bkp;
 
+    unsigned char fidoTransport;
+
 } btchip_storage_t;
 
 // the global nvram memory variable

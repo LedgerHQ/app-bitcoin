@@ -253,6 +253,7 @@ void btchip_transaction_add_output(unsigned char *hash160Address,
     btchip_context_D.tmp += sizePost;
 }
 
+
 void btchip_signverify_finalhash(void WIDE *keyContext, unsigned char sign,
                                  unsigned char WIDE *in, unsigned short inlen,
                                  unsigned char *out, unsigned short outlen,

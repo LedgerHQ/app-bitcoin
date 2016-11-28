@@ -25,6 +25,19 @@
 
 #include "btchip_bagl_extensions.h"
 
+#ifdef HAVE_U2F
+
+#include "u2f_service.h"
+#include "u2f_transport.h"
+
+volatile unsigned char u2fMessageBuffer[U2F_MAX_MESSAGE_SIZE];
+
+extern void USB_power_U2F(unsigned char enabled, unsigned char fido);
+extern bool fidoActivated;
+volatile uint8_t fidoTransport;
+
+#endif
+
 unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 
 volatile char fullAmount[20];     // full amount
@@ -33,6 +46,21 @@ volatile char addressSummary[20]; // beginning of the output address ... end of
 volatile char feesAmount[20];     // fees
 volatile char address1[20];       // full first part of the output address
 volatile char address2[20];       // full last part of the output address
+
+#ifdef HAVE_U2F
+
+volatile u2f_service_t u2fService;
+
+void u2f_proxy_response(u2f_service_t *service, unsigned int tx) {
+    os_memset(service->messageBuffer, 0, 5);
+    os_memmove(service->messageBuffer + 5, G_io_apdu_buffer, tx);
+    service->messageBuffer[tx + 5] = 0x90;
+    service->messageBuffer[tx + 6] = 0x00;
+    u2f_send_fragmented_response(service, U2F_CMD_MSG, service->messageBuffer,
+                                 tx + 7, true);
+}
+
+#endif
 
 unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_verify_ok(const bagl_element_t *e);
@@ -183,7 +211,38 @@ const bagl_element_t ui_idle_nanos[] = {
      NULL,
      NULL},
 
-    {{BAGL_ICON, 0x02, 29, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+    // NO! //{{BAGL_LABELINE                       , 0x02,  34,   3, 128,  32,
+    // 0, 0, 0        , 0xFFFFFF, 0x000000, BAGL_FONT_OPEN_SANS_REGULAR_11px, 0
+    // }, "view accounts", 0, 0, 0, NULL, NULL, NULL },
+    {{BAGL_LABELINE, 0x02, 0, 19, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Settings",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_ICON, 0x02, 3, 14, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_UP},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_ICON, 0x02, 118, 14, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_DOWN},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_ICON, 0x03, 29, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
       BAGL_GLYPH_ICON_DASHBOARD_BADGE},
      NULL,
      0,
@@ -196,9 +255,85 @@ const bagl_element_t ui_idle_nanos[] = {
     //, 0xFFFFFF, 0x000000,
     //BAGL_FONT_OPEN_SANS_REGULAR_11px|BAGL_FONT_ALIGNMENT_CENTER, 0  }, "view
     //accounts", 0, 0, 0, NULL, NULL, NULL },
-    {{BAGL_LABELINE, 0x02, 50, 19, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+    {{BAGL_LABELINE, 0x03, 50, 19, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
      "Quit app",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_ICON, 0x03, 3, 14, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_UP},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+};
+
+unsigned int ui_idle_nanos_button(unsigned int button_mask,
+                                  unsigned int button_mask_counter);
+
+unsigned int ui_idle_nanos_state;
+unsigned int ui_idle_nanos_prepro(const bagl_element_t *element) {
+    if (element->component.userid > 0) {
+        return (ui_idle_nanos_state == element->component.userid - 1);
+    }
+    return 1;
+}
+
+#ifdef HAVE_U2F
+
+const bagl_element_t ui_settings_nanos[] = {
+    // type                               userid    x    y   w    h  str rad
+    // fill      fg        bg      fid iid  txt   touchparams...       ]
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x01, 0, 19, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Browser support",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    //{{BAGL_ICON                           , 0x01,   3,  14,   7,   4, 0, 0, 0
+    //, 0xFFFFFF, 0x000000, 0,
+    //BAGL_GLYPH_ICON_UP   }, NULL, 0, 0, 0, NULL, NULL, NULL },
+    {{BAGL_ICON, 0x01, 118, 14, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_DOWN},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_ICON, 0x12, 29, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x02, 61, 19, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
+     "Back",
      0,
      0,
      0,
@@ -215,16 +350,109 @@ const bagl_element_t ui_idle_nanos[] = {
      NULL,
      NULL},
 };
-unsigned int ui_idle_nanos_button(unsigned int button_mask,
-                                  unsigned int button_mask_counter);
 
-unsigned int ui_idle_nanos_state;
-unsigned int ui_idle_nanos_prepro(const bagl_element_t *element) {
+unsigned int ui_settings_nanos_button(unsigned int button_mask,
+                                      unsigned int button_mask_counter);
+
+unsigned int ui_settings_nanos_state;
+unsigned int ui_settings_nanos_prepro(const bagl_element_t *element) {
     if (element->component.userid > 0) {
-        return (ui_idle_nanos_state == element->component.userid - 1);
+        unsigned char displayed = (ui_settings_nanos_state ==
+                                   ((element->component.userid - 1) & 0x0F));
+        // display custom icon for
+        if (displayed && (element->component.userid == 0x13 ||
+                          element->component.userid == 0x12)) {
+            extern unsigned int const C_icon_back_colors[];
+            extern unsigned char const C_icon_back_bitmap[];
+            io_seproxyhal_display_bitmap(40, 9, 14, 14, C_icon_back_colors, 1,
+                                         C_icon_back_bitmap);
+            // superseded
+            return 0;
+        }
+        return displayed;
     }
     return 1;
 }
+
+const bagl_element_t ui_settings_fido_nanos[] = {
+    // erase
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x01, 35, 19, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_REGULAR_11px, 0},
+     "Enable",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_ICON, 0x02, 76, 11, 16, 10, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_TOGGLE_ON},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_ICON, 0x03, 76, 11, 16, 10, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_TOGGLE_OFF},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    // icons
+    {{BAGL_ICON, 0x00, 3, 12, 7, 7, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CROSS},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_ICON, 0x00, 117, 13, 8, 6, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CHECK},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+};
+unsigned int ui_settings_fido_nanos_button(unsigned int button_mask,
+                                           unsigned int button_mask_counter);
+
+unsigned int ui_settings_fido_nanos_prepro(const bagl_element_t *element) {
+    unsigned int display = 1;
+    switch (element->component.userid) {
+    case 0x02:
+        display = fidoTransport;
+        break;
+    case 0x03:
+        display = !fidoTransport;
+        break;
+    }
+    return display;
+}
+
+#endif
 
 bagl_element_t const ui_verify_blue[] = {
     {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 480, 0, 0, BAGL_FILL, 0xf9f9f9, 0xf9f9f9,
@@ -842,27 +1070,99 @@ unsigned int ui_idle_nanos_button(unsigned int button_mask,
                                   unsigned int button_mask_counter) {
     switch (button_mask) {
     case BUTTON_EVT_RELEASED | BUTTON_LEFT: // UP
-        if (ui_idle_nanos_state == 1) {
-            ui_idle_nanos_state = 0;
+        if (ui_idle_nanos_state != 0) {
+            ui_idle_nanos_state--;
+#ifndef HAVE_U2F
+            if (ui_idle_nanos_state == 1) {
+                ui_idle_nanos_state--;
+            }
+#endif
             UX_DISPLAY(ui_idle_nanos, ui_idle_nanos_prepro);
         }
         break;
 
     case BUTTON_EVT_RELEASED | BUTTON_RIGHT: // DOWN
-        if (ui_idle_nanos_state == 0) {
-            ui_idle_nanos_state = 1;
+        if (ui_idle_nanos_state != 2) {
+            ui_idle_nanos_state++;
+#ifndef HAVE_U2F
+            if (ui_idle_nanos_state == 1) {
+                ui_idle_nanos_state++;
+            }
+#endif
             UX_DISPLAY(ui_idle_nanos, ui_idle_nanos_prepro);
         }
         break;
 
-    case BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT: // EXIT
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT: // Settings, EXIT
+#ifdef HAVE_U2F
         if (ui_idle_nanos_state == 1) {
+            ui_settings_nanos_state = 0;
+            UX_DISPLAY(ui_settings_nanos, ui_settings_nanos_prepro);
+        } else
+#endif
+            if (ui_idle_nanos_state == 2) {
             io_seproxyhal_touch_exit(NULL);
         }
         break;
     }
     return 0;
 }
+
+#ifdef HAVE_U2F
+
+unsigned int ui_settings_nanos_button(unsigned int button_mask,
+                                      unsigned int button_mask_counter) {
+    switch (button_mask) {
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT: // UP
+        if (ui_settings_nanos_state != 0) {
+            ui_settings_nanos_state--;
+            UX_DISPLAY(ui_settings_nanos, ui_settings_nanos_prepro);
+        }
+        break;
+
+    case BUTTON_EVT_RELEASED | BUTTON_RIGHT: // DOWN
+        if (ui_settings_nanos_state != 1) {
+            ui_settings_nanos_state++;
+            UX_DISPLAY(ui_settings_nanos, ui_settings_nanos_prepro);
+        }
+        break;
+
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT: // Settings, EXIT
+        if (ui_settings_nanos_state == 0) {
+            fidoTransport = N_btchip.fidoTransport;
+            UX_DISPLAY(ui_settings_fido_nanos, ui_settings_fido_nanos_prepro);
+        } else if (ui_settings_nanos_state == 1) {
+            UX_DISPLAY(ui_idle_nanos, ui_idle_nanos_prepro);
+        }
+        break;
+    }
+    return 0;
+}
+
+unsigned int ui_settings_fido_nanos_button(unsigned int button_mask,
+                                           unsigned int button_mask_counter) {
+    switch (button_mask) {
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT:
+        fidoTransport = 0x00;
+        goto set;
+    case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
+        fidoTransport = 0x01;
+    set:
+        if (N_btchip.fidoTransport != fidoTransport) {
+            nvm_write(&N_btchip.fidoTransport, (void *)&fidoTransport,
+                      sizeof(uint8_t));
+            USB_power_U2F(0, 0);
+            USB_power_U2F(1, N_btchip.fidoTransport);
+        }
+    // no break is intentional
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT:
+        UX_DISPLAY(ui_settings_nanos, ui_settings_nanos_prepro);
+        break;
+    }
+    return 0;
+}
+
+#endif
 
 unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e) {
     // user denied the transaction, tell the USB side
@@ -1039,10 +1339,15 @@ unsigned char io_event(unsigned char channel) {
 #endif // COIN_LITECOIN || COIN_DASH || COIN_DOGE || COIN_ZCASH 
             ;
         } else {
-            UX_DISPLAY_PROCESSED_EVENT();
-            // nothing displayed, then it's likely the end of the screen
-            if (!io_seproxyhal_spi_is_status_sent()) {
-                goto UX_DISPLAYED_;
+            while (ux.elements && ux.elements_current < ux.elements_count &&
+                   !io_seproxyhal_spi_is_status_sent()) {
+                if (!ux.elements_preprocessor ||
+                    ux.elements_preprocessor(
+                        &ux.elements[ux.elements_current])) {
+                    io_seproxyhal_display(&ux.elements[ux.elements_current++]);
+                    break;
+                }
+                ux.elements_current++;
             }
         }
         break;
@@ -1319,7 +1624,18 @@ __attribute__((section(".boot"))) int main(void) {
 
             btchip_context_init();
 
-            USB_power(1);
+#ifdef HAVE_U2F
+            os_memset((unsigned char *)&u2fService, 0, sizeof(u2fService));
+            u2fService.inputBuffer = G_io_apdu_buffer;
+            u2fService.outputBuffer = G_io_apdu_buffer;
+            u2fService.messageBuffer = (uint8_t *)u2fMessageBuffer;
+            u2fService.messageBufferSize = U2F_MAX_MESSAGE_SIZE;
+            u2f_initialize_service((u2f_service_t *)&u2fService);
+
+            USB_power_U2F(1, N_btchip.fidoTransport);
+#else
+            USB_power_U2F(1, 0);
+#endif
 
 #ifdef HAVE_BLE
             BLE_power(1, "Ledger Wallet");

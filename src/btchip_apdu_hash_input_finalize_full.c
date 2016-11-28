@@ -22,6 +22,17 @@
 #include "btchip_apdu_constants.h"
 #include "btchip_bagl_extensions.h"
 
+#ifdef HAVE_U2F
+
+#include "u2f_service.h"
+#include "u2f_transport.h"
+
+extern bool fidoActivated;
+extern volatile u2f_service_t u2fService;
+void u2f_proxy_response(u2f_service_t *service, unsigned int tx);
+
+#endif
+
 #define FINALIZE_P1_MORE 0x00
 #define FINALIZE_P1_LAST 0x80
 #define FINALIZE_P1_CHANGEINFO 0xFF
@@ -132,7 +143,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     keyLength,                                        // INLEN
                     transactionSummary->summarydata.changeAddress + 1 // OUT
                     );
-                // Commit to persistent memory if necessary
+// Commit to persistent memory if necessary
                 os_memmove(
                     btchip_context_D.tmpCtx.output.changeAddress,
                     transactionSummary->summarydata.changeAddress,
@@ -545,5 +556,15 @@ void btchip_bagl_user_action(unsigned char confirming) {
     // we've finished the processing of the input
     btchip_apdu_hash_input_finalize_full_reset();
 
+#ifdef HAVE_U2F
+    if (fidoActivated) {
+        u2f_proxy_response((u2f_service_t *)&u2fService,
+                           btchip_context_D.outLength);
+    } else {
+        io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX,
+                    btchip_context_D.outLength);
+    }
+#else
     io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, btchip_context_D.outLength);
+#endif
 }

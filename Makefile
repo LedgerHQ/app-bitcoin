@@ -60,7 +60,7 @@ DEFINES   += OS_IO_SEPROXYHAL IO_SEPROXYHAL_BUFFER_SIZE_B=300
 DEFINES   += HAVE_BAGL HAVE_PRINTF 
 DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=6 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
 
-DEFINES   += LEDGER_MAJOR_VERSION=1 LEDGER_MINOR_VERSION=1 LEDGER_PATCH_VERSION=1 TCS_LOADER_PATCH_VERSION=0
+DEFINES   += LEDGER_MAJOR_VERSION=1 LEDGER_MINOR_VERSION=1 LEDGER_PATCH_VERSION=2 TCS_LOADER_PATCH_VERSION=0
 
 ifndef COIN
 COIN = bitcoin
@@ -141,7 +141,7 @@ LDFLAGS  += -fno-common -ffunction-sections -fdata-sections -fwhole-program -nos
 LDFLAGS  += -mno-unaligned-access
 #LDFLAGS  += -nodefaultlibs
 #LDFLAGS  += -nostdlib -nostdinc
-LDFLAGS  += -T$(BOLOS_SDK)/script.ld  -Wl,--gc-sections -Wl,-Map,debug/$(PROG).map,--cref
+LDFLAGS  += -Tscript.ld  -Wl,--gc-sections -Wl,-Map,debug/$(PROG).map,--cref
 LDLIBS   += -Wl,--library-path -Wl,$(GCCPATH)/../lib/armv6-m/
 #LDLIBS   += -Wl,--start-group 
 LDLIBS   += -lm -lgcc -lc 
@@ -180,7 +180,7 @@ load_release:
 delete:
 	python -m ledgerblue.deleteApp --targetId $(TARGET_ID) --appName $(APPNAME)
 
-bin/$(PROG): $(OBJECT_FILES) $(BOLOS_SDK)/script.ld
+bin/$(PROG): $(OBJECT_FILES) script.ld
 	@echo "[LINK] 	$@"
 	$(call log,$(call link_cmdline,$(OBJECT_FILES) $(LDLIBS),$@))
 	$(call log,$(GCCPATH)/arm-none-eabi-objcopy -O ihex -S bin/$(PROG) bin/$(PROG).hex)
