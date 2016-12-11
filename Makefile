@@ -102,6 +102,16 @@ else
 $(error Unsupported COIN - use bitcoin-testnet, bitcoin, litecoin, dogecoin, dash, zcash) 
 endif
 
+# U2F
+DEFINES   += HAVE_U2F
+DEFINES   += USB_SEGMENT_SIZE=64
+DEFINES   += BLE_SEGMENT_SIZE=32 #max MTU, min 20
+#DEFINES   += U2F_MAX_MESSAGE_SIZE=264 #257+5+2
+DEFINES    += U2F_MAX_MESSAGE_SIZE=200
+DEFINES   += UNUSED\(x\)=\(void\)x
+DEFINES   += PRINTF\(...\)=
+DEFINES   += TARGET_ID=$(TARGET_ID)
+
 ##############
 # Compiler #
 ##############
