@@ -1349,6 +1349,10 @@ unsigned char io_event(unsigned char channel) {
                 }
                 ux.elements_current++;
             }
+            // nothing displayed, then it's likely the end of the screen
+            if (!io_seproxyhal_spi_is_status_sent()) {
+                goto UX_DISPLAYED_;
+            }                    
         }
         break;
 
