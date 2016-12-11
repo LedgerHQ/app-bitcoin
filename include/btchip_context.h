@@ -68,13 +68,15 @@ enum btchip_transaction_state_e {
     BTCHIP_TRANSACTION_OUTPUT_HASHING_IN_PROGRESS_OUTPUT_SCRIPT = 0x05,
     /** Transaction defined, output hashing done, pending finalization */
     BTCHIP_TRANSACTION_OUTPUT_HASHING_DONE = 0x06,
+    /** Extra data present */
+    BTCHIP_TRANSACTION_PROCESS_EXTRA = 0x07,
     /** Transaction parsed */
-    BTCHIP_TRANSACTION_PARSED = 0x07,
+    BTCHIP_TRANSACTION_PARSED = 0x08,
     /** Transaction parsed, ready to prepare for signature after validating the
        user outputs */
-    BTCHIP_TRANSACTION_PRESIGN_READY = 0x08,
+    BTCHIP_TRANSACTION_PRESIGN_READY = 0x09,
     /** Transaction fully parsed, ready to be signed */
-    BTCHIP_TRANSACTION_SIGN_READY = 0x09,
+    BTCHIP_TRANSACTION_SIGN_READY = 0x0a,
 };
 typedef enum btchip_transaction_state_e btchip_transaction_state_t;
 
@@ -203,7 +205,6 @@ struct btchip_context_s {
 
     // was previously in NVRAM
     btchip_transaction_summary_t transactionSummary;
-
 
     unsigned short hashedMessageLength;
 

@@ -741,10 +741,52 @@ void transaction_parse(unsigned char parseMode) {
                     // Locktime
                     check_transaction_available(4);
                     transaction_offset_increase(4);
-                    btchip_context_D.transactionContext.transactionState =
-                        BTCHIP_TRANSACTION_PARSED;
 
-                    // no break is intentional
+                    if (btchip_context_D.transactionDataRemaining == 0) {
+                        btchip_context_D.transactionContext.transactionState =
+                            BTCHIP_TRANSACTION_PARSED;
+                        continue;
+                    } else {
+                        btchip_context_D.transactionHashOption = 0;
+                        btchip_context_D.transactionContext.scriptRemaining =
+                            transaction_get_varint();
+                        btchip_context_D.transactionHashOption =
+                            TRANSACTION_HASH_FULL;
+                        btchip_context_D.transactionContext.transactionState =
+                            BTCHIP_TRANSACTION_PROCESS_EXTRA;
+                        continue;
+                    }
+                }
+
+                case BTCHIP_TRANSACTION_PROCESS_EXTRA: {
+                    unsigned char dataAvailable;
+
+                    if (btchip_context_D.transactionContext.scriptRemaining ==
+                        0) {
+                        btchip_context_D.transactionContext.transactionState =
+                            BTCHIP_TRANSACTION_PARSED;
+                        continue;
+                    }
+
+                    if (btchip_context_D.transactionDataRemaining < 1) {
+                        // No more data to read, ok
+                        goto ok;
+                    }
+
+                    dataAvailable =
+                        (btchip_context_D.transactionDataRemaining >
+                                 btchip_context_D.transactionContext
+                                     .scriptRemaining
+                             ? btchip_context_D.transactionContext
+                                   .scriptRemaining
+                             : btchip_context_D.transactionDataRemaining);
+                    if (dataAvailable == 0) {
+                        goto ok;
+                    }
+                    transaction_offset_increase(dataAvailable);
+                    btchip_context_D.transactionContext.scriptRemaining -=
+                        dataAvailable;
+                    break;
                 }
 
                 case BTCHIP_TRANSACTION_PARSED: {
