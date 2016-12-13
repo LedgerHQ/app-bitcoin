@@ -23,6 +23,8 @@ var LedgerBtc = function(timeout) {
 	this.comm = new Ledger3("BTC", timeout);
 }
 
+// Libraries
+
 LedgerBtc.splitPath = function(path) {
 	var result = [];
 	var components = path.split('/');
@@ -37,6 +39,53 @@ LedgerBtc.splitPath = function(path) {
 		result.push(number);
 	});
 	return result;
+}
+
+
+LedgerBtc.foreach = function (arr, callback) {
+	var deferred = Q.defer();
+	var iterate = function (index, array, result) {
+		if (index >= array.length) {
+			deferred.resolve(result);
+			return ;
+		}
+		callback(array[index], index).then(function (res) {
+			result.push(res);
+			iterate(index + 1, array, result);
+		}).fail(function (ex) {
+			deferred.reject(ex);
+		}).done();
+	};
+	iterate(0, arr, []);
+	return deferred.promise;
+}
+
+LedgerBtc.doIf = function(condition, callback) {
+	var deferred = Q.defer();
+	if (condition) {
+		deferred.resolve(callback())
+	} else {
+		deferred.resolve();
+	}
+	return deferred.promise;
+}
+
+LedgerBtc.asyncWhile = function(condition, callback) {
+	var deferred = Q.defer();
+	var iterate = function (result) {
+		if (!condition()) {
+			deferred.resolve(result);
+			return ;
+		}
+		callback().then(function (res) {
+			result.push(res);
+			iterate(result);
+		}).fail(function (ex) {
+			deferred.reject(ex);
+		}).done();
+	};
+	iterate([]);
+	return deferred.promise;
 }
 
 LedgerBtc.prototype.getWalletPublicKey_async = function(path) {
@@ -193,10 +242,10 @@ LedgerBtc.prototype.startUntrustedHashTransactionInputRaw_async = function (newT
 		return this.comm.exchange(buffer.toString('hex'), [0x9000]);
 }
 
-LedgerBtc.prototype.startUntrustedHashTransactionInput_async = function (newTransaction, transaction, trustedInputs) {
+LedgerBtc.prototype.startUntrustedHashTransactionInput_async = function (newTransaction, transaction, inputs) {
 	var currentObject = this;
 	var data = Buffer.concat([transaction['version'],
-		   											currentObject.createVarint(transaction['inputs'].length)]);
+	currentObject.createVarint(transaction['inputs'].length)]);
 	var deferred = Q.defer();
 	currentObject.startUntrustedHashTransactionInputRaw_async(newTransaction, true, data).then(function (result) {
 		var i = 0;
@@ -205,19 +254,48 @@ LedgerBtc.prototype.startUntrustedHashTransactionInput_async = function (newTran
 			function (input, finishedCallback) {
 				var inputKey;
 				// TODO : segwit
-				var prefix = Buffer.alloc(2);
-				prefix[0] = 0x01;
-				prefix[1] = trustedInputs[i].length;		
-				data = Buffer.concat([prefix, trustedInputs[i], currentObject.createVarint(input['script'].length)]);
+				var prefix;
+				if (inputs[i]['trustedInput']) {
+					prefix = Buffer.alloc(2);
+					prefix[0] = 0x01;
+					prefix[1] = inputs[i]['value'].length;		
+				}
+				else {
+					prefix = Buffer.alloc(1);
+					prefix[0] = 0x00;
+				}
+				data = Buffer.concat([prefix, inputs[i]['value'], currentObject.createVarint(input['script'].length)]);
 				currentObject.startUntrustedHashTransactionInputRaw_async(newTransaction, false, data).then(function (result) {
-					data = Buffer.concat([input['script'], input['sequence']]);
-					currentObject.startUntrustedHashTransactionInputRaw_async(newTransaction, false, data).then(function (result) {
-						// TODO notify progress
-						i++;
-						finishedCallback();
-					}).fail(function (err) {
-						deferred.reject(err);
-					});
+
+					var scriptBlocks = [];
+					var offset = 0;
+					if (input['script'].length == 0) {
+						scriptBlocks.push(input['sequence']);						
+					}
+					else {
+						while (offset != input['script'].length) {
+							var blockSize = (input['script'].length - offset > LedgerBtc.MAX_SCRIPT_BLOCK ? 
+								LedgerBtc.MAX_SCRIPT_BLOCK : input['script'].length - offset);
+							if ((offset + blockSize) != input['script'].length) {
+								scriptBlocks.push(input['script'].slice(offset, offset + blockSize));
+							}
+							else {
+								scriptBlocks.push(Buffer.concat([input['script'].slice(offset, offset + blockSize), input['sequence']]));
+							}
+							offset += blockSize;
+						}
+					}
+					async.eachSeries(
+						scriptBlocks,
+						function(scriptBlock, blockFinishedCallback) {
+							currentObject.startUntrustedHashTransactionInputRaw_async(newTransaction, false, scriptBlock).then(function (result) {
+							blockFinishedCallback();
+							}).fail(function (err) { deferred.reject(err); });
+						},
+						function(finished) {          	  		
+							finishedCallback();
+						}
+					);
 				}).fail(function (err) {
 					deferred.reject(err);
 				});
@@ -250,43 +328,24 @@ LedgerBtc.prototype.provideOutputFullChangePath_async = function(path) {
 }
 
 LedgerBtc.prototype.hashOutputFull_async = function(outputScript) {
-        var offset = 0;
-        var self = this;
+	var offset = 0;
+	var self = this;
 
-        return asyncWhile(function () {return offset < outputScript.length;}, function () {
-            var blockSize = ((offset + LedgerBtc.MAX_SCRIPT_BLOCK) >= outputScript.length ? outputScript.length - offset : LedgerBtc.MAX_SCRIPT_BLOCK);
-            var p1 = ((offset + blockSize) == outputScript.length ? 0x80 : 0x00);
-            var prefix = Buffer.alloc(5);
-            prefix[0] = 0xe0;
-            prefix[1] = 0x4a;
-            prefix[2] = p1;
-            prefix[3] = 0x00;
-            prefix[4] = blockSize;
-            var data = Buffer.concat([prefix, outputScript.slice(offset, offset + blockSize)]);
-            return self.comm.exchange(data.toString('hex'), [0x9000]).then(function(data) {
-							offset += blockSize;
-            });
-        });
-
-        // Library
-        function asyncWhile(condition, callback) {
-            var deferred = Q.defer();
-            var iterate = function (result) {
-                if (!condition()) {
-                    deferred.resolve(result);
-                    return ;
-                }
-                callback().then(function (res) {
-                    result.push(res);
-                    iterate(result);
-                }).fail(function (ex) {
-                    deferred.reject(ex);
-                }).done();
-            };
-            iterate([]);
-            return deferred.promise;
-        }
-    },
+	return LedgerBtc.asyncWhile(function () {return offset < outputScript.length;}, function () {
+		var blockSize = ((offset + LedgerBtc.MAX_SCRIPT_BLOCK) >= outputScript.length ? outputScript.length - offset : LedgerBtc.MAX_SCRIPT_BLOCK);
+		var p1 = ((offset + blockSize) == outputScript.length ? 0x80 : 0x00);
+		var prefix = Buffer.alloc(5);
+		prefix[0] = 0xe0;
+		prefix[1] = 0x4a;
+		prefix[2] = p1;
+		prefix[3] = 0x00;
+		prefix[4] = blockSize;
+		var data = Buffer.concat([prefix, outputScript.slice(offset, offset + blockSize)]);
+		return self.comm.exchange(data.toString('hex'), [0x9000]).then(function(data) {
+			offset += blockSize;
+		});
+	});
+}
 
 LedgerBtc.prototype.signTransaction_async = function (path, lockTime, sigHashType) {
 	if (typeof lockTime == "undefined") {
@@ -346,11 +405,14 @@ LedgerBtc.prototype.createPaymentTransactionNew_async = function(inputs, associa
 
 	var deferred = Q.defer();
 
-	foreach(inputs, function (input, i) {
-		return doIf(!resuming, function () {
+	LedgerBtc.foreach(inputs, function (input, i) {
+		return LedgerBtc.doIf(!resuming, function () {
 			return self.getTrustedInput_async(input[1], input[0])
 				.then(function (trustedInput) {
-						trustedInputs.push(Buffer.from(trustedInput, 'hex'));
+						var inputItem = {};
+						inputItem['trustedInput'] = true;
+						inputItem['value'] = Buffer.from(trustedInput, 'hex');
+						trustedInputs.push(inputItem);
 				});
 		}).then(function () {
 			regularOutputs.push(input[0].outputs[input[1]]);
@@ -376,9 +438,9 @@ LedgerBtc.prototype.createPaymentTransactionNew_async = function(inputs, associa
 			targetTransaction['inputs'].push(tmpInput);
 		}
 	}).then(function () {
-		return doIf(!resuming, function () {
+		return LedgerBtc.doIf(!resuming, function () {
 			// Collect public keys
-			return foreach(inputs, function (input, i) {
+			return LedgerBtc.foreach(inputs, function (input, i) {
 				return self.getWalletPublicKey_async(associatedKeysets[i]).then(function (p) {
 					return p;
 				});
@@ -389,17 +451,17 @@ LedgerBtc.prototype.createPaymentTransactionNew_async = function(inputs, associa
 			});
 		})
 	}).then(function () {
-		return foreach(inputs, function (input, i) {
+		return LedgerBtc.foreach(inputs, function (input, i) {
 			var usedScript;
 			if ((inputs[i].length >= 3) && (typeof inputs[i][2] != "undefined")) {
-				usedScript = inputs[i][2];
+				usedScript = Buffer.from(inputs[i][2], 'hex');
 			}
 			else {
 				usedScript = regularOutputs[i]['script'];
 			}
 			targetTransaction['inputs'][i]['script'] = usedScript;
 			return self.startUntrustedHashTransactionInput_async(firstRun, targetTransaction, trustedInputs).then(function () {
-				return doIf(!resuming && (typeof changePath != "undefined"), function () {
+				return LedgerBtc.doIf(!resuming && (typeof changePath != "undefined"), function () {
 					return self.provideOutputFullChangePath_async(changePath);
 				}).then (function () {
 					return self.hashOutputFull_async(outputScript);
@@ -422,7 +484,7 @@ LedgerBtc.prototype.createPaymentTransactionNew_async = function(inputs, associa
 			signatureSize[0] = signatures[i].length;
 			keySize[0] = publicKeys[i].length;
 			targetTransaction['inputs'][i]['script'] = Buffer.concat([signatureSize, signatures[i], keySize, publicKeys[i]]);
-			targetTransaction['inputs'][i]['prevout'] = trustedInputs[i].slice(4, 4 + 0x24);
+			targetTransaction['inputs'][i]['prevout'] = trustedInputs[i]['value'].slice(4, 4 + 0x24);
 		}
 
 		var lockTimeBuffer = Buffer.alloc(4);
@@ -443,39 +505,101 @@ LedgerBtc.prototype.createPaymentTransactionNew_async = function(inputs, associa
 	});
 
 	return deferred.promise;
-
-	// Library
-	function foreach(arr, callback) {
-		var deferred = Q.defer();
-		var iterate = function (index, array, result) {
-			if (index >= array.length) {
-				deferred.resolve(result);
-				return ;
-			}
-			callback(array[index], index).then(function (res) {
-				result.push(res);
-				iterate(index + 1, array, result);
-			}).fail(function (ex) {
-				deferred.reject(ex);
-			}).done();
-		};
-		iterate(0, arr, []);
-		return deferred.promise;
-	}
-
-	function doIf(condition, callback) {
-		var deferred = Q.defer();
-		if (condition) {
-			deferred.resolve(callback())
-		} else {
-			deferred.resolve();
-		}
-		return deferred.promise;
-	}
 }
 
-// startP2SHUntrustedHashTransactionInput_async
-// 
+LedgerBtc.prototype.signP2SHTransaction_async = function(inputs, associatedKeysets, outputScript, lockTime, sigHashType) {
+	// Inputs are provided as arrays of [transaction, output_index, redeem script, optional sequence]
+	// associatedKeysets are provided as arrays of [path]	
+	var nullScript = Buffer.alloc(0);
+	var defaultVersion = Buffer.alloc(4);	
+	defaultVersion.writeUInt32LE(1, 0);
+	var trustedInputs = [];
+	var regularOutputs = [];
+	var signatures = [];
+	var publicKeys = [];
+	var firstRun = true;
+	var resuming = false;
+	var self = this;
+	var targetTransaction = {};
+
+	outputScript = Buffer.from(outputScript, 'hex');
+
+	if (typeof lockTime == "undefined") {
+		lockTime = LedgerBtc.DEFAULT_LOCKTIME;
+	}
+	if (typeof sigHashType == "undefined") {
+		sigHashType = LedgerBtc.SIGHASH_ALL;
+	}	
+
+	var deferred = Q.defer();
+
+	LedgerBtc.foreach(inputs, function (input, i) {
+		return LedgerBtc.doIf(!resuming, function () {
+			return self.getTrustedInput_async(input[1], input[0])
+				.then(function (trustedInput) {
+						var inputItem = {};
+						inputItem['trustedInput'] = false;
+						inputItem['value'] = Buffer.from(trustedInput, 'hex').slice(4, 4 + 0x24);
+						trustedInputs.push(inputItem);
+				});
+		}).then(function () {
+			regularOutputs.push(input[0].outputs[input[1]]);
+		});
+	}).then(function () {
+		// Pre-build the target transaction
+		targetTransaction['version'] = defaultVersion;
+		targetTransaction['inputs'] = [];
+
+		for (var i = 0; i < inputs.length; i++) {
+			var tmpInput = {};
+			var tmp = Buffer.alloc(4);
+			var sequence;
+			if ((inputs[i].length >= 4) && (typeof inputs[i][3] != "undefined")) {                
+				sequence = inputs[i][3];
+			}
+			else {
+				sequence = LedgerBtc.DEFAULT_SEQUENCE;
+			}
+			tmp.writeUInt32LE(sequence, 0);
+			tmpInput['script'] = nullScript;
+			tmpInput['sequence'] = tmp;
+			targetTransaction['inputs'].push(tmpInput);
+		}
+	}).then(function () {
+		return LedgerBtc.foreach(inputs, function (input, i) {
+			var usedScript;
+			if ((inputs[i].length >= 3) && (typeof inputs[i][2] != "undefined")) {
+				usedScript = Buffer.from(inputs[i][2], 'hex');
+			}
+			else {
+				usedScript = regularOutputs[i]['script'];
+			}
+			targetTransaction['inputs'][i]['script'] = usedScript;
+			return self.startUntrustedHashTransactionInput_async(firstRun, targetTransaction, trustedInputs).then(function () {
+					return self.hashOutputFull_async(outputScript);
+				}).then (function (resultHash) {
+					return self.signTransaction_async(associatedKeysets[i], lockTime, sigHashType).then(function (signature) {
+						signatures.push(signature.slice(0, signature.length - 1).toString('hex'));
+						targetTransaction['inputs'][i]['script'] = nullScript;
+						if (firstRun) {
+							firstRun = false;
+						}
+					});
+				});
+		});
+	}).then(function () {
+		// Return the signatures
+		return signatures;
+	}).fail(function (failure) {
+		throw failure;
+	}).then(function (result) {
+		deferred.resolve(result);
+	}).fail(function (error) {
+		deferred.reject(error);
+	});
+
+	return deferred.promise;
+}
 
 
 LedgerBtc.prototype.compressPublicKey = function (publicKey) {
