@@ -106,12 +106,6 @@ void app_main(void) {
                         // use the previous outlength as the reply
                         btchip_context_D.outLength);
 
-        // if was still waiting for a user action and receives a new apdu, then
-        // display back the idle screen
-        if (btchip_context_D.io_flags & IO_ASYNCH_REPLY) {
-            btchip_bagl_idle();
-        }
-
         app_dispatch();
 
         // reply during reception of next apdu

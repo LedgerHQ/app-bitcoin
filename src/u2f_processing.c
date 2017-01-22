@@ -73,7 +73,6 @@ static const uint8_t PROXY_MAGIC[] = {'B', 'T', 'C'};
 
 static const uint8_t DUMMY_USER_PRESENCE[] = {SIGN_USER_PRESENCE_MASK};
 
-
 void u2f_handle_enroll(u2f_service_t *service, uint8_t p1, uint8_t p2,
                        uint8_t *buffer, uint16_t length) {
     (void)p1;
@@ -126,8 +125,6 @@ void u2f_handle_sign(u2f_service_t *service, uint8_t p1, uint8_t p2,
     app_dispatch();
     if ((btchip_context_D.io_flags & IO_ASYNCH_REPLY) == 0) {
         u2f_proxy_response(service, btchip_context_D.outLength);
-    } else {
-        btchip_bagl_idle();
     }
 }
 

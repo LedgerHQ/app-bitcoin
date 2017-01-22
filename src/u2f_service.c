@@ -142,5 +142,4 @@ void u2f_continue_sending_fragmented_response(u2f_service_t *service) {
     }
 }
 
-
 #endif

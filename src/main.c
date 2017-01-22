@@ -25,6 +25,11 @@
 
 #include "btchip_bagl_extensions.h"
 
+#include "glyphs.h"
+
+#define __NAME3(a, b, c) a##b##c
+#define NAME3(a, b, c) __NAME3(a, b, c)
+
 #ifdef HAVE_U2F
 
 #include "u2f_service.h"
@@ -38,14 +43,53 @@ volatile uint8_t fidoTransport;
 
 #endif
 
+bagl_element_t tmp_element;
+
 unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 
-volatile char fullAmount[20];     // full amount
+#define BAGL_FONT_OPEN_SANS_LIGHT_16_22PX_AVG_WIDTH 10
+#define BAGL_FONT_OPEN_SANS_REGULAR_10_13PX_AVG_WIDTH 8
+#define MAX_CHAR_PER_LINE 25
+
+#define COLOR_BG_1 0xF9F9F9
+#define COLOR_APP COLOR_HDR      // bitcoin 0xFCB653
+#define COLOR_APP_LIGHT COLOR_DB // bitcoin 0xFEDBA9
+
+#if TARGET_ID == 0x31000002
+
+volatile char fullAmount[40]; // full amount
+volatile char fullAddress[65];
+volatile char addressSummary[40]; // beginning of the output address ... end of
+                                  // the address
+volatile char feesAmount[40];     // fees
+
+#else
+
+volatile char fullAmount[20]; // full amount
+volatile char fullAddress[20];
 volatile char addressSummary[20]; // beginning of the output address ... end of
                                   // the address
 volatile char feesAmount[20];     // fees
-volatile char address1[20];       // full first part of the output address
-volatile char address2[20];       // full last part of the output address
+
+#endif
+
+unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e);
+unsigned int io_seproxyhal_touch_verify_ok(const bagl_element_t *e);
+unsigned int
+io_seproxyhal_touch_message_signature_verify_cancel(const bagl_element_t *e);
+unsigned int
+io_seproxyhal_touch_message_signature_verify_ok(const bagl_element_t *e);
+unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e);
+void ui_idle(void);
+
+ux_state_t ux;
+
+// display stepped screens
+unsigned int ux_step;
+unsigned int ux_step_count;
+
+const unsigned char hex_digits[] = {'0', '1', '2', '3', '4', '5', '6', '7',
+                                    '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
 #ifdef HAVE_U2F
 
@@ -62,23 +106,6 @@ void u2f_proxy_response(u2f_service_t *service, unsigned int tx) {
 
 #endif
 
-unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e);
-unsigned int io_seproxyhal_touch_verify_ok(const bagl_element_t *e);
-unsigned int
-io_seproxyhal_touch_message_signature_verify_cancel(const bagl_element_t *e);
-unsigned int
-io_seproxyhal_touch_message_signature_verify_ok(const bagl_element_t *e);
-unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e);
-
-ux_state_t ux;
-
-// display stepped screens
-unsigned int ux_step;
-unsigned int ux_step_count;
-
-const unsigned char hex_digits[] = {'0', '1', '2', '3', '4', '5', '6', '7',
-                                    '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
-
 void array_hexstr(char *strbuf, const void *bin, unsigned int len) {
     while (len--) {
         *strbuf++ = hex_digits[((*((char *)bin)) >> 4) & 0xF];
@@ -88,9 +115,25 @@ void array_hexstr(char *strbuf, const void *bin, unsigned int len) {
     *strbuf = 0; // EOS
 }
 
-static const bagl_element_t const ui_idle_blue[] = {
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 480, 0, 0, BAGL_FILL, 0xf9f9f9, 0xf9f9f9,
-      0, 0},
+const bagl_element_t *ui_menu_item_out_over(const bagl_element_t *e) {
+    // the selection rectangle is after the none|touchable
+    e = (const bagl_element_t *)(((unsigned int)e) + sizeof(bagl_element_t));
+    return e;
+}
+
+#if TARGET_ID == 0x31000002
+const bagl_icon_details_t ui_blue_gif = {
+    .bpp = NAME3(GLYPH_badge_, COINID, _BPP),
+    .colors = NAME3(C_badge_, COINID, _colors),
+    .bitmap = NAME3(C_badge_, COINID, _bitmap),
+};
+
+unsigned int io_seproxyhal_touch_settings(const bagl_element_t *e);
+const bagl_element_t ui_idle_blue[] = {
+    // type                               userid    x    y   w    h  str rad
+    // fill      fg        bg      fid iid  txt   touchparams...       ]
+    {{BAGL_RECTANGLE, 0x00, 0, 68, 320, 413, 0, 0, BAGL_FILL, COLOR_BG_1,
+      0x000000, 0, 0},
      NULL,
      0,
      0,
@@ -99,20 +142,10 @@ static const bagl_element_t const ui_idle_blue[] = {
      NULL,
      NULL},
 
-    // type                                 id    x    y    w    h    s  r  fill
-    // fg        bg        font icon   text, out, over, touch
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 60, 0, 0, BAGL_FILL, 0x1d2028, 0x1d2028,
-      0, 0},
+    // erase screen (only under the status bar)
+    {{BAGL_RECTANGLE, 0x00, 0, 20, 320, 48, 0, 0, BAGL_FILL, COLOR_APP,
+      COLOR_APP, 0, 0},
      NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABEL, 0x00, 20, 0, 320, 60, 0, 0, BAGL_FILL, 0xFFFFFF, 0x1d2028,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_MIDDLE, 0},
-     "Ledger Blue",
      0,
      0,
      0,
@@ -120,45 +153,102 @@ static const bagl_element_t const ui_idle_blue[] = {
      NULL,
      NULL},
 
-    {{BAGL_LABEL, 0x00, 0, 90, 320, 32, 0, 0, 0, 0x000000, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "$DEVICENAME",
+    /// TOP STATUS BAR
+    {{BAGL_LABELINE, 0x00, 0, 45, 320, 30, 0, 0, BAGL_FILL, 0xFFFFFF, COLOR_APP,
+      BAGL_FONT_OPEN_SANS_SEMIBOLD_10_13PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     COINID_UPCASE,
      0,
      0,
      0,
      NULL,
      NULL,
      NULL},
-    {{BAGL_LABEL, 0x00, 0, 150, 320, 32, 0, 0, 0, 0x000000, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "Ready",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    {{BAGL_BUTTON | BAGL_FLAG_TOUCHABLE, 0x00, 165, 225, 120, 40, 0, 6,
-      BAGL_FILL, 0x41ccb4, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER |
+#ifdef HAVE_U2F
+    {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 0, 19, 56, 44, 0, 0,
+      BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT,
+      BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_CENTER |
           BAGL_FONT_ALIGNMENT_MIDDLE,
       0},
-     "EXIT",
+     BAGL_FONT_SYMBOLS_0_SETTINGS,
      0,
-     0x37ae99,
-     0xF9F9F9,
+     COLOR_APP,
+     0xFFFFFF,
+     io_seproxyhal_touch_settings,
+     NULL,
+     NULL},
+#endif
+    {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 264, 19, 56, 44, 0, 0,
+      BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT,
+      BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_CENTER |
+          BAGL_FONT_ALIGNMENT_MIDDLE,
+      0},
+     BAGL_FONT_SYMBOLS_0_DASHBOARD,
+     0,
+     COLOR_APP,
+     0xFFFFFF,
      io_seproxyhal_touch_exit,
      NULL,
      NULL},
 
+    // BADGE_<COINID>.GIF
+    {{BAGL_ICON, 0x00, 135, 178, 50, 50, 0, 0, BAGL_FILL, 0, COLOR_BG_1, 0, 0},
+     &ui_blue_gif,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x00, 0, 270, 320, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1,
+      BAGL_FONT_OPEN_SANS_LIGHT_16_22PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Open " COINID_NAME " wallet",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x00, 0, 308, 320, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1,
+      BAGL_FONT_OPEN_SANS_REGULAR_10_13PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Connect your Ledger Blue and open your",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x00, 0, 331, 320, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1,
+      BAGL_FONT_OPEN_SANS_REGULAR_10_13PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "preferred wallet to view your accounts.",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x00, 0, 450, 320, 14, 0, 0, 0, 0x999999, COLOR_BG_1,
+      BAGL_FONT_OPEN_SANS_REGULAR_8_11PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Validation requests will show automatically.",
+     10,
+     0,
+     COLOR_BG_1,
+     NULL,
+     NULL,
+     NULL},
 };
 
 unsigned int ui_idle_blue_button(unsigned int button_mask,
                                  unsigned int button_mask_counter) {
     return 0;
 }
+#endif // #if TARGET_ID == 0x31000002
 
+#if TARGET_ID == 0x31100002
 const bagl_element_t ui_idle_nanos[] = {
     // type                               userid    x    y   w    h  str rad
     // fill      fg        bg      fid iid  txt   touchparams...       ]
@@ -172,17 +262,6 @@ const bagl_element_t ui_idle_nanos[] = {
      NULL,
      NULL},
 
-#ifdef COIN_BITCOIN
-    {{BAGL_ICON, 0x01, 12, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
-      BAGL_GLYPH_ICON_BITCOIN_BADGE},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-#endif // COIN_BITCOIN
     {{BAGL_LABELINE, 0x01, 33, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
      "Use wallet to",
@@ -211,9 +290,6 @@ const bagl_element_t ui_idle_nanos[] = {
      NULL,
      NULL},
 
-    // NO! //{{BAGL_LABELINE                       , 0x02,  34,   3, 128,  32,
-    // 0, 0, 0        , 0xFFFFFF, 0x000000, BAGL_FONT_OPEN_SANS_REGULAR_11px, 0
-    // }, "view accounts", 0, 0, 0, NULL, NULL, NULL },
     {{BAGL_LABELINE, 0x02, 0, 19, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
      "Settings",
@@ -274,7 +350,6 @@ const bagl_element_t ui_idle_nanos[] = {
      NULL,
      NULL},
 };
-
 unsigned int ui_idle_nanos_button(unsigned int button_mask,
                                   unsigned int button_mask_counter);
 
@@ -285,6 +360,761 @@ unsigned int ui_idle_nanos_prepro(const bagl_element_t *element) {
     }
     return 1;
 }
+#endif // #if TARGET_ID == 0x31100002
+
+#if TARGET_ID == 0x31000002
+// reuse addressSummary for each line content
+const char *ui_details_title;
+const char *ui_details_content;
+typedef void (*callback_t)(void);
+callback_t ui_details_back_callback;
+
+// don't perform any draw/color change upon finger event over settings
+const bagl_element_t *ui_settings_out_over(const bagl_element_t *e) {
+    return NULL;
+}
+
+#ifdef HAVE_U2F
+
+const bagl_element_t *ui_settings_blue_toggle_browser(const bagl_element_t *e) {
+    // swap setting and request redraw of settings elements
+    uint8_t setting = N_btchip.fidoTransport ? 0 : 1;
+    nvm_write(&N_btchip.fidoTransport, (void *)&setting, sizeof(uint8_t));
+
+    // only refresh settings mutable drawn elements
+    UX_REDISPLAY_IDX(8);
+
+    // won't redisplay the bagl_none
+    return 0;
+}
+
+#endif
+
+const bagl_element_t *
+ui_details_blue_back_callback(const bagl_element_t *element) {
+    ui_details_back_callback();
+    return 0;
+}
+
+unsigned int ui_settings_back_callback(const bagl_element_t *e) {
+    // go back to idle
+    ui_idle();
+    return 0;
+}
+
+#ifdef HAVE_U2F
+
+const bagl_icon_details_t ui_blue_item_set_gif = {
+    .bpp = GLYPH_icon_toggle_set_BPP,
+    .colors = C_icon_toggle_set_colors,
+    .bitmap = C_icon_toggle_set_bitmap,
+};
+
+const bagl_icon_details_t ui_blue_item_reset_gif = {
+    .bpp = GLYPH_icon_toggle_reset_BPP,
+    .colors = C_icon_toggle_reset_colors,
+    .bitmap = C_icon_toggle_reset_bitmap,
+};
+
+const bagl_element_t ui_settings_blue[] = {
+    // type                               userid    x    y   w    h  str rad
+    // fill      fg        bg      fid iid  txt   touchparams...       ]
+    {{BAGL_RECTANGLE, 0x00, 0, 68, 320, 413, 0, 0, BAGL_FILL, COLOR_BG_1,
+      0x000000, 0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    // erase screen (only under the status bar)
+    {{BAGL_RECTANGLE, 0x00, 0, 20, 320, 48, 0, 0, BAGL_FILL, COLOR_APP,
+      COLOR_APP, 0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    /// TOP STATUS BAR
+    {{BAGL_LABELINE, 0x00, 0, 45, 320, 30, 0, 0, BAGL_FILL, 0xFFFFFF, COLOR_APP,
+      BAGL_FONT_OPEN_SANS_SEMIBOLD_10_13PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "SETTINGS",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 0, 19, 50, 44, 0, 0,
+      BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT,
+      BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_CENTER |
+          BAGL_FONT_ALIGNMENT_MIDDLE,
+      0},
+     BAGL_FONT_SYMBOLS_0_LEFT,
+     0,
+     COLOR_APP,
+     0xFFFFFF,
+     ui_settings_back_callback,
+     NULL,
+     NULL},
+    {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 264, 19, 56, 44, 0, 0,
+      BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT,
+      BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_CENTER |
+          BAGL_FONT_ALIGNMENT_MIDDLE,
+      0},
+     BAGL_FONT_SYMBOLS_0_DASHBOARD,
+     0,
+     COLOR_APP,
+     0xFFFFFF,
+     io_seproxyhal_touch_exit,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x00, 30, 105, 160, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0},
+     "Browser support",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x00, 30, 126, 260, 30, 0, 0, BAGL_FILL, 0x999999,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, 0},
+     "Enable integrated browser support",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_NONE | BAGL_FLAG_TOUCHABLE, 0x00, 0, 78, 320, 68, 0, 0, BAGL_FILL,
+      0xFFFFFF, 0x000000, 0, 0},
+     NULL,
+     0,
+     0xEEEEEE,
+     0x000000,
+     ui_settings_blue_toggle_browser,
+     ui_settings_out_over,
+     ui_settings_out_over},
+
+    {{BAGL_ICON, 0x01, 258, 98, 32, 18, 0, 0, BAGL_FILL, 0x000000, COLOR_BG_1,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+};
+
+const bagl_element_t *ui_settings_blue_prepro(const bagl_element_t *e) {
+    // none elements are skipped
+    if ((e->component.type & (~BAGL_FLAG_TOUCHABLE)) == BAGL_NONE) {
+        return 0;
+    }
+    // swap icon buffer to be displayed depending on if corresponding setting is
+    // enabled or not.
+    if (e->component.userid) {
+        os_memmove(&tmp_element, e, sizeof(bagl_element_t));
+        switch (e->component.userid) {
+        case 0x01:
+            // swap icon content
+            if (N_btchip.fidoTransport) {
+                tmp_element.text = &ui_blue_item_set_gif;
+            } else {
+                tmp_element.text = &ui_blue_item_reset_gif;
+            }
+            break;
+        }
+        return &tmp_element;
+    }
+    return 1;
+}
+
+unsigned int ui_settings_blue_button(unsigned int button_mask,
+                                     unsigned int button_mask_counter) {
+    return 0;
+}
+
+unsigned int io_seproxyhal_touch_settings(const bagl_element_t *e) {
+    UX_DISPLAY(ui_settings_blue, ui_settings_blue_prepro);
+    return 0; // do not redraw button, screen has switched
+}
+
+#endif
+
+const bagl_element_t ui_details_blue[] = {
+    // erase screen (only under the status bar)
+    {{BAGL_RECTANGLE, 0x00, 0, 68, 320, 413, 0, 0, BAGL_FILL, COLOR_BG_1,
+      0x000000, 0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_RECTANGLE, 0x00, 0, 20, 320, 48, 0, 0, BAGL_FILL, COLOR_APP,
+      COLOR_APP, 0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    /// TOP STATUS BAR
+    {{BAGL_LABELINE, 0x01, 0, 45, 320, 30, 0, 0, BAGL_FILL, 0xFFFFFF, COLOR_APP,
+      BAGL_FONT_OPEN_SANS_SEMIBOLD_10_13PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 0, 19, 50, 44, 0, 0,
+      BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT,
+      BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_CENTER |
+          BAGL_FONT_ALIGNMENT_MIDDLE,
+      0},
+     BAGL_FONT_SYMBOLS_0_LEFT,
+     0,
+     COLOR_APP,
+     0xFFFFFF,
+     ui_details_blue_back_callback,
+     NULL,
+     NULL},
+    //{{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 264,  19,  56,  44, 0, 0,
+    //BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT,
+    //BAGL_FONT_SYMBOLS_0|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE,
+    //0 }, BAGL_FONT_SYMBOLS_0_DASHBOARD, 0, COLOR_APP, 0xFFFFFF,
+    //io_seproxyhal_touch_exit, NULL, NULL},
+
+    {{BAGL_LABELINE, 0x00, 30, 106, 320, 30, 0, 0, BAGL_FILL, 0x999999,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, 0},
+     "VALUE",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x10, 30, 136, 260, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x11, 30, 159, 260, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x12, 30, 182, 260, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x13, 30, 205, 260, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x14, 30, 228, 260, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x15, 30, 251, 260, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x16, 30, 274, 260, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x17, 30, 297, 260, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x18, 30, 320, 260, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    //"..." at the end if too much
+    {{BAGL_LABELINE, 0x19, 30, 343, 260, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x00, 0, 450, 320, 14, 0, 0, 0, 0x999999, COLOR_BG_1,
+      BAGL_FONT_OPEN_SANS_REGULAR_8_11PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Review the whole value before continuing.",
+     10,
+     0,
+     COLOR_BG_1,
+     NULL,
+     NULL,
+     NULL},
+};
+
+unsigned int ui_details_blue_prepro(const bagl_element_t *element) {
+    if (element->component.userid == 1) {
+        strcpy(addressSummary, ui_details_title);
+    } else if (element->component.userid > 0) {
+        unsigned int length = strlen(ui_details_content);
+        if (length >= (element->component.userid & 0xF) * MAX_CHAR_PER_LINE) {
+            os_memset(addressSummary, 0, MAX_CHAR_PER_LINE + 1);
+            os_memmove(
+                addressSummary,
+                ui_details_content +
+                    (element->component.userid & 0xF) * MAX_CHAR_PER_LINE,
+                MIN(length -
+                        (element->component.userid & 0xF) * MAX_CHAR_PER_LINE,
+                    MAX_CHAR_PER_LINE));
+            return 1;
+        }
+        // nothing to draw for this line
+        return 0;
+    }
+    return 1;
+}
+unsigned int ui_details_blue_button(unsigned int button_mask,
+                                    unsigned int button_mask_counter) {
+    return 0;
+}
+
+void ui_details_init(const char *title, const char *content,
+                     callback_t back_callback) {
+    ui_details_title = title;
+    ui_details_content = content;
+    ui_details_back_callback = back_callback;
+    UX_DISPLAY(ui_details_blue, ui_details_blue_prepro);
+}
+
+const bagl_icon_details_t ui_blue_transaction_gif = {
+    .bpp = GLYPH_badge_transaction_BPP,
+    .colors = C_badge_transaction_colors,
+    .bitmap = C_badge_transaction_bitmap,
+};
+
+void ui_transaction_blue_init(void);
+
+bagl_element_callback_t ui_transaction_blue_ok;
+bagl_element_callback_t ui_transaction_blue_cancel;
+
+const bagl_element_t *ui_transaction_blue_ok_callback(const bagl_element_t *e) {
+    return ui_transaction_blue_ok(e);
+}
+
+const bagl_element_t *
+ui_transaction_blue_cancel_callback(const bagl_element_t *e) {
+    return ui_transaction_blue_cancel(e);
+}
+
+const bagl_element_t *
+ui_transaction_blue_amount_details(const bagl_element_t *e) {
+    if (strlen(fullAmount) * BAGL_FONT_OPEN_SANS_LIGHT_16_22PX_AVG_WIDTH >=
+        160) {
+        // display details screen
+        ui_details_init("AMOUNT", fullAmount, ui_transaction_blue_init);
+    }
+    return 0;
+};
+
+const bagl_element_t *
+ui_transaction_blue_address_details(const bagl_element_t *e) {
+    if (strlen(fullAddress) * BAGL_FONT_OPEN_SANS_REGULAR_10_13PX_AVG_WIDTH >=
+        160) {
+        ui_details_init(addressSummary, fullAddress, ui_transaction_blue_init);
+    }
+    return 0;
+};
+
+const bagl_element_t *
+ui_transaction_blue_fees_details(const bagl_element_t *e) {
+    if (strlen(feesAmount) * BAGL_FONT_OPEN_SANS_REGULAR_10_13PX_AVG_WIDTH >=
+        160) {
+        ui_details_init("FEES", feesAmount, ui_transaction_blue_init);
+    }
+    return 0;
+};
+
+const bagl_element_t ui_transaction_blue[] = {
+    {{BAGL_RECTANGLE, 0x00, 0, 68, 320, 413, 0, 0, BAGL_FILL, COLOR_BG_1,
+      0x000000, 0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    // erase screen (only under the status bar)
+    {{BAGL_RECTANGLE, 0x00, 0, 20, 320, 48, 0, 0, BAGL_FILL, COLOR_APP,
+      COLOR_APP, 0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    /// TOP STATUS BAR
+    {{BAGL_LABELINE, 0x00, 0, 45, 320, 30, 0, 0, BAGL_FILL, 0xFFFFFF, COLOR_APP,
+      BAGL_FONT_OPEN_SANS_SEMIBOLD_10_13PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "CONFIRM TRANSACTION",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    //{{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 264,  19,  56,  44, 0, 0,
+    //BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT,
+    //BAGL_FONT_SYMBOLS_0|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE,
+    //0 }, BAGL_FONT_SYMBOLS_0_DASHBOARD, 0, COLOR_APP, 0xFFFFFF,
+    //io_seproxyhal_touch_exit, NULL, NULL},
+
+    // BADGE_TRANSACTION.GIF
+    {{BAGL_ICON, 0x00, 30, 98, 50, 50, 0, 0, BAGL_FILL, 0, COLOR_BG_1, 0, 0},
+     &ui_blue_transaction_gif,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x00, 100, 117, 320, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0},
+     "Transaction details",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x00, 100, 138, 320, 30, 0, 0, BAGL_FILL, 0x999999,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, 0},
+     "Check and confirm values",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x00, 30, 196, 100, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, 0},
+     "AMOUNT",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    // x-18 when ...
+    {{BAGL_LABELINE, 0x01, 130, 200, 160, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_LIGHT_16_22PX | BAGL_FONT_ALIGNMENT_RIGHT,
+      0},
+     fullAmount,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x11, 284, 196, 6, 16, 0, 0, BAGL_FILL, 0x999999,
+      COLOR_BG_1, BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_RIGHT, 0},
+     BAGL_FONT_SYMBOLS_0_MINIRIGHT,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_NONE | BAGL_FLAG_TOUCHABLE, 0x00, 0, 168, 320, 48, 0, 9, BAGL_FILL,
+      0xFFFFFF, 0x000000, 0, 0},
+     NULL,
+     0,
+     0xEEEEEE,
+     0x000000,
+     ui_transaction_blue_amount_details,
+     ui_menu_item_out_over,
+     ui_menu_item_out_over},
+    {{BAGL_RECTANGLE, 0x11, 0, 168, 5, 48, 0, 0, BAGL_FILL, COLOR_BG_1,
+      COLOR_BG_1, 0, 0},
+     NULL,
+     0,
+     0x41CCB4,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_RECTANGLE, 0x00, 30, 216, 260, 1, 1, 0, 0, 0xEEEEEE, COLOR_BG_1, 0,
+      0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x00, 30, 245, 100, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    // x-18 when ...
+    {{BAGL_LABELINE, 0x02, 130, 245, 160, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1,
+      BAGL_FONT_OPEN_SANS_REGULAR_10_13PX | BAGL_FONT_ALIGNMENT_RIGHT, 0},
+     fullAddress,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x12, 284, 245, 6, 16, 0, 0, BAGL_FILL, 0x999999,
+      COLOR_BG_1, BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_RIGHT, 0},
+     BAGL_FONT_SYMBOLS_0_MINIRIGHT,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_NONE | BAGL_FLAG_TOUCHABLE, 0x00, 0, 217, 320, 48, 0, 9, BAGL_FILL,
+      0xFFFFFF, 0x000000, 0, 0},
+     NULL,
+     0,
+     0xEEEEEE,
+     0x000000,
+     ui_transaction_blue_address_details,
+     ui_menu_item_out_over,
+     ui_menu_item_out_over},
+    {{BAGL_RECTANGLE, 0x12, 0, 217, 5, 48, 0, 0, BAGL_FILL, COLOR_BG_1,
+      COLOR_BG_1, 0, 0},
+     NULL,
+     0,
+     0x41CCB4,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_RECTANGLE, 0x00, 30, 265, 260, 1, 1, 0, 0, 0xEEEEEE, COLOR_BG_1, 0,
+      0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x00, 30, 294, 100, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, 0},
+     "FEES",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    // x-18 when ...
+    {{BAGL_LABELINE, 0x03, 130, 294, 160, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1,
+      BAGL_FONT_OPEN_SANS_REGULAR_10_13PX | BAGL_FONT_ALIGNMENT_RIGHT, 0},
+     feesAmount,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x13, 284, 294, 6, 16, 0, 0, BAGL_FILL, 0x999999,
+      COLOR_BG_1, BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_RIGHT, 0},
+     BAGL_FONT_SYMBOLS_0_MINIRIGHT,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_NONE | BAGL_FLAG_TOUCHABLE, 0x00, 0, 266, 320, 48, 0, 9, BAGL_FILL,
+      0xFFFFFF, 0x000000, 0, 0},
+     NULL,
+     0,
+     0xEEEEEE,
+     0x000000,
+     ui_transaction_blue_fees_details,
+     ui_menu_item_out_over,
+     ui_menu_item_out_over},
+    {{BAGL_RECTANGLE, 0x13, 0, 266, 5, 48, 0, 0, BAGL_FILL, COLOR_BG_1,
+      COLOR_BG_1, 0, 0},
+     NULL,
+     0,
+     0x41CCB4,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 40, 414, 115, 36, 0, 18,
+      BAGL_FILL, 0xCCCCCC, COLOR_BG_1,
+      BAGL_FONT_OPEN_SANS_REGULAR_11_14PX | BAGL_FONT_ALIGNMENT_CENTER |
+          BAGL_FONT_ALIGNMENT_MIDDLE,
+      0},
+     "REJECT",
+     0,
+     0xB7B7B7,
+     COLOR_BG_1,
+     ui_transaction_blue_cancel_callback,
+     NULL,
+     NULL},
+    {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 165, 414, 115, 36, 0, 18,
+      BAGL_FILL, 0x41ccb4, COLOR_BG_1,
+      BAGL_FONT_OPEN_SANS_REGULAR_11_14PX | BAGL_FONT_ALIGNMENT_CENTER |
+          BAGL_FONT_ALIGNMENT_MIDDLE,
+      0},
+     "CONFIRM",
+     0,
+     0x3ab7a2,
+     COLOR_BG_1,
+     ui_transaction_blue_ok_callback,
+     NULL,
+     NULL},
+};
+
+const bagl_element_t *
+ui_transaction_blue_prepro(const bagl_element_t *element) {
+    // none elements are skipped
+    if ((element->component.type & (~BAGL_FLAG_TOUCHABLE)) == BAGL_NONE) {
+        return 0;
+    } else {
+        switch (element->component.userid) {
+        case 0x01:
+            if (strlen(fullAmount) *
+                    BAGL_FONT_OPEN_SANS_LIGHT_16_22PX_AVG_WIDTH >=
+                160) {
+                os_memmove(&tmp_element, element, sizeof(bagl_element_t));
+                tmp_element.component.x -= 18;
+                return &tmp_element;
+            }
+            break;
+        case 0x11:
+            return strlen(fullAmount) *
+                       BAGL_FONT_OPEN_SANS_LIGHT_16_22PX_AVG_WIDTH >=
+                   160;
+
+        case 0x02:
+            if (strlen(fullAddress) *
+                    BAGL_FONT_OPEN_SANS_REGULAR_10_13PX_AVG_WIDTH >=
+                160) {
+                os_memmove(&tmp_element, element, sizeof(bagl_element_t));
+                tmp_element.component.x -= 18;
+                return &tmp_element;
+            }
+            break;
+        case 0x12:
+            return strlen(fullAddress) *
+                       BAGL_FONT_OPEN_SANS_REGULAR_10_13PX_AVG_WIDTH >=
+                   160;
+
+        case 0x03:
+            if (strlen(feesAmount) *
+                    BAGL_FONT_OPEN_SANS_REGULAR_10_13PX_AVG_WIDTH >=
+                160) {
+                os_memmove(&tmp_element, element, sizeof(bagl_element_t));
+                tmp_element.component.x -= 18;
+                return &tmp_element;
+            }
+            break;
+        case 0x13:
+            return strlen(feesAmount) *
+                       BAGL_FONT_OPEN_SANS_REGULAR_10_13PX_AVG_WIDTH >=
+                   160;
+        }
+    }
+    return 1;
+}
+unsigned int ui_transaction_blue_button(unsigned int button_mask,
+                                        unsigned int button_mask_counter) {
+    return 0;
+}
+#endif // #if TARGET_ID == 0x31000002
+
+#if TARGET_ID == 0x31100002
 
 #ifdef HAVE_U2F
 
@@ -310,9 +1140,6 @@ const bagl_element_t ui_settings_nanos[] = {
      NULL,
      NULL,
      NULL},
-    //{{BAGL_ICON                           , 0x01,   3,  14,   7,   4, 0, 0, 0
-    //, 0xFFFFFF, 0x000000, 0,
-    //BAGL_GLYPH_ICON_UP   }, NULL, 0, 0, 0, NULL, NULL, NULL },
     {{BAGL_ICON, 0x01, 118, 14, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
       BAGL_GLYPH_ICON_DOWN},
      NULL,
@@ -349,6 +1176,7 @@ const bagl_element_t ui_settings_nanos[] = {
      NULL,
      NULL,
      NULL},
+
 };
 
 unsigned int ui_settings_nanos_button(unsigned int button_mask,
@@ -360,8 +1188,7 @@ unsigned int ui_settings_nanos_prepro(const bagl_element_t *element) {
         unsigned char displayed = (ui_settings_nanos_state ==
                                    ((element->component.userid - 1) & 0x0F));
         // display custom icon for
-        if (displayed && (element->component.userid == 0x13 ||
-                          element->component.userid == 0x12)) {
+        if (displayed && element->component.userid == 0x12) {
             extern unsigned int const C_icon_back_colors[];
             extern unsigned char const C_icon_back_bitmap[];
             io_seproxyhal_display_bitmap(40, 9, 14, 14, C_icon_back_colors, 1,
@@ -453,124 +1280,6 @@ unsigned int ui_settings_fido_nanos_prepro(const bagl_element_t *element) {
 }
 
 #endif
-
-bagl_element_t const ui_verify_blue[] = {
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 480, 0, 0, BAGL_FILL, 0xf9f9f9, 0xf9f9f9,
-      0, 0},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    // type                                 id    x    y    w    h    s  r  fill
-    // fg        bg        font icon   text, out, over, touch
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 60, 0, 0, BAGL_FILL, 0x1d2028, 0x1d2028,
-      0, 0},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABEL, 0x00, 20, 0, 320, 60, 0, 0, BAGL_FILL, 0xFFFFFF, 0x1d2028,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_MIDDLE, 0},
-     "Ledger Blue",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    {{BAGL_BUTTON | BAGL_FLAG_TOUCHABLE, 0x00, 35, 385, 120, 40, 0, 6,
-      BAGL_FILL, 0xcccccc, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER |
-          BAGL_FONT_ALIGNMENT_MIDDLE,
-      0},
-     "CANCEL",
-     0,
-     0x37ae99,
-     0xF9F9F9,
-     io_seproxyhal_touch_verify_cancel,
-     NULL,
-     NULL},
-    {{BAGL_BUTTON | BAGL_FLAG_TOUCHABLE, 0x00, 165, 385, 120, 40, 0, 6,
-      BAGL_FILL, 0x41ccb4, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER |
-          BAGL_FONT_ALIGNMENT_MIDDLE,
-      0},
-     "CONFIRM",
-     0,
-     0x37ae99,
-     0xF9F9F9,
-     io_seproxyhal_touch_verify_ok,
-     NULL,
-     NULL},
-
-    {{BAGL_LABEL, 0x00, 0, 147, 320, 32, 0, 0, 0, 0x000000, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "CONFIRM TRANSACTION",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABEL, 0x00, 0, 185, 320, 32, 0, 0, 0, 0x000000, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "Default wallet",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABEL, 0x00, 0, 217, 320, 33, 0, 0, 0, 0x000000, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_16px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     (const char *)fullAmount,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABEL, 0x00, 0, 280, 320, 33, 0, 0, 0, 0x000000, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_16px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     (const char *)addressSummary,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABEL, 0x00, 0, 310, 320, 33, 0, 0, 0, 0x000000, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     (const char *)address1,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABEL, 0x00, 0, 330, 320, 33, 0, 0, 0, 0x000000, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     (const char *)address2,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-};
-
-unsigned int ui_verify_blue_button(unsigned int button_mask,
-                                   unsigned int button_mask_counter) {
-    return 0;
-}
 
 const bagl_element_t ui_verify_nanos[] = {
     // type                               userid    x    y   w    h  str rad
@@ -688,94 +1397,9 @@ const bagl_element_t ui_verify_nanos[] = {
      NULL,
      NULL,
      NULL},
-
-    /*
-    {{BAGL_LABELINE                       , 0x03,   0,  26, 128,  11, 0, 0, 0
-    , 0xFFFFFF, 0x000000,
-    BAGL_FONT_OPEN_SANS_REGULAR_11px|BAGL_FONT_ALIGNMENT_CENTER, 0  }, address1,
-    0, 0, 0, NULL, NULL, NULL },
-    {{BAGL_LABELINE                       , 0x04,   0,  26, 128,  11, 0, 0, 0
-    , 0xFFFFFF, 0x000000,
-    BAGL_FONT_OPEN_SANS_REGULAR_11px|BAGL_FONT_ALIGNMENT_CENTER, 0  }, address2,
-    0, 0, 0, NULL, NULL, NULL },
-    */
-
 };
 unsigned int ui_verify_nanos_button(unsigned int button_mask,
                                     unsigned int button_mask_counter);
-
-bagl_element_t const ui_verify_p2sh_blue[] = {
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 480, 0, 0, BAGL_FILL, 0xf9f9f9, 0xf9f9f9,
-      0, 0},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    // type                                 id    x    y    w    h    s  r  fill
-    // fg        bg        font icon   text, out, over, touch
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 60, 0, 0, BAGL_FILL, 0x1d2028, 0x1d2028,
-      0, 0},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABEL, 0x00, 20, 0, 320, 60, 0, 0, BAGL_FILL, 0xFFFFFF, 0x1d2028,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_MIDDLE, 0},
-     "Ledger Blue",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    {{BAGL_BUTTON | BAGL_FLAG_TOUCHABLE, 0x00, 35, 385, 120, 40, 0, 6,
-      BAGL_FILL, 0xcccccc, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER |
-          BAGL_FONT_ALIGNMENT_MIDDLE,
-      0},
-     "CANCEL",
-     0,
-     0x37ae99,
-     0xF9F9F9,
-     io_seproxyhal_touch_verify_cancel,
-     NULL,
-     NULL},
-    {{BAGL_BUTTON | BAGL_FLAG_TOUCHABLE, 0x00, 165, 385, 120, 40, 0, 6,
-      BAGL_FILL, 0x41ccb4, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER |
-          BAGL_FONT_ALIGNMENT_MIDDLE,
-      0},
-     "CONFIRM",
-     0,
-     0x37ae99,
-     0xF9F9F9,
-     io_seproxyhal_touch_verify_ok,
-     NULL,
-     NULL},
-
-    {{BAGL_LABEL, 0x00, 0, 147, 320, 32, 0, 0, 0, 0x000000, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "CONFIRM P2SH TRANSACTION",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-};
-
-unsigned int ui_verify_p2sh_blue_button(unsigned int button_mask,
-                                        unsigned int button_mask_counter) {
-    return 0;
-}
 
 const bagl_element_t ui_verify_p2sh_nanos[] = {
     // type                               userid    x    y   w    h  str rad
@@ -848,17 +1472,17 @@ unsigned int ui_verify_prepro(const bagl_element_t *element) {
         if (display) {
             switch (element->component.userid) {
             case 1:
-                io_seproxyhal_setup_ticker(2000);
+                UX_CALLBACK_SET_INTERVAL(2000);
                 break;
             case 2:
-                io_seproxyhal_setup_ticker(MAX(
+                UX_CALLBACK_SET_INTERVAL(MAX(
                     3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
                 break;
             case 3:
-                io_seproxyhal_setup_ticker(3000);
+                UX_CALLBACK_SET_INTERVAL(3000);
                 break;
             case 4:
-                io_seproxyhal_setup_ticker(MAX(
+                UX_CALLBACK_SET_INTERVAL(MAX(
                     3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
                 break;
             }
@@ -866,89 +1490,6 @@ unsigned int ui_verify_prepro(const bagl_element_t *element) {
         return display;
     }
     return 1;
-}
-
-bagl_element_t const ui_verify_message_signature_blue[] = {
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 480, 0, 0, BAGL_FILL, 0xf9f9f9, 0xf9f9f9,
-      0, 0},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    // type                                 id    x    y    w    h    s  r  fill
-    // fg        bg        font icon   text, out, over, touch
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 320, 60, 0, 0, BAGL_FILL, 0x1d2028, 0x1d2028,
-      0, 0},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABEL, 0x00, 20, 0, 320, 60, 0, 0, BAGL_FILL, 0xFFFFFF, 0x1d2028,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_MIDDLE, 0},
-     "Ledger Blue",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    {{BAGL_BUTTON | BAGL_FLAG_TOUCHABLE, 0x00, 35, 385, 120, 40, 0, 6,
-      BAGL_FILL, 0xcccccc, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER |
-          BAGL_FONT_ALIGNMENT_MIDDLE,
-      0},
-     "CANCEL",
-     0,
-     0x37ae99,
-     0xF9F9F9,
-     io_seproxyhal_touch_message_signature_verify_cancel,
-     NULL,
-     NULL},
-    {{BAGL_BUTTON | BAGL_FLAG_TOUCHABLE, 0x00, 165, 385, 120, 40, 0, 6,
-      BAGL_FILL, 0x41ccb4, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER |
-          BAGL_FONT_ALIGNMENT_MIDDLE,
-      0},
-     "CONFIRM",
-     0,
-     0x37ae99,
-     0xF9F9F9,
-     io_seproxyhal_touch_message_signature_verify_ok,
-     NULL,
-     NULL},
-
-    {{BAGL_LABEL, 0x00, 0, 147, 320, 32, 0, 0, 0, 0x000000, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_14px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "CONFIRM SIGNATURE",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABEL, 0x00, 0, 185, 320, 32, 0, 0, 0, 0x000000, 0xF9F9F9,
-      BAGL_FONT_OPEN_SANS_LIGHT_16px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     addressSummary,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-};
-
-unsigned int
-ui_verify_message_signature_blue_button(unsigned int button_mask,
-                                        unsigned int button_mask_counter) {
-    return 0;
 }
 
 const bagl_element_t ui_verify_message_signature_nanos[] = {
@@ -1039,25 +1580,27 @@ unsigned int ui_verify_message_prepro(const bagl_element_t *element) {
     if (element->component.userid > 0) {
         switch (element->component.userid) {
         case 1:
-            io_seproxyhal_setup_ticker(2000);
+            UX_CALLBACK_SET_INTERVAL(2000);
             break;
         case 2:
-            io_seproxyhal_setup_ticker(3000);
+            UX_CALLBACK_SET_INTERVAL(3000);
             break;
         }
         return (ux_step == element->component.userid - 1);
     }
     return 1;
 }
+#endif // #if TARGET_ID == 0x31100002
 
 void ui_idle(void) {
-    if (os_seph_features() &
-        SEPROXYHAL_TAG_SESSION_START_EVENT_FEATURE_SCREEN_BIG) {
-        UX_DISPLAY(ui_idle_blue, NULL);
-    } else {
-        ui_idle_nanos_state = 0; // start by displaying the idle first screen
-        UX_DISPLAY(ui_idle_nanos, ui_idle_nanos_prepro);
-    }
+    ux_step_count = 0;
+
+#if TARGET_ID == 0x31000002
+    UX_DISPLAY(ui_idle_blue, NULL);
+#elif TARGET_ID == 0x31100002
+    ui_idle_nanos_state = 0;      // start by displaying the idle first screen
+    UX_DISPLAY(ui_idle_nanos, ui_idle_nanos_prepro);
+#endif // #if TARGET_ID
 }
 
 unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e) {
@@ -1066,6 +1609,7 @@ unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e) {
     return 0; // DO NOT REDRAW THE BUTTON
 }
 
+#if TARGET_ID == 0x31100002
 unsigned int ui_idle_nanos_button(unsigned int button_mask,
                                   unsigned int button_mask_counter) {
     switch (button_mask) {
@@ -1164,6 +1708,8 @@ unsigned int ui_settings_fido_nanos_button(unsigned int button_mask,
 
 #endif
 
+#endif // #if TARGET_ID == 0x31100002
+
 unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e) {
     // user denied the transaction, tell the USB side
     btchip_bagl_user_action(0);
@@ -1198,6 +1744,7 @@ io_seproxyhal_touch_message_signature_verify_ok(const bagl_element_t *e) {
     return 0; // DO NOT REDRAW THE BUTTON
 }
 
+#if TARGET_ID == 0x31100002
 unsigned int ui_verify_nanos_button(unsigned int button_mask,
                                     unsigned int button_mask_counter) {
     switch (button_mask) {
@@ -1240,9 +1787,55 @@ ui_verify_message_signature_nanos_button(unsigned int button_mask,
     }
     return 0;
 }
+#endif // #if TARGET_ID == 0x31100002
+
+#if TARGET_ID == 0x31000002
+void ui_transaction_blue_init(void) {
+    ui_transaction_blue_ok =
+        (bagl_element_callback_t)io_seproxyhal_touch_verify_ok;
+    ui_transaction_blue_cancel =
+        (bagl_element_callback_t)io_seproxyhal_touch_verify_cancel;
+    strcpy(addressSummary, "ADDRESS");
+    UX_DISPLAY(ui_transaction_blue, ui_transaction_blue_prepro);
+}
+
+void ui_message_signature_blue_init(void) {
+    ui_transaction_blue_ok = (bagl_element_callback_t)
+        io_seproxyhal_touch_message_signature_verify_ok;
+    ui_transaction_blue_cancel = (bagl_element_callback_t)
+        io_seproxyhal_touch_message_signature_verify_cancel;
+    snprintf(fullAddress, 65, "%.*H", 32, fullAmount);
+    strcpy(fullAmount, "SIGNATURE");
+    strcpy(feesAmount, "SIGNATURE");
+    strcpy(addressSummary, "HASH");
+    UX_DISPLAY(ui_transaction_blue, ui_transaction_blue_prepro);
+}
+
+void ui_transaction_p2sh_blue_init(void) {
+    ui_transaction_blue_ok =
+        (bagl_element_callback_t)io_seproxyhal_touch_verify_ok;
+    ui_transaction_blue_cancel =
+        (bagl_element_callback_t)io_seproxyhal_touch_verify_cancel;
+    strcpy(fullAmount, "P2SH");
+    strcpy(fullAddress, "P2SH");
+    strcpy(feesAmount, "P2SH");
+    strcpy(addressSummary, "ADDRESS");
+    UX_DISPLAY(ui_transaction_blue, ui_transaction_blue_prepro);
+}
+#endif // #if TARGET_ID == 0x31000002
 
 // override point, but nothing more to do
 void io_seproxyhal_display(const bagl_element_t *element) {
+    // common icon element display,
+    if ((element->component.type & (~BAGL_FLAG_TOUCHABLE)) == BAGL_ICON
+        // this is a streamed icon from the app content
+        && element->component.icon_id == 0 && element->text != NULL) {
+        bagl_icon_details_t *icon = (bagl_icon_details_t *)PIC(element->text);
+        // here could avoid the loop and do a pure aysnch stuff, but it's way
+        // too sluggish
+        io_seproxyhal_display_icon(element, icon);
+        return;
+    }
     io_seproxyhal_display_default((bagl_element_t *)element);
 }
 
@@ -1286,47 +1879,35 @@ unsigned char io_event(unsigned char channel) {
         UX_BUTTON_PUSH_EVENT(G_io_seproxyhal_spi_buffer);
         break;
 
+    case SEPROXYHAL_TAG_STATUS_EVENT:
+        if (G_io_apdu_media == IO_APDU_MEDIA_USB_HID &&
+            !(U4BE(G_io_seproxyhal_spi_buffer, 3) &
+              SEPROXYHAL_TAG_STATUS_EVENT_FLAG_USB_POWERED)) {
+            THROW(EXCEPTION_IO_RESET);
+        }
+    // no break is intentional
+    default:
+        UX_DEFAULT_EVENT();
+        break;
+
     case SEPROXYHAL_TAG_DISPLAY_PROCESSED_EVENT:
-        if (UX_DISPLAYED()) {
-        UX_DISPLAYED_:
-#if defined(COIN_LITECOIN) || defined(COIN_DASH) || defined(COIN_DOGE) ||      \
-    defined(COIN_ZCASH) 
+        UX_DISPLAYED_EVENT({
+#if TARGET_ID == 0x31100002
             // extra elements per screen, only for idle screen
             if (ux.elements == ui_idle_nanos && ui_idle_nanos_state == 0) {
                 // could be used to perform extra print after an array has been
                 // displayed
                 switch (ux.elements_count - ux.elements_current) {
                 case 0: {
-#ifdef COIN_LITECOIN
-                    extern unsigned int const C_icon_litecoin_colors[];
-                    extern unsigned char const C_icon_litecoin_bitmap[];
-                    io_seproxyhal_display_bitmap(12, 9, 14, 14,
-                                                 C_icon_litecoin_colors, 1,
-                                                 C_icon_litecoin_bitmap);
-#endif
-#ifdef COIN_DOGE
-                    extern unsigned int const C_icon_doge_colors[];
-                    extern unsigned char const C_icon_doge_bitmap[];
-                    io_seproxyhal_display_bitmap(12, 9, 14, 14,
-                                                 C_icon_doge_colors, 1,
-                                                 C_icon_doge_bitmap);
-#endif
-#ifdef COIN_ZCASH
-                    extern unsigned int const C_icon_zcash_colors[];
-                    extern unsigned char const C_icon_zcash_bitmap[];
-                    io_seproxyhal_display_bitmap(12, 9, 14, 14,
-                                                 C_icon_zcash_colors, 1,
-                                                 C_icon_zcash_bitmap);
-#endif
-#ifdef COIN_DASH
-                    extern unsigned int const C_icon_dash_colors[];
-                    extern unsigned char const C_icon_dash_bitmap[];
-                    io_seproxyhal_display_bitmap(12, 9, 14, 14,
-                                                 C_icon_dash_colors, 1,
-                                                 C_icon_dash_bitmap);
-#endif
-                    break;
+                    extern unsigned int const NAME3(C_icon_, COINID, _colors)[];
+                    extern unsigned char const NAME3(C_icon_, COINID,
+                                                     _bitmap)[];
+                    io_seproxyhal_display_bitmap(
+                        12, 9, 14, 14, NAME3(C_icon_, COINID, _colors), 1,
+                        NAME3(C_icon_, COINID, _bitmap));
                 }
+                    ux.elements_current++;
+                    break;
 
                 // case 1: // next extra element
                 // case 2: // next next extra element ...
@@ -1334,36 +1915,20 @@ unsigned char io_event(unsigned char channel) {
                 default:
                     break;
                 }
-                ux.elements_current++;
             }
-#endif // COIN_LITECOIN || COIN_DASH || COIN_DOGE || COIN_ZCASH 
-            ;
-        } else {
-            while (ux.elements && ux.elements_current < ux.elements_count &&
-                   !io_seproxyhal_spi_is_status_sent()) {
-                if (!ux.elements_preprocessor ||
-                    ux.elements_preprocessor(
-                        &ux.elements[ux.elements_current])) {
-                    io_seproxyhal_display(&ux.elements[ux.elements_current++]);
-                    break;
-                }
-                ux.elements_current++;
-            }
-            // nothing displayed, then it's likely the end of the screen
-            if (!io_seproxyhal_spi_is_status_sent()) {
-                goto UX_DISPLAYED_;
-            }                    
-        }
+#endif // #if TARGET_ID == 0x31100002
+        });
         break;
 
     case SEPROXYHAL_TAG_TICKER_EVENT:
-        // prepare next screen
-        ux_step = (ux_step + 1) % ux_step_count;
-        // redisplay screen
-        UX_REDISPLAY();
-        break;
-
-    default:
+        UX_TICKER_EVENT(G_io_seproxyhal_spi_buffer, {
+            if (ux_step_count) {
+                // prepare next screen
+                ux_step = (ux_step + 1) % ux_step_count;
+                // redisplay screen
+                UX_REDISPLAY();
+            }
+        });
         break;
     }
 
@@ -1382,11 +1947,11 @@ uint8_t prepare_full_output() {
     int i;
     unsigned int currentPos = 0;
     unsigned char amount[8], totalOutputAmount[8], fees[8];
-    char tmp[100];
+    char tmp[40];
     unsigned char outputPos = 0, changeFound = 0;
     if (btchip_context_D.transactionContext.relaxed &&
         !btchip_context_D.transactionContext.consumeP2SH) {
-        screen_printf("Error : Mixed inputs");
+        PRINTF("Error : Mixed inputs");
         goto error;
     }
     if (btchip_context_D.transactionContext.consumeP2SH) {
@@ -1399,7 +1964,7 @@ uint8_t prepare_full_output() {
     os_memset(totalOutputAmount, 0, sizeof(totalOutputAmount));
     numberOutputs = btchip_context_D.currentOutput[offset++];
     if (numberOutputs > 3) {
-        screen_printf("Error : Too many outputs");
+        PRINTF("Error : Too many outputs");
         goto error;
     }
     for (i = 0; i < numberOutputs; i++) {
@@ -1422,7 +1987,7 @@ uint8_t prepare_full_output() {
         if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                              offset) &&
             !isP2sh && !(nullAmount && isOpReturn)) {
-            screen_printf("Error : Unrecognized input script");
+            PRINTF("Error : Unrecognized input script");
             goto error;
         }
         if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {
@@ -1434,7 +1999,7 @@ uint8_t prepare_full_output() {
                           btchip_context_D.tmpCtx.output.changeAddress + 1,
                           20) == 0) {
                 if (changeFound) {
-                    screen_printf("Error : Multiple change output found");
+                    PRINTF("Error : Multiple change output found");
                     goto error;
                 }
                 changeFound = 1;
@@ -1446,13 +2011,13 @@ uint8_t prepare_full_output() {
         currentPos++;
     }
     if (btchip_context_D.tmpCtx.output.changeInitialized && !changeFound) {
-        screen_printf("Error : change output not found");
+        PRINTF("Error : change output not found");
         goto error;
     }
     if (transaction_amount_sub_be(
             fees, btchip_context_D.transactionContext.transactionAmount,
             totalOutputAmount)) {
-        screen_printf("Error : Fees not consistent");
+        PRINTF("Error : Fees not consistent");
         goto error;
     }
     // Format validation message
@@ -1489,15 +2054,15 @@ uint8_t prepare_full_output() {
                        btchip_context_D.currentOutput + addressOffset, 20);
             if (currentPos == outputPos) {
                 unsigned short textSize;
+                // Prepare address
                 textSize = btchip_public_key_to_encoded_base58(
                     address, 20 + versionSize, (unsigned char *)tmp,
                     sizeof(tmp), version, 1);
                 tmp[textSize] = '\0';
-                // Prepare address
-                os_memmove((void *)address1, tmp, 18);
-                address1[18] = '\0';
-                os_memmove((void *)address2, tmp + 18, strlen(tmp) - 18);
-                address2[strlen(tmp) - 18] = '\0';
+
+#if TARGET_ID == 0x31000002
+                os_memmove(fullAddress, tmp, textSize + 1);
+#endif
 
                 os_memset(addressSummary, 0, sizeof(addressSummary));
                 os_memmove((void *)addressSummary, tmp, 5);
@@ -1542,34 +2107,27 @@ error:
 
 #define HASH_LENGTH 4
 uint8_t prepare_message_signature() {
-    unsigned char hash[32];
     cx_hash(&btchip_context_D.transactionHashAuthorization.header, CX_LAST,
-            hash, 0, hash);
-    array_hexstr(addressSummary, hash, HASH_LENGTH / 2);
+            fullAmount, 0, fullAmount);
+
+    array_hexstr(addressSummary, fullAddress, HASH_LENGTH / 2);
     addressSummary[HASH_LENGTH / 2 * 2] = '.';
     addressSummary[HASH_LENGTH / 2 * 2 + 1] = '.';
     addressSummary[HASH_LENGTH / 2 * 2 + 2] = '.';
     array_hexstr(addressSummary + HASH_LENGTH / 2 * 2 + 3,
-                 hash + 32 - HASH_LENGTH / 2, HASH_LENGTH / 2);
+                 fullAddress + 32 - HASH_LENGTH / 2, HASH_LENGTH / 2);
     return 1;
-}
-
-// reset interface
-void btchip_bagl_idle(void) {
-    // here shall wait until all ui is displayed
-    // ui_idle();
 }
 
 unsigned int btchip_bagl_confirm_full_output() {
     // TODO : remove when supporting multi output
     if (btchip_context_D.transactionContext.consumeP2SH) {
-        if (os_seph_features() &
-            SEPROXYHAL_TAG_SESSION_START_EVENT_FEATURE_SCREEN_BIG) {
-            UX_DISPLAY(ui_verify_p2sh_blue, NULL);
-        } else {
-            // no preprocessing
-            UX_DISPLAY(ui_verify_p2sh_nanos, NULL);
-        }
+#if TARGET_ID == 0x31000002
+        ui_transaction_p2sh_blue_init();
+#elif TARGET_ID == 0x31100002
+        // no preprocessing
+        UX_DISPLAY(ui_verify_p2sh_nanos, NULL);
+#endif // #if TARGET_ID
         return 1;
     }
 
@@ -1577,14 +2135,13 @@ unsigned int btchip_bagl_confirm_full_output() {
         return 0;
     }
 
-    if (os_seph_features() &
-        SEPROXYHAL_TAG_SESSION_START_EVENT_FEATURE_SCREEN_BIG) {
-        UX_DISPLAY(ui_verify_blue, NULL);
-    } else {
-        ux_step = 0;
-        ux_step_count = 4;
-        UX_DISPLAY(ui_verify_nanos, ui_verify_prepro);
-    }
+#if TARGET_ID == 0x31000002
+    ui_transaction_blue_init();
+#elif TARGET_ID == 0x31100002
+    ux_step = 0;
+    ux_step_count = 4;
+    UX_DISPLAY(ui_verify_nanos, ui_verify_prepro);
+#endif // #if TARGET_ID
     return 1;
 }
 
@@ -1592,14 +2149,14 @@ void btchip_bagl_confirm_message_signature() {
     if (!prepare_message_signature()) {
         return;
     }
-    if (os_seph_features() &
-        SEPROXYHAL_TAG_SESSION_START_EVENT_FEATURE_SCREEN_BIG) {
-        UX_DISPLAY(ui_verify_message_signature_blue, NULL);
-    } else {
-        ux_step = 0;
-        ux_step_count = 2;
-        UX_DISPLAY(ui_verify_message_signature_nanos, ui_verify_message_prepro);
-    }
+
+#if TARGET_ID == 0x31000002
+    ui_message_signature_blue_init();
+#elif TARGET_ID == 0x31100002
+    ux_step = 0;
+    ux_step_count = 2;
+    UX_DISPLAY(ui_verify_message_signature_nanos, ui_verify_message_prepro);
+#endif // #if TARGET_ID
 }
 
 void app_exit(void) {
@@ -1644,6 +2201,12 @@ __attribute__((section(".boot"))) int main(void) {
 #ifdef HAVE_BLE
             BLE_power(1, "Ledger Wallet");
 #endif // HAVE_BLE
+
+#if TARGET_ID == 0x31000002
+            // setup the status bar colors (remembered after wards, even more if
+            // another app does not resetup after app switch)
+            UX_SET_STATUS_BAR_COLOR(0xFFFFFF, COLOR_APP);
+#endif // TARGET_ID
 
             ui_idle();
 
