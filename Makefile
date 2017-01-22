@@ -14,10 +14,22 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #*******************************************************************************
-
-TARGET_ID = 0x31100002 #Nano S
-#TARGET_ID = 0x31000002 #Blue
+#extract TARGET_ID from the SDK to allow for makefile choices
+TARGET_ID := $(shell cat $(BOLOS_SDK)/include/bolos_target.h | grep 0x | cut -f3 -d' ')
+$(info TARGET_ID=$(TARGET_ID))
 APP_LOAD_PARAMS=--appFlags 0x50 --path "" --curve secp256k1
+
+APPVERSION_M=1
+APPVERSION_N=1
+APPVERSION_P=3
+APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
+
+#prepare hsm generation
+ifeq ($(TARGET_ID),0x31000002)
+LOADFLAGS = --params --appVersion $(APPVERSION)
+else
+endif
+
 
 ################
 # Default rule #
@@ -25,14 +37,14 @@ APP_LOAD_PARAMS=--appFlags 0x50 --path "" --curve secp256k1
 
 all: default
 
-# consider every intermediate target as final to avoid deleting intermediate files
+# consider every intermediate target aTARGET_ID=s final to avoid deleting intermediate files
 .SECONDARY:
 
 # disable builtin rules that overload the build process (and the debug log !!)
 .SUFFIXES:
 MAKEFLAGS += -r
 
-SHELL = /bin/bash
+SHELL =       /bin/bash
 #.ONESHELL:
 
 
@@ -44,62 +56,70 @@ PROG     := token
 CONFIG_PRODUCTIONS := bin/$(PROG)
 
 GLYPH_FILES := $(addprefix glyphs/,$(sort $(notdir $(shell find glyphs/))))
-GLYPH_DEST := src/glyphs.c
-$(GLYPH_DEST): $(GLYPH_FILES) $(BOLOS_SDK)/icon.py
+GLYPH_DESTC := src/glyphs.c
+GLYPH_DESTH := src/glyphs.h
+$(GLYPH_DESTC) $(GLYPH_DESTH): $(GLYPH_FILES) $(BOLOS_SDK)/icon.py
 	-rm $@
-	if [ ! -z "$(GLYPH_FILES)" ] ; then for gif in $(GLYPH_FILES) ; do python $(BOLOS_SDK)/icon.py $$gif | grep -v "bitmap}," ; done > $(GLYPH_DEST) ; fi
+	if [ ! -z "$(GLYPH_FILES)" ] ; then for gif in $(GLYPH_FILES) ; do python $(BOLOS_SDK)/icon.py $$gif glyphcheader ; done > $(GLYPH_DESTH) ; fi
+	if [ ! -z "$(GLYPH_FILES)" ] ; then for gif in $(GLYPH_FILES) ; do python $(BOLOS_SDK)/icon.py $$gif glyphcfile ; done > $(GLYPH_DESTC) ; fi
 
 SOURCE_PATH   := src $(BOLOS_SDK)/src $(dir $(shell find $(BOLOS_SDK)/lib_stusb* | grep "\.c$$"))
-SOURCE_FILES  := $(foreach path, $(SOURCE_PATH),$(shell find $(path) | grep -E "\.c$$|\.s") ) $(GLYPH_DEST)
+SOURCE_FILES  := $(foreach path, $(SOURCE_PATH),$(shell find $(path) | grep -E "\.c$$|\.s") ) $(GLYPH_DESTC)
 INCLUDES_PATH := $(dir $(shell find $(BOLOS_SDK)/lib_stusb* | grep "\.h$$")) include src $(BOLOS_SDK)/include $(BOLOS_SDK)/include/arm
+
 
 ### platform definitions
 DEFINES := ST31 gcc __IO=volatile
 
 DEFINES   += OS_IO_SEPROXYHAL IO_SEPROXYHAL_BUFFER_SIZE_B=300
-DEFINES   += HAVE_BAGL HAVE_PRINTF 
+DEFINES   += HAVE_BAGL HAVE_SPRINTF
+#DEFINES   += HAVE_PRINTF PRINTF=screen_printf
+DEFINES   += PRINTF\(...\)=
 DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=6 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
+DEFINES   += LEDGER_MAJOR_VERSION=$(APPVERSION_M) LEDGER_MINOR_VERSION=$(APPVERSION_N) LEDGER_PATCH_VERSION=$(APPVERSION_P) TCS_LOADER_PATCH_VERSION=0
 
-DEFINES   += LEDGER_MAJOR_VERSION=1 LEDGER_MINOR_VERSION=1 LEDGER_PATCH_VERSION=2 TCS_LOADER_PATCH_VERSION=0
+# ifndef COIN
+# COIN =bitcoin
+# endif
 
-ifndef COIN
-COIN = bitcoin
+ifeq ($(COIN),bitcoin_testnet)
+# Bitcoin testnet
+DEFINES  += BTCHIP_P2PKH_VERSION=111 BTCHIP_P2SH_VERSION=196 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Bitcoin\" COINID_UPCASE=\"BITCOIN\" COLOR_HDR=0xFCB653 COLOR_DB=0xFEDBA9 COINID_NAME=\"Bitcoin\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"TEST\" COIN_BITCOIN_TESTNET
+APPNAME ="Bitcoin Test"
+else ifeq ($(COIN),bitcoin)
+# Bitcoin mainnet
+DEFINES   += BTCHIP_P2PKH_VERSION=0 BTCHIP_P2SH_VERSION=5 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Bitcoin\" COINID_UPCASE=\"BITCOIN\" COLOR_HDR=0xFCB653 COLOR_DB=0xFEDBA9 COINID_NAME=\"Bitcoin\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"BTC\" COIN_BITCOIN
+APPNAME ="Bitcoin"
+else ifeq ($(COIN),litecoin)
+# Litecoin
+DEFINES   += BTCHIP_P2PKH_VERSION=48 BTCHIP_P2SH_VERSION=5 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Litecoin\" COINID_UPCASE=\"LITECOIN\" COLOR_HDR=0xCCCCCC COLOR_DB=0xE6E6E6 COINID_NAME=\"Litecoin\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"LTC\" COIN_LITECOIN
+APPNAME ="Litecoin"
+else ifeq ($(COIN),dogecoin)
+# Doge
+DEFINES   += BTCHIP_P2PKH_VERSION=30 BTCHIP_P2SH_VERSION=22 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Dogecoin\" COINID_UPCASE=\"DOGECOIN\" COLOR_HDR=0x65D196 COLOR_DB=0xB2E8CB COINID_NAME=\"Dogecoin\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"DOGE\" COIN_DOGE
+APPNAME ="Dogecoin"
+else ifeq ($(COIN),dash)
+# Dash
+DEFINES   += BTCHIP_P2PKH_VERSION=76 BTCHIP_P2SH_VERSION=16 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"DarkCoin\" COINID_UPCASE=\"DASH\" COLOR_HDR=0x0E76AA COLOR_DB=0x87BBD5 COINID_NAME=\"Dash\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"DASH\" COIN_DASH
+APPNAME ="Dash"
+else ifeq ($(COIN),zcash)
+# Zcash
+DEFINES   += BTCHIP_P2PKH_VERSION=7352 BTCHIP_P2SH_VERSION=7357 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Zcash\" COINID_UPCASE=\"ZCASH\" COLOR_HDR=0x3790CA COLOR_DB=0x9BC8E5 COINID_NAME=\"Zcash\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"ZEC\" COIN_ZCASH
+APPNAME ="Zcash"
+else ifeq ($(COIN),stratis)
+# Stratis 
+DEFINES   += BTCHIP_P2PKH_VERSION=63 BTCHIP_P2SH_VERSION=125 BTCHIP_COIN_FAMILY=2 BTCHIP_COINID=\"Stratis\" COINID_UPCASE=\"STRAT\" COLOR_HDR=0x3790CA COLOR_DB=0x9BC8E5 COINID_NAME=\"Strat\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"STRAT\" COIN_STRATIS HAVE_PEERCOIN_SUPPORT
+APPNAME ="Stratis"
+else
+ifeq ($(filter clean,$(MAKECMDGOALS)),)
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, litecoin, dogecoin, dash, zcash, stratis) 
+endif
 endif
 
-ifeq ($(COIN), bitcoin-testnet)
-# Bitcoin testnet
-DEFINES  += BTCHIP_P2PKH_VERSION=111 BTCHIP_P2SH_VERSION=196 BTCHIP_COINID=\"Bitcoin\" BTCHIP_COINID_SHORT=\"TEST\" COIN_BITCOIN_TESTNET
-APPNAME ="Bitcoin"
-ICONNAME=icon_bitcoin.gif
-else ifeq ($(COIN), bitcoin)
-# Bitcoin mainnet
-DEFINES   += BTCHIP_P2PKH_VERSION=0 BTCHIP_P2SH_VERSION=5 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Bitcoin\" BTCHIP_COINID_SHORT=\"BTC\" COIN_BITCOIN
-APPNAME ="Bitcoin"
-ICONNAME=icon_bitcoin.gif
-SIGNATURE=3045022100d7a784ba23f5eac9c82a8c132274d62de921039ccd6cc6ac24614a35329d20ae0220759dc74de0b509608a0e0d82e0ae5d0a07028c7411bf7e3368e7fe290360b274
-else ifeq ($(COIN), litecoin)
-# Litecoin
-DEFINES   += BTCHIP_P2PKH_VERSION=48 BTCHIP_P2SH_VERSION=5 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Litecoin\" BTCHIP_COINID_SHORT=\"LTC\" COIN_LITECOIN
-APPNAME ="Litecoin"
-ICONNAME=icon_litecoin.gif
-SIGNATURE=3045022100f2b8109a13ac96dfd78403647bbb07e654579ea4b1b80b9bff7eb0ea5b083c6002204b1ae026ff40dbc19fcaef86e2d1d189241d7bc0d23ee95dc8718e84fe041f5d
-else ifeq ($(COIN), dogecoin)
-# Doge
-DEFINES   += BTCHIP_P2PKH_VERSION=30 BTCHIP_P2SH_VERSION=22 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Dogecoin\" BTCHIP_COINID_SHORT=\"DOGE\" COIN_DOGE
-APPNAME ="Dogecoin"
-ICONNAME=icon_doge.gif
-else ifeq ($(COIN), dash)
-# Dash
-DEFINES   += BTCHIP_P2PKH_VERSION=76 BTCHIP_P2SH_VERSION=16 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"DarkCoin\" BTCHIP_COINID_SHORT=\"DASH\" COIN_DASH
-APPNAME ="Dash"
-ICONNAME=icon_dash.gif
-else ifeq ($(COIN), zcash)
-# ZCash 
-DEFINES   += BTCHIP_P2PKH_VERSION=7352 BTCHIP_P2SH_VERSION=7357 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Zcash\" BTCHIP_COINID_SHORT=\"ZEC\" COIN_ZCASH
-APPNAME ="Zcash"
-ICONNAME=icon_zcash.gif
+ifeq ($(TARGET_ID),0x31000002)
+ICONNAME=icon_$(COIN)_blue.gif
 else
-$(error Unsupported COIN - use bitcoin-testnet, bitcoin, litecoin, dogecoin, dash, zcash) 
+ICONNAME=icon_$(COIN).gif
 endif
 
 # U2F
@@ -109,8 +129,6 @@ DEFINES   += BLE_SEGMENT_SIZE=32 #max MTU, min 20
 #DEFINES   += U2F_MAX_MESSAGE_SIZE=264 #257+5+2
 DEFINES    += U2F_MAX_MESSAGE_SIZE=200
 DEFINES   += UNUSED\(x\)=\(void\)x
-DEFINES   += PRINTF\(...\)=
-DEFINES   += TARGET_ID=$(TARGET_ID)
 
 ##############
 # Compiler #
@@ -151,7 +169,7 @@ LDFLAGS  += -fno-common -ffunction-sections -fdata-sections -fwhole-program -nos
 LDFLAGS  += -mno-unaligned-access
 #LDFLAGS  += -nodefaultlibs
 #LDFLAGS  += -nostdlib -nostdinc
-LDFLAGS  += -Tscript.ld  -Wl,--gc-sections -Wl,-Map,debug/$(PROG).map,--cref
+LDFLAGS  += -T$(BOLOS_SDK)/script.ld  -Wl,--gc-sections -Wl,-Map,debug/$(PROG).map,--cref
 LDLIBS   += -Wl,--library-path -Wl,$(GCCPATH)/../lib/armv6-m/
 #LDLIBS   += -Wl,--start-group 
 LDLIBS   += -lm -lgcc -lc 
@@ -169,9 +187,9 @@ ifeq ($(filter clean,$(MAKECMDGOALS)),)
 endif
 
 clean:
-	rm -fr obj bin debug dep $(GLYPH_DEST)
+	rm -fr obj bin debug dep $(GLYPH_DESTC) $(GLYPH_DESTH)
 
-prepare: $(GLYPH_DEST)
+prepare: $(GLYPH_DESTC)
 	@mkdir -p bin obj debug dep
 
 .SECONDEXPANSION:
@@ -181,16 +199,15 @@ log = $(if $(strip $(VERBOSE)),$1,@$1)
 
 default: prepare bin/$(PROG)
 
-load:
-	python -m ledgerblue.loadApp --targetId $(TARGET_ID) --fileName bin/$(PROG).hex --appName $(APPNAME) --icon `python $(BOLOS_SDK)/icon.py 16 16 $(ICONNAME) hexbitmaponly` $(APP_LOAD_PARAMS)
+reload: delete load
 
-load_release:
-	python -m ledgerblue.loadApp --targetId $(TARGET_ID) --fileName bin/$(PROG).hex --appName $(APPNAME) --icon `python $(BOLOS_SDK)/icon.py 16 16 $(ICONNAME) hexbitmaponly` $(APP_LOAD_PARAMS) --signature $(SIGNATURE)
+load: all
+	python -m ledgerblue.loadApp --targetId $(TARGET_ID) --fileName bin/$(PROG).hex --appName $(APPNAME) --icon `python $(BOLOS_SDK)/icon.py $(ICONNAME) hexbitmaponly` $(LOADFLAGS) $(APP_LOAD_PARAMS)
 
 delete:
 	python -m ledgerblue.deleteApp --targetId $(TARGET_ID) --appName $(APPNAME)
 
-bin/$(PROG): $(OBJECT_FILES) script.ld
+bin/$(PROG): $(OBJECT_FILES) $(BOLOS_SDK)/script.ld
 	@echo "[LINK] 	$@"
 	$(call log,$(call link_cmdline,$(OBJECT_FILES) $(LDLIBS),$@))
 	$(call log,$(GCCPATH)/arm-none-eabi-objcopy -O ihex -S bin/$(PROG) bin/$(PROG).hex)
