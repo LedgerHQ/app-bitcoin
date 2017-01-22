@@ -294,7 +294,8 @@ LedgerBtc.prototype.startUntrustedHashTransactionInput_async = function (newTran
 							blockFinishedCallback();
 							}).fail(function (err) { deferred.reject(err); });
 						},
-						function(finished) {          	  		
+						function(finished) { 
+							i++;	
 							finishedCallback();
 						}
 					);
