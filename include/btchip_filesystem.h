@@ -33,6 +33,9 @@ enum btchip_supported_modes_e {
 
 enum btchip_family_e {
     BTCHIP_FAMILY_BITCOIN = 0x01,
+#ifdef HAVE_PEERCOIN_SUPPORT
+    BTCHIP_FAMILY_PEERCOIN = 0x02
+#endif
 };
 
 struct btchip_config_s {

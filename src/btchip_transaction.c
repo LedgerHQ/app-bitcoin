@@ -202,6 +202,13 @@ void transaction_parse(unsigned char parseMode) {
                     os_memmove(btchip_context_D.transactionVersion,
                                btchip_context_D.transactionBufferPointer, 4);
                     transaction_offset_increase(4);
+#ifdef HAVE_PEERCOIN_SUPPORT
+                    if (btchip_context_D.coinFamily == BTCHIP_FAMILY_PEERCOIN) {
+                        // Timestamp
+                        check_transaction_available(4);
+                        transaction_offset_increase(4);
+                    }
+#endif
                     // Number of inputs
                     btchip_context_D.transactionContext
                         .transactionRemainingInputsOutputs =

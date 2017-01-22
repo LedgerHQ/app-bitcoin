@@ -52,6 +52,9 @@ unsigned short btchip_apdu_set_alternate_coin_version() {
 
     switch (G_io_apdu_buffer[offset + 4]) {
     case BTCHIP_FAMILY_BITCOIN:
+#ifdef HAVE_PEERCOIN_SUPPORT
+    case BTCHIP_FAMILY_PEERCOIN:
+#endif
         break;
     default:
         return BTCHIP_SW_INCORRECT_DATA;
