@@ -1333,7 +1333,7 @@ const bagl_element_t ui_verify_nanos[] = {
      NULL},
     {{BAGL_LABELINE, 0x01, 43, 26, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
-     "transaction",
+     "output",
      0,
      0,
      0,
@@ -1400,6 +1400,89 @@ const bagl_element_t ui_verify_nanos[] = {
 };
 unsigned int ui_verify_nanos_button(unsigned int button_mask,
                                     unsigned int button_mask_counter);
+
+const bagl_element_t ui_finalize_nanos[] = {
+    // type                               userid    x    y   w    h  str rad
+    // fill      fg        bg      fid iid  txt   touchparams...       ]
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_ICON, 0x00, 3, 12, 7, 7, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CROSS},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_ICON, 0x00, 117, 13, 8, 6, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CHECK},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_ICON, 0x01, 21, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_TRANSACTION_BADGE},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x01, 42, 12, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
+     "Confirm",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x01, 43, 26, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
+     "Transaction",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x02, 0, 12, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Fees",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x02, 23, 26, 82, 11, 0x80 | 10, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 26},
+     feesAmount,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+};
+unsigned int ui_finalize_nanos_button(unsigned int button_mask,
+                                    unsigned int button_mask_counter);
+
 
 const bagl_element_t ui_verify_p2sh_nanos[] = {
     // type                               userid    x    y   w    h  str rad
@@ -1481,7 +1564,23 @@ unsigned int ui_verify_prepro(const bagl_element_t *element) {
             case 3:
                 UX_CALLBACK_SET_INTERVAL(3000);
                 break;
-            case 4:
+            }
+        }
+        return display;
+    }
+    return 1;
+}
+
+// display or not according to step, and adjust delay
+unsigned int ui_finalize_prepro(const bagl_element_t *element) {
+    if (element->component.userid > 0) {
+        unsigned int display = (ux_step == element->component.userid - 1);
+        if (display) {
+            switch (element->component.userid) {
+            case 1:
+                UX_CALLBACK_SET_INTERVAL(2000);
+                break;
+            case 2:
                 UX_CALLBACK_SET_INTERVAL(MAX(
                     3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
                 break;
@@ -1491,6 +1590,7 @@ unsigned int ui_verify_prepro(const bagl_element_t *element) {
     }
     return 1;
 }
+
 
 const bagl_element_t ui_verify_message_signature_nanos[] = {
     // type                               userid    x    y   w    h  str rad
@@ -1712,17 +1812,19 @@ unsigned int ui_settings_fido_nanos_button(unsigned int button_mask,
 
 unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e) {
     // user denied the transaction, tell the USB side
-    btchip_bagl_user_action(0);
-    // redraw ui
-    ui_idle();
+    if (!btchip_bagl_user_action(0)) {
+        // redraw ui
+        ui_idle();
+    }
     return 0; // DO NOT REDRAW THE BUTTON
 }
 
 unsigned int io_seproxyhal_touch_verify_ok(const bagl_element_t *e) {
     // user accepted the transaction, tell the USB side
-    btchip_bagl_user_action(1);
-    // redraw ui
-    ui_idle();
+    if (!btchip_bagl_user_action(1)) {
+        // redraw ui
+        ui_idle();
+    }
     return 0; // DO NOT REDRAW THE BUTTON
 }
 
@@ -1758,6 +1860,21 @@ unsigned int ui_verify_nanos_button(unsigned int button_mask,
     }
     return 0;
 }
+
+unsigned int ui_finalize_nanos_button(unsigned int button_mask,
+                                    unsigned int button_mask_counter) {
+    switch (button_mask) {
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT:
+        io_seproxyhal_touch_verify_cancel(NULL);
+        break;
+
+    case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
+        io_seproxyhal_touch_verify_ok(NULL);
+        break;
+    }
+    return 0;
+}
+
 
 unsigned int ui_verify_p2sh_nanos_button(unsigned int button_mask,
                                          unsigned int button_mask_counter) {
@@ -1941,7 +2058,112 @@ unsigned char io_event(unsigned char channel) {
     return 1;
 }
 
+uint8_t prepare_fees() {
+    if (btchip_context_D.transactionContext.relaxed) {
+        os_memmove(feesAmount, "UNKNOWN", 7);
+        feesAmount[7] = '\0';
+    }
+    else {
+        unsigned char fees[8];
+        unsigned short textSize;
+        if (transaction_amount_sub_be(
+            fees, btchip_context_D.transactionContext.transactionAmount,
+            btchip_context_D.totalOutputAmount)) {
+            PRINTF("Error : Fees not consistent");
+            goto error;
+        }
+        os_memmove(feesAmount, btchip_context_D.shortCoinId,
+            btchip_context_D.shortCoinIdLength);
+        feesAmount[btchip_context_D.shortCoinIdLength] = ' ';
+        btchip_context_D.tmp =
+                    (unsigned char *)(feesAmount +
+                                      btchip_context_D.shortCoinIdLength + 1);
+        textSize = btchip_convert_hex_amount_to_displayable(fees);
+        feesAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
+                    '\0';
+    }
+    return 1;
+error:
+    return 0;    
+}
+
 uint8_t prepare_full_output() {
+
+    //TODO : special display for OP_RETURN
+    unsigned char amount[8];    
+    char tmp[40];
+    unsigned int offset = 0;
+    unsigned char versionSize;
+    int addressOffset;
+    unsigned char address[22];
+    unsigned short version;
+    unsigned short textSize;    
+
+    btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset,
+                              8);
+    offset += 8;
+    if (btchip_output_script_is_op_return(btchip_context_D.currentOutput + offset)) {
+        os_memmove(addressSummary, "OP_RETURN", 9);
+        os_memmove(fullAddress, "OP_RETURN", 9);
+        addressSummary[10] = '\0';
+        fullAddress[10] = '\0';
+        fullAmount[0] = '\0';
+        return 1;
+    }
+    else    
+    if (btchip_output_script_is_regular(btchip_context_D.currentOutput +
+                                                offset)) {
+        addressOffset = offset + 4;
+        version = btchip_context_D.payToAddressVersion;
+    } 
+    else
+    {
+        addressOffset = offset + 3;
+        version = btchip_context_D.payToScriptHashVersion;
+    }
+    if (version > 255) {
+        versionSize = 2;
+        address[0] = (version >> 8);
+        address[1] = version;
+    } else {
+        versionSize = 1;
+        address[0] = version;
+    }
+    os_memmove(address + versionSize,
+                    btchip_context_D.currentOutput + addressOffset, 20);
+            
+                
+    // Prepare address
+    textSize = btchip_public_key_to_encoded_base58(
+        address, 20 + versionSize, (unsigned char *)tmp,
+        sizeof(tmp), version, 1);
+    tmp[textSize] = '\0';
+
+#if TARGET_ID == 0x31000002
+    os_memmove(fullAddress, tmp, textSize + 1);
+#endif
+
+    os_memset(addressSummary, 0, sizeof(addressSummary));
+    os_memmove((void *)addressSummary, tmp, 5);
+    os_memmove((void *)(addressSummary + 5), "...", 3);
+    os_memmove((void *)(addressSummary + 8), tmp + strlen(tmp) - 4,
+                           4);
+
+    // Prepare amount
+
+    os_memmove(fullAmount, btchip_context_D.shortCoinId,
+                           btchip_context_D.shortCoinIdLength);
+    fullAmount[btchip_context_D.shortCoinIdLength] = ' ';
+    btchip_context_D.tmp =
+                    (unsigned char *)(fullAmount +
+                                      btchip_context_D.shortCoinIdLength + 1);
+    textSize = btchip_convert_hex_amount_to_displayable(amount);
+    fullAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
+                    '\0';
+
+    return 1;
+
+#if 0
     unsigned int offset = 0;
     int numberOutputs;
     int i;
@@ -1949,6 +2171,9 @@ uint8_t prepare_full_output() {
     unsigned char amount[8], totalOutputAmount[8], fees[8];
     char tmp[40];
     unsigned char outputPos = 0, changeFound = 0;
+
+
+
     if (btchip_context_D.transactionContext.relaxed &&
         !btchip_context_D.transactionContext.consumeP2SH) {
         PRINTF("Error : Mixed inputs");
@@ -2103,6 +2328,7 @@ uint8_t prepare_full_output() {
     return 1;
 error:
     return 0;
+#endif    
 }
 
 #define HASH_LENGTH 4
@@ -2121,15 +2347,12 @@ uint8_t prepare_message_signature() {
 
 unsigned int btchip_bagl_confirm_full_output() {
     // TODO : remove when supporting multi output
+#if TARGET_ID == 0x31000002    
     if (btchip_context_D.transactionContext.consumeP2SH) {
-#if TARGET_ID == 0x31000002
         ui_transaction_p2sh_blue_init();
-#elif TARGET_ID == 0x31100002
-        // no preprocessing
-        UX_DISPLAY(ui_verify_p2sh_nanos, NULL);
-#endif // #if TARGET_ID
         return 1;
     }
+#endif    
 
     if (!prepare_full_output()) {
         return 0;
@@ -2139,8 +2362,28 @@ unsigned int btchip_bagl_confirm_full_output() {
     ui_transaction_blue_init();
 #elif TARGET_ID == 0x31100002
     ux_step = 0;
-    ux_step_count = 4;
+    ux_step_count = 3;
     UX_DISPLAY(ui_verify_nanos, ui_verify_prepro);
+#endif // #if TARGET_ID
+    return 1;
+}
+
+
+unsigned int btchip_bagl_finalize_tx() {
+
+    if (!prepare_fees()) {
+        return 0;
+    }
+
+#if TARGET_ID == 0x31000002
+
+    #error "TODO BLUE FINALIZE TX"
+
+    ui_transaction_blue_init();
+#elif TARGET_ID == 0x31100002
+    ux_step = 0;
+    ux_step_count = 2;
+    UX_DISPLAY(ui_finalize_nanos, ui_finalize_prepro);
 #endif // #if TARGET_ID
     return 1;
 }

@@ -70,7 +70,6 @@ unsigned short btchip_apdu_hash_input_start() {
             os_memset(&btchip_context_D.tmpCtx.output, 0,
                       sizeof(btchip_context_D.tmpCtx.output));
             btchip_context_D.tmpCtx.output.changeAccepted = 1;
-            btchip_context_D.tmpCtx.output.outputCrc = CX_CRC16_INIT;
         }
     } else if (G_io_apdu_buffer[ISO_OFFSET_P2] != P2_CONTINUE) {
         return BTCHIP_SW_INCORRECT_P1_P2;

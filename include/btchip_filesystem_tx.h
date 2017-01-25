@@ -32,7 +32,6 @@ struct btchip_transaction_summary_data_s {
     unsigned char isP2sh;
     unsigned char arbitraryChange;
     unsigned char relaxed;
-    unsigned char outputAmount[8];
     unsigned char fees[8];           // only in wallet mode
     unsigned char changeAmount[8];   // only in wallet mode
     unsigned char outputAddress[21]; // only in wallet mode
@@ -43,11 +42,12 @@ typedef struct btchip_transaction_summary_data_s
     btchip_transaction_summary_data_t;
 
 struct btchip_transaction_summary_s {
-    unsigned char active;
+#if 0    
 #define ACTION_NONE 0
 #define ACTION_REQUIRED 1
 #define ACTION_DONE 2
     unsigned char action;
+#endif    
     unsigned char payToAddressVersion;
     unsigned char payToScriptHashVersion;
     unsigned char authorizationHash[32];

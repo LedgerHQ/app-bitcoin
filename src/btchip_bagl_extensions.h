@@ -3,10 +3,13 @@
 #define __BTCHIP_BAGL_H__
 
 // btchip asking the UI
-unsigned int btchip_bagl_confirm_full_output();
+unsigned int btchip_bagl_confirm_full_output(void);
+
+// btchip finalizing the transaction
+unsigned int btchip_bagl_finalize_tx(void);
 
 // UI response to btchip to finish the exchange
-void btchip_bagl_user_action(unsigned char confirming);
+unsigned char btchip_bagl_user_action(unsigned char confirming);
 
 // request the UI to redisplay the idle screen
 void btchip_bagl_idle(void);

@@ -23,7 +23,7 @@
 #include "btchip_secure_value.h"
 #include "btchip_filesystem_tx.h"
 
-#define MAX_OUTPUT_TO_CHECK 200
+#define MAX_OUTPUT_TO_CHECK 100
 #define MAX_COIN_ID 10
 #define MAX_SHORT_COIN_ID 5
 
@@ -80,6 +80,14 @@ enum btchip_transaction_state_e {
 };
 typedef enum btchip_transaction_state_e btchip_transaction_state_t;
 
+enum btchip_output_parsing_state_e {
+    BTCHIP_OUTPUT_PARSING_NONE = 0x00,
+    BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS = 0x01,
+    BTCHIP_OUTPUT_PARSING_OUTPUT = 0x02,
+    BTCHIP_OUTPUT_FINALIZE_TX = 0x03
+};
+typedef enum btchip_output_parsing_state_e btchip_output_parsing_state_t;
+
 struct segwit_hash_s {
     cx_sha256_t hashPrevouts;
     cx_sha256_t hashSequence;
@@ -130,8 +138,6 @@ struct btchip_tmp_output_s {
     unsigned char changeAccepted;
     /** Flag set if the outputs have been fragmented */
     unsigned char multipleOutput;
-    /** Crc of the cleartext output */
-    unsigned short outputCrc;
 };
 typedef struct btchip_tmp_output_s btchip_tmp_output_t;
 
@@ -215,6 +221,11 @@ struct btchip_context_s {
 
     unsigned char currentOutput[MAX_OUTPUT_TO_CHECK];
     unsigned short currentOutputOffset;
+    unsigned int remainingOutputs;
+    unsigned int discardSize;
+    unsigned char outputParsingState;
+    unsigned char totalOutputAmount[8];
+    unsigned char changeOutputFound;
 };
 typedef struct btchip_context_s btchip_context_t;
 
