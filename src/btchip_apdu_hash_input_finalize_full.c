@@ -44,12 +44,15 @@ static void btchip_apdu_hash_input_finalize_full_reset(void) {
     btchip_context_D.currentOutputOffset = 0;
     btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS;
     os_memset(btchip_context_D.totalOutputAmount, 0, sizeof(btchip_context_D.totalOutputAmount));
+    os_memset(btchip_context_D.totalNoChangeOutputAmount, 0, sizeof(btchip_context_D.totalNoChangeOutputAmount));
     btchip_context_D.changeOutputFound = 0;
+    btchip_context_D.outputCount = 0;
     btchip_set_check_internal_structure_integrity(1);
 }
 
 static bool check_output_displayable() {
     bool displayable = true;
+    bool foundChange = false;
     unsigned char amount[8], isOpReturn, isP2sh, j, nullAmount = 1;
     for (j = 0; j < 8; j++) {
         if (btchip_context_D.currentOutput[j] != 0) {
@@ -80,10 +83,19 @@ static bool check_output_displayable() {
                     PRINTF("Error : Multiple change output found");
                     THROW(EXCEPTION);
                 }
+                foundChange = true;
                 btchip_context_D.changeOutputFound = true;
                 displayable = false;
             }
     }
+
+    if (!foundChange) {
+        transaction_amount_add_be(btchip_context_D.totalNoChangeOutputAmount, btchip_context_D.totalNoChangeOutputAmount, amount);        
+    }
+
+    displayable = displayable && !(btchip_context_D.outputCount % OUTPUT_DISPLAY_STEP);
+    btchip_context_D.outputCount++;        
+
     return displayable;
 }
 

@@ -130,6 +130,9 @@ DEFINES   += BLE_SEGMENT_SIZE=32 #max MTU, min 20
 DEFINES    += U2F_MAX_MESSAGE_SIZE=200
 DEFINES   += UNUSED\(x\)=\(void\)x
 
+# Display step
+DEFINES	  += OUTPUT_DISPLAY_STEP=10
+
 ##############
 # Compiler #
 ##############

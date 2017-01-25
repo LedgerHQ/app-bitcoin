@@ -1463,7 +1463,7 @@ const bagl_element_t ui_finalize_nanos[] = {
 
     {{BAGL_LABELINE, 0x02, 0, 12, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "Fees",
+     "Amount sent",
      0,
      0,
      0,
@@ -1471,6 +1471,26 @@ const bagl_element_t ui_finalize_nanos[] = {
      NULL,
      NULL},
     {{BAGL_LABELINE, 0x02, 23, 26, 82, 11, 0x80 | 10, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 26},
+     fullAmount,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+
+    {{BAGL_LABELINE, 0x03, 0, 12, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Fees",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x03, 23, 26, 82, 11, 0x80 | 10, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 26},
      feesAmount,
      0,
@@ -1584,6 +1604,10 @@ unsigned int ui_finalize_prepro(const bagl_element_t *element) {
                 UX_CALLBACK_SET_INTERVAL(MAX(
                     3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
                 break;
+            case 3:
+                UX_CALLBACK_SET_INTERVAL(MAX(
+                    3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
+                break;                
             }
         }
         return display;
@@ -2059,13 +2083,24 @@ unsigned char io_event(unsigned char channel) {
 }
 
 uint8_t prepare_fees() {
+    unsigned short textSize;
+
+    os_memmove(fullAmount, btchip_context_D.shortCoinId,
+                           btchip_context_D.shortCoinIdLength);
+    fullAmount[btchip_context_D.shortCoinIdLength] = ' ';
+    btchip_context_D.tmp =
+                    (unsigned char *)(fullAmount +
+                                      btchip_context_D.shortCoinIdLength + 1);
+    textSize = btchip_convert_hex_amount_to_displayable(btchip_context_D.totalNoChangeOutputAmount);
+    fullAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
+                    '\0';
+
     if (btchip_context_D.transactionContext.relaxed) {
         os_memmove(feesAmount, "UNKNOWN", 7);
         feesAmount[7] = '\0';
     }
     else {
-        unsigned char fees[8];
-        unsigned short textSize;
+        unsigned char fees[8];        
         if (transaction_amount_sub_be(
             fees, btchip_context_D.transactionContext.transactionAmount,
             btchip_context_D.totalOutputAmount)) {
@@ -2382,7 +2417,7 @@ unsigned int btchip_bagl_finalize_tx() {
     ui_transaction_blue_init();
 #elif TARGET_ID == 0x31100002
     ux_step = 0;
-    ux_step_count = 2;
+    ux_step_count = 3;
     UX_DISPLAY(ui_finalize_nanos, ui_finalize_prepro);
 #endif // #if TARGET_ID
     return 1;
