@@ -110,9 +110,13 @@ else ifeq ($(COIN),stratis)
 # Stratis 
 DEFINES   += BTCHIP_P2PKH_VERSION=63 BTCHIP_P2SH_VERSION=125 BTCHIP_COIN_FAMILY=2 BTCHIP_COINID=\"Stratis\" COINID_UPCASE=\"STRAT\" COLOR_HDR=0x3790CA COLOR_DB=0x9BC8E5 COINID_NAME=\"Strat\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"STRAT\" COIN_STRATIS HAVE_PEERCOIN_SUPPORT
 APPNAME ="Stratis"
+else ifeq ($(COIN),peercoin)
+# Peercoin
+DEFINES += BTCHIP_P2PKH_VERSION=55 BTCHIP_P2SH_VERSION=117 BTCHIP_COIN_FAMILY=2 BTCHIP_COINID=\"Peercoin\" COINID_UPCASE=\"PPC\" COLOR_HDR=0x3790CA COLOR_DB=0x9BC8E5 COINID_NAME=\"Peercoin\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"PPC\" COIN_PEERCOIN HAVE_PEERCOIN_SUPPORT
+APPNAME ="Peercoin"
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, litecoin, dogecoin, dash, zcash, stratis) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, litecoin, dogecoin, dash, zcash, stratis, peercoin) 
 endif
 endif
 
