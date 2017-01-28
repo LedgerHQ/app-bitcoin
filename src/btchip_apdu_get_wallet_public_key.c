@@ -18,14 +18,32 @@
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
 
+#include "btchip_bagl_extensions.h"
+
+#ifdef HAVE_U2F
+
+#include "u2f_service.h"
+#include "u2f_transport.h"
+
+extern bool fidoActivated;
+extern volatile u2f_service_t u2fService;
+void u2f_proxy_response(u2f_service_t *service, unsigned int tx);
+
+#endif
+
+#define P1_NO_DISPLAY 0x00
+#define P1_DISPLAY 0x01
+
 unsigned short btchip_apdu_get_wallet_public_key() {
     unsigned char keyLength;
     unsigned char uncompressedPublicKeys =
         ((N_btchip.bkp.config.options & BTCHIP_OPTION_UNCOMPRESSED_KEYS) != 0);
     unsigned char keyPath[MAX_BIP32_PATH_LENGTH];
     unsigned char chainCode[32];
+    bool display = (G_io_apdu_buffer[ISO_OFFSET_P1] == P1_DISPLAY);
 
-    if ((G_io_apdu_buffer[ISO_OFFSET_P1] != 0x00) ||
+    if (((G_io_apdu_buffer[ISO_OFFSET_P1] != P1_NO_DISPLAY) && 
+        (G_io_apdu_buffer[ISO_OFFSET_P1] != P1_DISPLAY)) || 
         (G_io_apdu_buffer[ISO_OFFSET_P2] != 0x00)) {
         return BTCHIP_SW_INCORRECT_P1_P2;
     }
@@ -82,5 +100,48 @@ unsigned short btchip_apdu_get_wallet_public_key() {
                sizeof(chainCode));
     btchip_context_D.outLength = 1 + 65 + 1 + keyLength + sizeof(chainCode);
 
+    if (display) {
+        if (keyLength > 50) {
+            return BTCHIP_SW_INCORRECT_DATA;
+        }
+        // Hax, avoid wasting space
+        os_memmove(G_io_apdu_buffer + 200, G_io_apdu_buffer + 67, keyLength);
+        G_io_apdu_buffer[200 + keyLength] = '\0';
+        btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
+        if (!btchip_bagl_display_public_key()) {
+            btchip_context_D.io_flags &= ~IO_ASYNCH_REPLY;
+            btchip_context_D.outLength = 0;
+            return BTCHIP_SW_INCORRECT_DATA;
+        }
+    }
+
     return BTCHIP_SW_OK;
 }
+
+void btchip_bagl_user_action_display(unsigned char confirming) {
+    unsigned short sw = BTCHIP_SW_OK;
+    // confirm and finish the apdu exchange //spaghetti
+    if (confirming) {
+        btchip_context_D.outLength -=
+            2; // status was already set by the last call
+
+    } else {
+        sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
+        btchip_context_D.outLength = 0;
+    }
+    G_io_apdu_buffer[btchip_context_D.outLength++] = sw >> 8;
+    G_io_apdu_buffer[btchip_context_D.outLength++] = sw;
+
+#ifdef HAVE_U2F
+    if (fidoActivated) {
+        u2f_proxy_response((u2f_service_t *)&u2fService,
+                           btchip_context_D.outLength);
+    } else {
+        io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX,
+                    btchip_context_D.outLength);
+    }
+#else
+    io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, btchip_context_D.outLength);
+#endif
+}
+
