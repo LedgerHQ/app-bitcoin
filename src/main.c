@@ -79,6 +79,8 @@ unsigned int
 io_seproxyhal_touch_message_signature_verify_cancel(const bagl_element_t *e);
 unsigned int
 io_seproxyhal_touch_message_signature_verify_ok(const bagl_element_t *e);
+unsigned int io_seproxyhal_touch_display_cancel(const bagl_element_t *e);
+unsigned int io_seproxyhal_touch_display_ok(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e);
 void ui_idle(void);
 
@@ -249,117 +251,59 @@ unsigned int ui_idle_blue_button(unsigned int button_mask,
 #endif // #if TARGET_ID == 0x31000002
 
 #if TARGET_ID == 0x31100002
-const bagl_element_t ui_idle_nanos[] = {
-    // type                               userid    x    y   w    h  str rad
-    // fill      fg        bg      fid iid  txt   touchparams...       ]
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF,
-      0, 0},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
 
-    {{BAGL_LABELINE, 0x01, 33, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
-      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
-     "Use wallet to",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABELINE, 0x01, 34, 26, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
-      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
-     "view accounts",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_ICON, 0x01, 118, 14, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
-      BAGL_GLYPH_ICON_DOWN},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
+const ux_menu_entry_t menu_main[];
+const ux_menu_entry_t menu_settings[];
+const ux_menu_entry_t menu_settings_browser[];
 
-    {{BAGL_LABELINE, 0x02, 0, 19, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
-      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "Settings",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_ICON, 0x02, 3, 14, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
-      BAGL_GLYPH_ICON_UP},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_ICON, 0x02, 118, 14, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
-      BAGL_GLYPH_ICON_DOWN},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    {{BAGL_ICON, 0x03, 29, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
-      BAGL_GLYPH_ICON_DASHBOARD_BADGE},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    //{{BAGL_LABELINE                       , 0x02,   0,   3, 128,  32, 0, 0, 0
-    //, 0xFFFFFF, 0x000000,
-    //BAGL_FONT_OPEN_SANS_REGULAR_11px|BAGL_FONT_ALIGNMENT_CENTER, 0  }, "view
-    //accounts", 0, 0, 0, NULL, NULL, NULL },
-    {{BAGL_LABELINE, 0x03, 50, 19, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
-      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
-     "Quit app",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_ICON, 0x03, 3, 14, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
-      BAGL_GLYPH_ICON_UP},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-};
-unsigned int ui_idle_nanos_button(unsigned int button_mask,
-                                  unsigned int button_mask_counter);
-
-unsigned int ui_idle_nanos_state;
-unsigned int ui_idle_nanos_prepro(const bagl_element_t *element) {
-    if (element->component.userid > 0) {
-        return (ui_idle_nanos_state == element->component.userid - 1);
-    }
-    return 1;
+#ifdef HAVE_U2F
+// change the setting
+void menu_settings_browser_change(unsigned int enabled) {
+    fidoTransport = enabled;
+    nvm_write(&N_btchip.fidoTransport, (void *)&fidoTransport, sizeof(uint8_t));
+    USB_power_U2F(0, 0);
+    USB_power_U2F(1, N_btchip.fidoTransport);
+    // go back to the menu entry
+    UX_MENU_DISPLAY(0, menu_settings, NULL);
 }
+
+// show the currently activated entry
+void menu_settings_browser_init(unsigned int ignored) {
+    UNUSED(ignored);
+    UX_MENU_DISPLAY(N_btchip.fidoTransport ? 1 : 0, menu_settings_browser,
+                    NULL);
+}
+
+const ux_menu_entry_t menu_settings_browser[] = {
+    {NULL, menu_settings_browser_change, 0, NULL, "No", NULL, 0, 0},
+    {NULL, menu_settings_browser_change, 1, NULL, "Yes", NULL, 0, 0},
+    UX_MENU_END};
+
+const ux_menu_entry_t menu_settings[] = {
+    {NULL, menu_settings_browser_init, 0, NULL, "Browser support", NULL, 0, 0},
+    {menu_main, NULL, 1, &C_icon_back, "Back", NULL, 61, 40},
+    UX_MENU_END};
+#endif // HAVE_U2F
+
+const ux_menu_entry_t menu_about[] = {
+    {NULL, NULL, 0, NULL, "Version", APPVERSION, 0, 0},
+#ifdef HAVE_U2F
+    {menu_main, NULL, 2, &C_icon_back, "Back", NULL, 61, 40},
+#else
+    {menu_main, NULL, 1, &C_icon_back, "Back", NULL, 61, 40},
+#endif // HAVE_U2F
+    UX_MENU_END};
+
+const ux_menu_entry_t menu_main[] = {
+    {NULL, NULL, 0, &NAME3(C_icon_, COINID, ), "Use wallet to", "view accounts",
+     33, 12},
+#ifdef HAVE_U2F
+    {menu_settings, NULL, 0, NULL, "Settings", NULL, 0, 0},
+#endif // HAVE_U2F
+    {menu_about, NULL, 0, NULL, "About", NULL, 0, 0},
+    {NULL, os_sched_exit, 0, &C_icon_dashboard, "Quit app", NULL, 50, 29},
+    UX_MENU_END};
+
 #endif // #if TARGET_ID == 0x31100002
 
 #if TARGET_ID == 0x31000002
@@ -736,6 +680,7 @@ unsigned int ui_details_blue_prepro(const bagl_element_t *element) {
     }
     return 1;
 }
+
 unsigned int ui_details_blue_button(unsigned int button_mask,
                                     unsigned int button_mask_counter) {
     return 0;
@@ -1116,171 +1061,6 @@ unsigned int ui_transaction_blue_button(unsigned int button_mask,
 
 #if TARGET_ID == 0x31100002
 
-#ifdef HAVE_U2F
-
-const bagl_element_t ui_settings_nanos[] = {
-    // type                               userid    x    y   w    h  str rad
-    // fill      fg        bg      fid iid  txt   touchparams...       ]
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF,
-      0, 0},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    {{BAGL_LABELINE, 0x01, 0, 19, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
-      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "Browser support",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_ICON, 0x01, 118, 14, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
-      BAGL_GLYPH_ICON_DOWN},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    {{BAGL_ICON, 0x12, 29, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0, 0},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABELINE, 0x02, 61, 19, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
-      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
-     "Back",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_ICON, 0x02, 3, 14, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
-      BAGL_GLYPH_ICON_UP},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-};
-
-unsigned int ui_settings_nanos_button(unsigned int button_mask,
-                                      unsigned int button_mask_counter);
-
-unsigned int ui_settings_nanos_state;
-unsigned int ui_settings_nanos_prepro(const bagl_element_t *element) {
-    if (element->component.userid > 0) {
-        unsigned char displayed = (ui_settings_nanos_state ==
-                                   ((element->component.userid - 1) & 0x0F));
-        // display custom icon for
-        if (displayed && element->component.userid == 0x12) {
-            extern unsigned int const C_icon_back_colors[];
-            extern unsigned char const C_icon_back_bitmap[];
-            io_seproxyhal_display_bitmap(40, 9, 14, 14, C_icon_back_colors, 1,
-                                         C_icon_back_bitmap);
-            // superseded
-            return 0;
-        }
-        return displayed;
-    }
-    return 1;
-}
-
-const bagl_element_t ui_settings_fido_nanos[] = {
-    // erase
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF,
-      0, 0},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    {{BAGL_LABELINE, 0x01, 35, 19, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
-      BAGL_FONT_OPEN_SANS_REGULAR_11px, 0},
-     "Enable",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    {{BAGL_ICON, 0x02, 76, 11, 16, 10, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
-      BAGL_GLYPH_ICON_TOGGLE_ON},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_ICON, 0x03, 76, 11, 16, 10, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
-      BAGL_GLYPH_ICON_TOGGLE_OFF},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    // icons
-    {{BAGL_ICON, 0x00, 3, 12, 7, 7, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
-      BAGL_GLYPH_ICON_CROSS},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    {{BAGL_ICON, 0x00, 117, 13, 8, 6, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
-      BAGL_GLYPH_ICON_CHECK},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-};
-unsigned int ui_settings_fido_nanos_button(unsigned int button_mask,
-                                           unsigned int button_mask_counter);
-
-unsigned int ui_settings_fido_nanos_prepro(const bagl_element_t *element) {
-    unsigned int display = 1;
-    switch (element->component.userid) {
-    case 0x02:
-        display = fidoTransport;
-        break;
-    case 0x03:
-        display = !fidoTransport;
-        break;
-    }
-    return display;
-}
-
-#endif
-
 const bagl_element_t ui_verify_nanos[] = {
     // type                               userid    x    y   w    h  str rad
     // fill      fg        bg      fid iid  txt   touchparams...       ]
@@ -1313,17 +1093,11 @@ const bagl_element_t ui_verify_nanos[] = {
      NULL,
      NULL},
 
-    {{BAGL_ICON, 0x01, 21, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
-      BAGL_GLYPH_ICON_TRANSACTION_BADGE},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABELINE, 0x01, 42, 12, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
-      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
+    //{{BAGL_ICON                           , 0x01,  21,   9,  14,  14, 0, 0, 0
+    //, 0xFFFFFF, 0x000000, 0, BAGL_GLYPH_ICON_TRANSACTION_BADGE  }, NULL, 0, 0,
+    //0, NULL, NULL, NULL },
+    {{BAGL_LABELINE, 0x01, 0, 12, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
      "Confirm",
      0,
      0,
@@ -1331,8 +1105,8 @@ const bagl_element_t ui_verify_nanos[] = {
      NULL,
      NULL,
      NULL},
-    {{BAGL_LABELINE, 0x01, 43, 26, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
-      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
+    {{BAGL_LABELINE, 0x01, 0, 26, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
      "transaction",
      0,
      0,
@@ -1341,7 +1115,7 @@ const bagl_element_t ui_verify_nanos[] = {
      NULL,
      NULL},
 
-    {{BAGL_LABELINE, 0x02, 0, 12, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
+    {{BAGL_LABELINE, 0x02, 0, 12, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
      "Amount",
      0,
@@ -1350,7 +1124,7 @@ const bagl_element_t ui_verify_nanos[] = {
      NULL,
      NULL,
      NULL},
-    {{BAGL_LABELINE, 0x02, 23, 26, 82, 11, 0x80 | 10, 0, 0, 0xFFFFFF, 0x000000,
+    {{BAGL_LABELINE, 0x02, 23, 26, 82, 12, 0x80 | 10, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 26},
      fullAmount,
      0,
@@ -1360,16 +1134,16 @@ const bagl_element_t ui_verify_nanos[] = {
      NULL,
      NULL},
 
-    {{BAGL_LABELINE, 0x03, 0, 12, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
+    {{BAGL_LABELINE, 0x03, 0, 12, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "Recipient address",
+     "Address",
      0,
      0,
      0,
      NULL,
      NULL,
      NULL},
-    {{BAGL_LABELINE, 0x03, 0, 26, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
+    {{BAGL_LABELINE, 0x03, 0, 26, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
      addressSummary,
      0,
@@ -1379,7 +1153,7 @@ const bagl_element_t ui_verify_nanos[] = {
      NULL,
      NULL},
 
-    {{BAGL_LABELINE, 0x04, 0, 12, 128, 11, 0, 0, 0, 0xFFFFFF, 0x000000,
+    {{BAGL_LABELINE, 0x04, 0, 12, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
      "Fees",
      0,
@@ -1388,7 +1162,7 @@ const bagl_element_t ui_verify_nanos[] = {
      NULL,
      NULL,
      NULL},
-    {{BAGL_LABELINE, 0x04, 23, 26, 82, 11, 0x80 | 10, 0, 0, 0xFFFFFF, 0x000000,
+    {{BAGL_LABELINE, 0x04, 23, 26, 82, 12, 0x80 | 10, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 26},
      feesAmount,
      0,
@@ -1401,7 +1175,7 @@ const bagl_element_t ui_verify_nanos[] = {
 unsigned int ui_verify_nanos_button(unsigned int button_mask,
                                     unsigned int button_mask_counter);
 
-const bagl_element_t ui_verify_p2sh_nanos[] = {
+const bagl_element_t ui_verify_output_nanos[] = {
     // type                               userid    x    y   w    h  str rad
     // fill      fg        bg      fid iid  txt   touchparams...       ]
     {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF,
@@ -1433,17 +1207,11 @@ const bagl_element_t ui_verify_p2sh_nanos[] = {
      NULL,
      NULL},
 
-    {{BAGL_ICON, 0x01, 32, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
-      BAGL_GLYPH_ICON_TRANSACTION_BADGE},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABELINE, 0x01, 53, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
-      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
+    //{{BAGL_ICON                           , 0x01,  21,   9,  14,  14, 0, 0, 0
+    //, 0xFFFFFF, 0x000000, 0, BAGL_GLYPH_ICON_TRANSACTION_BADGE  }, NULL, 0, 0,
+    //0, NULL, NULL, NULL },
+    {{BAGL_LABELINE, 0x01, 0, 12, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
      "Confirm",
      0,
      0,
@@ -1451,9 +1219,9 @@ const bagl_element_t ui_verify_p2sh_nanos[] = {
      NULL,
      NULL,
      NULL},
-    {{BAGL_LABELINE, 0x01, 53, 26, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
-      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
-     "P2SH",
+    {{BAGL_LABELINE, 0x01, 0, 26, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     fullAddress,
      0,
      0,
      0,
@@ -1461,9 +1229,121 @@ const bagl_element_t ui_verify_p2sh_nanos[] = {
      NULL,
      NULL},
 
+    {{BAGL_LABELINE, 0x02, 0, 12, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Amount",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x02, 23, 26, 82, 12, 0x80 | 10, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 26},
+     fullAmount,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x03, 0, 12, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Address",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x03, 0, 26, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL}};
+unsigned int ui_verify_output_nanos_button(unsigned int button_mask,
+                                           unsigned int button_mask_counter);
+
+const bagl_element_t ui_finalize_nanos[] = {
+    // type                               userid    x    y   w    h  str rad
+    // fill      fg        bg      fid iid  txt   touchparams...       ]
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_ICON, 0x00, 3, 12, 7, 7, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CROSS},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_ICON, 0x00, 117, 13, 8, 6, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CHECK},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    //{{BAGL_ICON                           , 0x01,  21,   9,  14,  14, 0, 0, 0
+    //, 0xFFFFFF, 0x000000, 0, BAGL_GLYPH_ICON_TRANSACTION_BADGE  }, NULL, 0, 0,
+    //0, NULL, NULL, NULL },
+    {{BAGL_LABELINE, 0x01, 0, 12, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Confirm",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x01, 0, 26, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "transaction",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x02, 0, 12, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Fees",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x02, 23, 26, 82, 12, 0x80 | 10, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 26},
+     feesAmount,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
 };
-unsigned int ui_verify_p2sh_nanos_button(unsigned int button_mask,
-                                         unsigned int button_mask_counter);
+unsigned int ui_finalize_nanos_button(unsigned int button_mask,
+                                      unsigned int button_mask_counter);
 
 // display or not according to step, and adjust delay
 unsigned int ui_verify_prepro(const bagl_element_t *element) {
@@ -1482,6 +1362,47 @@ unsigned int ui_verify_prepro(const bagl_element_t *element) {
                 UX_CALLBACK_SET_INTERVAL(3000);
                 break;
             case 4:
+                UX_CALLBACK_SET_INTERVAL(MAX(
+                    3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
+                break;
+            }
+        }
+        return display;
+    }
+    return 1;
+}
+
+unsigned int ui_verify_output_prepro(const bagl_element_t *element) {
+    if (element->component.userid > 0) {
+        unsigned int display = (ux_step == element->component.userid - 1);
+        if (display) {
+            switch (element->component.userid) {
+            case 1:
+                UX_CALLBACK_SET_INTERVAL(2000);
+                break;
+            case 2:
+                UX_CALLBACK_SET_INTERVAL(MAX(
+                    3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
+                break;
+            case 3:
+                UX_CALLBACK_SET_INTERVAL(3000);
+                break;
+            }
+        }
+        return display;
+    }
+    return 1;
+}
+
+unsigned int ui_finalize_prepro(const bagl_element_t *element) {
+    if (element->component.userid > 0) {
+        unsigned int display = (ux_step == element->component.userid - 1);
+        if (display) {
+            switch (element->component.userid) {
+            case 1:
+                UX_CALLBACK_SET_INTERVAL(2000);
+                break;
+            case 2:
                 UX_CALLBACK_SET_INTERVAL(MAX(
                     3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
                 break;
@@ -1524,17 +1445,11 @@ const bagl_element_t ui_verify_message_signature_nanos[] = {
      NULL,
      NULL},
 
-    {{BAGL_ICON, 0x01, 28, 9, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
-      BAGL_GLYPH_ICON_TRANSACTION_BADGE},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABELINE, 0x01, 50, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
-      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
+    //{{BAGL_ICON                           , 0x01,  28,   9,  14,  14, 0, 0, 0
+    //, 0xFFFFFF, 0x000000, 0, BAGL_GLYPH_ICON_TRANSACTION_BADGE  }, NULL, 0, 0,
+    //0, NULL, NULL, NULL },
+    {{BAGL_LABELINE, 0x01, 0, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
      "Sign the",
      0,
      0,
@@ -1542,8 +1457,8 @@ const bagl_element_t ui_verify_message_signature_nanos[] = {
      NULL,
      NULL,
      NULL},
-    {{BAGL_LABELINE, 0x01, 49, 26, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
-      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
+    {{BAGL_LABELINE, 0x01, 0, 26, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
      "message",
      0,
      0,
@@ -1590,6 +1505,103 @@ unsigned int ui_verify_message_prepro(const bagl_element_t *element) {
     }
     return 1;
 }
+
+const bagl_element_t ui_display_address_nanos[] = {
+    // type                               userid    x    y   w    h  str rad
+    // fill      fg        bg      fid iid  txt   touchparams...       ]
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_ICON, 0x00, 3, 12, 7, 7, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CROSS},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_ICON, 0x00, 117, 13, 8, 6, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CHECK},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    //{{BAGL_ICON                           , 0x01,  21,   9,  14,  14, 0, 0, 0
+    //, 0xFFFFFF, 0x000000, 0, BAGL_GLYPH_ICON_TRANSACTION_BADGE  }, NULL, 0, 0,
+    //0, NULL, NULL, NULL },
+    {{BAGL_LABELINE, 0x01, 0, 12, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Confirm",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x01, 0, 26, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "address",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+
+    {{BAGL_LABELINE, 0x02, 0, 12, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Address",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    // Hax, avoid wasting space
+    {{BAGL_LABELINE, 0x02, 23, 26, 82, 12, 0x80 | 10, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 26},
+     G_io_apdu_buffer + 200,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+};
+unsigned int ui_display_address_nanos_button(unsigned int button_mask,
+                                             unsigned int button_mask_counter);
+
+unsigned int ui_display_address_prepro(const bagl_element_t *element) {
+    if (element->component.userid > 0) {
+        unsigned int display = (ux_step == element->component.userid - 1);
+        if (display) {
+            switch (element->component.userid) {
+            case 1:
+                UX_CALLBACK_SET_INTERVAL(2000);
+                break;
+            case 2:
+                UX_CALLBACK_SET_INTERVAL(MAX(
+                    3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
+                break;
+            }
+        }
+        return display;
+    }
+    return 1;
+}
+
 #endif // #if TARGET_ID == 0x31100002
 
 void ui_idle(void) {
@@ -1598,8 +1610,7 @@ void ui_idle(void) {
 #if TARGET_ID == 0x31000002
     UX_DISPLAY(ui_idle_blue, NULL);
 #elif TARGET_ID == 0x31100002
-    ui_idle_nanos_state = 0;      // start by displaying the idle first screen
-    UX_DISPLAY(ui_idle_nanos, ui_idle_nanos_prepro);
+    UX_MENU_DISPLAY(0, menu_main, NULL);
 #endif // #if TARGET_ID
 }
 
@@ -1609,120 +1620,21 @@ unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e) {
     return 0; // DO NOT REDRAW THE BUTTON
 }
 
-#if TARGET_ID == 0x31100002
-unsigned int ui_idle_nanos_button(unsigned int button_mask,
-                                  unsigned int button_mask_counter) {
-    switch (button_mask) {
-    case BUTTON_EVT_RELEASED | BUTTON_LEFT: // UP
-        if (ui_idle_nanos_state != 0) {
-            ui_idle_nanos_state--;
-#ifndef HAVE_U2F
-            if (ui_idle_nanos_state == 1) {
-                ui_idle_nanos_state--;
-            }
-#endif
-            UX_DISPLAY(ui_idle_nanos, ui_idle_nanos_prepro);
-        }
-        break;
-
-    case BUTTON_EVT_RELEASED | BUTTON_RIGHT: // DOWN
-        if (ui_idle_nanos_state != 2) {
-            ui_idle_nanos_state++;
-#ifndef HAVE_U2F
-            if (ui_idle_nanos_state == 1) {
-                ui_idle_nanos_state++;
-            }
-#endif
-            UX_DISPLAY(ui_idle_nanos, ui_idle_nanos_prepro);
-        }
-        break;
-
-    case BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT: // Settings, EXIT
-#ifdef HAVE_U2F
-        if (ui_idle_nanos_state == 1) {
-            ui_settings_nanos_state = 0;
-            UX_DISPLAY(ui_settings_nanos, ui_settings_nanos_prepro);
-        } else
-#endif
-            if (ui_idle_nanos_state == 2) {
-            io_seproxyhal_touch_exit(NULL);
-        }
-        break;
-    }
-    return 0;
-}
-
-#ifdef HAVE_U2F
-
-unsigned int ui_settings_nanos_button(unsigned int button_mask,
-                                      unsigned int button_mask_counter) {
-    switch (button_mask) {
-    case BUTTON_EVT_RELEASED | BUTTON_LEFT: // UP
-        if (ui_settings_nanos_state != 0) {
-            ui_settings_nanos_state--;
-            UX_DISPLAY(ui_settings_nanos, ui_settings_nanos_prepro);
-        }
-        break;
-
-    case BUTTON_EVT_RELEASED | BUTTON_RIGHT: // DOWN
-        if (ui_settings_nanos_state != 1) {
-            ui_settings_nanos_state++;
-            UX_DISPLAY(ui_settings_nanos, ui_settings_nanos_prepro);
-        }
-        break;
-
-    case BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT: // Settings, EXIT
-        if (ui_settings_nanos_state == 0) {
-            fidoTransport = N_btchip.fidoTransport;
-            UX_DISPLAY(ui_settings_fido_nanos, ui_settings_fido_nanos_prepro);
-        } else if (ui_settings_nanos_state == 1) {
-            UX_DISPLAY(ui_idle_nanos, ui_idle_nanos_prepro);
-        }
-        break;
-    }
-    return 0;
-}
-
-unsigned int ui_settings_fido_nanos_button(unsigned int button_mask,
-                                           unsigned int button_mask_counter) {
-    switch (button_mask) {
-    case BUTTON_EVT_RELEASED | BUTTON_LEFT:
-        fidoTransport = 0x00;
-        goto set;
-    case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
-        fidoTransport = 0x01;
-    set:
-        if (N_btchip.fidoTransport != fidoTransport) {
-            nvm_write(&N_btchip.fidoTransport, (void *)&fidoTransport,
-                      sizeof(uint8_t));
-            USB_power_U2F(0, 0);
-            USB_power_U2F(1, N_btchip.fidoTransport);
-        }
-    // no break is intentional
-    case BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT:
-        UX_DISPLAY(ui_settings_nanos, ui_settings_nanos_prepro);
-        break;
-    }
-    return 0;
-}
-
-#endif
-
-#endif // #if TARGET_ID == 0x31100002
-
 unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e) {
     // user denied the transaction, tell the USB side
-    btchip_bagl_user_action(0);
-    // redraw ui
-    ui_idle();
+    if (!btchip_bagl_user_action(0)) {
+        // redraw ui
+        ui_idle();
+    }
     return 0; // DO NOT REDRAW THE BUTTON
 }
 
 unsigned int io_seproxyhal_touch_verify_ok(const bagl_element_t *e) {
     // user accepted the transaction, tell the USB side
-    btchip_bagl_user_action(1);
-    // redraw ui
-    ui_idle();
+    if (!btchip_bagl_user_action(1)) {
+        // redraw ui
+        ui_idle();
+    }
     return 0; // DO NOT REDRAW THE BUTTON
 }
 
@@ -1744,6 +1656,22 @@ io_seproxyhal_touch_message_signature_verify_ok(const bagl_element_t *e) {
     return 0; // DO NOT REDRAW THE BUTTON
 }
 
+unsigned int io_seproxyhal_touch_display_cancel(const bagl_element_t *e) {
+    // user denied the transaction, tell the USB side
+    btchip_bagl_user_action_display(0);
+    // redraw ui
+    ui_idle();
+    return 0; // DO NOT REDRAW THE BUTTON
+}
+
+unsigned int io_seproxyhal_touch_display_ok(const bagl_element_t *e) {
+    // user accepted the transaction, tell the USB side
+    btchip_bagl_user_action_display(1);
+    // redraw ui
+    ui_idle();
+    return 0; // DO NOT REDRAW THE BUTTON
+}
+
 #if TARGET_ID == 0x31100002
 unsigned int ui_verify_nanos_button(unsigned int button_mask,
                                     unsigned int button_mask_counter) {
@@ -1759,8 +1687,22 @@ unsigned int ui_verify_nanos_button(unsigned int button_mask,
     return 0;
 }
 
-unsigned int ui_verify_p2sh_nanos_button(unsigned int button_mask,
-                                         unsigned int button_mask_counter) {
+unsigned int ui_verify_output_nanos_button(unsigned int button_mask,
+                                           unsigned int button_mask_counter) {
+    switch (button_mask) {
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT:
+        io_seproxyhal_touch_verify_cancel(NULL);
+        break;
+
+    case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
+        io_seproxyhal_touch_verify_ok(NULL);
+        break;
+    }
+    return 0;
+}
+
+unsigned int ui_finalize_nanos_button(unsigned int button_mask,
+                                      unsigned int button_mask_counter) {
     switch (button_mask) {
     case BUTTON_EVT_RELEASED | BUTTON_LEFT:
         io_seproxyhal_touch_verify_cancel(NULL);
@@ -1787,6 +1729,21 @@ ui_verify_message_signature_nanos_button(unsigned int button_mask,
     }
     return 0;
 }
+
+unsigned int ui_display_address_nanos_button(unsigned int button_mask,
+                                             unsigned int button_mask_counter) {
+    switch (button_mask) {
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT:
+        io_seproxyhal_touch_display_cancel(NULL);
+        break;
+
+    case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
+        io_seproxyhal_touch_display_ok(NULL);
+        break;
+    }
+    return 0;
+}
+
 #endif // #if TARGET_ID == 0x31100002
 
 #if TARGET_ID == 0x31000002
@@ -1826,16 +1783,6 @@ void ui_transaction_p2sh_blue_init(void) {
 
 // override point, but nothing more to do
 void io_seproxyhal_display(const bagl_element_t *element) {
-    // common icon element display,
-    if ((element->component.type & (~BAGL_FLAG_TOUCHABLE)) == BAGL_ICON
-        // this is a streamed icon from the app content
-        && element->component.icon_id == 0 && element->text != NULL) {
-        bagl_icon_details_t *icon = (bagl_icon_details_t *)PIC(element->text);
-        // here could avoid the loop and do a pure aysnch stuff, but it's way
-        // too sluggish
-        io_seproxyhal_display_icon(element, icon);
-        return;
-    }
     io_seproxyhal_display_default((bagl_element_t *)element);
 }
 
@@ -1891,38 +1838,14 @@ unsigned char io_event(unsigned char channel) {
         break;
 
     case SEPROXYHAL_TAG_DISPLAY_PROCESSED_EVENT:
-        UX_DISPLAYED_EVENT({
-#if TARGET_ID == 0x31100002
-            // extra elements per screen, only for idle screen
-            if (ux.elements == ui_idle_nanos && ui_idle_nanos_state == 0) {
-                // could be used to perform extra print after an array has been
-                // displayed
-                switch (ux.elements_count - ux.elements_current) {
-                case 0: {
-                    extern unsigned int const NAME3(C_icon_, COINID, _colors)[];
-                    extern unsigned char const NAME3(C_icon_, COINID,
-                                                     _bitmap)[];
-                    io_seproxyhal_display_bitmap(
-                        12, 9, 14, 14, NAME3(C_icon_, COINID, _colors), 1,
-                        NAME3(C_icon_, COINID, _bitmap));
-                }
-                    ux.elements_current++;
-                    break;
-
-                // case 1: // next extra element
-                // case 2: // next next extra element ...
-
-                default:
-                    break;
-                }
-            }
-#endif // #if TARGET_ID == 0x31100002
-        });
+        UX_DISPLAYED_EVENT({});
         break;
 
     case SEPROXYHAL_TAG_TICKER_EVENT:
         UX_TICKER_EVENT(G_io_seproxyhal_spi_buffer, {
-            if (ux_step_count) {
+            // don't redisplay if UX not allowed (pin locked in the common bolos
+            // ux ?)
+            if (ux_step_count && UX_ALLOWED) {
                 // prepare next screen
                 ux_step = (ux_step + 1) % ux_step_count;
                 // redisplay screen
@@ -1941,7 +1864,102 @@ unsigned char io_event(unsigned char channel) {
     return 1;
 }
 
-uint8_t prepare_full_output() {
+uint8_t prepare_fees() {
+    if (btchip_context_D.transactionContext.relaxed) {
+        os_memmove(feesAmount, "UNKNOWN", 7);
+        feesAmount[7] = '\0';
+    } else {
+        unsigned char fees[8];
+        unsigned short textSize;
+        if (transaction_amount_sub_be(
+                fees, btchip_context_D.transactionContext.transactionAmount,
+                btchip_context_D.totalOutputAmount)) {
+            PRINTF("Error : Fees not consistent");
+            goto error;
+        }
+        os_memmove(feesAmount, btchip_context_D.shortCoinId,
+                   btchip_context_D.shortCoinIdLength);
+        feesAmount[btchip_context_D.shortCoinIdLength] = ' ';
+        btchip_context_D.tmp =
+            (unsigned char *)(feesAmount + btchip_context_D.shortCoinIdLength +
+                              1);
+        textSize = btchip_convert_hex_amount_to_displayable(fees);
+        feesAmount[textSize + btchip_context_D.shortCoinIdLength + 1] = '\0';
+    }
+    return 1;
+error:
+    return 0;
+}
+
+uint8_t prepare_single_output() {
+    // TODO : special display for OP_RETURN
+    unsigned char amount[8];
+    char tmp[40];
+    unsigned int offset = 0;
+    unsigned char versionSize;
+    int addressOffset;
+    unsigned char address[22];
+    unsigned short version;
+    unsigned short textSize;
+
+    btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset, 8);
+    offset += 8;
+    if (btchip_output_script_is_op_return(btchip_context_D.currentOutput +
+                                          offset)) {
+        os_memmove(addressSummary, "OP_RETURN", 9);
+        os_memmove(fullAddress, "OP_RETURN", 9);
+        addressSummary[10] = '\0';
+        fullAddress[10] = '\0';
+        fullAmount[0] = '\0';
+        return 1;
+    } else if (btchip_output_script_is_regular(btchip_context_D.currentOutput +
+                                               offset)) {
+        addressOffset = offset + 4;
+        version = btchip_context_D.payToAddressVersion;
+    } else {
+        addressOffset = offset + 3;
+        version = btchip_context_D.payToScriptHashVersion;
+    }
+    if (version > 255) {
+        versionSize = 2;
+        address[0] = (version >> 8);
+        address[1] = version;
+    } else {
+        versionSize = 1;
+        address[0] = version;
+    }
+    os_memmove(address + versionSize,
+               btchip_context_D.currentOutput + addressOffset, 20);
+
+    // Prepare address
+    textSize = btchip_public_key_to_encoded_base58(address, 20 + versionSize,
+                                                   (unsigned char *)tmp,
+                                                   sizeof(tmp), version, 1);
+    tmp[textSize] = '\0';
+
+#if TARGET_ID == 0x31000002
+    os_memmove(fullAddress, tmp, textSize + 1);
+#endif
+
+    os_memset(addressSummary, 0, sizeof(addressSummary));
+    os_memmove((void *)addressSummary, tmp, 5);
+    os_memmove((void *)(addressSummary + 5), "...", 3);
+    os_memmove((void *)(addressSummary + 8), tmp + strlen(tmp) - 4, 4);
+
+    // Prepare amount
+
+    os_memmove(fullAmount, btchip_context_D.shortCoinId,
+               btchip_context_D.shortCoinIdLength);
+    fullAmount[btchip_context_D.shortCoinIdLength] = ' ';
+    btchip_context_D.tmp =
+        (unsigned char *)(fullAmount + btchip_context_D.shortCoinIdLength + 1);
+    textSize = btchip_convert_hex_amount_to_displayable(amount);
+    fullAmount[textSize + btchip_context_D.shortCoinIdLength + 1] = '\0';
+
+    return 1;
+}
+
+uint8_t prepare_full_output(uint8_t checkOnly) {
     unsigned int offset = 0;
     int numberOutputs;
     int i;
@@ -1951,10 +1969,15 @@ uint8_t prepare_full_output() {
     unsigned char outputPos = 0, changeFound = 0;
     if (btchip_context_D.transactionContext.relaxed &&
         !btchip_context_D.transactionContext.consumeP2SH) {
-        PRINTF("Error : Mixed inputs");
+        if (!checkOnly) {
+            PRINTF("Error : Mixed inputs");
+        }
         goto error;
     }
     if (btchip_context_D.transactionContext.consumeP2SH) {
+        if (checkOnly) {
+            goto error;
+        }
         fullAmount[0] = '\0';
         feesAmount[0] = '\0';
         strcpy(addressSummary, "P2SH");
@@ -1964,7 +1987,9 @@ uint8_t prepare_full_output() {
     os_memset(totalOutputAmount, 0, sizeof(totalOutputAmount));
     numberOutputs = btchip_context_D.currentOutput[offset++];
     if (numberOutputs > 3) {
-        PRINTF("Error : Too many outputs");
+        if (!checkOnly) {
+            PRINTF("Error : Too many outputs");
+        }
         goto error;
     }
     for (i = 0; i < numberOutputs; i++) {
@@ -1987,7 +2012,9 @@ uint8_t prepare_full_output() {
         if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                              offset) &&
             !isP2sh && !(nullAmount && isOpReturn)) {
-            PRINTF("Error : Unrecognized input script");
+            if (!checkOnly) {
+                PRINTF("Error : Unrecognized input script");
+            }
             goto error;
         }
         if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {
@@ -1999,7 +2026,9 @@ uint8_t prepare_full_output() {
                           btchip_context_D.tmpCtx.output.changeAddress + 1,
                           20) == 0) {
                 if (changeFound) {
-                    PRINTF("Error : Multiple change output found");
+                    if (!checkOnly) {
+                        PRINTF("Error : Multiple change output found");
+                    }
                     goto error;
                 }
                 changeFound = 1;
@@ -2011,94 +2040,102 @@ uint8_t prepare_full_output() {
         currentPos++;
     }
     if (btchip_context_D.tmpCtx.output.changeInitialized && !changeFound) {
-        PRINTF("Error : change output not found");
+        if (!checkOnly) {
+            PRINTF("Error : change output not found");
+        }
         goto error;
     }
     if (transaction_amount_sub_be(
             fees, btchip_context_D.transactionContext.transactionAmount,
             totalOutputAmount)) {
-        PRINTF("Error : Fees not consistent");
+        if (!checkOnly) {
+            PRINTF("Error : Fees not consistent");
+        }
         goto error;
     }
-    // Format validation message
-    currentPos = 0;
-    offset = 1;
-    btchip_context_D.tmp = (unsigned char *)tmp;
-    for (i = 0; i < numberOutputs; i++) {
-        if (!btchip_output_script_is_op_return(btchip_context_D.currentOutput +
-                                               offset + 8)) {
-            unsigned char versionSize;
-            int addressOffset;
-            unsigned char address[22];
-            unsigned short version;
-            btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset,
-                              8);
-            offset += 8;
-            if (btchip_output_script_is_regular(btchip_context_D.currentOutput +
-                                                offset)) {
-                addressOffset = offset + 4;
-                version = btchip_context_D.payToAddressVersion;
-            } else {
-                addressOffset = offset + 3;
-                version = btchip_context_D.payToScriptHashVersion;
-            }
-            if (version > 255) {
-                versionSize = 2;
-                address[0] = (version >> 8);
-                address[1] = version;
-            } else {
-                versionSize = 1;
-                address[0] = version;
-            }
-            os_memmove(address + versionSize,
-                       btchip_context_D.currentOutput + addressOffset, 20);
-            if (currentPos == outputPos) {
-                unsigned short textSize;
-                // Prepare address
-                textSize = btchip_public_key_to_encoded_base58(
-                    address, 20 + versionSize, (unsigned char *)tmp,
-                    sizeof(tmp), version, 1);
-                tmp[textSize] = '\0';
+    if (!checkOnly) {
+        // Format validation message
+        currentPos = 0;
+        offset = 1;
+        btchip_context_D.tmp = (unsigned char *)tmp;
+        for (i = 0; i < numberOutputs; i++) {
+            if (!btchip_output_script_is_op_return(
+                    btchip_context_D.currentOutput + offset + 8)) {
+                unsigned char versionSize;
+                int addressOffset;
+                unsigned char address[22];
+                unsigned short version;
+                btchip_swap_bytes(amount,
+                                  btchip_context_D.currentOutput + offset, 8);
+                offset += 8;
+                if (btchip_output_script_is_regular(
+                        btchip_context_D.currentOutput + offset)) {
+                    addressOffset = offset + 4;
+                    version = btchip_context_D.payToAddressVersion;
+                } else {
+                    addressOffset = offset + 3;
+                    version = btchip_context_D.payToScriptHashVersion;
+                }
+                if (version > 255) {
+                    versionSize = 2;
+                    address[0] = (version >> 8);
+                    address[1] = version;
+                } else {
+                    versionSize = 1;
+                    address[0] = version;
+                }
+                os_memmove(address + versionSize,
+                           btchip_context_D.currentOutput + addressOffset, 20);
+                if (currentPos == outputPos) {
+                    unsigned short textSize;
+                    // Prepare address
+                    textSize = btchip_public_key_to_encoded_base58(
+                        address, 20 + versionSize, (unsigned char *)tmp,
+                        sizeof(tmp), version, 1);
+                    tmp[textSize] = '\0';
 
 #if TARGET_ID == 0x31000002
-                os_memmove(fullAddress, tmp, textSize + 1);
+                    os_memmove(fullAddress, tmp, textSize + 1);
 #endif
 
-                os_memset(addressSummary, 0, sizeof(addressSummary));
-                os_memmove((void *)addressSummary, tmp, 5);
-                os_memmove((void *)(addressSummary + 5), "...", 3);
-                os_memmove((void *)(addressSummary + 8), tmp + strlen(tmp) - 4,
-                           4);
+                    os_memset(addressSummary, 0, sizeof(addressSummary));
+                    os_memmove((void *)addressSummary, tmp, 5);
+                    os_memmove((void *)(addressSummary + 5), "...", 3);
+                    os_memmove((void *)(addressSummary + 8),
+                               tmp + strlen(tmp) - 4, 4);
 
-                // Prepare amount
+                    // Prepare amount
 
-                os_memmove(fullAmount, btchip_context_D.shortCoinId,
-                           btchip_context_D.shortCoinIdLength);
-                fullAmount[btchip_context_D.shortCoinIdLength] = ' ';
-                btchip_context_D.tmp =
-                    (unsigned char *)(fullAmount +
-                                      btchip_context_D.shortCoinIdLength + 1);
-                textSize = btchip_convert_hex_amount_to_displayable(amount);
-                fullAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
-                    '\0';
+                    os_memmove(fullAmount, btchip_context_D.shortCoinId,
+                               btchip_context_D.shortCoinIdLength);
+                    fullAmount[btchip_context_D.shortCoinIdLength] = ' ';
+                    btchip_context_D.tmp =
+                        (unsigned char *)(fullAmount +
+                                          btchip_context_D.shortCoinIdLength +
+                                          1);
+                    textSize = btchip_convert_hex_amount_to_displayable(amount);
+                    fullAmount[textSize + btchip_context_D.shortCoinIdLength +
+                               1] = '\0';
 
-                // prepare fee display
-                os_memmove(feesAmount, btchip_context_D.shortCoinId,
-                           btchip_context_D.shortCoinIdLength);
-                feesAmount[btchip_context_D.shortCoinIdLength] = ' ';
-                btchip_context_D.tmp =
-                    (unsigned char *)(feesAmount +
-                                      btchip_context_D.shortCoinIdLength + 1);
-                textSize = btchip_convert_hex_amount_to_displayable(fees);
-                feesAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
-                    '\0';
-                break;
+                    // prepare fee display
+                    os_memmove(feesAmount, btchip_context_D.shortCoinId,
+                               btchip_context_D.shortCoinIdLength);
+                    feesAmount[btchip_context_D.shortCoinIdLength] = ' ';
+                    btchip_context_D.tmp =
+                        (unsigned char *)(feesAmount +
+                                          btchip_context_D.shortCoinIdLength +
+                                          1);
+                    textSize = btchip_convert_hex_amount_to_displayable(fees);
+                    feesAmount[textSize + btchip_context_D.shortCoinIdLength +
+                               1] = '\0';
+                    break;
+                }
+            } else {
+                offset += 8;
             }
-        } else {
-            offset += 8;
+            offset += 1 + btchip_context_D.currentOutput[offset];
+            currentPos++;
         }
-        offset += 1 + btchip_context_D.currentOutput[offset];
-        currentPos++;
     }
     return 1;
 error:
@@ -2110,28 +2147,17 @@ uint8_t prepare_message_signature() {
     cx_hash(&btchip_context_D.transactionHashAuthorization.header, CX_LAST,
             fullAmount, 0, fullAmount);
 
-    array_hexstr(addressSummary, fullAddress, HASH_LENGTH / 2);
+    array_hexstr(addressSummary, fullAmount, HASH_LENGTH / 2);
     addressSummary[HASH_LENGTH / 2 * 2] = '.';
     addressSummary[HASH_LENGTH / 2 * 2 + 1] = '.';
     addressSummary[HASH_LENGTH / 2 * 2 + 2] = '.';
     array_hexstr(addressSummary + HASH_LENGTH / 2 * 2 + 3,
-                 fullAddress + 32 - HASH_LENGTH / 2, HASH_LENGTH / 2);
+                 fullAmount + 32 - HASH_LENGTH / 2, HASH_LENGTH / 2);
     return 1;
 }
 
 unsigned int btchip_bagl_confirm_full_output() {
-    // TODO : remove when supporting multi output
-    if (btchip_context_D.transactionContext.consumeP2SH) {
-#if TARGET_ID == 0x31000002
-        ui_transaction_p2sh_blue_init();
-#elif TARGET_ID == 0x31100002
-        // no preprocessing
-        UX_DISPLAY(ui_verify_p2sh_nanos, NULL);
-#endif // #if TARGET_ID
-        return 1;
-    }
-
-    if (!prepare_full_output()) {
+    if (!prepare_full_output(0)) {
         return 0;
     }
 
@@ -2141,6 +2167,50 @@ unsigned int btchip_bagl_confirm_full_output() {
     ux_step = 0;
     ux_step_count = 4;
     UX_DISPLAY(ui_verify_nanos, ui_verify_prepro);
+#endif // #if TARGET_ID
+    return 1;
+}
+
+unsigned int btchip_bagl_confirm_single_output() {
+// TODO : remove when supporting multi output
+#if TARGET_ID == 0x31000002
+    if (btchip_context_D.transactionContext.consumeP2SH) {
+        ui_transaction_p2sh_blue_init();
+        return 1;
+    }
+#endif
+
+    if (!prepare_single_output()) {
+        return 0;
+    }
+
+#if TARGET_ID == 0x31000002
+    ui_transaction_blue_init();
+#elif TARGET_ID == 0x31100002
+    snprintf(fullAddress, sizeof(fullAddress), "output #%d",
+             btchip_context_D.totalOutputs - btchip_context_D.remainingOutputs +
+                 1);
+    ux_step = 0;
+    ux_step_count = 3;
+    UX_DISPLAY(ui_verify_output_nanos, ui_verify_output_prepro);
+#endif // #if TARGET_ID
+    return 1;
+}
+
+unsigned int btchip_bagl_finalize_tx() {
+    if (!prepare_fees()) {
+        return 0;
+    }
+
+#if TARGET_ID == 0x31000002
+
+#error "TODO BLUE FINALIZE TX"
+
+    ui_transaction_blue_init();
+#elif TARGET_ID == 0x31100002
+    ux_step = 0;
+    ux_step_count = 2;
+    UX_DISPLAY(ui_finalize_nanos, ui_finalize_prepro);
 #endif // #if TARGET_ID
     return 1;
 }
@@ -2157,6 +2227,22 @@ void btchip_bagl_confirm_message_signature() {
     ux_step_count = 2;
     UX_DISPLAY(ui_verify_message_signature_nanos, ui_verify_message_prepro);
 #endif // #if TARGET_ID
+}
+
+unsigned int btchip_bagl_display_public_key() {
+#if TARGET_ID == 0x31000002
+
+#error "TODO BLUE FINALIZE DISPLAY PUBLIC KEY"
+
+#elif TARGET_ID == 0x31100002
+    // append and prepend a white space to the address
+    G_io_apdu_buffer[199] = ' ';
+    strcat(G_io_apdu_buffer + 200, " ");
+    ux_step = 0;
+    ux_step_count = 2;
+    UX_DISPLAY(ui_display_address_nanos, ui_display_address_prepro);
+#endif // #if TARGET_ID
+    return 1;
 }
 
 void app_exit(void) {

@@ -28,6 +28,10 @@ void btchip_context_init() {
     os_memset(&btchip_context_D, 0, sizeof(btchip_context_D));
     SB_SET(btchip_context_D.halted, 0);
     btchip_context_D.currentOutputOffset = 0;
+    btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS;
+    os_memset(btchip_context_D.totalOutputAmount, 0,
+              sizeof(btchip_context_D.totalOutputAmount));
+    btchip_context_D.changeOutputFound = 0;
 
     if (N_btchip.config_valid != 0x01) {
         btchip_autosetup();

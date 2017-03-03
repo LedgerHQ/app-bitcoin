@@ -21,7 +21,7 @@ APP_LOAD_PARAMS=--appFlags 0x50 --path "" --curve secp256k1
 
 APPVERSION_M=1
 APPVERSION_N=1
-APPVERSION_P=3
+APPVERSION_P=5
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 #prepare hsm generation
@@ -37,7 +37,7 @@ endif
 
 all: default
 
-# consider every intermediate target aTARGET_ID=s final to avoid deleting intermediate files
+# consider every intermediate target as final to avoid deleting intermediate files
 .SECONDARY:
 
 # disable builtin rules that overload the build process (and the debug log !!)
@@ -60,8 +60,9 @@ GLYPH_DESTC := src/glyphs.c
 GLYPH_DESTH := src/glyphs.h
 $(GLYPH_DESTC) $(GLYPH_DESTH): $(GLYPH_FILES) $(BOLOS_SDK)/icon.py
 	-rm $@
-	if [ ! -z "$(GLYPH_FILES)" ] ; then for gif in $(GLYPH_FILES) ; do python $(BOLOS_SDK)/icon.py $$gif glyphcheader ; done > $(GLYPH_DESTH) ; fi
-	if [ ! -z "$(GLYPH_FILES)" ] ; then for gif in $(GLYPH_FILES) ; do python $(BOLOS_SDK)/icon.py $$gif glyphcfile ; done > $(GLYPH_DESTC) ; fi
+	for gif in $(GLYPH_FILES) ; do python $(BOLOS_SDK)/icon.py $$gif glyphcheader ; done > $(GLYPH_DESTH)
+	for gif in $(GLYPH_FILES) ; do python $(BOLOS_SDK)/icon.py $$gif glyphcfile ; done > $(GLYPH_DESTC)
+
 
 SOURCE_PATH   := src $(BOLOS_SDK)/src $(dir $(shell find $(BOLOS_SDK)/lib_stusb* | grep "\.c$$"))
 SOURCE_FILES  := $(foreach path, $(SOURCE_PATH),$(shell find $(path) | grep -E "\.c$$|\.s") ) $(GLYPH_DESTC)
@@ -76,7 +77,7 @@ DEFINES   += HAVE_BAGL HAVE_SPRINTF
 #DEFINES   += HAVE_PRINTF PRINTF=screen_printf
 DEFINES   += PRINTF\(...\)=
 DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=6 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
-DEFINES   += LEDGER_MAJOR_VERSION=$(APPVERSION_M) LEDGER_MINOR_VERSION=$(APPVERSION_N) LEDGER_PATCH_VERSION=$(APPVERSION_P) TCS_LOADER_PATCH_VERSION=0
+DEFINES   += LEDGER_MAJOR_VERSION=$(APPVERSION_M) LEDGER_MINOR_VERSION=$(APPVERSION_N) LEDGER_PATCH_VERSION=$(APPVERSION_P) TCS_LOADER_PATCH_VERSION=0 APPVERSION=\"$(APPVERSION)\"
 
 # ifndef COIN
 # COIN =bitcoin
@@ -110,9 +111,13 @@ else ifeq ($(COIN),stratis)
 # Stratis 
 DEFINES   += BTCHIP_P2PKH_VERSION=63 BTCHIP_P2SH_VERSION=125 BTCHIP_COIN_FAMILY=2 BTCHIP_COINID=\"Stratis\" COINID_UPCASE=\"STRAT\" COLOR_HDR=0x3790CA COLOR_DB=0x9BC8E5 COINID_NAME=\"Strat\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"STRAT\" COIN_STRATIS HAVE_PEERCOIN_SUPPORT
 APPNAME ="Stratis"
+else ifeq ($(COIN),peercoin)
+# Peercoin
+DEFINES += BTCHIP_P2PKH_VERSION=55 BTCHIP_P2SH_VERSION=117 BTCHIP_COIN_FAMILY=2 BTCHIP_COINID=\"Peercoin\" COINID_UPCASE=\"PPC\" COLOR_HDR=0x3790CA COLOR_DB=0x9BC8E5 COINID_NAME=\"Peercoin\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"PPC\" COIN_PEERCOIN HAVE_PEERCOIN_SUPPORT
+APPNAME ="Peercoin"
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, litecoin, dogecoin, dash, zcash, stratis) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, litecoin, dogecoin, dash, zcash, stratis, peercoin) 
 endif
 endif
 
