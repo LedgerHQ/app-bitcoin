@@ -96,6 +96,11 @@
   * @{
   */
 
+#if 0
+/* Private functions ---------------------------------------------------------*/
+static void IntToUnicode (uint32_t value , uint8_t *pbuf , uint8_t len);
+static void Get_SerialNum(void);
+#endif
 
 /**
   * @}
@@ -463,18 +468,21 @@ uint8_t USBD_HID_DataOut_impl(USBD_HandleTypeDef *pdev, uint8_t epnum,
                              U2F_MEDIA_USB);
 #endif
     } else {
-        // add to the hid transport
-        switch (
-            io_usb_hid_receive(io_usb_send_apdu_data, buffer,
-                               io_seproxyhal_get_ep_rx_size(HID_EPOUT_ADDR))) {
-        default:
-            break;
+        // avoid troubles when an apdu has not been replied yet
+        if (G_io_apdu_media == IO_APDU_MEDIA_NONE) {
+            // add to the hid transport
+            switch (io_usb_hid_receive(
+                io_usb_send_apdu_data, buffer,
+                io_seproxyhal_get_ep_rx_size(HID_EPOUT_ADDR))) {
+            default:
+                break;
 
-        case IO_USB_APDU_RECEIVED:
-            G_io_apdu_media = IO_APDU_MEDIA_USB_HID; // for application code
-            G_io_apdu_state = APDU_USB_HID; // for next call to io_exchange
-            G_io_apdu_length = G_io_usb_hid_total_length;
-            break;
+            case IO_USB_APDU_RECEIVED:
+                G_io_apdu_media = IO_APDU_MEDIA_USB_HID; // for application code
+                G_io_apdu_state = APDU_USB_HID; // for next call to io_exchange
+                G_io_apdu_length = G_io_usb_hid_total_length;
+                break;
+            }
         }
     }
 

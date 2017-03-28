@@ -2263,49 +2263,57 @@ __attribute__((section(".boot"))) int main(void) {
     // ensure exception will work as planned
     os_boot();
 
-    UX_INIT();
+    for (;;) {
+        UX_INIT();
+        BEGIN_TRY {
+            TRY {
+                io_seproxyhal_init();
 
-    BEGIN_TRY {
-        TRY {
-            io_seproxyhal_init();
+                btchip_context_init();
 
-            btchip_context_init();
+                // deactivate usb before activating
+                USB_power_U2F(0, 0);
 
 #ifdef HAVE_U2F
-            os_memset((unsigned char *)&u2fService, 0, sizeof(u2fService));
-            u2fService.inputBuffer = G_io_apdu_buffer;
-            u2fService.outputBuffer = G_io_apdu_buffer;
-            u2fService.messageBuffer = (uint8_t *)u2fMessageBuffer;
-            u2fService.messageBufferSize = U2F_MAX_MESSAGE_SIZE;
-            u2f_initialize_service((u2f_service_t *)&u2fService);
+                os_memset((unsigned char *)&u2fService, 0, sizeof(u2fService));
+                u2fService.inputBuffer = G_io_apdu_buffer;
+                u2fService.outputBuffer = G_io_apdu_buffer;
+                u2fService.messageBuffer = (uint8_t *)u2fMessageBuffer;
+                u2fService.messageBufferSize = U2F_MAX_MESSAGE_SIZE;
+                u2f_initialize_service((u2f_service_t *)&u2fService);
 
-            USB_power_U2F(1, N_btchip.fidoTransport);
+                USB_power_U2F(1, N_btchip.fidoTransport);
 #else
-            USB_power_U2F(1, 0);
+                USB_power_U2F(1, 0);
 #endif
 
 #ifdef HAVE_BLE
-            BLE_power(1, "Ledger Wallet");
+                BLE_power(0, NULL);
+                BLE_power(1, "Ledger Wallet");
 #endif // HAVE_BLE
 
 #if TARGET_ID == 0x31000002
-            // setup the status bar colors (remembered after wards, even more if
-            // another app does not resetup after app switch)
-            UX_SET_STATUS_BAR_COLOR(0xFFFFFF, COLOR_APP);
+                // setup the status bar colors (remembered after wards, even
+                // more if another app does not resetup after app switch)
+                UX_SET_STATUS_BAR_COLOR(0xFFFFFF, COLOR_APP);
 #endif // TARGET_ID
 
-            ui_idle();
+                ui_idle();
 
-            app_main();
+                app_main();
+            }
+            CATCH(EXCEPTION_IO_RESET) {
+                // reset IO and UX
+                continue;
+            }
+            CATCH_ALL {
+                break;
+            }
+            FINALLY {
+            }
         }
-        CATCH_ALL {
-            // exit :)
-        }
-        FINALLY {
-        }
+        END_TRY;
     }
-    END_TRY;
-
     app_exit();
 
     return 0;
