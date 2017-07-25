@@ -24,7 +24,7 @@ APP_LOAD_PARAMS=--appFlags 0x50 --path "" --curve secp256k1 $(COMMON_LOAD_PARAMS
 
 APPVERSION_M=1
 APPVERSION_N=1
-APPVERSION_P=5
+APPVERSION_P=7
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 # ifndef COIN
@@ -61,22 +61,25 @@ DEFINES   += BTCHIP_P2PKH_VERSION=60 BTCHIP_P2SH_VERSION=85 BTCHIP_COIN_FAMILY=1
 APPNAME ="Komodo"
 else ifeq ($(COIN),stratis)
 # Stratis 
-DEFINES   += BTCHIP_P2PKH_VERSION=63 BTCHIP_P2SH_VERSION=125 BTCHIP_COIN_FAMILY=2 BTCHIP_COINID=\"Stratis\" COINID_UPCASE=\"STRAT\" COLOR_HDR=0x3790CA COLOR_DB=0x9BC8E5 COINID_NAME=\"Strat\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"STRAT\" COIN_STRATIS HAVE_PEERCOIN_SUPPORT
+DEFINES   += BTCHIP_P2PKH_VERSION=63 BTCHIP_P2SH_VERSION=125 BTCHIP_COIN_FAMILY=2 BTCHIP_COINID=\"Stratis\" COINID_UPCASE=\"STRAT\" COLOR_HDR=0x3790CA COLOR_DB=0x9BC8E5 COINID_NAME=\"Stratis\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"STRAT\" COIN_STRATIS HAVE_PEERCOIN_SUPPORT
 APPNAME ="Stratis"
 else ifeq ($(COIN),peercoin)
 # Peercoin
 DEFINES += BTCHIP_P2PKH_VERSION=55 BTCHIP_P2SH_VERSION=117 BTCHIP_COIN_FAMILY=2 BTCHIP_COINID=\"Peercoin\" COINID_UPCASE=\"PPC\" COLOR_HDR=0x3790CA COLOR_DB=0x9BC8E5 COINID_NAME=\"Peercoin\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"PPC\" COIN_PEERCOIN HAVE_PEERCOIN_SUPPORT
 APPNAME ="Peercoin"
+else ifeq ($(COIN),posw)
+DEFINES += BTCHIP_P2PKH_VERSION=55 BTCHIP_P2SH_VERSION=85 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"PoSWallet\" COINID_UPCASE=\"POSW\" COLOR_HDR=0x23273D COLOR_DB=0x91939E COINID_NAME=\"PoSW\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"POSW\" COIN_POSW 
+APPNAME ="PoSW"
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, litecoin, dogecoin, dash, zcash, komodo, stratis, peercoin) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, litecoin, dogecoin, dash, zcash, komodo, stratis, peercoin, posw) 
 endif
 endif
 
 ifeq ($(TARGET_NAME),TARGET_BLUE)
-ICONNAME=icon_$(COIN)_blue.gif
+ICONNAME=blue_app_$(COIN).gif
 else
-ICONNAME=icon_$(COIN).gif
+ICONNAME=nanos_app_$(COIN).gif
 endif
 
 ################
@@ -125,9 +128,9 @@ LDLIBS   += -lm -lgcc -lc
 # import rules to compile glyphs(/pone)
 include $(BOLOS_SDK)/Makefile.glyphs
 
-### computed variables
+### variables processed by the common makefile.rules of the SDK to grab source files and include dirs
 APP_SOURCE_PATH  += src
-SDK_SOURCE_PATH  += lib_stusb
+SDK_SOURCE_PATH  += lib_stusb qrcode
 
 
 load: all

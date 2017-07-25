@@ -19,6 +19,8 @@
 
 #include "btchip_internal.h"
 
+#include "os_io_seproxyhal.h"
+
 #include "btchip_apdu_constants.h"
 
 #define BTCHIP_TECHNICAL_NOT_IMPLEMENTED 0x99
@@ -59,12 +61,18 @@ void app_dispatch(void) {
                     btchip_context_D.sw = BTCHIP_SW_INCORRECT_LENGTH;
                     goto sendSW;
                 }
-                // notify we ned to receive data
+                // notify we need to receive data
                 // io_exchange(CHANNEL_APDU | IO_RECEIVE_DATA, 0);
             }
             // call the apdu handler
             btchip_context_D.sw = ((apduProcessingFunction)PIC(
                 DISPATCHER_FUNCTIONS[dispatched]))();
+
+// an APDU has been replied. request for power off time extension from the
+// common ux
+#ifdef IO_APP_ACTIVITY
+            IO_APP_ACTIVITY();
+#endif // IO_APP_ACTIVITY
 
         sendSW:
             // prepare SW after replied data
@@ -73,6 +81,9 @@ void app_dispatch(void) {
             G_io_apdu_buffer[btchip_context_D.outLength + 1] =
                 (btchip_context_D.sw & 0xff);
             btchip_context_D.outLength += 2;
+        }
+        CATCH(EXCEPTION_IO_RESET) {
+            THROW(EXCEPTION_IO_RESET);
         }
         CATCH_OTHER(e) {
             // uncaught exception detected

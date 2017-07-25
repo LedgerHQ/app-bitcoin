@@ -56,7 +56,13 @@ unsigned short btchip_apdu_hash_input_start() {
             unsigned char usingSegwit =
                 (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT);
             // Request PIN validation
-            if (!os_global_pin_is_validated()) {
+            // Only request PIN validation (user presence) to start a new
+            // transaction signing flow.
+            // Thus allowing for numerous output to be processed in the
+            // background without
+            // requiring to disable autolock/autopoweroff
+            if (!btchip_context_D.transactionContext.firstSigned &&
+                !os_global_pin_is_validated()) {
                 return BTCHIP_SW_SECURITY_STATUS_NOT_SATISFIED;
             }
             // Master transaction reset
