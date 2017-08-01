@@ -19,6 +19,9 @@
 #include "btchip_apdu_constants.h"
 
 #define SIGHASH_ALL 0x01
+#ifdef COIN_BITCOIN_CASH
+#define SIGHASH_FORKID 0x40
+#endif
 
 unsigned short btchip_apdu_hash_sign() {
     unsigned long int lockTime;
@@ -84,10 +87,17 @@ unsigned short btchip_apdu_hash_sign() {
 
             if (((N_btchip.bkp.config.options &
                   BTCHIP_OPTION_FREE_SIGHASHTYPE) == 0)) {
+#ifdef COIN_BITCOIN_CASH
+                if (sighashType != (SIGHASH_ALL | SIGHASH_FORKID)) {
+                    sw = BTCHIP_SW_INCORRECT_DATA;
+                    goto discardTransaction;
+                }
+#else
                 if (sighashType != SIGHASH_ALL) {
                     sw = BTCHIP_SW_INCORRECT_DATA;
                     goto discardTransaction;
                 }
+#endif
             }
 
             // Read transaction parameters
