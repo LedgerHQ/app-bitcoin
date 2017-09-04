@@ -43,6 +43,7 @@ else ifeq ($(COIN),litecoin)
 # Litecoin
 DEFINES   += BTCHIP_P2PKH_VERSION=48 BTCHIP_P2SH_VERSION=5 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Litecoin\" COINID_UPCASE=\"LITECOIN\" COLOR_HDR=0xCCCCCC COLOR_DB=0xE6E6E6 COINID_NAME=\"Litecoin\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"LTC\" COIN_LITECOIN
 APPNAME ="Litecoin"
+else ifeq ($(COIN),viacoin)
 # Viacoin:
 DEFINES   += BTCHIP_P2PKH_VERSION=71 BTCHIP_P2SH_VERSION=33 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Viacoin\" COINID_UPCASE=\"VIACOIN\" COLOR_HDR=0xCCCCCC COLOR_DB=0xF9F9F9 COINID_NAME=\"Viacoin\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"VIA\" COIN_VIACOIN
 APPNAME ="Viacoin"
@@ -72,7 +73,7 @@ DEFINES += BTCHIP_P2PKH_VERSION=55 BTCHIP_P2SH_VERSION=117 BTCHIP_COIN_FAMILY=2 
 APPNAME ="Peercoin"
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, litecoin, dogecoin, dash, zcash, komodo, stratis, peercoin) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, litecoin, viacoin, dogecoin, dash, zcash, komodo, stratis, peercoin) 
 endif
 endif
 
