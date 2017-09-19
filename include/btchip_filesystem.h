@@ -36,6 +36,9 @@ enum btchip_family_e {
 #ifdef HAVE_PEERCOIN_SUPPORT
     BTCHIP_FAMILY_PEERCOIN = 0x02
 #endif
+#ifdef HAVE_QTUM_SUPPORT
+    BTCHIP_FAMILY_QTUM = 0x03
+#endif
 };
 
 struct btchip_config_s {

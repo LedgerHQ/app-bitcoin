@@ -74,9 +74,12 @@ APPNAME ="Peercoin"
 else ifeq ($(COIN),posw)
 DEFINES += BTCHIP_P2PKH_VERSION=55 BTCHIP_P2SH_VERSION=85 BTCHIP_COIN_FAMILY=2 BTCHIP_COINID=\"PoSWallet\" COINID_UPCASE=\"POSW\" COLOR_HDR=0x23273D COLOR_DB=0x91939E COINID_NAME=\"PoSW\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"POSW\" COIN_POSW HAVE_PEERCOIN_SUPPORT
 APPNAME ="PoSW"
+else ifeq ($(COIN),qtum)
+DEFINES += BTCHIP_P2PKH_VERSION=58 BTCHIP_P2SH_VERSION=50 BTCHIP_COIN_FAMILY=3 BTCHIP_COINID=\"Qtum\" COINID_UPCASE=\"QTUM\" COLOR_HDR=0x2E9AD0 COLOR_DB=0x58AFDA COINID_NAME=\"QTUM\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"QTUM\" COIN_QTUM HAVE_QTUM_SUPPORT
+APPNAME ="Qtum"
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, litecoin, dogecoin, dash, zcash, komodo, stratis, peercoin, posw) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, litecoin, dogecoin, dash, zcash, komodo, stratis, peercoin, posw, qtum) 
 endif
 endif
 
