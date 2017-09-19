@@ -2232,6 +2232,20 @@ uint8_t prepare_single_output() {
         vars.tmp.fullAddress[10] = '\0';
         vars.tmp.fullAmount[0] = '\0';
         return 1;
+	#ifdef HAVE_QTUM_SUPPORT
+	} else if (btchip_output_script_is_op_create(btchip_context_D.currentOutput +
+			offset)) {
+		os_memmove(vars.tmp.fullAddress, "OP_CREATE", 9);
+		vars.tmp.fullAddress[10] = '\0';
+		vars.tmp.fullAmount[0] = '\0';
+		return 1;
+	} else if (btchip_output_script_is_op_call(btchip_context_D.currentOutput +
+				offset)) {
+		os_memmove(vars.tmp.fullAddress, "OP_CALL", 7);
+		vars.tmp.fullAddress[10] = '\0';
+		vars.tmp.fullAmount[0] = '\0';
+		return 1;
+	#endif
     } else if (btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                                offset)) {
         addressOffset = offset + 4;
@@ -2311,6 +2325,9 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         unsigned char nullAmount = 1;
         unsigned int j;
         unsigned char isOpReturn, isP2sh;
+        #ifdef HAVE_QTUM_SUPPORT
+        unsigned char isOpCreate, isOpCall;
+        #endif
         for (j = 0; j < 8; j++) {
             if (btchip_context_D.currentOutput[offset + j] != 0) {
                 nullAmount = 0;
@@ -2324,15 +2341,32 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
             btchip_context_D.currentOutput + offset);
         isP2sh = btchip_output_script_is_p2sh(btchip_context_D.currentOutput +
                                               offset);
+        #ifdef HAVE_QTUM_SUPPORT
+        isOpCreate = btchip_output_script_is_op_create(
+                    btchip_context_D.currentOutput + offset);
+        isOpCall = btchip_output_script_is_op_call(
+                            btchip_context_D.currentOutput + offset);
+        #endif
+        #ifdef HAVE_QTUM_SUPPORT
         if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                              offset) &&
-            !isP2sh && !(nullAmount && isOpReturn)) {
+            !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate && !isOpCall) {
+        #else
+        if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
+                                                     offset) &&
+                    !isP2sh && !(nullAmount && isOpReturn)) {
+        #endif
             if (!checkOnly) {
                 PRINTF("Error : Unrecognized input script");
             }
             goto error;
         }
+        #ifdef HAVE_QTUM_SUPPORT
+        if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn && !isOpCreate && !isOpCall) {
+        #else
         if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {
+        #endif
+
             unsigned char addressOffset =
                 (isP2sh ? OUTPUT_SCRIPT_P2SH_PRE_LENGTH
                         : OUTPUT_SCRIPT_REGULAR_PRE_LENGTH);
@@ -2374,8 +2408,15 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         offset = 1;
         btchip_context_D.tmp = (unsigned char *)tmp;
         for (i = 0; i < numberOutputs; i++) {
+            #ifdef HAVE_QTUM_SUPPORT
+            if (!btchip_output_script_is_op_return(
+                    btchip_context_D.currentOutput + offset + 8) && !btchip_output_script_is_op_create(
+                            btchip_context_D.currentOutput + offset + 8) && !btchip_output_script_is_op_call(
+                                    btchip_context_D.currentOutput + offset + 8)) {
+            #else
             if (!btchip_output_script_is_op_return(
                     btchip_context_D.currentOutput + offset + 8)) {
+            #endif
                 unsigned char versionSize;
                 int addressOffset;
                 unsigned char address[22];

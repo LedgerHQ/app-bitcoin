@@ -54,6 +54,9 @@ static void btchip_apdu_hash_input_finalize_full_reset(void) {
 static bool check_output_displayable() {
     bool displayable = true;
     unsigned char amount[8], isOpReturn, isP2sh, j, nullAmount = 1;
+    #ifdef HAVE_QTUM_SUPPORT
+    unsigned char isOpCreate, isOpCall;
+    #endif
     for (j = 0; j < 8; j++) {
         if (btchip_context_D.currentOutput[j] != 0) {
             nullAmount = 0;
@@ -68,8 +71,19 @@ static bool check_output_displayable() {
     isOpReturn =
         btchip_output_script_is_op_return(btchip_context_D.currentOutput + 8);
     isP2sh = btchip_output_script_is_p2sh(btchip_context_D.currentOutput + 8);
+    #ifdef HAVE_QTUM_SUPPORT
+    isOpCreate = btchip_output_script_is_op_create(
+                btchip_context_D.currentOutput + 8);
+    isOpCall = btchip_output_script_is_op_call(
+                        btchip_context_D.currentOutput + 8);
+    #endif
+    #ifdef HAVE_QTUM_SUPPORT
     if (!btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
-        !isP2sh && !(nullAmount && isOpReturn)) {
+            !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate && !isOpCall) {
+    #else
+    if (!btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
+                !isP2sh && !(nullAmount && isOpReturn)) {
+    #endif
         PRINTF("Error : Unrecognized input script");
         THROW(EXCEPTION);
     }
