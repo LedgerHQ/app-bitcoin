@@ -53,7 +53,8 @@ static void btchip_apdu_hash_input_finalize_full_reset(void) {
 
 static bool check_output_displayable() {
     bool displayable = true;
-    unsigned char amount[8], isOpReturn, isP2sh, j, nullAmount = 1;
+    unsigned char amount[8], isOpReturn, isP2sh, isNativeSegwit, j,
+        nullAmount = 1;
     for (j = 0; j < 8; j++) {
         if (btchip_context_D.currentOutput[j] != 0) {
             nullAmount = 0;
@@ -68,18 +69,43 @@ static bool check_output_displayable() {
     isOpReturn =
         btchip_output_script_is_op_return(btchip_context_D.currentOutput + 8);
     isP2sh = btchip_output_script_is_p2sh(btchip_context_D.currentOutput + 8);
+    isNativeSegwit = btchip_output_script_is_native_witness(
+        btchip_context_D.currentOutput + 8);
     if (!btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
         !isP2sh && !(nullAmount && isOpReturn)) {
         PRINTF("Error : Unrecognized input script");
         THROW(EXCEPTION);
     }
     if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {
+        bool changeFound = false;
         unsigned char addressOffset =
-            (isP2sh ? OUTPUT_SCRIPT_P2SH_PRE_LENGTH
-                    : OUTPUT_SCRIPT_REGULAR_PRE_LENGTH);
-        if (os_memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
+            (isNativeSegwit ? OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET
+                            : isP2sh ? OUTPUT_SCRIPT_P2SH_PRE_LENGTH
+                                     : OUTPUT_SCRIPT_REGULAR_PRE_LENGTH);
+        if (!isP2sh &&
+            os_memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
                       btchip_context_D.tmpCtx.output.changeAddress + 1,
                       20) == 0) {
+            changeFound = true;
+        } else if (isP2sh && btchip_context_D.usingSegwit) {
+            unsigned char changeSegwit[22];
+            changeSegwit[0] = 0x00;
+            changeSegwit[1] = 0x14;
+            os_memmove(changeSegwit + 2,
+                       btchip_context_D.tmpCtx.output.changeAddress + 1, 20);
+            btchip_public_key_hash160(changeSegwit, 22, changeSegwit);
+            if (os_memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
+                          changeSegwit, 20) == 0) {
+#ifdef HAVE_SEGWIT_CHANGE_SUPPORT
+                changeFound = true;
+#else
+                // Attempt to avoid fatal failures on Bitcoin Cash
+                PRINTF("Error : Non spendable Segwit change");
+                THROW(EXCEPTION);
+#endif
+            }
+        }
+        if (changeFound) {
             if (btchip_context_D.changeOutputFound) {
                 PRINTF("Error : Multiple change output found");
                 THROW(EXCEPTION);

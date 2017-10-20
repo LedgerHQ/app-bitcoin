@@ -25,6 +25,8 @@
 
 #include "btchip_bagl_extensions.h"
 
+#include "segwit_addr.h"
+
 #include "glyphs.h"
 
 #define __NAME3(a, b, c) a##b##c
@@ -85,7 +87,7 @@ union {
         // char addressSummary[40]; // beginning of the output address ... end
         // of
 
-        char fullAddress[36]; // the address
+        char fullAddress[43]; // the address
         char fullAmount[20];  // full amount
         char feesAmount[20];  // fees
     } tmp;
@@ -2216,22 +2218,27 @@ error:
 uint8_t prepare_single_output() {
     // TODO : special display for OP_RETURN
     unsigned char amount[8];
-    char tmp[40];
+    char tmp[80];
     unsigned int offset = 0;
     unsigned char versionSize;
     int addressOffset;
     unsigned char address[22];
     unsigned short version;
     unsigned short textSize;
+    unsigned char nativeSegwit;
 
     btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset, 8);
     offset += 8;
+    nativeSegwit = btchip_output_script_is_native_witness(
+        btchip_context_D.currentOutput + offset);
     if (btchip_output_script_is_op_return(btchip_context_D.currentOutput +
                                           offset)) {
         os_memmove(vars.tmp.fullAddress, "OP_RETURN", 9);
         vars.tmp.fullAddress[10] = '\0';
         vars.tmp.fullAmount[0] = '\0';
         return 1;
+    } else if (nativeSegwit) {
+        addressOffset = offset + OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET;
     } else if (btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                                offset)) {
         addressOffset = offset + 4;
@@ -2240,22 +2247,32 @@ uint8_t prepare_single_output() {
         addressOffset = offset + 3;
         version = btchip_context_D.payToScriptHashVersion;
     }
-    if (version > 255) {
-        versionSize = 2;
-        address[0] = (version >> 8);
-        address[1] = version;
-    } else {
-        versionSize = 1;
-        address[0] = version;
-    }
-    os_memmove(address + versionSize,
-               btchip_context_D.currentOutput + addressOffset, 20);
+    if (!nativeSegwit) {
+        if (version > 255) {
+            versionSize = 2;
+            address[0] = (version >> 8);
+            address[1] = version;
+        } else {
+            versionSize = 1;
+            address[0] = version;
+        }
+        os_memmove(address + versionSize,
+                   btchip_context_D.currentOutput + addressOffset, 20);
 
-    // Prepare address
-    textSize = btchip_public_key_to_encoded_base58(address, 20 + versionSize,
-                                                   (unsigned char *)tmp,
-                                                   sizeof(tmp), version, 1);
-    tmp[textSize] = '\0';
+        // Prepare address
+        textSize = btchip_public_key_to_encoded_base58(
+            address, 20 + versionSize, (unsigned char *)tmp, sizeof(tmp),
+            version, 1);
+        tmp[textSize] = '\0';
+    }
+#ifdef NATIVE_SEGWIT_PREFIX
+    else {
+        textSize = segwit_addr_encode(
+            tmp, NATIVE_SEGWIT_PREFIX, 0,
+            btchip_context_D.currentOutput + addressOffset,
+            btchip_context_D.currentOutput[addressOffset - 1]);
+    }
+#endif
 
     strcpy(vars.tmp.fullAddress, tmp);
 
@@ -2280,7 +2297,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
     int i;
     unsigned int currentPos = 0;
     unsigned char amount[8], totalOutputAmount[8], fees[8];
-    char tmp[40];
+    char tmp[80];
     unsigned char outputPos = 0, changeFound = 0;
     if (btchip_context_D.transactionContext.relaxed &&
         !btchip_context_D.transactionContext.consumeP2SH) {
@@ -2310,7 +2327,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
     for (i = 0; i < numberOutputs; i++) {
         unsigned char nullAmount = 1;
         unsigned int j;
-        unsigned char isOpReturn, isP2sh;
+        unsigned char isOpReturn, isP2sh, isNativeSegwit;
         for (j = 0; j < 8; j++) {
             if (btchip_context_D.currentOutput[offset + j] != 0) {
                 nullAmount = 0;
@@ -2324,6 +2341,8 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
             btchip_context_D.currentOutput + offset);
         isP2sh = btchip_output_script_is_p2sh(btchip_context_D.currentOutput +
                                               offset);
+        isNativeSegwit = btchip_output_script_is_native_witness(
+            btchip_context_D.currentOutput + offset);
         if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                              offset) &&
             !isP2sh && !(nullAmount && isOpReturn)) {
@@ -2334,8 +2353,9 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         }
         if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {
             unsigned char addressOffset =
-                (isP2sh ? OUTPUT_SCRIPT_P2SH_PRE_LENGTH
-                        : OUTPUT_SCRIPT_REGULAR_PRE_LENGTH);
+                (isNativeSegwit ? OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET
+                                : isP2sh ? OUTPUT_SCRIPT_P2SH_PRE_LENGTH
+                                         : OUTPUT_SCRIPT_REGULAR_PRE_LENGTH);
             if (os_memcmp(btchip_context_D.currentOutput + offset +
                               addressOffset,
                           btchip_context_D.tmpCtx.output.changeAddress + 1,
@@ -2380,34 +2400,54 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                 int addressOffset;
                 unsigned char address[22];
                 unsigned short version;
+                unsigned char isNativeSegwit;
+                isNativeSegwit = btchip_output_script_is_native_witness(
+                    btchip_context_D.currentOutput + offset);
                 btchip_swap_bytes(amount,
                                   btchip_context_D.currentOutput + offset, 8);
                 offset += 8;
-                if (btchip_output_script_is_regular(
-                        btchip_context_D.currentOutput + offset)) {
-                    addressOffset = offset + 4;
-                    version = btchip_context_D.payToAddressVersion;
-                } else {
-                    addressOffset = offset + 3;
-                    version = btchip_context_D.payToScriptHashVersion;
+                if (!isNativeSegwit) {
+                    if (btchip_output_script_is_regular(
+                            btchip_context_D.currentOutput + offset)) {
+                        addressOffset = offset + 4;
+                        version = btchip_context_D.payToAddressVersion;
+                    } else {
+                        addressOffset = offset + 3;
+                        version = btchip_context_D.payToScriptHashVersion;
+                    }
+                    if (version > 255) {
+                        versionSize = 2;
+                        address[0] = (version >> 8);
+                        address[1] = version;
+                    } else {
+                        versionSize = 1;
+                        address[0] = version;
+                    }
+                    os_memmove(address + versionSize,
+                               btchip_context_D.currentOutput + addressOffset,
+                               20);
                 }
-                if (version > 255) {
-                    versionSize = 2;
-                    address[0] = (version >> 8);
-                    address[1] = version;
-                } else {
-                    versionSize = 1;
-                    address[0] = version;
-                }
-                os_memmove(address + versionSize,
-                           btchip_context_D.currentOutput + addressOffset, 20);
                 if (currentPos == outputPos) {
                     unsigned short textSize;
-                    // Prepare address
-                    textSize = btchip_public_key_to_encoded_base58(
-                        address, 20 + versionSize, (unsigned char *)tmp,
-                        sizeof(tmp), version, 1);
-                    tmp[textSize] = '\0';
+                    if (!isNativeSegwit) {
+                        // Prepare address
+                        textSize = btchip_public_key_to_encoded_base58(
+                            address, 20 + versionSize, (unsigned char *)tmp,
+                            sizeof(tmp), version, 1);
+                        tmp[textSize] = '\0';
+                    }
+#ifdef NATIVE_SEGWIT_PREFIX
+                    else {
+                        textSize = segwit_addr_encode(
+                            tmp, NATIVE_SEGWIT_PREFIX, 0,
+                            btchip_context_D.currentOutput + offset +
+                                OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET,
+                            btchip_context_D.currentOutput
+                                [offset +
+                                 OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET -
+                                 1]);
+                    }
+#endif
 
                     strcpy(vars.tmp.fullAddress, tmp);
 

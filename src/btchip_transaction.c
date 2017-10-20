@@ -190,8 +190,9 @@ void transaction_parse(unsigned char parseMode) {
                                 NULL);
                             cx_hash(&btchip_context_D
                                          .transactionHashAuthorization.header,
-                                    0, (unsigned char WIDE *)&btchip_context_D
-                                           .segwit.cache,
+                                    0,
+                                    (unsigned char WIDE *)&btchip_context_D
+                                        .segwit.cache,
                                     sizeof(btchip_context_D.segwit.cache),
                                     NULL);
                         }

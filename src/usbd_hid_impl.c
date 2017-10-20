@@ -96,11 +96,6 @@
   * @{
   */
 
-#if 0
-/* Private functions ---------------------------------------------------------*/
-static void IntToUnicode (uint32_t value , uint8_t *pbuf , uint8_t len);
-static void Get_SerialNum(void);
-#endif
 
 /**
   * @}
@@ -123,13 +118,13 @@ static void Get_SerialNum(void);
 #define USBD_PID 0xf1d1
 #else
 #define USBD_VID 0x2C97
-#if TARGET_ID == 0x31000002 // blue
+#if defined(TARGET_BLUE) // blue
 #define USBD_PID 0x0000
 const uint8_t const USBD_PRODUCT_FS_STRING[] = {
     4 * 2 + 2, USB_DESC_TYPE_STRING, 'B', 0, 'l', 0, 'u', 0, 'e', 0,
 };
 
-#elif TARGET_ID == 0x31100002 // nano s
+#elif defined(TARGET_NANOS) // nano s
 #define USBD_PID 0x0001
 const uint8_t const USBD_PRODUCT_FS_STRING[] = {
     6 * 2 + 2, USB_DESC_TYPE_STRING,
@@ -140,7 +135,7 @@ const uint8_t const USBD_PRODUCT_FS_STRING[] = {
     ' ',       0,
     'S',       0,
 };
-#elif TARGET_ID == 0x31200002 // aramis
+#elif defined(TARGET_ARAMIS) // aramis
 #define USBD_PID 0x0002
 const uint8_t const USBD_PRODUCT_FS_STRING[] = {
     6 * 2 + 2, USB_DESC_TYPE_STRING,
@@ -237,8 +232,7 @@ the configuration*/
     0x09,                /*bLength: HID Descriptor size*/
     HID_DESCRIPTOR_TYPE, /*bDescriptorType: HID*/
     0x11,                /*bHIDUSTOM_HID: HID Class Spec release number*/
-    0x01,
-    0x00, /*bCountryCode: Hardware target country*/
+    0x01, 0x00,          /*bCountryCode: Hardware target country*/
     0x01, /*bNumDescriptors: Number of HID class descriptors to follow*/
     0x22, /*bDescriptorType*/
     sizeof(
@@ -252,8 +246,7 @@ the configuration*/
     HID_EPIN_ADDR,          /*bEndpointAddress: Endpoint Address (IN)*/
     0x03,                   /*bmAttributes: Interrupt endpoint*/
     HID_EPIN_SIZE,          /*wMaxPacketSize: 2 Byte max */
-    0x00,
-    0x01, /*bInterval: Polling Interval (20 ms)*/
+    0x00, 0x01,             /*bInterval: Polling Interval (20 ms)*/
     /* 34 */
 
     0x07,                   /* bLength: Endpoint Descriptor size */
@@ -271,7 +264,8 @@ __ALIGN_BEGIN const uint8_t const USBD_HID_Desc[] __ALIGN_END = {
     0x09,                /*bLength: HID Descriptor size*/
     HID_DESCRIPTOR_TYPE, /*bDescriptorType: HID*/
     0x11,                /*bHIDUSTOM_HID: HID Class Spec release number*/
-    0x01, 0x00,          /*bCountryCode: Hardware target country*/
+    0x01,
+    0x00, /*bCountryCode: Hardware target country*/
     0x01, /*bNumDescriptors: Number of HID class descriptors to follow*/
     0x22, /*bDescriptorType*/
     sizeof(
@@ -502,13 +496,21 @@ static const USBD_DescriptorsTypeDef const HID_Desc = {
 };
 
 static const USBD_ClassTypeDef const USBD_HID = {
-    USBD_HID_Init, USBD_HID_DeInit, USBD_HID_Setup, NULL, /*EP0_TxSent*/
-    NULL, /*EP0_RxReady*/                                 /* STATUS STAGE IN */
-    NULL,                                                 /*DataIn*/
-    USBD_HID_DataOut_impl,                                /*DataOut*/
-    NULL,                                                 /*SOF */
-    NULL, NULL, USBD_HID_GetCfgDesc_impl, USBD_HID_GetCfgDesc_impl,
-    USBD_HID_GetCfgDesc_impl, USBD_HID_GetDeviceQualifierDesc_impl,
+    USBD_HID_Init,
+    USBD_HID_DeInit,
+    USBD_HID_Setup,
+    NULL, /*EP0_TxSent*/
+    NULL,
+    /*EP0_RxReady*/        /* STATUS STAGE IN */
+    NULL,                  /*DataIn*/
+    USBD_HID_DataOut_impl, /*DataOut*/
+    NULL,                  /*SOF */
+    NULL,
+    NULL,
+    USBD_HID_GetCfgDesc_impl,
+    USBD_HID_GetCfgDesc_impl,
+    USBD_HID_GetCfgDesc_impl,
+    USBD_HID_GetDeviceQualifierDesc_impl,
 };
 
 void USB_power_U2F(unsigned char enabled, unsigned char fido) {

@@ -28,7 +28,20 @@ const unsigned char TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE[] = {
     0x17, 0xA9, 0x14}; // script length, OP_HASH160, address length
 const unsigned char TRANSACTION_OUTPUT_SCRIPT_P2SH_POST[] = {0x87}; // OP_EQUAL
 
+#ifdef NATIVE_SEGWIT_PREFIX
+const unsigned char TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE[] = {0x16, 0x00, 0x14};
+const unsigned char TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE[] = {0x22, 0x00, 0x20};
+#endif
+
 unsigned char btchip_output_script_is_regular(unsigned char *buffer) {
+#ifdef NATIVE_SEGWIT_PREFIX
+    if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
+                   sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE)) == 0) ||
+        (os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
+                   sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE)) == 0)) {
+        return 1;
+    }
+#endif
     if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_PRE,
                    sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE)) == 0) &&
         (os_memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE) + 20,
@@ -47,6 +60,18 @@ unsigned char btchip_output_script_is_p2sh(unsigned char *buffer) {
                    sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_POST)) == 0)) {
         return 1;
     }
+    return 0;
+}
+
+unsigned char btchip_output_script_is_native_witness(unsigned char *buffer) {
+#ifdef NATIVE_SEGWIT_PREFIX
+    if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
+                   sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE)) == 0) ||
+        (os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
+                   sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE)) == 0)) {
+        return 1;
+    }
+#endif
     return 0;
 }
 
@@ -261,7 +286,12 @@ void btchip_signverify_finalhash(void WIDE *keyContext, unsigned char sign,
     if (sign) {
         cx_ecdsa_sign((cx_ecfp_private_key_t WIDE *)keyContext,
                       CX_LAST | (rfc6979 ? CX_RND_RFC6979 : CX_RND_TRNG),
-                      CX_SHA256, in, inlen, out);
+                      CX_SHA256, in, inlen, out
+#if CX_APILEVEL >= 8
+                      ,
+                      NULL
+#endif
+                      );
     } else {
         cx_ecdsa_verify((cx_ecfp_public_key_t WIDE *)keyContext, CX_LAST,
                         CX_SHA256, in, inlen, out, outlen);
