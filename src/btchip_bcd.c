@@ -19,6 +19,14 @@
 
 #define SCRATCH_SIZE 21
 
+#ifndef HAVE_PEERCOIN_UNITS
+#define LOOP1 13
+#define LOOP2 8
+#else
+#define LOOP1 15
+#define LOOP2 6
+#endif
+
 unsigned char
 btchip_convert_hex_amount_to_displayable(unsigned char WIDE *amount) {
     unsigned short scratch[SCRATCH_SIZE];
@@ -56,7 +64,7 @@ btchip_convert_hex_amount_to_displayable(unsigned char WIDE *amount) {
         }
     }
 
-    for (i = 0; i < 13; i++) {
+    for (i = 0; i < LOOP1; i++) {
         if (!nonZero && (scratch[offset] == 0)) {
             offset++;
         } else {
@@ -68,10 +76,10 @@ btchip_convert_hex_amount_to_displayable(unsigned char WIDE *amount) {
         btchip_context_D.tmp[targetOffset++] = '0';
     }
     workOffset = offset;
-    for (i = 0; i < 8; i++) {
+    for (i = 0; i < LOOP2; i++) {
         unsigned char allZero = 1;
         unsigned char j;
-        for (j = i; j < 8; j++) {
+        for (j = i; j < LOOP2; j++) {
             if (scratch[workOffset + j] != 0) {
                 allZero = 0;
                 break;
