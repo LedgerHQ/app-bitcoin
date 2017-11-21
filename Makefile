@@ -24,7 +24,7 @@ APP_LOAD_PARAMS=--appFlags 0x50 --path "" --curve secp256k1 $(COMMON_LOAD_PARAMS
 
 APPVERSION_M=1
 APPVERSION_N=1
-APPVERSION_P=13
+APPVERSION_P=14
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 # ifndef COIN
@@ -41,8 +41,12 @@ DEFINES   += BTCHIP_P2PKH_VERSION=0 BTCHIP_P2SH_VERSION=5 BTCHIP_COIN_FAMILY=1 B
 APPNAME ="Bitcoin"
 else ifeq ($(COIN),bitcoin_cash)
 # Bitcoin cash
-DEFINES   += BTCHIP_P2PKH_VERSION=0 BTCHIP_P2SH_VERSION=5 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Bitcoin\" COINID_UPCASE=\"BITCOINCASH\" COLOR_HDR=0x85bb65 COLOR_DB=0xc2ddb2 COINID_NAME=\"BitcoinCash\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"BCH\" COIN_BITCOIN_CASH
+DEFINES   += BTCHIP_P2PKH_VERSION=0 BTCHIP_P2SH_VERSION=5 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Bitcoin\" COINID_UPCASE=\"BITCOINCASH\" COLOR_HDR=0x85bb65 COLOR_DB=0xc2ddb2 COINID_NAME=\"BitcoinCash\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"BCH\" COIN_BITCOIN_CASH COIN_FORKID=0
 APPNAME ="Bitcoin Cash"
+else ifeq ($(COIN),bitcoin_gold)
+# Bitcoin Gold 
+DEFINES   += BTCHIP_P2PKH_VERSION=38 BTCHIP_P2SH_VERSION=23 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID="\"Bitcoin Gold\"" COINID_UPCASE=\"BITCOINGOLD\" COLOR_HDR=0x85bb65 COLOR_DB=0xc2ddb2 COINID_NAME=\"BitcoinGold\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"BTG\" COIN_BITCOIN_GOLD COIN_FORKID=79
+APPNAME ="Bitcoin Gold"
 else ifeq ($(COIN),litecoin)
 # Litecoin
 DEFINES   += BTCHIP_P2PKH_VERSION=48 BTCHIP_P2SH_VERSION=50 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Litecoin\" COINID_UPCASE=\"LITECOIN\" COLOR_HDR=0xCCCCCC COLOR_DB=0xE6E6E6 COINID_NAME=\"Litecoin\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"LTC\" COIN_LITECOIN HAVE_SEGWIT_CHANGE_SUPPORT
@@ -92,7 +96,7 @@ DEFINES   += BTCHIP_P2PKH_VERSION=71 BTCHIP_P2SH_VERSION=5 BTCHIP_COIN_FAMILY=1 
 APPNAME ="Vertcoin"
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, litecoin, dogecoin, dash, zcash, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealthcoin) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealthcoin) 
 endif
 endif
 

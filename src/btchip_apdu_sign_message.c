@@ -102,6 +102,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                     if (G_io_apdu_buffer[offset] > MAX_BIP32_PATH) {
                         L_DEBUG_APP(("Invalid path\n"));
                         sw = BTCHIP_SW_INCORRECT_DATA;
+                        CLOSE_TRY;
                         goto discard;
                     }
                     btchip_context_D.transactionSummary.payToAddressVersion =
@@ -126,6 +127,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                         0) {
                         L_DEBUG_APP(("Null message length\n"));
                         sw = BTCHIP_SW_INCORRECT_DATA;
+                        CLOSE_TRY;
                         goto discard;
                     }
                     btchip_context_D.hashedMessageLength = 0;
@@ -164,6 +166,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                         btchip_context_D.transactionSummary.messageLength) {
                         L_DEBUG_APP(("Invalid data length\n"));
                         sw = BTCHIP_SW_INCORRECT_DATA;
+                        CLOSE_TRY;
                         goto discard;
                     }
                     cx_hash(&btchip_context_D.transactionHashFull.header, 0,
@@ -185,6 +188,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                         btchip_context_D.transactionSummary.messageLength) {
                         L_DEBUG_APP(("Invalid data length\n"));
                         sw = BTCHIP_SW_INCORRECT_DATA;
+                        CLOSE_TRY;
                         goto discard;
                     }
                     cx_hash(&btchip_context_D.transactionHashFull.header, 0,
@@ -208,6 +212,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                      btchip_context_D.transactionSummary.messageLength)) {
                     L_DEBUG_APP(("Invalid length to sign\n"));
                     sw = BTCHIP_SW_INCORRECT_DATA;
+                    CLOSE_TRY;
                     goto discard;
                 }
                 if (checkBitId(btchip_context_D.transactionSummary.summarydata

@@ -24,7 +24,7 @@
 #include "btchip_filesystem_tx.h"
 
 #define MAX_OUTPUT_TO_CHECK 200
-#define MAX_COIN_ID 12
+#define MAX_COIN_ID 13
 #define MAX_SHORT_COIN_ID 5
 
 #define MAGIC_TRUSTED_INPUT 0x32
