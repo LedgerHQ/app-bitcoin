@@ -55,6 +55,9 @@ unsigned short btchip_apdu_set_alternate_coin_version() {
 #ifdef HAVE_PEERCOIN_SUPPORT
     case BTCHIP_FAMILY_PEERCOIN:
 #endif
+#ifdef HAVE_QTUM_SUPPORT
+    case BTCHIP_FAMILY_QTUM:
+#endif
         break;
     default:
         return BTCHIP_SW_INCORRECT_DATA;

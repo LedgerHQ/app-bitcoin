@@ -79,6 +79,22 @@ unsigned char btchip_output_script_is_op_return(unsigned char *buffer) {
     return (buffer[1] == 0x6A);
 }
 
+#ifdef HAVE_QTUM_SUPPORT
+unsigned char btchip_output_script_is_op_create(unsigned char *buffer) {
+    return (!btchip_output_script_is_regular(buffer) &&
+            !btchip_output_script_is_p2sh(buffer) &&
+            !btchip_output_script_is_op_return(buffer) && (buffer[0] <= 0xEA) &&
+            (buffer[buffer[0]] == 0xC1));
+}
+
+unsigned char btchip_output_script_is_op_call(unsigned char *buffer) {
+    return (!btchip_output_script_is_regular(buffer) &&
+            !btchip_output_script_is_p2sh(buffer) &&
+            !btchip_output_script_is_op_return(buffer) && (buffer[0] <= 0xEA) &&
+            (buffer[buffer[0]] == 0xC2));
+}
+#endif
+
 unsigned char btchip_rng_u8_modulo(unsigned char modulo) {
     unsigned int rng_max = 256 % modulo;
     unsigned int rng_limit = 256 - rng_max;

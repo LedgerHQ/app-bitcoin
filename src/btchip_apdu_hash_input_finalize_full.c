@@ -55,6 +55,9 @@ static bool check_output_displayable() {
     bool displayable = true;
     unsigned char amount[8], isOpReturn, isP2sh, isNativeSegwit, j,
         nullAmount = 1;
+#ifdef HAVE_QTUM_SUPPORT
+    unsigned char isOpCreate, isOpCall;
+#endif
     for (j = 0; j < 8; j++) {
         if (btchip_context_D.currentOutput[j] != 0) {
             nullAmount = 0;
@@ -71,8 +74,17 @@ static bool check_output_displayable() {
     isP2sh = btchip_output_script_is_p2sh(btchip_context_D.currentOutput + 8);
     isNativeSegwit = btchip_output_script_is_native_witness(
         btchip_context_D.currentOutput + 8);
+#ifdef HAVE_QTUM_SUPPORT
+    isOpCreate =
+        btchip_output_script_is_op_create(btchip_context_D.currentOutput + 8);
+    isOpCall =
+        btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8);
+    if (!btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
+        !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate && !isOpCall) {
+#else
     if (!btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
         !isP2sh && !(nullAmount && isOpReturn)) {
+#endif
         PRINTF("Error : Unrecognized input script");
         THROW(EXCEPTION);
     }
@@ -327,10 +339,14 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                            G_io_apdu_buffer + ISO_OFFSET_CDATA, apduLength);
                 btchip_context_D.currentOutputOffset += apduLength;
 
-                // Check if the legacy UI can be applied
+// Check if the legacy UI can be applied
+#ifndef HAVE_QTUM_SUPPORT
                 if ((G_io_apdu_buffer[ISO_OFFSET_P1] == FINALIZE_P1_LAST) &&
                     !btchip_context_D.tmpCtx.output.multipleOutput &&
                     prepare_full_output(1)) {
+#else
+                if (0) {
+#endif
                     btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
                     btchip_context_D.outputParsingState =
                         BTCHIP_OUTPUT_HANDLE_LEGACY;

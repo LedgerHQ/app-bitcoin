@@ -2227,17 +2227,25 @@ uint8_t prepare_single_output() {
     unsigned short textSize;
     unsigned char nativeSegwit;
 
+    vars.tmp.fullAddress[0] = '\0';
     btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset, 8);
     offset += 8;
     nativeSegwit = btchip_output_script_is_native_witness(
         btchip_context_D.currentOutput + offset);
     if (btchip_output_script_is_op_return(btchip_context_D.currentOutput +
                                           offset)) {
-        os_memmove(vars.tmp.fullAddress, "OP_RETURN", 9);
-        vars.tmp.fullAddress[10] = '\0';
-        vars.tmp.fullAmount[0] = '\0';
-        return 1;
-    } else if (nativeSegwit) {
+        strcpy(vars.tmp.fullAddress, "OP_RETURN");
+    }
+#ifdef HAVE_QTUM_SUPPORT
+    else if (btchip_output_script_is_op_create(btchip_context_D.currentOutput +
+                                               offset)) {
+        strcpy(vars.tmp.fullAddress, "OP_CREATE");
+    } else if (btchip_output_script_is_op_call(btchip_context_D.currentOutput +
+                                               offset)) {
+        strcpy(vars.tmp.fullAddress, "OP_CALL");
+    }
+#endif
+    else if (nativeSegwit) {
         addressOffset = offset + OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET;
     } else if (btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                                offset)) {
@@ -2247,34 +2255,36 @@ uint8_t prepare_single_output() {
         addressOffset = offset + 3;
         version = btchip_context_D.payToScriptHashVersion;
     }
-    if (!nativeSegwit) {
-        if (version > 255) {
-            versionSize = 2;
-            address[0] = (version >> 8);
-            address[1] = version;
-        } else {
-            versionSize = 1;
-            address[0] = version;
-        }
-        os_memmove(address + versionSize,
-                   btchip_context_D.currentOutput + addressOffset, 20);
+    if (vars.tmp.fullAddress[0] == 0) {
+        if (!nativeSegwit) {
+            if (version > 255) {
+                versionSize = 2;
+                address[0] = (version >> 8);
+                address[1] = version;
+            } else {
+                versionSize = 1;
+                address[0] = version;
+            }
+            os_memmove(address + versionSize,
+                       btchip_context_D.currentOutput + addressOffset, 20);
 
-        // Prepare address
-        textSize = btchip_public_key_to_encoded_base58(
-            address, 20 + versionSize, (unsigned char *)tmp, sizeof(tmp),
-            version, 1);
-        tmp[textSize] = '\0';
-    }
+            // Prepare address
+            textSize = btchip_public_key_to_encoded_base58(
+                address, 20 + versionSize, (unsigned char *)tmp, sizeof(tmp),
+                version, 1);
+            tmp[textSize] = '\0';
+        }
 #ifdef NATIVE_SEGWIT_PREFIX
-    else {
-        textSize = segwit_addr_encode(
-            tmp, NATIVE_SEGWIT_PREFIX, 0,
-            btchip_context_D.currentOutput + addressOffset,
-            btchip_context_D.currentOutput[addressOffset - 1]);
-    }
+        else {
+            textSize = segwit_addr_encode(
+                tmp, NATIVE_SEGWIT_PREFIX, 0,
+                btchip_context_D.currentOutput + addressOffset,
+                btchip_context_D.currentOutput[addressOffset - 1]);
+        }
 #endif
 
-    strcpy(vars.tmp.fullAddress, tmp);
+        strcpy(vars.tmp.fullAddress, tmp);
+    }
 
     // Prepare amount
 
@@ -2328,6 +2338,9 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         unsigned char nullAmount = 1;
         unsigned int j;
         unsigned char isOpReturn, isP2sh, isNativeSegwit;
+#ifdef HAVE_QTUM_SUPPORT
+        unsigned char isOpCreate, isOpCall;
+#endif
         for (j = 0; j < 8; j++) {
             if (btchip_context_D.currentOutput[offset + j] != 0) {
                 nullAmount = 0;
@@ -2343,15 +2356,31 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                                               offset);
         isNativeSegwit = btchip_output_script_is_native_witness(
             btchip_context_D.currentOutput + offset);
+#ifdef HAVE_QTUM_SUPPORT
+        isOpCreate = btchip_output_script_is_op_create(
+            btchip_context_D.currentOutput + offset);
+        isOpCall = btchip_output_script_is_op_call(
+            btchip_context_D.currentOutput + offset);
+        if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
+                                             offset) &&
+            !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate &&
+            !isOpCall) {
+#else
         if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                              offset) &&
             !isP2sh && !(nullAmount && isOpReturn)) {
+#endif
             if (!checkOnly) {
                 PRINTF("Error : Unrecognized input script");
             }
             goto error;
         }
+#ifdef HAVE_QTUM_SUPPORT
+        if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn &&
+            !isOpCreate && !isOpCall) {
+#else
         if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {
+#endif
             unsigned char addressOffset =
                 (isNativeSegwit ? OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET
                                 : isP2sh ? OUTPUT_SCRIPT_P2SH_PRE_LENGTH
@@ -2394,8 +2423,17 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         offset = 1;
         btchip_context_D.tmp = (unsigned char *)tmp;
         for (i = 0; i < numberOutputs; i++) {
+#ifdef HAVE_QTUM_SUPPORT
+            if (!btchip_output_script_is_op_return(
+                    btchip_context_D.currentOutput + offset + 8) &&
+                !btchip_output_script_is_op_create(
+                    btchip_context_D.currentOutput + offset + 8) &&
+                !btchip_output_script_is_op_call(
+                    btchip_context_D.currentOutput + offset + 8)) {
+#else
             if (!btchip_output_script_is_op_return(
                     btchip_context_D.currentOutput + offset + 8)) {
+#endif
                 unsigned char versionSize;
                 int addressOffset;
                 unsigned char address[22];
