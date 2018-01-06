@@ -129,6 +129,9 @@ unsigned short btchip_apdu_get_wallet_public_key() {
             keyLength =
                 segwit_addr_encode((char *)(G_io_apdu_buffer + 67),
                                    NATIVE_SEGWIT_PREFIX, 0, tmp + 2, 20);
+            if (keyLength == 1) {
+                keyLength = strlen((char *)(G_io_apdu_buffer + 67));
+            }
 #endif
         }
     }
