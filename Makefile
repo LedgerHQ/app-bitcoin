@@ -21,7 +21,7 @@ endif
 include $(BOLOS_SDK)/Makefile.defines
 
 APP_PATH = ""
-APP_LOAD_PARAMS=--appFlags 0x50 --curve secp256k1 $(COMMON_LOAD_PARAMS) 
+APP_LOAD_PARAMS=--appFlags 0x50 --curve secp256k1 $(COMMON_LOAD_PARAMS)
 
 APPVERSION_M=1
 APPVERSION_N=1
@@ -34,7 +34,7 @@ APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ifeq ($(COIN),bitcoin_testnet)
 # Bitcoin testnet
-DEFINES  += BTCHIP_P2PKH_VERSION=111 BTCHIP_P2SH_VERSION=196 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Bitcoin\" COINID_UPCASE=\"BITCOIN\" COLOR_HDR=0xFCB653 COLOR_DB=0xFEDBA9 COINID_NAME=\"Bitcoin\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"TEST\" NATIVE_SEGWIT_PREFIX=\"tb\" COIN_BITCOIN_TESTNET HAVE_SEGWIT_CHANGE_SUPPORT 
+DEFINES  += BTCHIP_P2PKH_VERSION=111 BTCHIP_P2SH_VERSION=196 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Bitcoin\" COINID_UPCASE=\"BITCOIN\" COLOR_HDR=0xFCB653 COLOR_DB=0xFEDBA9 COINID_NAME=\"Bitcoin\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"TEST\" NATIVE_SEGWIT_PREFIX=\"tb\" COIN_BITCOIN_TESTNET HAVE_SEGWIT_CHANGE_SUPPORT
 APPNAME ="Bitcoin Test"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),bitcoin)
@@ -48,7 +48,7 @@ DEFINES   += BTCHIP_P2PKH_VERSION=0 BTCHIP_P2SH_VERSION=5 BTCHIP_COIN_FAMILY=1 B
 APPNAME ="Bitcoin Cash"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),bitcoin_gold)
-# Bitcoin Gold 
+# Bitcoin Gold
 DEFINES   += BTCHIP_P2PKH_VERSION=38 BTCHIP_P2SH_VERSION=23 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Bitcoin\\x20Gold\" COINID_UPCASE=\"BITCOINGOLD\" COLOR_HDR=0x85bb65 COLOR_DB=0xc2ddb2 COINID_NAME=\"BitcoinGold\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"BTG\" COIN_BITCOIN_GOLD HAVE_SEGWIT_CHANGE_SUPPORT COIN_FORKID=79
 APPNAME ="Bitcoin Gold"
 APP_LOAD_PARAMS += --path $(APP_PATH)
@@ -74,7 +74,7 @@ APPNAME ="Zcash"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),zclassic)
 # Zclassic
-DEFINES   += BTCHIP_P2PKH_VERSION=7352 BTCHIP_P2SH_VERSION=7357 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Zclassic\" COINID_UPCASE=\"ZCLASSIC\" COLOR_HDR=0x3790CA COLOR_DB=0x9BC8E5 COINID_NAME=\"Zclassic\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"ZCL\" COIN_ZCLASSIC
+DEFINES   += BTCHIP_P2PKH_VERSION=7353 BTCHIP_P2SH_VERSION=7358 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Zclassic\" COINID_UPCASE=\"ZCLASSIC\" COLOR_HDR=0xD37239 COLOR_DB=0xEEA37D COINID_NAME=\"Zclassic\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"ZCL\" COIN_ZCLASSIC
 APPNAME ="Zclassic"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),komodo)
@@ -83,7 +83,7 @@ DEFINES   += BTCHIP_P2PKH_VERSION=60 BTCHIP_P2SH_VERSION=85 BTCHIP_COIN_FAMILY=1
 APPNAME ="Komodo"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),stratis)
-# Stratis 
+# Stratis
 DEFINES   += BTCHIP_P2PKH_VERSION=63 BTCHIP_P2SH_VERSION=125 BTCHIP_COIN_FAMILY=2 BTCHIP_COINID=\"Stratis\" COINID_UPCASE=\"STRAT\" COLOR_HDR=0x3790CA COLOR_DB=0x9BC8E5 COINID_NAME=\"Stratis\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"STRAT\" COIN_STRATIS HAVE_PEERCOIN_SUPPORT
 APPNAME ="Stratis"
 APP_LOAD_PARAMS += --path $(APP_PATH)
@@ -129,7 +129,7 @@ else ifeq ($(COIN),hcash)
 DEFINES   += BTCHIP_P2PKH_VERSION=40 BTCHIP_P2SH_VERSION=100 BTCHIP_COIN_FAMILY=2 BTCHIP_COINID=\"HShare\" COINID_UPCASE=\"HCASH\" COLOR_HDR=0x57448D COLOR_DB=0xABA2C6 COINID_NAME=\"HCash\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"HCASH\" COIN_HCASH HAVE_PEERCOIN_SUPPORT
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, zclassic, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealthcoin, digibyte, qtum, hcash) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, zclassic, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealthcoin, digibyte, qtum, hcash)
 endif
 endif
 
@@ -171,7 +171,7 @@ DEFINES   += APPVERSION=\"$(APPVERSION)\"
 ##############
 #GCCPATH   := $(BOLOS_ENV)/gcc-arm-none-eabi-5_3-2016q1/bin/
 #CLANGPATH := $(BOLOS_ENV)/clang-arm-fropi/bin/
-CC       := $(CLANGPATH)clang 
+CC       := $(CLANGPATH)clang
 
 #CFLAGS   += -O0
 CFLAGS   += -O3 -Os
@@ -180,7 +180,7 @@ AS     := $(GCCPATH)arm-none-eabi-gcc
 
 LD       := $(GCCPATH)arm-none-eabi-gcc
 LDFLAGS  += -O3 -Os
-LDLIBS   += -lm -lgcc -lc 
+LDLIBS   += -lm -lgcc -lc
 
 # import rules to compile glyphs(/pone)
 include $(BOLOS_SDK)/Makefile.glyphs
@@ -201,4 +201,3 @@ include $(BOLOS_SDK)/Makefile.rules
 
 #add dependency on custom makefile filename
 dep/%.d: %.c Makefile
-
