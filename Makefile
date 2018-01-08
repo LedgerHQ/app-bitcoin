@@ -72,6 +72,11 @@ else ifeq ($(COIN),zcash)
 DEFINES   += BTCHIP_P2PKH_VERSION=7352 BTCHIP_P2SH_VERSION=7357 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Zcash\" COINID_UPCASE=\"ZCASH\" COLOR_HDR=0x3790CA COLOR_DB=0x9BC8E5 COINID_NAME=\"Zcash\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"ZEC\" COIN_ZCASH
 APPNAME ="Zcash"
 APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),zclassic)
+# Zclassic
+DEFINES   += BTCHIP_P2PKH_VERSION=7352 BTCHIP_P2SH_VERSION=7357 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Zclassic\" COINID_UPCASE=\"ZCLASSIC\" COLOR_HDR=0x3790CA COLOR_DB=0x9BC8E5 COINID_NAME=\"Zclassic\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"ZCL\" COIN_ZCLASSIC
+APPNAME ="Zclassic"
+APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),komodo)
 # Komodo
 DEFINES   += BTCHIP_P2PKH_VERSION=60 BTCHIP_P2SH_VERSION=85 BTCHIP_COIN_FAMILY=1 BTCHIP_COINID=\"Komodo\" COINID_UPCASE=\"KMD\" COLOR_HDR=0x326464 COLOR_DB=0x99b2b2 COINID_NAME=\"Komodo\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"KMD\" COIN_KOMODO
@@ -124,7 +129,7 @@ else ifeq ($(COIN),hcash)
 DEFINES   += BTCHIP_P2PKH_VERSION=40 BTCHIP_P2SH_VERSION=100 BTCHIP_COIN_FAMILY=2 BTCHIP_COINID=\"HShare\" COINID_UPCASE=\"HCASH\" COLOR_HDR=0x57448D COLOR_DB=0xABA2C6 COINID_NAME=\"HCash\" COINID=$(COIN) BTCHIP_COINID_SHORT=\"HCASH\" COIN_HCASH HAVE_PEERCOIN_SUPPORT
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealthcoin, digibyte, qtum, hcash) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, zclassic, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealthcoin, digibyte, qtum, hcash) 
 endif
 endif
 
