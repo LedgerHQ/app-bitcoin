@@ -26,6 +26,7 @@
 #include "btchip_bagl_extensions.h"
 
 #include "segwit_addr.h"
+#include "cashaddr.h"
 
 #include "glyphs.h"
 
@@ -2269,10 +2270,25 @@ uint8_t prepare_single_output() {
                        btchip_context_D.currentOutput + addressOffset, 20);
 
             // Prepare address
-            textSize = btchip_public_key_to_encoded_base58(
-                address, 20 + versionSize, (unsigned char *)tmp, sizeof(tmp),
-                version, 1);
-            tmp[textSize] = '\0';
+#ifdef CASHADDR
+            // Bitcoin Cash
+            if (btchip_context_D.usingCashAddr) {
+                unsigned short cash_version = CASHADDR_P2PKH; // P2PKH
+                if (version == BTCHIP_P2SH_VERSION)
+                    cash_version = CASHADDR_P2SH; // P2SH
+                cashaddr_encode(address + versionSize, // HASH
+                                20,                    // HASH LENGTH
+                                tmp,                   // OUT
+                                sizeof(tmp),           // MAXOUTLEN
+                                cash_version);         // VERSION
+            } else
+#endif
+                {
+                    textSize = btchip_public_key_to_encoded_base58(
+                        address, 20 + versionSize, (unsigned char *)tmp,
+                        sizeof(tmp), version, 1);
+                    tmp[textSize] = '\0';
+                }
         }
 #ifdef NATIVE_SEGWIT_PREFIX
         else {
@@ -2469,10 +2485,25 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                     unsigned short textSize;
                     if (!isNativeSegwit) {
                         // Prepare address
-                        textSize = btchip_public_key_to_encoded_base58(
-                            address, 20 + versionSize, (unsigned char *)tmp,
-                            sizeof(tmp), version, 1);
-                        tmp[textSize] = '\0';
+#ifdef CASHADDR
+                        // Bitcoin Cash
+                        if (btchip_context_D.usingCashAddr) {
+                            unsigned short cash_version = CASHADDR_P2PKH; // P2PKH
+                            if (version == BTCHIP_P2SH_VERSION)
+                                cash_version = CASHADDR_P2SH; // P2SH
+                            cashaddr_encode(address + versionSize, // HASH
+                                            20,                    // HASH LENGTH
+                                            tmp,                   // OUT
+                                            sizeof(tmp),           // MAXOUTLEN
+                                            cash_version);         // VERSION
+                        } else
+#endif
+                            {
+                                textSize = btchip_public_key_to_encoded_base58(
+                                               address, 20 + versionSize, (unsigned char *)tmp,
+                                               sizeof(tmp), version, 1);
+                                tmp[textSize] = '\0';
+                            }
                     }
 #ifdef NATIVE_SEGWIT_PREFIX
                     else {

@@ -37,6 +37,9 @@ void u2f_proxy_response(u2f_service_t *service, unsigned int tx);
 #define FINALIZE_P1_LAST 0x80
 #define FINALIZE_P1_CHANGEINFO 0xFF
 
+#define FINALIZE_P2_DEFAULT 0x00
+#define FINALIZE_P2_CASHADDR 0x01
+
 #define FLAG_SIGNATURE 0x01
 #define FLAG_CHANGE_VALIDATED 0x80
 
@@ -238,6 +241,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
     unsigned char screenPaired = 0;
     unsigned char deepControl = 0;
     unsigned char p1 = G_io_apdu_buffer[ISO_OFFSET_P1];
+    unsigned char p2 = G_io_apdu_buffer[ISO_OFFSET_P2];
     unsigned char persistentCommit = 0;
     unsigned char hashOffset = 0;
     unsigned char numOutputs = 0;
@@ -248,6 +252,13 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
         (p1 != FINALIZE_P1_CHANGEINFO)) {
         return BTCHIP_SW_INCORRECT_P1_P2;
     }
+
+#ifdef CASHADDR
+    if ((p2 != FINALIZE_P2_DEFAULT) && (p2 != FINALIZE_P2_CASHADDR)) {
+        return BTCHIP_SW_INCORRECT_P1_P2;
+    }
+    btchip_context_D.usingCashAddr = (p2 == FINALIZE_P2_CASHADDR);
+#endif
 
     // See if there is a hashing offset
     if (btchip_context_D.usingSegwit &&
