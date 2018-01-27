@@ -228,6 +228,8 @@ struct btchip_context_s {
     unsigned char outputParsingState;
     unsigned char totalOutputAmount[8];
     unsigned char changeOutputFound;
+
+    unsigned char usingCashAddr;
 };
 typedef struct btchip_context_s btchip_context_t;
 
