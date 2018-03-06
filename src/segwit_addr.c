@@ -19,8 +19,6 @@
  * THE SOFTWARE.
  */
 
-#ifdef NATIVE_SEGWIT_PREFIX
-
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -204,5 +202,3 @@ int segwit_addr_decode(int *witver, uint8_t *witdata, size_t *witdata_len,
     *witver = data[0];
     return 1;
 }
-
-#endif

@@ -21,18 +21,6 @@
 #include "btchip_bagl_extensions.h"
 
 #include "segwit_addr.h"
-
-#ifdef HAVE_U2F
-
-#include "u2f_service.h"
-#include "u2f_transport.h"
-
-extern bool fidoActivated;
-extern volatile u2f_service_t u2fService;
-void u2f_proxy_response(u2f_service_t *service, unsigned int tx);
-
-#endif
-
 #define P1_NO_DISPLAY 0x00
 #define P1_DISPLAY 0x01
 
@@ -59,11 +47,12 @@ unsigned short btchip_apdu_get_wallet_public_key() {
     }
 
     switch (G_io_apdu_buffer[ISO_OFFSET_P2]) {
+    case P2_NATIVE_SEGWIT:
+        if (!(G_coin_config->native_segwit_prefix)) {
+            return BTCHIP_SW_INCORRECT_P1_P2;
+        }
     case P2_LEGACY:
     case P2_SEGWIT:
-#ifdef NATIVE_SEGWIT_PREFIX
-    case P2_NATIVE_SEGWIT:
-#endif
         break;
     default:
         return BTCHIP_SW_INCORRECT_P1_P2;
@@ -125,14 +114,14 @@ unsigned short btchip_apdu_get_wallet_public_key() {
                 150,                   // MAXOUTLEN
                 btchip_context_D.payToScriptHashVersion, 0);
         } else {
-#ifdef NATIVE_SEGWIT_PREFIX
-            keyLength =
-                segwit_addr_encode((char *)(G_io_apdu_buffer + 67),
-                                   NATIVE_SEGWIT_PREFIX, 0, tmp + 2, 20);
-            if (keyLength == 1) {
-                keyLength = strlen((char *)(G_io_apdu_buffer + 67));
+            if (G_coin_config->native_segwit_prefix) {
+                keyLength = segwit_addr_encode(
+                    (char *)(G_io_apdu_buffer + 67),
+                    G_coin_config->native_segwit_prefix, 0, tmp + 2, 20);
+                if (keyLength == 1) {
+                    keyLength = strlen((char *)(G_io_apdu_buffer + 67));
+                }
             }
-#endif
         }
     }
     G_io_apdu_buffer[66] = keyLength;
@@ -179,15 +168,5 @@ void btchip_bagl_user_action_display(unsigned char confirming) {
     G_io_apdu_buffer[btchip_context_D.outLength++] = sw >> 8;
     G_io_apdu_buffer[btchip_context_D.outLength++] = sw;
 
-#ifdef HAVE_U2F
-    if (fidoActivated) {
-        u2f_proxy_response((u2f_service_t *)&u2fService,
-                           btchip_context_D.outLength);
-    } else {
-        io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX,
-                    btchip_context_D.outLength);
-    }
-#else
     io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, btchip_context_D.outLength);
-#endif
 }

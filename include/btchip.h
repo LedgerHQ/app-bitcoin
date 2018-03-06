@@ -22,6 +22,9 @@
 #include "btchip_config.h"
 #include "os.h"
 
+#include "stdlib.h"
+#include "stdbool.h"
+
 #define L_DEBUG_APP(x)
 #define L_DEBUG_NOPREFIX(x)
 #define L_DEBUG_BUF(x)

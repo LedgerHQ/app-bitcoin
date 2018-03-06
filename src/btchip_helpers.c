@@ -28,20 +28,18 @@ const unsigned char TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE[] = {
     0x17, 0xA9, 0x14}; // script length, OP_HASH160, address length
 const unsigned char TRANSACTION_OUTPUT_SCRIPT_P2SH_POST[] = {0x87}; // OP_EQUAL
 
-#ifdef NATIVE_SEGWIT_PREFIX
 const unsigned char TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE[] = {0x16, 0x00, 0x14};
 const unsigned char TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE[] = {0x22, 0x00, 0x20};
-#endif
 
 unsigned char btchip_output_script_is_regular(unsigned char *buffer) {
-#ifdef NATIVE_SEGWIT_PREFIX
-    if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
-                   sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE)) == 0) ||
-        (os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
-                   sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE)) == 0)) {
-        return 1;
+    if (G_coin_config->native_segwit_prefix) {
+        if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
+                       sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE)) == 0) ||
+            (os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
+                       sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE)) == 0)) {
+            return 1;
+        }
     }
-#endif
     if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_PRE,
                    sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE)) == 0) &&
         (os_memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE) + 20,
@@ -64,14 +62,14 @@ unsigned char btchip_output_script_is_p2sh(unsigned char *buffer) {
 }
 
 unsigned char btchip_output_script_is_native_witness(unsigned char *buffer) {
-#ifdef NATIVE_SEGWIT_PREFIX
-    if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
-                   sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE)) == 0) ||
-        (os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
-                   sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE)) == 0)) {
-        return 1;
+    if (G_coin_config->native_segwit_prefix) {
+        if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
+                       sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE)) == 0) ||
+            (os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
+                       sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE)) == 0)) {
+            return 1;
+        }
     }
-#endif
     return 0;
 }
 
@@ -79,7 +77,6 @@ unsigned char btchip_output_script_is_op_return(unsigned char *buffer) {
     return (buffer[1] == 0x6A);
 }
 
-#ifdef HAVE_QTUM_SUPPORT
 unsigned char btchip_output_script_is_op_create(unsigned char *buffer) {
     return (!btchip_output_script_is_regular(buffer) &&
             !btchip_output_script_is_p2sh(buffer) &&
@@ -93,7 +90,6 @@ unsigned char btchip_output_script_is_op_call(unsigned char *buffer) {
             !btchip_output_script_is_op_return(buffer) && (buffer[0] <= 0xEA) &&
             (buffer[buffer[0]] == 0xC2));
 }
-#endif
 
 unsigned char btchip_rng_u8_modulo(unsigned char modulo) {
     unsigned int rng_max = 256 % modulo;
@@ -300,14 +296,13 @@ void btchip_signverify_finalhash(void WIDE *keyContext, unsigned char sign,
                                  unsigned char *out, unsigned short outlen,
                                  unsigned char rfc6979) {
     if (sign) {
+        unsigned int info = 0;
         cx_ecdsa_sign((cx_ecfp_private_key_t WIDE *)keyContext,
                       CX_LAST | (rfc6979 ? CX_RND_RFC6979 : CX_RND_TRNG),
-                      CX_SHA256, in, inlen, out
-#if CX_APILEVEL >= 8
-                      ,
-                      NULL
-#endif
-                      );
+                      CX_SHA256, in, inlen, out, &info);
+        if (info & CX_ECCINFO_PARITY_ODD) {
+            out[0] |= 0x01;
+        }
     } else {
         cx_ecdsa_verify((cx_ecfp_public_key_t WIDE *)keyContext, CX_LAST,
                         CX_SHA256, in, inlen, out, outlen);

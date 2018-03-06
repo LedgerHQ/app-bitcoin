@@ -34,14 +34,15 @@ void btchip_autosetup() {
                                                    // supporting multi output
     SB_SET(config.supportedModes, BTCHIP_MODE_WALLET);
     SB_SET(config.operationMode, BTCHIP_MODE_WALLET);
-    config.payToAddressVersion = BTCHIP_P2PKH_VERSION;
-    config.payToScriptHashVersion = BTCHIP_P2SH_VERSION;
-    config.coinFamily = BTCHIP_COIN_FAMILY;
-    config.coinIdLength = strlen(BTCHIP_COINID);
-    os_memmove(config.coinId, BTCHIP_COINID, config.coinIdLength);
-    config.shortCoinIdLength = strlen(BTCHIP_COINID_SHORT);
-    os_memmove(config.shortCoinId, BTCHIP_COINID_SHORT,
-               config.shortCoinIdLength);
+    // config.payToAddressVersion = G_coin_config->p2pkh_version;
+    // config.payToScriptHashVersion = G_coin_config->p2sh_version;
+    // config.coinFamily = G_coin_config->family;
+    // config.coinIdLength = strlen(PIC(G_coin_config->coinid));
+    // os_memmove(config.coinId, PIC(G_coin_config->coinid),
+    // config.coinIdLength);
+    // config.shortCoinIdLength = strlen(PIC(G_coin_config->name_short));
+    // os_memmove(config.shortCoinId, PIC(G_coin_config->name_short),
+    // config.shortCoinIdLength);
     nvm_write((void *)&N_btchip.bkp.config, &config, sizeof(config));
     cx_rng(tmp, sizeof(tmp));
     cx_des_init_key(tmp, sizeof(tmp), &desKey);

@@ -19,9 +19,6 @@
 #include "btchip_apdu_constants.h"
 
 #define SIGHASH_ALL 0x01
-#if defined(COIN_BITCOIN_CASH) || defined(COIN_BITCOIN_GOLD)
-#define SIGHASH_FORKID 0x40
-#endif
 
 unsigned short btchip_apdu_hash_sign() {
     unsigned long int lockTime;
@@ -73,7 +70,9 @@ unsigned short btchip_apdu_hash_sign() {
             // Read parameters
             if (G_io_apdu_buffer[ISO_OFFSET_CDATA] > MAX_BIP32_PATH) {
                 sw = BTCHIP_SW_INCORRECT_DATA;
-                goto discardTransaction;
+            discardTransaction:
+                CLOSE_TRY;
+                goto catch_discardTransaction;
             }
             os_memmove(keyPath, G_io_apdu_buffer + ISO_OFFSET_CDATA,
                        MAX_BIP32_PATH_LENGTH);
@@ -87,19 +86,21 @@ unsigned short btchip_apdu_hash_sign() {
 
             if (((N_btchip.bkp.config.options &
                   BTCHIP_OPTION_FREE_SIGHASHTYPE) == 0)) {
-#if defined(COIN_BITCOIN_CASH) || defined(COIN_BITCOIN_GOLD)
-                if (sighashType != (SIGHASH_ALL | SIGHASH_FORKID)) {
-                    sw = BTCHIP_SW_INCORRECT_DATA;
-                    goto discardTransaction;
+                // if bitcoin cash OR forkid is set, then use the fork id
+                if (G_coin_config->kind == COIN_KIND_BITCOIN_CASH ||
+                    G_coin_config->forkid) {
+#define SIGHASH_FORKID 0x40
+                    if (sighashType != (SIGHASH_ALL | SIGHASH_FORKID)) {
+                        sw = BTCHIP_SW_INCORRECT_DATA;
+                        goto discardTransaction;
+                    }
+                    sighashType |= (G_coin_config->forkid << 8);
+                } else {
+                    if (sighashType != SIGHASH_ALL) {
+                        sw = BTCHIP_SW_INCORRECT_DATA;
+                        goto discardTransaction;
+                    }
                 }
-                sighashType |= (COIN_FORKID << 8);
-
-#else
-                if (sighashType != SIGHASH_ALL) {
-                    sw = BTCHIP_SW_INCORRECT_DATA;
-                    goto discardTransaction;
-                }
-#endif
             }
 
             // Read transaction parameters
@@ -147,7 +148,7 @@ unsigned short btchip_apdu_hash_sign() {
         }
         CATCH_ALL {
             sw = SW_TECHNICAL_DETAILS(0xF);
-        discardTransaction:
+        catch_discardTransaction:
             btchip_context_D.transactionContext.transactionState =
                 BTCHIP_TRANSACTION_NONE;
         }

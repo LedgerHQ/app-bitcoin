@@ -52,14 +52,19 @@ unsigned short btchip_apdu_set_alternate_coin_version() {
 
     switch (G_io_apdu_buffer[offset + 4]) {
     case BTCHIP_FAMILY_BITCOIN:
-#ifdef HAVE_PEERCOIN_SUPPORT
+        break;
     case BTCHIP_FAMILY_PEERCOIN:
-#endif
-#ifdef HAVE_QTUM_SUPPORT
+        if (!(G_coin_config->flags & FLAG_PEERCOIN_SUPPORT)) {
+            goto incorrect_family;
+        }
+        break;
     case BTCHIP_FAMILY_QTUM:
-#endif
+        if (!(G_coin_config->flags & FLAG_QTUM_SUPPORT)) {
+            goto incorrect_family;
+        }
         break;
     default:
+    incorrect_family:
         return BTCHIP_SW_INCORRECT_DATA;
     }
 

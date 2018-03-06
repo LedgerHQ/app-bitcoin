@@ -22,17 +22,6 @@
 #include "btchip_apdu_constants.h"
 #include "btchip_bagl_extensions.h"
 
-#ifdef HAVE_U2F
-
-#include "u2f_service.h"
-#include "u2f_transport.h"
-
-extern bool fidoActivated;
-extern volatile u2f_service_t u2fService;
-void u2f_proxy_response(u2f_service_t *service, unsigned int tx);
-
-#endif
-
 #define FINALIZE_P1_MORE 0x00
 #define FINALIZE_P1_LAST 0x80
 #define FINALIZE_P1_CHANGEINFO 0xFF
@@ -55,9 +44,8 @@ static bool check_output_displayable() {
     bool displayable = true;
     unsigned char amount[8], isOpReturn, isP2sh, isNativeSegwit, j,
         nullAmount = 1;
-#ifdef HAVE_QTUM_SUPPORT
     unsigned char isOpCreate, isOpCall;
-#endif
+
     for (j = 0; j < 8; j++) {
         if (btchip_context_D.currentOutput[j] != 0) {
             nullAmount = 0;
@@ -74,17 +62,16 @@ static bool check_output_displayable() {
     isP2sh = btchip_output_script_is_p2sh(btchip_context_D.currentOutput + 8);
     isNativeSegwit = btchip_output_script_is_native_witness(
         btchip_context_D.currentOutput + 8);
-#ifdef HAVE_QTUM_SUPPORT
     isOpCreate =
         btchip_output_script_is_op_create(btchip_context_D.currentOutput + 8);
     isOpCall =
         btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8);
-    if (!btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
-        !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate && !isOpCall) {
-#else
-    if (!btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
-        !isP2sh && !(nullAmount && isOpReturn)) {
-#endif
+    if (((G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+         !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
+         !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate && !isOpCall) ||
+        (!(G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+         !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
+         !isP2sh && !(nullAmount && isOpReturn))) {
         PRINTF("Error : Unrecognized input script");
         THROW(EXCEPTION);
     }
@@ -108,13 +95,13 @@ static bool check_output_displayable() {
             btchip_public_key_hash160(changeSegwit, 22, changeSegwit);
             if (os_memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
                           changeSegwit, 20) == 0) {
-#ifdef HAVE_SEGWIT_CHANGE_SUPPORT
-                changeFound = true;
-#else
-                // Attempt to avoid fatal failures on Bitcoin Cash
-                PRINTF("Error : Non spendable Segwit change");
-                THROW(EXCEPTION);
-#endif
+                if (G_coin_config->flags & FLAG_SEGWIT_CHANGE_SUPPORT) {
+                    changeFound = true;
+                } else {
+                    // Attempt to avoid fatal failures on Bitcoin Cash
+                    PRINTF("Error : Non spendable Segwit change");
+                    THROW(EXCEPTION);
+                }
             }
         }
         if (changeFound) {
@@ -275,7 +262,8 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             if (p1 == FINALIZE_P1_CHANGEINFO) {
                 unsigned char keyLength;
                 if (!btchip_context_D.transactionContext.firstSigned) {
-                    // Already validated, should be prevented on the client side
+                // Already validated, should be prevented on the client side
+                return_OK:
                     CLOSE_TRY;
                     return BTCHIP_SW_OK;
                 }
@@ -288,8 +276,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                 if (G_io_apdu_buffer[ISO_OFFSET_CDATA] == 0x00) {
                     // Called with no change path, abort, should be prevented on
                     // the client side
-                    CLOSE_TRY;
-                    return BTCHIP_SW_OK;
+                    goto return_OK;
                 }
                 os_memmove(transactionSummary->summarydata.keyPath,
                            G_io_apdu_buffer + ISO_OFFSET_CDATA,
@@ -314,8 +301,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     sizeof(transactionSummary->summarydata.changeAddress));
                 btchip_context_D.tmpCtx.output.changeInitialized = 1;
                 btchip_context_D.tmpCtx.output.changeAccepted = 0;
-                CLOSE_TRY;
-                return BTCHIP_SW_OK;
+                goto return_OK;
             }
 
             // Always update the transaction & authorization hashes with the
@@ -339,14 +325,11 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                            G_io_apdu_buffer + ISO_OFFSET_CDATA, apduLength);
                 btchip_context_D.currentOutputOffset += apduLength;
 
-// Check if the legacy UI can be applied
-#ifndef HAVE_QTUM_SUPPORT
-                if ((G_io_apdu_buffer[ISO_OFFSET_P1] == FINALIZE_P1_LAST) &&
+                // Check if the legacy UI can be applied
+                if (!(G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+                    (G_io_apdu_buffer[ISO_OFFSET_P1] == FINALIZE_P1_LAST) &&
                     !btchip_context_D.tmpCtx.output.multipleOutput &&
                     prepare_full_output(1)) {
-#else
-                if (0) {
-#endif
                     btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
                     btchip_context_D.outputParsingState =
                         BTCHIP_OUTPUT_HANDLE_LEGACY;
@@ -377,8 +360,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                 G_io_apdu_buffer[0] = 0x00;
                 btchip_context_D.outLength = 1;
                 btchip_context_D.tmpCtx.output.multipleOutput = 1;
-                CLOSE_TRY;
-                return BTCHIP_SW_OK;
+                goto return_OK;
             }
 
             if (!btchip_context_D.usingSegwit) {
@@ -447,9 +429,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                 os_memmove(transactionSummary->authorizationHash,
                            authorizationHash,
                            sizeof(transactionSummary->authorizationHash));
-                CLOSE_TRY;
-                return BTCHIP_SW_OK;
-
+                goto return_OK;
             } else {
                 if (btchip_secure_memcmp(
                         authorizationHash,
@@ -458,7 +438,9 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     L_DEBUG_APP(
                         ("Authorization hash not matching, aborting\n"));
                     sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
-                    goto discardTransaction;
+                discardTransaction:
+                    CLOSE_TRY;
+                    goto catch_discardTransaction;
                 }
             }
 
@@ -477,7 +459,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
         }
         CATCH_ALL {
             sw = SW_TECHNICAL_DETAILS(0x0F);
-        discardTransaction:
+        catch_discardTransaction:
             btchip_context_D.transactionContext.transactionState =
                 BTCHIP_TRANSACTION_NONE;
             btchip_context_D.outLength = 0;
@@ -612,17 +594,7 @@ unsigned char btchip_bagl_user_action(unsigned char confirming) {
         btchip_apdu_hash_input_finalize_full_reset();
     }
 
-#ifdef HAVE_U2F
-    if (fidoActivated) {
-        u2f_proxy_response((u2f_service_t *)&u2fService,
-                           btchip_context_D.outLength);
-    } else {
-        io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX,
-                    btchip_context_D.outLength);
-    }
-#else
     io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, btchip_context_D.outLength);
-#endif
 
     return 0;
 }

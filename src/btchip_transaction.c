@@ -203,13 +203,16 @@ void transaction_parse(unsigned char parseMode) {
                     os_memmove(btchip_context_D.transactionVersion,
                                btchip_context_D.transactionBufferPointer, 4);
                     transaction_offset_increase(4);
-#ifdef HAVE_PEERCOIN_SUPPORT
-                    if (btchip_context_D.coinFamily == BTCHIP_FAMILY_PEERCOIN) {
-                        // Timestamp
-                        check_transaction_available(4);
-                        transaction_offset_increase(4);
+
+                    if (G_coin_config->flags & FLAG_PEERCOIN_SUPPORT) {
+                        if (btchip_context_D.coinFamily ==
+                            BTCHIP_FAMILY_PEERCOIN) {
+                            // Timestamp
+                            check_transaction_available(4);
+                            transaction_offset_increase(4);
+                        }
                     }
-#endif
+
                     // Number of inputs
                     btchip_context_D.transactionContext
                         .transactionRemainingInputsOutputs =
@@ -817,6 +820,7 @@ void transaction_parse(unsigned char parseMode) {
         fail:
             L_DEBUG_APP(("Transaction parse - fail\n"));
             THROW(EXCEPTION);
+        ok : {}
         }
         CATCH_OTHER(e) {
             L_DEBUG_APP(("Transaction parse - surprise fail\n"));
@@ -825,7 +829,7 @@ void transaction_parse(unsigned char parseMode) {
             btchip_set_check_internal_structure_integrity(1);
             THROW(e);
         }
-    ok: // before the finally to restore the surrounding context if an exception
+        // before the finally to restore the surrounding context if an exception
         // is raised during finally
         FINALLY {
             btchip_set_check_internal_structure_integrity(1);

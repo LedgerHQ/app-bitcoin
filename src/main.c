@@ -32,19 +32,6 @@
 #define __NAME3(a, b, c) a##b##c
 #define NAME3(a, b, c) __NAME3(a, b, c)
 
-#ifdef HAVE_U2F
-
-#include "u2f_service.h"
-#include "u2f_transport.h"
-
-volatile unsigned char u2fMessageBuffer[U2F_MAX_MESSAGE_SIZE];
-
-extern void USB_power_U2F(unsigned char enabled, unsigned char fido);
-extern bool fidoActivated;
-volatile uint8_t fidoTransport;
-
-#endif
-
 bagl_element_t tmp_element;
 
 unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
@@ -122,19 +109,6 @@ ux_state_t ux;
 unsigned int ux_step;
 unsigned int ux_step_count;
 
-#ifdef HAVE_U2F
-volatile u2f_service_t u2fService;
-
-void u2f_proxy_response(u2f_service_t *service, unsigned int tx) {
-    os_memset(service->messageBuffer, 0, 5);
-    os_memmove(service->messageBuffer + 5, G_io_apdu_buffer, tx);
-    service->messageBuffer[tx + 5] = 0x90;
-    service->messageBuffer[tx + 6] = 0x00;
-    u2f_send_fragmented_response(service, U2F_CMD_MSG, service->messageBuffer,
-                                 tx + 7, true);
-}
-
-#endif
 const bagl_element_t *ui_menu_item_out_over(const bagl_element_t *e) {
     // the selection rectangle is after the none|touchable
     e = (const bagl_element_t *)(((unsigned int)e) + sizeof(bagl_element_t));
@@ -178,20 +152,6 @@ const bagl_element_t ui_idle_blue[] = {
      NULL,
      NULL,
      NULL},
-#ifdef HAVE_U2F
-    {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 0, 19, 56, 44, 0, 0,
-      BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT,
-      BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_CENTER |
-          BAGL_FONT_ALIGNMENT_MIDDLE,
-      0},
-     BAGL_FONT_SYMBOLS_0_SETTINGS,
-     0,
-     COLOR_APP,
-     0xFFFFFF,
-     io_seproxyhal_touch_settings,
-     NULL,
-     NULL},
-#endif
     {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 264, 19, 56, 44, 0, 0,
       BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT,
       BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_CENTER |
@@ -266,53 +226,16 @@ unsigned int ui_idle_blue_button(unsigned int button_mask,
 #if defined(TARGET_NANOS)
 
 const ux_menu_entry_t menu_main[];
-const ux_menu_entry_t menu_settings[];
-const ux_menu_entry_t menu_settings_browser[];
-
-#ifdef HAVE_U2F
-// change the setting
-void menu_settings_browser_change(unsigned int enabled) {
-    fidoTransport = enabled;
-    nvm_write(&N_btchip.fidoTransport, (void *)&fidoTransport, sizeof(uint8_t));
-    USB_power_U2F(0, 0);
-    USB_power_U2F(1, N_btchip.fidoTransport);
-    // go back to the menu entry
-    UX_MENU_DISPLAY(0, menu_settings, NULL);
-}
-
-// show the currently activated entry
-void menu_settings_browser_init(unsigned int ignored) {
-    UNUSED(ignored);
-    UX_MENU_DISPLAY(N_btchip.fidoTransport ? 1 : 0, menu_settings_browser,
-                    NULL);
-}
-
-const ux_menu_entry_t menu_settings_browser[] = {
-    {NULL, menu_settings_browser_change, 0, NULL, "No", NULL, 0, 0},
-    {NULL, menu_settings_browser_change, 1, NULL, "Yes", NULL, 0, 0},
-    UX_MENU_END};
-
-const ux_menu_entry_t menu_settings[] = {
-    {NULL, menu_settings_browser_init, 0, NULL, "Browser support", NULL, 0, 0},
-    {menu_main, NULL, 1, &C_nanos_icon_back, "Back", NULL, 61, 40},
-    UX_MENU_END};
-#endif // HAVE_U2F
 
 const ux_menu_entry_t menu_about[] = {
     {NULL, NULL, 0, NULL, "Version", APPVERSION, 0, 0},
-#ifdef HAVE_U2F
-    {menu_main, NULL, 2, &C_nanos_icon_back, "Back", NULL, 61, 40},
-#else
     {menu_main, NULL, 1, &C_nanos_icon_back, "Back", NULL, 61, 40},
-#endif // HAVE_U2F
     UX_MENU_END};
 
 const ux_menu_entry_t menu_main[] = {
-    {NULL, NULL, 0, &NAME3(C_nanos_badge_, COINID, ), "Use wallet to",
-     "view accounts", 33, 12},
-#ifdef HAVE_U2F
-    {menu_settings, NULL, 0, NULL, "Settings", NULL, 0, 0},
-#endif // HAVE_U2F
+    //{NULL, NULL, 0, &NAME3(C_nanos_badge_, COINID, ), "Use wallet to", "view
+    //accounts", 33, 12},
+    {NULL, NULL, 0, NULL, "Use wallet to", "view accounts", 0, 0},
     {menu_about, NULL, 0, NULL, "About", NULL, 0, 0},
     {NULL, os_sched_exit, 0, &C_nanos_icon_dashboard, "Quit app", NULL, 50, 29},
     UX_MENU_END};
@@ -329,164 +252,8 @@ const bagl_element_t *ui_settings_out_over(const bagl_element_t *e) {
     return NULL;
 }
 
-#ifdef HAVE_U2F
-
-const bagl_element_t *ui_settings_blue_toggle_browser(const bagl_element_t *e) {
-    // swap setting and request redraw of settings elements
-    uint8_t setting = N_btchip.fidoTransport ? 0 : 1;
-    nvm_write(&N_btchip.fidoTransport, (void *)&setting, sizeof(uint8_t));
-
-    // only refresh settings mutable drawn elements
-    UX_REDISPLAY_IDX(8);
-
-    // won't redisplay the bagl_none
-    return 0;
-}
-
-#endif
-
-unsigned int ui_settings_back_callback(const bagl_element_t *e) {
-    // go back to idle
-    ui_idle();
-    return 0;
-}
-
-#ifdef HAVE_U2F
-
-const bagl_element_t ui_settings_blue[] = {
-    // type                               userid    x    y   w    h  str rad
-    // fill      fg        bg      fid iid  txt   touchparams...       ]
-    {{BAGL_RECTANGLE, 0x00, 0, 68, 320, 413, 0, 0, BAGL_FILL, COLOR_BG_1,
-      0x000000, 0, 0},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    // erase screen (only under the status bar)
-    {{BAGL_RECTANGLE, 0x00, 0, 20, 320, 48, 0, 0, BAGL_FILL, COLOR_APP,
-      COLOR_APP, 0, 0},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    /// TOP STATUS BAR
-    {{BAGL_LABELINE, 0x00, 0, 45, 320, 30, 0, 0, BAGL_FILL, 0xFFFFFF, COLOR_APP,
-      BAGL_FONT_OPEN_SANS_SEMIBOLD_10_13PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "SETTINGS",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-
-    {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 0, 19, 50, 44, 0, 0,
-      BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT,
-      BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_CENTER |
-          BAGL_FONT_ALIGNMENT_MIDDLE,
-      0},
-     BAGL_FONT_SYMBOLS_0_LEFT,
-     0,
-     COLOR_APP,
-     0xFFFFFF,
-     ui_settings_back_callback,
-     NULL,
-     NULL},
-    {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 264, 19, 56, 44, 0, 0,
-      BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT,
-      BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_CENTER |
-          BAGL_FONT_ALIGNMENT_MIDDLE,
-      0},
-     BAGL_FONT_SYMBOLS_0_DASHBOARD,
-     0,
-     COLOR_APP,
-     0xFFFFFF,
-     io_seproxyhal_touch_exit,
-     NULL,
-     NULL},
-
-    {{BAGL_LABELINE, 0x00, 30, 105, 160, 30, 0, 0, BAGL_FILL, 0x000000,
-      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0},
-     "Browser support",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_LABELINE, 0x00, 30, 126, 260, 30, 0, 0, BAGL_FILL, 0x999999,
-      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, 0},
-     "Enable integrated browser support",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-    {{BAGL_NONE | BAGL_FLAG_TOUCHABLE, 0x00, 0, 78, 320, 68, 0, 0, BAGL_FILL,
-      0xFFFFFF, 0x000000, 0, 0},
-     NULL,
-     0,
-     0xEEEEEE,
-     0x000000,
-     ui_settings_blue_toggle_browser,
-     ui_settings_out_over,
-     ui_settings_out_over},
-
-    {{BAGL_ICON, 0x01, 258, 98, 32, 18, 0, 0, BAGL_FILL, 0x000000, COLOR_BG_1,
-      0, 0},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
-};
-
-const bagl_element_t *ui_settings_blue_prepro(const bagl_element_t *e) {
-    // none elements are skipped
-    if ((e->component.type & (~BAGL_FLAG_TOUCHABLE)) == BAGL_NONE) {
-        return 0;
-    }
-    // swap icon buffer to be displayed depending on if corresponding setting is
-    // enabled or not.
-    if (e->component.userid) {
-        os_memmove(&tmp_element, e, sizeof(bagl_element_t));
-        switch (e->component.userid) {
-        case 0x01:
-            // swap icon content
-            if (N_btchip.fidoTransport) {
-                tmp_element.text = &C_blue_icon_toggle_set;
-            } else {
-                tmp_element.text = &C_blue_icon_toggle_reset;
-            }
-            break;
-        }
-        return &tmp_element;
-    }
-    return 1;
-}
-
-unsigned int ui_settings_blue_button(unsigned int button_mask,
-                                     unsigned int button_mask_counter) {
-    return 0;
-}
-#endif // #if defined(TARGET_BLUE)
-
-#if defined(TARGET_BLUE)
 const char *ui_details_title;
 const char *ui_details_content;
-
-#endif
 
 const bagl_element_t *
 ui_details_blue_back_callback(const bagl_element_t *element) {
@@ -2235,17 +2002,15 @@ uint8_t prepare_single_output() {
     if (btchip_output_script_is_op_return(btchip_context_D.currentOutput +
                                           offset)) {
         strcpy(vars.tmp.fullAddress, "OP_RETURN");
-    }
-#ifdef HAVE_QTUM_SUPPORT
-    else if (btchip_output_script_is_op_create(btchip_context_D.currentOutput +
-                                               offset)) {
+    } else if ((G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+               btchip_output_script_is_op_create(
+                   btchip_context_D.currentOutput + offset)) {
         strcpy(vars.tmp.fullAddress, "OP_CREATE");
-    } else if (btchip_output_script_is_op_call(btchip_context_D.currentOutput +
+    } else if ((G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+               btchip_output_script_is_op_call(btchip_context_D.currentOutput +
                                                offset)) {
         strcpy(vars.tmp.fullAddress, "OP_CALL");
-    }
-#endif
-    else if (nativeSegwit) {
+    } else if (nativeSegwit) {
         addressOffset = offset + OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET;
     } else if (btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                                offset)) {
@@ -2273,15 +2038,12 @@ uint8_t prepare_single_output() {
                 address, 20 + versionSize, (unsigned char *)tmp, sizeof(tmp),
                 version, 1);
             tmp[textSize] = '\0';
-        }
-#ifdef NATIVE_SEGWIT_PREFIX
-        else {
+        } else if (G_coin_config->native_segwit_prefix) {
             textSize = segwit_addr_encode(
-                tmp, NATIVE_SEGWIT_PREFIX, 0,
+                tmp, G_coin_config->native_segwit_prefix, 0,
                 btchip_context_D.currentOutput + addressOffset,
                 btchip_context_D.currentOutput[addressOffset - 1]);
         }
-#endif
 
         strcpy(vars.tmp.fullAddress, tmp);
     }
@@ -2338,9 +2100,8 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         unsigned char nullAmount = 1;
         unsigned int j;
         unsigned char isOpReturn, isP2sh, isNativeSegwit;
-#ifdef HAVE_QTUM_SUPPORT
         unsigned char isOpCreate, isOpCall;
-#endif
+
         for (j = 0; j < 8; j++) {
             if (btchip_context_D.currentOutput[offset + j] != 0) {
                 nullAmount = 0;
@@ -2356,31 +2117,32 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                                               offset);
         isNativeSegwit = btchip_output_script_is_native_witness(
             btchip_context_D.currentOutput + offset);
-#ifdef HAVE_QTUM_SUPPORT
         isOpCreate = btchip_output_script_is_op_create(
             btchip_context_D.currentOutput + offset);
         isOpCall = btchip_output_script_is_op_call(
             btchip_context_D.currentOutput + offset);
         if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                              offset) &&
-            !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate &&
-            !isOpCall) {
-#else
-        if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
-                                             offset) &&
-            !isP2sh && !(nullAmount && isOpReturn)) {
-#endif
+            !isP2sh && !(nullAmount && isOpReturn) &&
+            (!(G_coin_config->flags & FLAG_QTUM_SUPPORT) ||
+             (!isOpCreate && !isOpCall))) {
+            if (!checkOnly) {
+                PRINTF("Error : Unrecognized input script");
+            }
+            goto error;
+        } else if (!btchip_output_script_is_regular(
+                       btchip_context_D.currentOutput + offset) &&
+                   !isP2sh && !(nullAmount && isOpReturn)) {
             if (!checkOnly) {
                 PRINTF("Error : Unrecognized input script");
             }
             goto error;
         }
-#ifdef HAVE_QTUM_SUPPORT
-        if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn &&
-            !isOpCreate && !isOpCall) {
-#else
-        if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {
-#endif
+        if (((G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+             btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn &&
+             !isOpCreate && !isOpCall) ||
+            (!(G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+             btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn)) {
             unsigned char addressOffset =
                 (isNativeSegwit ? OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET
                                 : isP2sh ? OUTPUT_SCRIPT_P2SH_PRE_LENGTH
@@ -2423,17 +2185,16 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         offset = 1;
         btchip_context_D.tmp = (unsigned char *)tmp;
         for (i = 0; i < numberOutputs; i++) {
-#ifdef HAVE_QTUM_SUPPORT
-            if (!btchip_output_script_is_op_return(
-                    btchip_context_D.currentOutput + offset + 8) &&
-                !btchip_output_script_is_op_create(
-                    btchip_context_D.currentOutput + offset + 8) &&
-                !btchip_output_script_is_op_call(
-                    btchip_context_D.currentOutput + offset + 8)) {
-#else
-            if (!btchip_output_script_is_op_return(
-                    btchip_context_D.currentOutput + offset + 8)) {
-#endif
+            if (((G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+                 !btchip_output_script_is_op_return(
+                     btchip_context_D.currentOutput + offset + 8) &&
+                 !btchip_output_script_is_op_create(
+                     btchip_context_D.currentOutput + offset + 8) &&
+                 !btchip_output_script_is_op_call(
+                     btchip_context_D.currentOutput + offset + 8)) ||
+                (!(G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+                 !btchip_output_script_is_op_return(
+                     btchip_context_D.currentOutput + offset + 8))) {
                 unsigned char versionSize;
                 int addressOffset;
                 unsigned char address[22];
@@ -2466,18 +2227,16 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                                20);
                 }
                 if (currentPos == outputPos) {
-                    unsigned short textSize;
+                    unsigned short textSize = 0;
                     if (!isNativeSegwit) {
                         // Prepare address
                         textSize = btchip_public_key_to_encoded_base58(
                             address, 20 + versionSize, (unsigned char *)tmp,
                             sizeof(tmp), version, 1);
                         tmp[textSize] = '\0';
-                    }
-#ifdef NATIVE_SEGWIT_PREFIX
-                    else {
+                    } else if (G_coin_config->native_segwit_prefix) {
                         textSize = segwit_addr_encode(
-                            tmp, NATIVE_SEGWIT_PREFIX, 0,
+                            tmp, G_coin_config->native_segwit_prefix, 0,
                             btchip_context_D.currentOutput + offset +
                                 OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET,
                             btchip_context_D.currentOutput
@@ -2485,7 +2244,6 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                                  OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET -
                                  1]);
                     }
-#endif
 
                     strcpy(vars.tmp.fullAddress, tmp);
 
@@ -2672,9 +2430,84 @@ void app_exit(void) {
     END_TRY_L(exit);
 }
 
-__attribute__((section(".boot"))) int main(void) {
+// used when application is compiled statically (no lib dependency)
+btchip_altcoin_config_t const C_coin_config = {
+    .p2pkh_version = COIN_P2PKH_VERSION,
+    .p2sh_version = COIN_P2SH_VERSION,
+    .family = COIN_FAMILY,
+// unsigned char* iconsuffix;// will use the icon provided on the stack (maybe)
+#ifdef TARGET_BLUE
+    .header_text = COIN_COINID_HEADER,
+    .color_header = COIN_COLOR_HDR,
+    .color_dashboard = COIN_COLOR_DB,
+#endif // TARGET_BLUE
+    .coinid = COIN_COINID,
+    .name = COIN_COINID_NAME,
+    .name_short = COIN_COINID_SHORT,
+#ifdef COIN_NATIVE_SEGWIT_PREFIX
+    .native_segwit_prefix = COIN_NATIVE_SEGWIT_PREFIX,
+#endif // COIN_NATIVE_SEGWIT_PREFIX
+#ifdef COIN_FORKID
+    .forkid = COIN_FORKID,
+#endif // COIN_FORKID
+#ifdef COIN_FLAGS
+    .flags = COIN_FLAGS,
+#endif // COIN_FLAGS
+    .kind = COIN_KIND,
+};
+
+__attribute__((section(".boot"))) int main(int arg0) {
+#ifdef USE_LIB_BITCOIN
+    // in RAM allocation (on stack), to allow simple simple traversal into the
+    // bitcoin app (separate NVRAM zone)
+    unsigned int libcall_params[3];
+    unsigned char coinid[sizeof(COIN_COINID)];
+    strcpy(coinid, COIN_COINID);
+    unsigned char name[sizeof(COIN_COINID_NAME)];
+    strcpy(name, COIN_COINID_NAME);
+    unsigned char name_short[sizeof(COIN_COINID_SHORT)];
+    strcpy(name_short, COIN_COINID_SHORT);
+#ifdef COIN_NATIVE_SEGWIT_PREFIX
+    unsigned char native_segwit_prefix[sizeof(COIN_NATIVE_SEGWIT_PREFIX)];
+    strcpy(native_segwit_prefix, COIN_NATIVE_SEGWIT_PREFIX);
+#endif
+    btchip_altcoin_config_t coin_config;
+    os_memmove(&coin_config, &C_coin_config, sizeof(coin_config));
+    coin_config.coinid = coinid;
+    coin_config.name = name;
+    coin_config.name_short = name_short;
+#ifdef COIN_NATIVE_SEGWIT_PREFIX
+    coin_config.native_segwit_prefix = native_segwit_prefix;
+#endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
+    BEGIN_TRY {
+        TRY {
+            // ensure syscall will accept us
+            check_api_level(CX_COMPAT_APILEVEL);
+            // delegate to bitcoin app/lib
+            libcall_params[0] = "Bitcoin";
+            libcall_params[1] = 0x100; // use the Init call, as we won't exit
+            libcall_params[2] = &coin_config;
+            os_lib_call(&libcall_params);
+        }
+        FINALLY {
+            app_exit();
+        }
+    }
+    END_TRY;
+// no return
+#else
     // exit critical section
     __asm volatile("cpsie i");
+
+    if (arg0) {
+        // is ID 1 ?
+        if (((unsigned int *)arg0)[0] != 0x100) {
+            os_lib_throw(INVALID_PARAMETER);
+        }
+        G_coin_config = (btchip_altcoin_config_t *)((unsigned int *)arg0)[1];
+    } else {
+        G_coin_config = (btchip_altcoin_config_t *)PIC(&C_coin_config);
+    }
 
     // ensure exception will work as planned
     os_boot();
@@ -2687,21 +2520,8 @@ __attribute__((section(".boot"))) int main(void) {
 
                 btchip_context_init();
 
-                // deactivate usb before activating
-                USB_power_U2F(0, 0);
-
-#ifdef HAVE_U2F
-                os_memset((unsigned char *)&u2fService, 0, sizeof(u2fService));
-                u2fService.inputBuffer = G_io_apdu_buffer;
-                u2fService.outputBuffer = G_io_apdu_buffer;
-                u2fService.messageBuffer = (uint8_t *)u2fMessageBuffer;
-                u2fService.messageBufferSize = U2F_MAX_MESSAGE_SIZE;
-                u2f_initialize_service((u2f_service_t *)&u2fService);
-
-                USB_power_U2F(1, N_btchip.fidoTransport);
-#else
-                USB_power_U2F(1, 0);
-#endif
+                USB_power(0);
+                USB_power(1);
 
 #ifdef HAVE_BLE
                 BLE_power(0, NULL);
@@ -2731,6 +2551,6 @@ __attribute__((section(".boot"))) int main(void) {
         END_TRY;
     }
     app_exit();
-
+#endif // USE_LIB_BITCOIN
     return 0;
 }

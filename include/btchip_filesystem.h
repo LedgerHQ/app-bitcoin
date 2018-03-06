@@ -33,29 +33,25 @@ enum btchip_supported_modes_e {
 
 enum btchip_family_e {
     BTCHIP_FAMILY_BITCOIN = 0x01,
-#ifdef HAVE_PEERCOIN_SUPPORT
-    BTCHIP_FAMILY_PEERCOIN = 0x02
-#endif
-#ifdef HAVE_QTUM_SUPPORT
-    BTCHIP_FAMILY_QTUM = 0x03
-#endif
+    BTCHIP_FAMILY_PEERCOIN = 0x02,
+    BTCHIP_FAMILY_QTUM = 0x03,
 };
 
 struct btchip_config_s {
     secu8 supportedModes;
     secu8 operationMode;
     unsigned char options;
-    unsigned short payToAddressVersion;
-    unsigned short payToScriptHashVersion;
-    unsigned char coinFamily;
-    /** Current Coin ID */
-    unsigned char coinId[MAX_COIN_ID];
-    /** Current short Coin ID */
-    unsigned char shortCoinId[MAX_SHORT_COIN_ID];
-    /** Current Coin ID length */
-    unsigned char coinIdLength;
-    /** Current short Coin ID length */
-    unsigned char shortCoinIdLength;
+    // unsigned short payToAddressVersion;
+    // unsigned short payToScriptHashVersion;
+    // unsigned char coinFamily;
+    // /** Current Coin ID */
+    // unsigned char coinId[MAX_COIN_ID];
+    // /** Current short Coin ID */
+    // unsigned char shortCoinId[MAX_SHORT_COIN_ID];    
+    // /** Current Coin ID length */
+    // unsigned char coinIdLength;        
+    // /** Current short Coin ID length */
+    // unsigned char shortCoinIdLength;        
 };
 typedef struct btchip_config_s btchip_config_t;
 
@@ -79,7 +75,7 @@ typedef struct btchip_storage_s {
 // the global nvram memory variable
 extern WIDE btchip_storage_t N_btchip_real;
 
-#define N_btchip (*(WIDE btchip_storage_t *)PIC(&N_btchip_real))
+#define N_btchip (*(WIDE btchip_storage_t*) PIC(&N_btchip_real))
 
 void btchip_set_operation_mode(unsigned char operationMode);
 

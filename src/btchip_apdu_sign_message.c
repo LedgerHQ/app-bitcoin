@@ -19,17 +19,6 @@
 #include "btchip_apdu_constants.h"
 #include "btchip_bagl_extensions.h"
 
-#ifdef HAVE_U2F
-
-#include "u2f_service.h"
-#include "u2f_transport.h"
-
-extern bool fidoActivated;
-extern volatile u2f_service_t u2fService;
-void u2f_proxy_response(u2f_service_t *service, unsigned int tx);
-
-#endif
-
 #define P1_PREPARE 0x00
 #define P1_SIGN 0x80
 #define P2_LEGACY 0x00
@@ -290,15 +279,5 @@ void btchip_bagl_user_action_message_signing(unsigned char confirming) {
     G_io_apdu_buffer[btchip_context_D.outLength++] = sw >> 8;
     G_io_apdu_buffer[btchip_context_D.outLength++] = sw;
 
-#ifdef HAVE_U2F
-    if (fidoActivated) {
-        u2f_proxy_response((u2f_service_t *)&u2fService,
-                           btchip_context_D.outLength);
-    } else {
-        io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX,
-                    btchip_context_D.outLength);
-    }
-#else
     io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, btchip_context_D.outLength);
-#endif
 }
