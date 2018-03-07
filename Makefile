@@ -205,10 +205,10 @@ DEFINES   += USB_SEGMENT_SIZE=64
 #DEFINES   += HAVE_USB_CLASS_CCID
 
 load: all
-    python -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
+	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
 
 delete:
-    python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
+	python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
 
 # import generic rules from the sdk
 include $(BOLOS_SDK)/Makefile.rules
