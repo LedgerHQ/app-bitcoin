@@ -117,7 +117,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
             if (G_coin_config->native_segwit_prefix) {
                 keyLength = segwit_addr_encode(
                     (char *)(G_io_apdu_buffer + 67),
-                    G_coin_config->native_segwit_prefix, 0, tmp + 2, 20);
+                    PIC(G_coin_config->native_segwit_prefix), 0, tmp + 2, 20);
                 if (keyLength == 1) {
                     keyLength = strlen((char *)(G_io_apdu_buffer + 67));
                 }

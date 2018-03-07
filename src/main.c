@@ -2040,7 +2040,7 @@ uint8_t prepare_single_output() {
             tmp[textSize] = '\0';
         } else if (G_coin_config->native_segwit_prefix) {
             textSize = segwit_addr_encode(
-                tmp, G_coin_config->native_segwit_prefix, 0,
+                tmp, PIC(G_coin_config->native_segwit_prefix), 0,
                 btchip_context_D.currentOutput + addressOffset,
                 btchip_context_D.currentOutput[addressOffset - 1]);
         }
@@ -2236,7 +2236,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                         tmp[textSize] = '\0';
                     } else if (G_coin_config->native_segwit_prefix) {
                         textSize = segwit_addr_encode(
-                            tmp, G_coin_config->native_segwit_prefix, 0,
+                            tmp, PIC(G_coin_config->native_segwit_prefix), 0,
                             btchip_context_D.currentOutput + offset +
                                 OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET,
                             btchip_context_D.currentOutput
@@ -2504,6 +2504,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
         if (((unsigned int *)arg0)[0] != 0x100) {
             os_lib_throw(INVALID_PARAMETER);
         }
+        // grab the coin config structure from the first parameter
         G_coin_config = (btchip_altcoin_config_t *)((unsigned int *)arg0)[1];
     } else {
         G_coin_config = (btchip_altcoin_config_t *)PIC(&C_coin_config);
