@@ -2200,11 +2200,11 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                 unsigned char address[22];
                 unsigned short version;
                 unsigned char isNativeSegwit;
-                isNativeSegwit = btchip_output_script_is_native_witness(
-                    btchip_context_D.currentOutput + offset);
                 btchip_swap_bytes(amount,
                                   btchip_context_D.currentOutput + offset, 8);
                 offset += 8;
+                isNativeSegwit = btchip_output_script_is_native_witness(
+                    btchip_context_D.currentOutput + offset);
                 if (!isNativeSegwit) {
                     if (btchip_output_script_is_regular(
                             btchip_context_D.currentOutput + offset)) {
