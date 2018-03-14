@@ -70,6 +70,11 @@ else ifeq ($(COIN),dogecoin)
 DEFINES   += COIN_P2PKH_VERSION=30 COIN_P2SH_VERSION=22 COIN_FAMILY=1 COIN_COINID=\"Dogecoin\" COIN_COINID_HEADER=\"DOGECOIN\" COIN_COLOR_HDR=0x65D196 COIN_COLOR_DB=0xB2E8CB COIN_COINID_NAME=\"Dogecoin\" COIN_COINID_SHORT=\"DOGE\" COIN_KIND=COIN_KIND_DOGE
 APPNAME ="Dogecoin"
 APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),denarius)
+# Denarius
+DEFINES   += COIN_P2PKH_VERSION=30 COIN_P2SH_VERSION=90 COIN_FAMILY=2 COIN_COINID=\"Denarius\" COIN_COINID_HEADER=\"DENARIUS\" COIN_COLOR_HDR=0x7A7A7A COIN_COLOR_DB=0xB2B2B2 COIN_COINID_NAME=\"Denarius\" COIN_COINID_SHORT=\"DNR\" COIN_KIND=COIN_KIND_DNR
+APPNAME ="Denarius"
+APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),dash)
 # Dash
 DEFINES   += COIN_P2PKH_VERSION=76 COIN_P2SH_VERSION=16 COIN_FAMILY=1 COIN_COINID=\"DarkCoin\" COIN_COINID_HEADER=\"DASH\" COIN_COLOR_HDR=0x0E76AA COIN_COLOR_DB=0x87BBD5 COIN_COINID_NAME=\"Dash\" COIN_COINID_SHORT=\"DASH\" COIN_KIND=COIN_KIND_DASH
@@ -134,7 +139,7 @@ APPNAME ="HCash"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealthcoin, digibyte, qtum, hcash) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, denarius, dash, zcash, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealthcoin, digibyte, qtum, hcash) 
 endif
 endif
 
