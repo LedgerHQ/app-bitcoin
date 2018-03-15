@@ -132,6 +132,14 @@ else ifeq ($(COIN),hcash)
 DEFINES   += COIN_P2PKH_VERSION=40 COIN_P2SH_VERSION=100 COIN_FAMILY=2 COIN_COINID=\"HShare\" COIN_COINID_HEADER=\"HCASH\" COIN_COLOR_HDR=0x57448D COIN_COLOR_DB=0xABA2C6 COIN_COINID_NAME=\"HCash\" COIN_COINID_SHORT=\"HCASH\" COIN_KIND=COIN_KIND_HCASH COIN_FLAGS=FLAG_PEERCOIN_SUPPORT
 APPNAME ="HCash"
 APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),minex)
+# Minex mainnet
+DEFINES   += COIN_P2PKH_VERSION=0 COIN_P2SH_VERSION=5 COIN_FAMILY=1 COIN_COINID=\"Minex\" COIN_COINID_HEADER=\"MINEX\" COIN_COLOR_HDR=0xFCB653 COIN_COLOR_DB=0xFEDBA9 COIN_COINID_NAME=\"Bitcoin\" COIN_COINID_SHORT=\"BTC\" COIN_NATIVE_SEGWIT_PREFIX=\"bc\" COIN_KIND=COIN_KIND_BITCOIN COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
+DEFINES_LIB=# we're not using the lib :)
+APPNAME ="Minex"
+APP_LOAD_PARAMS += --path "44'/182'" --path "44'/0'"
+#LIB and global pin and 
+APP_LOAD_FLAGS=--appFlags 0x850
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
 $(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealthcoin, digibyte, qtum, hcash) 
