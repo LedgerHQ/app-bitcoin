@@ -26,8 +26,7 @@ unsigned short btchip_apdu_setup() {
 void btchip_autosetup() {
     btchip_config_t config;
     unsigned char i;
-    cx_des_key_t desKey;
-    unsigned char tmp[16];
+    unsigned char tmp[32];
     os_memset(&config, 0, sizeof(btchip_config_t));
     config.options |= BTCHIP_OPTION_DETERMINISTIC_SIGNATURE;
     config.options |= BTCHIP_OPTION_SKIP_2FA_P2SH; // TODO : remove when
@@ -45,8 +44,7 @@ void btchip_autosetup() {
     // config.shortCoinIdLength);
     nvm_write((void *)&N_btchip.bkp.config, &config, sizeof(config));
     cx_rng(tmp, sizeof(tmp));
-    cx_des_init_key(tmp, sizeof(tmp), &desKey);
-    nvm_write((void *)&N_btchip.bkp.trustedinput_key, &desKey, sizeof(desKey));
+    nvm_write((void *)&N_btchip.bkp.trustedinput_key, tmp, sizeof(tmp));
     i = 1;
     nvm_write((void *)&N_btchip.config_valid, &i, 1);
 }

@@ -47,19 +47,17 @@ struct btchip_config_s {
     // /** Current Coin ID */
     // unsigned char coinId[MAX_COIN_ID];
     // /** Current short Coin ID */
-    // unsigned char shortCoinId[MAX_SHORT_COIN_ID];    
+    // unsigned char shortCoinId[MAX_SHORT_COIN_ID];
     // /** Current Coin ID length */
-    // unsigned char coinIdLength;        
+    // unsigned char coinIdLength;
     // /** Current short Coin ID length */
-    // unsigned char shortCoinIdLength;        
+    // unsigned char shortCoinIdLength;
 };
 typedef struct btchip_config_s btchip_config_t;
 
 typedef struct btchip_backup_area_s {
     btchip_config_t config;
-    // TODO : replace by AES key, review signature policy
-    cx_des_key_t trustedinput_key;
-
+    uint8_t trustedinput_key[32];
 } btchip_backup_area_t;
 
 typedef struct btchip_storage_s {
@@ -75,7 +73,7 @@ typedef struct btchip_storage_s {
 // the global nvram memory variable
 extern WIDE btchip_storage_t N_btchip_real;
 
-#define N_btchip (*(WIDE btchip_storage_t*) PIC(&N_btchip_real))
+#define N_btchip (*(WIDE btchip_storage_t *)PIC(&N_btchip_real))
 
 void btchip_set_operation_mode(unsigned char operationMode);
 
