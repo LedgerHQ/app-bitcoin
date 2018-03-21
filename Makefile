@@ -80,6 +80,11 @@ else ifeq ($(COIN),zcash)
 DEFINES   += COIN_P2PKH_VERSION=7352 COIN_P2SH_VERSION=7357 COIN_FAMILY=1 COIN_COINID=\"Zcash\" COIN_COINID_HEADER=\"ZCASH\" COIN_COLOR_HDR=0x3790CA COIN_COLOR_DB=0x9BC8E5 COIN_COINID_NAME=\"Zcash\" COIN_COINID_SHORT=\"ZEC\" COIN_KIND=COIN_KIND_ZCASH
 APPNAME ="Zcash"
 APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),zencash)
+# ZenCash
+DEFINES   += COIN_P2PKH_VERSION=8329 COIN_P2SH_VERSION=8342 COIN_FAMILY=4 COIN_COINID=\"Zencash\" COINID_UPCASE=\"ZENCASH\" COLOR_HDR=0xFF4300 COLOR_DB=0xFF8356 COIN_COINID_NAME=\"Zencash\" COINID=$(COIN) COIN_COINID_SHORT=\"ZEN\" COIN_KIND=COIN_KIND_ZENCASH COIN_FLAGS=FLAG_ZENCASH_SUPPORT
+APPNAME ="ZenCash"
+APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),komodo)
 # Komodo
 DEFINES   += COIN_P2PKH_VERSION=60 COIN_P2SH_VERSION=85 COIN_FAMILY=1 COIN_COINID=\"Komodo\" COIN_COINID_HEADER=\"KMD\" COIN_COLOR_HDR=0x326464 COIN_COLOR_DB=0x99b2b2 COIN_COINID_NAME=\"Komodo\" COIN_COINID_SHORT=\"KMD\" COIN_KIND=COIN_KIND_KOMODO
@@ -134,7 +139,7 @@ APPNAME ="HCash"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealthcoin, digibyte, qtum, hcash) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, zencash, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealthcoin, digibyte, qtum, hcash) 
 endif
 endif
 
@@ -170,8 +175,8 @@ DEFINES   += APPVERSION=\"$(APPVERSION)\"
 ##############
 # Compiler #
 ##############
-#GCCPATH   := $(BOLOS_ENV)/gcc-arm-none-eabi-5_3-2016q1/bin/
-#CLANGPATH := $(BOLOS_ENV)/clang-arm-fropi/bin/
+GCCPATH   := $(BOLOS_ENV)/gcc-arm-none-eabi-5_3-2016q1/bin/
+CLANGPATH := $(BOLOS_ENV)/clang-arm-fropi/bin/
 CC       := $(CLANGPATH)clang 
 
 #CFLAGS   += -O0
