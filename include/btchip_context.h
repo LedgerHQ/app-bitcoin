@@ -241,6 +241,7 @@ typedef enum btchip_coin_flags_e {
     FLAG_PEERCOIN_SUPPORT=2,
     FLAG_SEGWIT_CHANGE_SUPPORT=4,
     FLAG_QTUM_SUPPORT=8,
+    FLAG_ZENCASH_SUPPORT=16,
 } btchip_coin_flags_t;
 
 
