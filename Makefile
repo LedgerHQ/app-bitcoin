@@ -170,8 +170,20 @@ DEFINES   += APPVERSION=\"$(APPVERSION)\"
 ##############
 # Compiler #
 ##############
-#GCCPATH   := $(BOLOS_ENV)/gcc-arm-none-eabi-5_3-2016q1/bin/
-#CLANGPATH := $(BOLOS_ENV)/clang-arm-fropi/bin/
+ifneq ($(BOLOS_ENV),)
+$(info BOLOS_ENV=$(BOLOS_ENV))
+CLANGPATH := $(BOLOS_ENV)/clang-arm-fropi/bin/
+GCCPATH := $(BOLOS_ENV)/gcc-arm-none-eabi-5_3-2016q1/bin/
+else
+$(info BOLOS_ENV is not set: falling back to CLANGPATH and GCCPATH)
+endif
+ifeq ($(CLANGPATH),)
+$(info CLANGPATH is not set: clang will be used from PATH)
+endif
+ifeq ($(GCCPATH),)
+$(info GCCPATH is not set: arm-none-eabi-* will be used from PATH)
+endif
+
 CC       := $(CLANGPATH)clang 
 
 #CFLAGS   += -O0
