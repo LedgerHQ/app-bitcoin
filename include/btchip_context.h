@@ -241,6 +241,7 @@ typedef enum btchip_coin_flags_e {
     FLAG_PEERCOIN_SUPPORT=2,
     FLAG_SEGWIT_CHANGE_SUPPORT=4,
     FLAG_QTUM_SUPPORT=8,
+    FLAG_ZENCASH_SUPPORT=16,
 } btchip_coin_flags_t;
 
 
@@ -253,6 +254,7 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_DOGE,
     COIN_KIND_DASH,
     COIN_KIND_ZCASH,
+    COIN_KIND_ZENCASH,
     COIN_KIND_KOMODO,
     COIN_KIND_RFU,
     COIN_KIND_STRATIS,
