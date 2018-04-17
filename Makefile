@@ -132,9 +132,14 @@ else ifeq ($(COIN),hcash)
 DEFINES   += COIN_P2PKH_VERSION=40 COIN_P2SH_VERSION=100 COIN_FAMILY=2 COIN_COINID=\"HShare\" COIN_COINID_HEADER=\"HCASH\" COIN_COLOR_HDR=0x57448D COIN_COLOR_DB=0xABA2C6 COIN_COINID_NAME=\"HCash\" COIN_COINID_SHORT=\"HCASH\" COIN_KIND=COIN_KIND_HCASH COIN_FLAGS=FLAG_PEERCOIN_SUPPORT
 APPNAME ="HCash"
 APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),gamecredits)
+# GameCredits
+DEFINES   += COIN_P2PKH_VERSION=38 COIN_P2SH_VERSION=62 COIN_FAMILY=1 COIN_COINID=\"GameCredits\" COIN_COINID_HEADER=\"GAMECREDITS\" COIN_COLOR_HDR=0x98C01F COIN_COLOR_DB=0xA1A2A7 COIN_COINID_NAME=\"GameCredits\" COIN_COINID_SHORT=\"GAME\" COIN_KIND=COIN_KIND_GAMECREDITS COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
+APPNAME ="GameCredits"
+APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealthcoin, digibyte, qtum, hcash) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealthcoin, digibyte, qtum, hcash, gamecredits) 
 endif
 endif
 
