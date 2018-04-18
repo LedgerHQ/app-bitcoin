@@ -46,8 +46,8 @@ const unsigned char ZEN_OUTPUT_SCRIPT_POST[] = {
 
 
 const unsigned char ZEN_OUTPUT_SCRIPT_P2SH_PRE[] = {
-    0x3E, 0x76, 0xA9,
-    0x14}; // script length, OP_DUP, OP_HASH160, address length
+    0x3D, 0xA9,
+    0x14}; // script length, OP_HASH160, address length
 const unsigned char ZEN_OUTPUT_SCRIPT_P2SH_POST[] = {
     0x87, // OP_EQUAL
     0x20, 0x9e, 0xc9, 0x84, 0x5a, 0xcb, 0x02, 0xfa, 0xb2, 0x4e, 0x1c, 0x03,
