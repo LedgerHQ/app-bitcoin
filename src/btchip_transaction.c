@@ -382,16 +382,16 @@ void transaction_parse(unsigned char parseMode) {
                             }
 
                             check_transaction_available(2 + trustedInputLength);
-                            if (!cx_des(
-                                    (cx_des_key_t *)&N_btchip.bkp
-                                        .trustedinput_key,
-                                    CX_LAST | CX_PAD_NONE | CX_VERIFY |
-                                        CX_CHAIN_CBC,
+                            cx_hmac_sha256(
+                                N_btchip.bkp.trustedinput_key,
+                                sizeof(N_btchip.bkp.trustedinput_key),
+                                btchip_context_D.transactionBufferPointer + 2,
+                                trustedInputLength - 8, trustedInput);
+                            if (btchip_secure_memcmp(
+                                    trustedInput,
                                     btchip_context_D.transactionBufferPointer +
-                                        2,
-                                    trustedInputLength - 8,
-                                    btchip_context_D.transactionBufferPointer +
-                                        2 + trustedInputLength - 8)) {
+                                        2 + trustedInputLength - 8,
+                                    8) != 0) {
                                 L_DEBUG_APP(("Invalid signature\n"));
                                 goto fail;
                             }
