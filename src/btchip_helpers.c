@@ -44,6 +44,20 @@ const unsigned char ZEN_OUTPUT_SCRIPT_POST[] = {
     0xb4              // OP_CHECKBLOCKATHEIGHT
 };                    // BIP0115 Replay Protection
 
+
+const unsigned char ZEN_OUTPUT_SCRIPT_P2SH_PRE[] = {
+    0x3E, 0x76, 0xA9,
+    0x14}; // script length, OP_DUP, OP_HASH160, address length
+const unsigned char ZEN_OUTPUT_SCRIPT_P2SH_POST[] = {
+    0x87, // OP_EQUAL
+    0x20, 0x9e, 0xc9, 0x84, 0x5a, 0xcb, 0x02, 0xfa, 0xb2, 0x4e, 0x1c, 0x03,
+    0x68, 0xb3, 0xb5, 0x17, 0xc1, 0xa4, 0x48, 0x8f, 0xba, 0x97, 0xf0, 0xe3,
+    0x45, 0x9a, 0xc0, 0x53, 0xea, 0x01, 0x00, 0x00, 0x00, // ParamHash
+    0x03, // Push 3 bytes to stack to make ParamHeight line up properly
+    0xc0, 0x1f, 0x02, // ParamHeight (139200) -> hex -> endianness swapped
+    0xb4              // OP_CHECKBLOCKATHEIGHT
+};                    // BIP0115 Replay Protection
+
 unsigned char btchip_output_script_is_regular(unsigned char *buffer) {
     if (G_coin_config->native_segwit_prefix) {
         if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
@@ -80,6 +94,16 @@ unsigned char btchip_output_script_is_p2sh(unsigned char *buffer) {
                    TRANSACTION_OUTPUT_SCRIPT_P2SH_POST,
                    sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_POST)) == 0)) {
         return 1;
+    }
+
+    if (G_coin_config->kind == COIN_KIND_ZENCASH) {
+        if ((os_memcmp(buffer, ZEN_OUTPUT_SCRIPT_P2SH_PRE,
+                       sizeof(ZEN_OUTPUT_SCRIPT_P2SH_PRE)) == 0) &&
+            (os_memcmp(buffer + sizeof(ZEN_OUTPUT_SCRIPT_P2SH_PRE) + 20,
+                       ZEN_OUTPUT_SCRIPT_P2SH_POST,
+                       sizeof(ZEN_OUTPUT_SCRIPT_P2SH_POST)) == 0)) {
+            return 1;
+        }
     }
     return 0;
 }
