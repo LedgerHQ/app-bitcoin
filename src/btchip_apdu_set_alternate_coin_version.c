@@ -59,7 +59,7 @@ unsigned short btchip_apdu_set_alternate_coin_version() {
         }
         break;
     case BTCHIP_FAMILY_QTUM:
-        if (!(G_coin_config->flags & FLAG_QTUM_SUPPORT)) {
+        if (!(G_coin_config->kind == COIN_KIND_QTUM)) {
             goto incorrect_family;
         }
         break;
