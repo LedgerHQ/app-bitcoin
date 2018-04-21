@@ -21,12 +21,15 @@
 #include "btchip_bagl_extensions.h"
 
 #include "segwit_addr.h"
+#include "cashaddr.h"
+
 #define P1_NO_DISPLAY 0x00
 #define P1_DISPLAY 0x01
 
 #define P2_LEGACY 0x00
 #define P2_SEGWIT 0x01
 #define P2_NATIVE_SEGWIT 0x02
+#define P2_CASHADDR 0x03
 
 unsigned short btchip_apdu_get_wallet_public_key() {
     unsigned char keyLength;
@@ -37,6 +40,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
     bool display = (G_io_apdu_buffer[ISO_OFFSET_P1] == P1_DISPLAY);
     bool segwit = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_SEGWIT);
     bool nativeSegwit = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NATIVE_SEGWIT);
+    bool cashAddr = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_CASHADDR);
 
     switch (G_io_apdu_buffer[ISO_OFFSET_P1]) {
     case P1_NO_DISPLAY:
@@ -53,6 +57,11 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         }
     case P2_LEGACY:
     case P2_SEGWIT:
+        break;
+    case P2_CASHADDR:
+        if (G_coin_config->kind != COIN_KIND_BITCOIN_CASH) {
+            return BTCHIP_SW_INCORRECT_P1_P2;
+        }
         break;
     default:
         return BTCHIP_SW_INCORRECT_P1_P2;
@@ -78,7 +87,10 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         return BTCHIP_SW_SECURITY_STATUS_NOT_SATISFIED;
     }
 
+    PRINTF("pin ok\n");
+
     btchip_private_derive_keypair(keyPath, 1, chainCode);
+
     G_io_apdu_buffer[0] = 65;
 
     // Then encode it
@@ -91,7 +103,14 @@ unsigned short btchip_apdu_get_wallet_public_key() {
 
     os_memmove(G_io_apdu_buffer + 1, btchip_public_key_D.W,
                sizeof(btchip_public_key_D.W));
-    if (!(segwit || nativeSegwit)) {
+    if (cashAddr) {
+        uint8_t tmp[20];
+        btchip_public_key_hash160(G_io_apdu_buffer + 1, // IN
+                                  keyLength,            // INLEN
+                                  tmp);
+        keyLength =
+            cashaddr_encode(tmp, 20, G_io_apdu_buffer + 67, 50, CASHADDR_P2PKH);
+    } else if (!(segwit || nativeSegwit)) {
         keyLength = btchip_public_key_to_encoded_base58(
             G_io_apdu_buffer + 1,  // IN
             keyLength,             // INLEN
