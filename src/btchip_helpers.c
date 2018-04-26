@@ -25,21 +25,22 @@ const unsigned char TRANSACTION_OUTPUT_SCRIPT_POST[] = {
     0x88, 0xAC}; // OP_EQUALVERIFY, OP_CHECKSIG
 
 const unsigned char TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE[] = {
-    0x17, 0xA9, 0x14}; // script length, OP_HASH160, address length*/
+    0x17, 0xA9, 0x14}; // script length, OP_HASH160, address length
 const unsigned char TRANSACTION_OUTPUT_SCRIPT_P2SH_POST[] = {0x87}; // OP_EQUAL
 
 const unsigned char ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE[] = {
-        0x3D, 0xA9, 0x14}; // script length, OP_HASH160, address length
+        0x3D, 0xA9,
+        0x14}; // script length, OP_HASH160, address length
 
 const unsigned char ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_POST[] = {
-        0x87,
+        0x87, // OP_EQUAL
         0x20, 0x9E, 0xC9, 0x84, 0x5A, 0xCB, 0x02, 0xFA, 0XB2, 0X4E,
         0x1C, 0x03, 0x68, 0xB3, 0xB5, 0x17, 0xC1, 0xA4, 0x48, 0x8F,
         0xBA, 0x97, 0xF0, 0xE3, 0x45, 0x9A, 0xC0, 0x53, 0xEA, 0x01,
-        0x00, 0x00, 0x00,
-        0x03,
-        0xC0, 0x1F, 0x02,
-        0xB4};
+        0x00, 0x00, 0x00, // ParamHash
+        0x03, // Push 3 bytes to stack to make ParamHeight line up properly
+        0xC0, 0x1F, 0x02, // ParamHeight (139200) -> hex -> endianness swapped
+        0xB4};            // OP_CHECKBLOCKATHEIGHT
 
 const unsigned char TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE[] = {0x16, 0x00, 0x14};
 const unsigned char TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE[] = {0x22, 0x00, 0x20};
