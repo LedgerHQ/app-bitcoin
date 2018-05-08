@@ -183,6 +183,7 @@ struct btchip_context_s {
     unsigned char transactionVersion[4];
     unsigned char inputValue[8];
     unsigned char usingSegwit;
+    unsigned char usingCashAddr;
     unsigned char segwitParsedOnce;
 
     /* /Segregated Witness changes */
@@ -239,8 +240,7 @@ typedef struct btchip_context_s btchip_context_t;
 typedef enum btchip_coin_flags_e {
     FLAG_PEERCOIN_UNITS=1,
     FLAG_PEERCOIN_SUPPORT=2,
-    FLAG_SEGWIT_CHANGE_SUPPORT=4,
-    FLAG_QTUM_SUPPORT=8,
+    FLAG_SEGWIT_CHANGE_SUPPORT=4
 } btchip_coin_flags_t;
 
 
@@ -268,6 +268,7 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_BITCOIN_PRIVATE,
     COIN_KIND_ZENCASH,
     COIN_KIND_BITCORE
+
 } btchip_coin_kind_t;
 
 typedef struct btchip_altcoin_config_s {
