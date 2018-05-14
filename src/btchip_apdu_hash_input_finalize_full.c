@@ -26,6 +26,8 @@
 #define FINALIZE_P1_LAST 0x80
 #define FINALIZE_P1_CHANGEINFO 0xFF
 
+#define FINALIZE_P2_DEFAULT 0x00
+
 #define FLAG_SIGNATURE 0x01
 #define FLAG_CHANGE_VALIDATED 0x80
 
@@ -66,10 +68,10 @@ static bool check_output_displayable() {
         btchip_output_script_is_op_create(btchip_context_D.currentOutput + 8);
     isOpCall =
         btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8);
-    if (((G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+    if (((G_coin_config->kind == COIN_KIND_QTUM) &&
          !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
          !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate && !isOpCall) ||
-        (!(G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+        (!(G_coin_config->kind == COIN_KIND_QTUM) &&
          !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
          !isP2sh && !(nullAmount && isOpReturn))) {
         PRINTF("Error : Unrecognized input script");
@@ -326,7 +328,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                 btchip_context_D.currentOutputOffset += apduLength;
 
                 // Check if the legacy UI can be applied
-                if (!(G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+                if (!(G_coin_config->kind == COIN_KIND_QTUM) &&
                     (G_io_apdu_buffer[ISO_OFFSET_P1] == FINALIZE_P1_LAST) &&
                     !btchip_context_D.tmpCtx.output.multipleOutput &&
                     prepare_full_output(1)) {

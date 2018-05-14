@@ -26,6 +26,7 @@
 #include "btchip_bagl_extensions.h"
 
 #include "segwit_addr.h"
+#include "cashaddr.h"
 
 #include "glyphs.h"
 
@@ -2002,11 +2003,11 @@ uint8_t prepare_single_output() {
     if (btchip_output_script_is_op_return(btchip_context_D.currentOutput +
                                           offset)) {
         strcpy(vars.tmp.fullAddress, "OP_RETURN");
-    } else if ((G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+    } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
                btchip_output_script_is_op_create(
                    btchip_context_D.currentOutput + offset)) {
         strcpy(vars.tmp.fullAddress, "OP_CREATE");
-    } else if ((G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+    } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
                btchip_output_script_is_op_call(btchip_context_D.currentOutput +
                                                offset)) {
         strcpy(vars.tmp.fullAddress, "OP_CALL");
@@ -2034,10 +2035,18 @@ uint8_t prepare_single_output() {
                        btchip_context_D.currentOutput + addressOffset, 20);
 
             // Prepare address
-            textSize = btchip_public_key_to_encoded_base58(
-                address, 20 + versionSize, (unsigned char *)tmp, sizeof(tmp),
-                version, 1);
-            tmp[textSize] = '\0';
+            if (btchip_context_D.usingCashAddr) {
+                cashaddr_encode(
+                    address + versionSize, 20, tmp, sizeof(tmp),
+                    (version == btchip_context_D.payToScriptHashVersion
+                         ? CASHADDR_P2SH
+                         : CASHADDR_P2PKH));
+            } else {
+                textSize = btchip_public_key_to_encoded_base58(
+                    address, 20 + versionSize, (unsigned char *)tmp,
+                    sizeof(tmp), version, 1);
+                tmp[textSize] = '\0';
+            }
         } else if (G_coin_config->native_segwit_prefix) {
             textSize = segwit_addr_encode(
                 tmp, PIC(G_coin_config->native_segwit_prefix), 0,
@@ -2124,7 +2133,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                              offset) &&
             !isP2sh && !(nullAmount && isOpReturn) &&
-            (!(G_coin_config->flags & FLAG_QTUM_SUPPORT) ||
+            (!(G_coin_config->kind == COIN_KIND_QTUM) ||
              (!isOpCreate && !isOpCall))) {
             if (!checkOnly) {
                 PRINTF("Error : Unrecognized input script");
@@ -2138,10 +2147,10 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
             }
             goto error;
         }
-        if (((G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+        if (((G_coin_config->kind == COIN_KIND_QTUM) &&
              btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn &&
              !isOpCreate && !isOpCall) ||
-            (!(G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+            (!(G_coin_config->kind == COIN_KIND_QTUM) &&
              btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn)) {
             unsigned char addressOffset =
                 (isNativeSegwit ? OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET
@@ -2185,14 +2194,14 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         offset = 1;
         btchip_context_D.tmp = (unsigned char *)tmp;
         for (i = 0; i < numberOutputs; i++) {
-            if (((G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+            if (((G_coin_config->kind == COIN_KIND_QTUM) &&
                  !btchip_output_script_is_op_return(
                      btchip_context_D.currentOutput + offset + 8) &&
                  !btchip_output_script_is_op_create(
                      btchip_context_D.currentOutput + offset + 8) &&
                  !btchip_output_script_is_op_call(
                      btchip_context_D.currentOutput + offset + 8)) ||
-                (!(G_coin_config->flags & FLAG_QTUM_SUPPORT) &&
+                (!(G_coin_config->kind == COIN_KIND_QTUM) &&
                  !btchip_output_script_is_op_return(
                      btchip_context_D.currentOutput + offset + 8))) {
                 unsigned char versionSize;
@@ -2230,10 +2239,19 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                     unsigned short textSize = 0;
                     if (!isNativeSegwit) {
                         // Prepare address
-                        textSize = btchip_public_key_to_encoded_base58(
-                            address, 20 + versionSize, (unsigned char *)tmp,
-                            sizeof(tmp), version, 1);
-                        tmp[textSize] = '\0';
+                        if (btchip_context_D.usingCashAddr) {
+                            cashaddr_encode(
+                                address + versionSize, 20, tmp, sizeof(tmp),
+                                (version ==
+                                         btchip_context_D.payToScriptHashVersion
+                                     ? CASHADDR_P2SH
+                                     : CASHADDR_P2PKH));
+                        } else {
+                            textSize = btchip_public_key_to_encoded_base58(
+                                address, 20 + versionSize, (unsigned char *)tmp,
+                                sizeof(tmp), version, 1);
+                            tmp[textSize] = '\0';
+                        }
                     } else if (G_coin_config->native_segwit_prefix) {
                         textSize = segwit_addr_encode(
                             tmp, PIC(G_coin_config->native_segwit_prefix), 0,

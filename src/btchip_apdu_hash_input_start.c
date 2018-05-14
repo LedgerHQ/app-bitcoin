@@ -22,6 +22,7 @@
 #define P1_NEXT 0x80
 #define P2_NEW 0x00
 #define P2_NEW_SEGWIT 0x02
+#define P2_NEW_SEGWIT_CASHADDR 0x03
 #define P2_CONTINUE 0x80
 
 unsigned short btchip_apdu_hash_input_start() {
@@ -49,12 +50,16 @@ unsigned short btchip_apdu_hash_input_start() {
     }
 
     if ((G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW) ||
-        (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT)) {
+        (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT) ||
+        (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_CASHADDR)) {
         // btchip_context_D.transactionContext.consumeP2SH =
         // ((N_btchip.bkp.config.options & BTCHIP_OPTION_SKIP_2FA_P2SH) != 0);
         if (G_io_apdu_buffer[ISO_OFFSET_P1] == P1_FIRST) {
             unsigned char usingSegwit =
-                (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT);
+                (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT) ||
+                ((G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_CASHADDR));
+            unsigned char usingCashAddr =
+                (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_CASHADDR);
             // Request PIN validation
             // Only request PIN validation (user presence) to start a new
             // transaction signing flow.
@@ -70,6 +75,9 @@ unsigned short btchip_apdu_hash_input_start() {
             btchip_context_D.transactionContext.consumeP2SH = 0;
             btchip_context_D.transactionContext.relaxed = 0;
             btchip_context_D.usingSegwit = usingSegwit;
+            btchip_context_D.usingCashAddr =
+                (G_coin_config->kind == COIN_KIND_BITCOIN_CASH ? usingCashAddr
+                                                               : 0);
             btchip_context_D.segwitParsedOnce = 0;
             btchip_set_check_internal_structure_integrity(1);
             // Initialize for screen pairing
