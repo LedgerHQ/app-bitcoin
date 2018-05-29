@@ -26,6 +26,7 @@
 #define MAX_OUTPUT_TO_CHECK 200
 #define MAX_COIN_ID 13
 #define MAX_SHORT_COIN_ID 5 
+#define MAX_APP_VERSION_LEN 6
 
 #define MAGIC_TRUSTED_INPUT 0x32
 #define MAGIC_DEV_KEY 0x01
@@ -164,6 +165,8 @@ struct btchip_context_s {
     unsigned char coinIdLength;    
     /** Current short Coin ID length */
     unsigned char shortCoinIdLength;        
+    /** Current coin app version */
+    unsigned char app_version[MAX_APP_VERSION_LEN];
 
     /** Non protected transaction context */
 
@@ -280,6 +283,10 @@ typedef struct btchip_altcoin_config_s {
     const char* coinid; // used coind id for message signature prefix
     const char* name; // for ux displays
     const char* name_short; // for unit in ux displays
+    const char* app_version; // for app version display in "about" menu
+    unsigned char app_major_version; // for get_firmware API call
+    unsigned char app_minor_version; // for get_firmware API call
+    unsigned char app_patch_version; // for get_firmware API call
     const char* native_segwit_prefix; // null if no segwit prefix
     unsigned int forkid;
     btchip_coin_kind_t kind;

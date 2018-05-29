@@ -34,9 +34,9 @@
 
 void get_firmware_version(unsigned char *buffer) {
     buffer[0] = ARCH_ID;
-    buffer[1] = LEDGER_MAJOR_VERSION;
-    buffer[2] = LEDGER_MINOR_VERSION;
-    buffer[3] = LEDGER_PATCH_VERSION;
+    buffer[1] = G_coin_config->app_major_version;
+    buffer[2] = G_coin_config->app_minor_version;
+    buffer[3] = G_coin_config->app_patch_version;
     buffer[4] = 1;
     buffer[5] = TCS_LOADER_PATCH_VERSION;
 }
