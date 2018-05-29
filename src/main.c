@@ -229,7 +229,7 @@ unsigned int ui_idle_blue_button(unsigned int button_mask,
 const ux_menu_entry_t menu_main[];
 
 const ux_menu_entry_t menu_about[] = {
-    {NULL, NULL, 0, NULL, "Version", APPVERSION, 0, 0},
+    {NULL, NULL, 0, NULL, "Version", btchip_context_D.app_version, 0, 0},
     {menu_main, NULL, 1, &C_nanos_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 
@@ -2462,6 +2462,10 @@ btchip_altcoin_config_t const C_coin_config = {
     .coinid = COIN_COINID,
     .name = COIN_COINID_NAME,
     .name_short = COIN_COINID_SHORT,
+    .app_version = APPVERSION,
+    .app_major_version = LEDGER_MAJOR_VERSION,
+    .app_minor_version = LEDGER_MINOR_VERSION,
+    .app_patch_version = LEDGER_PATCH_VERSION,
 #ifdef COIN_NATIVE_SEGWIT_PREFIX
     .native_segwit_prefix = COIN_NATIVE_SEGWIT_PREFIX,
 #endif // COIN_NATIVE_SEGWIT_PREFIX
@@ -2485,6 +2489,8 @@ __attribute__((section(".boot"))) int main(int arg0) {
     strcpy(name, COIN_COINID_NAME);
     unsigned char name_short[sizeof(COIN_COINID_SHORT)];
     strcpy(name_short, COIN_COINID_SHORT);
+    unsigned char app_version[sizeof(APPVERSION)];
+    strcpy(app_version, APPVERSION);
 #ifdef COIN_NATIVE_SEGWIT_PREFIX
     unsigned char native_segwit_prefix[sizeof(COIN_NATIVE_SEGWIT_PREFIX)];
     strcpy(native_segwit_prefix, COIN_NATIVE_SEGWIT_PREFIX);
@@ -2494,6 +2500,10 @@ __attribute__((section(".boot"))) int main(int arg0) {
     coin_config.coinid = coinid;
     coin_config.name = name;
     coin_config.name_short = name_short;
+    coin_config.app_version = app_version;
+    coin_config.app_major_version = LEDGER_MAJOR_VERSION;
+    coin_config.app_minor_version = LEDGER_MINOR_VERSION;
+    coin_config.app_patch_version = LEDGER_PATCH_VERSION;
 #ifdef COIN_NATIVE_SEGWIT_PREFIX
     coin_config.native_segwit_prefix = native_segwit_prefix;
 #endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX

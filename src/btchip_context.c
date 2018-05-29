@@ -68,7 +68,9 @@ void btchip_context_init() {
             strlen(PIC(G_coin_config->name_short));
         os_memmove(btchip_context_D.shortCoinId, PIC(G_coin_config->name_short),
                    btchip_context_D.shortCoinIdLength);
-
+        os_memmove(btchip_context_D.app_version, PIC(G_coin_config->app_version),
+                   strlen(PIC(G_coin_config->app_version)));
+                   
         SB_CHECK(N_btchip.bkp.config.operationMode);
     }
     if (!N_btchip.storageInitialized) {
