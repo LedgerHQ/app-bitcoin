@@ -20,6 +20,7 @@
 #define BTCHIP_CONTEXT_H
 
 #include "os.h"
+#include "blake2b.h"
 #include "btchip_secure_value.h"
 #include "btchip_filesystem_tx.h"
 
@@ -89,9 +90,13 @@ enum btchip_output_parsing_state_e {
 };
 typedef enum btchip_output_parsing_state_e btchip_output_parsing_state_t;
 
+typedef union multi_hash {
+    cx_sha256_t sha256;
+    blake2b_state blake2b;
+} multi_hash;
+
 struct segwit_hash_s {
-    cx_sha256_t hashPrevouts;
-    cx_sha256_t hashSequence;
+    union multi_hash hashPrevouts;
 };
 struct segwit_cache_s {
     unsigned char hashedPrevouts[32];
@@ -168,7 +173,7 @@ struct btchip_context_s {
     /** Non protected transaction context */
 
     /** Full transaction hash context */
-    cx_sha256_t transactionHashFull;
+    union multi_hash transactionHashFull;
     /** Authorization transaction hash context */
     cx_sha256_t transactionHashAuthorization;
     /** Current hash to perform (TRANSACTION_HASH_) */
@@ -229,6 +234,14 @@ struct btchip_context_s {
     unsigned char outputParsingState;
     unsigned char totalOutputAmount[8];
     unsigned char changeOutputFound;    
+
+    /* Overwinter */
+    unsigned char usingOverwinter;
+    unsigned char overwinterSignReady;
+    unsigned char nVersionGroupId[4];
+    unsigned char nExpiryHeight[4];
+    unsigned char nLockTime[4];
+    unsigned char sigHashType[4];
 };
 typedef struct btchip_context_s btchip_context_t;
 

@@ -58,6 +58,28 @@ unsigned short btchip_apdu_hash_sign() {
     BEGIN_TRY {
         TRY {
             btchip_set_check_internal_structure_integrity(0);
+
+            // Zcash special - store parameters for later
+
+            if ((btchip_context_D.usingOverwinter) &&
+                (!btchip_context_D.overwinterSignReady) &&
+                (btchip_context_D.segwitParsedOnce) &&
+                (btchip_context_D.transactionContext.transactionState == BTCHIP_TRANSACTION_NONE)) {
+                unsigned long int expiryHeight;
+                parameters += (4 * G_io_apdu_buffer[ISO_OFFSET_CDATA]) + 1;
+                authorizationLength = *(parameters++);
+                parameters += authorizationLength;
+                lockTime = btchip_read_u32(parameters, 1, 0);
+                parameters += 4;
+                sighashType = *(parameters++);
+                expiryHeight = btchip_read_u32(parameters, 1, 0);
+                btchip_write_u32_le(btchip_context_D.nLockTime, lockTime);
+                btchip_write_u32_le(btchip_context_D.sigHashType, sighashType);
+                btchip_write_u32_le(btchip_context_D.nExpiryHeight, expiryHeight);
+                btchip_context_D.overwinterSignReady = 1;
+                return BTCHIP_SW_OK;                
+            }
+
             if (btchip_context_D.transactionContext.transactionState !=
                 BTCHIP_TRANSACTION_SIGN_READY) {
                 L_DEBUG_APP(
@@ -65,6 +87,12 @@ unsigned short btchip_apdu_hash_sign() {
                      btchip_context_D.transactionContext.transactionState));
                 sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
                 goto discardTransaction;
+            }
+
+            if (btchip_context_D.usingOverwinter && !btchip_context_D.overwinterSignReady) {
+                L_DEBUG_APP(("Overwinter not ready to sign\n"));
+                sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
+                goto discardTransaction;                
             }
 
             // Read parameters
@@ -88,7 +116,7 @@ unsigned short btchip_apdu_hash_sign() {
                   BTCHIP_OPTION_FREE_SIGHASHTYPE) == 0)) {
                 // if bitcoin cash OR forkid is set, then use the fork id
                 if (G_coin_config->kind == COIN_KIND_BITCOIN_CASH ||
-                    G_coin_config->forkid) {
+                    (G_coin_config->forkid && (G_coin_config->kind != COIN_KIND_ZCASH))) {
 #define SIGHASH_FORKID 0x40
                     if (sighashType != (SIGHASH_ALL | SIGHASH_FORKID)) {
                         sw = BTCHIP_SW_INCORRECT_DATA;
@@ -118,18 +146,23 @@ unsigned short btchip_apdu_hash_sign() {
 
             // Finalize the hash
 
-            btchip_write_u32_le(dataBuffer, lockTime);
-            btchip_write_u32_le(dataBuffer + 4, sighashType);
-            L_DEBUG_BUF(
-                ("Finalize hash with\n", dataBuffer, sizeof(dataBuffer)));
+            if (btchip_context_D.usingOverwinter) {
+                blake2b_final(&btchip_context_D.transactionHashFull.blake2b, hash2, 32);
+            }
+            else {
+                btchip_write_u32_le(dataBuffer, lockTime);
+                btchip_write_u32_le(dataBuffer + 4, sighashType);
+                L_DEBUG_BUF(
+                    ("Finalize hash with\n", dataBuffer, sizeof(dataBuffer)));
 
-            cx_hash(&btchip_context_D.transactionHashFull.header, CX_LAST,
+                cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
                     dataBuffer, sizeof(dataBuffer), hash1);
-            L_DEBUG_BUF(("Hash1\n", hash1, sizeof(hash1)));
+                L_DEBUG_BUF(("Hash1\n", hash1, sizeof(hash1)));
 
-            // Rehash
-            cx_sha256_init(&localHash);
-            cx_hash(&localHash.header, CX_LAST, hash1, sizeof(hash1), hash2);
+                // Rehash
+                cx_sha256_init(&localHash);
+                cx_hash(&localHash.header, CX_LAST, hash1, sizeof(hash1), hash2);                
+            }
             L_DEBUG_BUF(("Hash2\n", hash2, sizeof(hash2)));
 
             // Sign
