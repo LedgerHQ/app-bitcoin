@@ -1,19 +1,19 @@
 /*******************************************************************************
-*   Ledger Blue - Bitcoin Wallet
-*   (c) 2016 Ledger
-*
-*  Licensed under the Apache License, Version 2.0 (the "License");
-*  you may not use this file except in compliance with the License.
-*  You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-*  Unless required by applicable law or agreed to in writing, software
-*  distributed under the License is distributed on an "AS IS" BASIS,
-*  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-*  See the License for the specific language governing permissions and
-*  limitations under the License.
-********************************************************************************/
+ *   Ledger Blue - Bitcoin Wallet
+ *   (c) 2016 Ledger
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ ********************************************************************************/
 
 #include "os.h"
 #include "cx.h"
@@ -42,8 +42,8 @@ unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 #define MAX_CHAR_PER_LINE 25
 
 #define COLOR_BG_1 0xF9F9F9
-#define COLOR_APP COLOR_HDR      // bitcoin 0xFCB653
-#define COLOR_APP_LIGHT COLOR_DB // bitcoin 0xFEDBA9
+#define COLOR_APP COIN_COLOR_HDR      // bitcoin 0xFCB653
+#define COLOR_APP_LIGHT COIN_COLOR_DB // bitcoin 0xFEDBA9
 
 #if defined(TARGET_BLUE)
 #include "qrcodegen.h"
@@ -68,6 +68,24 @@ union {
                         // operate correctly
 } vars;
 
+unsigned int map_color(unsigned int color) {
+    switch (color) {
+    case COLOR_APP:
+        return G_coin_config->color_header;
+
+    case COLOR_APP_LIGHT:
+        return G_coin_config->color_dashboard;
+    }
+    return color;
+}
+void copy_element_and_map_coin_colors(const bagl_element_t *element) {
+    os_memmove(&tmp_element, element, sizeof(bagl_element_t));
+    tmp_element.component.fgcolor = map_color(tmp_element.component.fgcolor);
+    tmp_element.component.bgcolor = map_color(tmp_element.component.bgcolor);
+    tmp_element.overfgcolor = map_color(tmp_element.overfgcolor);
+    tmp_element.overbgcolor = map_color(tmp_element.overbgcolor);
+}
+
 #else
 
 union {
@@ -87,8 +105,8 @@ union {
       unsigned char qrcode[qrcodegen_BUFFER_LEN_FOR_VERSION(3)];
     } tmpqr;
 
-    unsigned int dummy; // ensure the whole vars is aligned for the CM0 to
-    operate correctly
+      unsigned int dummy; // ensure the whole vars is aligned for the CM0 to
+      operate correctly
     */
 } vars;
 #endif
@@ -118,7 +136,14 @@ const bagl_element_t *ui_menu_item_out_over(const bagl_element_t *e) {
 
 #if defined(TARGET_BLUE)
 
-unsigned int io_seproxyhal_touch_settings(const bagl_element_t *e);
+const bagl_element_t *ui_idle_blue_prepro(const bagl_element_t *element) {
+    copy_element_and_map_coin_colors(element);
+    if (element->component.userid == 0x01) {
+        tmp_element.text = G_coin_config->header_text;
+    }
+    return &tmp_element;
+}
+
 const bagl_element_t ui_idle_blue[] = {
     // type                               userid    x    y   w    h  str rad
     // fill      fg        bg      fid iid  txt   touchparams...       ]
@@ -144,9 +169,9 @@ const bagl_element_t ui_idle_blue[] = {
      NULL},
 
     /// TOP STATUS BAR
-    {{BAGL_LABELINE, 0x00, 0, 45, 320, 30, 0, 0, BAGL_FILL, 0xFFFFFF, COLOR_APP,
+    {{BAGL_LABELINE, 0x01, 0, 45, 320, 30, 0, 0, BAGL_FILL, 0xFFFFFF, COLOR_APP,
       BAGL_FONT_OPEN_SANS_SEMIBOLD_10_13PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     COINID_UPCASE,
+     COIN_COINID_HEADER,
      0,
      0,
      0,
@@ -167,19 +192,14 @@ const bagl_element_t ui_idle_blue[] = {
      NULL},
 
     // BADGE_<COINID>.GIF
-    {{BAGL_ICON, 0x00, 135, 178, 50, 50, 0, 0, BAGL_FILL, 0, COLOR_BG_1, 0, 0},
-     &NAME3(C_blue_badge_, COINID, ),
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
+    //{{BAGL_ICON                           , 0x00, 135, 178,  50,  50, 0, 0,
+    //BAGL_FILL, 0       , COLOR_BG_1, 0 ,0   } , &NAME3(C_blue_badge_, COINID,
+    //), 0, 0, 0, NULL, NULL, NULL },
 
     {{BAGL_LABELINE, 0x00, 0, 270, 320, 30, 0, 0, BAGL_FILL, 0x000000,
       COLOR_BG_1,
       BAGL_FONT_OPEN_SANS_LIGHT_16_22PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "Open " COINID_NAME " wallet",
+     "Open your wallet",
      0,
      0,
      0,
@@ -235,7 +255,7 @@ const ux_menu_entry_t menu_about[] = {
 
 const ux_menu_entry_t menu_main[] = {
     //{NULL, NULL, 0, &NAME3(C_nanos_badge_, COINID, ), "Use wallet to", "view
-    //accounts", 33, 12},
+    // accounts", 33, 12},
     {NULL, NULL, 0, NULL, "Use wallet to", "view accounts", 0, 0},
     {menu_about, NULL, 0, NULL, "About", NULL, 0, 0},
     {NULL, os_sched_exit, 0, &C_nanos_icon_dashboard, "Quit app", NULL, 50, 29},
@@ -247,11 +267,6 @@ const ux_menu_entry_t menu_main[] = {
 // reuse vars.tmp.addressSummary for each line content
 typedef void (*callback_t)(void);
 callback_t ui_details_back_callback;
-
-// don't perform any draw/color change upon finger event over settings
-const bagl_element_t *ui_settings_out_over(const bagl_element_t *e) {
-    return NULL;
-}
 
 const char *ui_details_title;
 const char *ui_details_content;
@@ -427,27 +442,26 @@ const bagl_element_t ui_details_blue[] = {
 };
 
 const bagl_element_t *ui_details_blue_prepro(const bagl_element_t *element) {
+    copy_element_and_map_coin_colors(element);
     if (element->component.userid == 1) {
-        os_memmove(&tmp_element, element, sizeof(bagl_element_t));
         tmp_element.text = ui_details_title;
         return &tmp_element;
     } else if (element->component.userid > 0) {
         unsigned int length = strlen(ui_details_content);
         if (length >= (element->component.userid & 0xF) * MAX_CHAR_PER_LINE) {
             os_memset(vars.tmp.addressSummary, 0, MAX_CHAR_PER_LINE + 1);
-            os_memmove(
-                vars.tmp.addressSummary,
-                ui_details_content +
-                    (element->component.userid & 0xF) * MAX_CHAR_PER_LINE,
-                MIN(length -
-                        (element->component.userid & 0xF) * MAX_CHAR_PER_LINE,
-                    MAX_CHAR_PER_LINE));
+            os_memmove(vars.tmp.addressSummary,
+                       ui_details_content + (element->component.userid & 0xF) *
+                                                MAX_CHAR_PER_LINE,
+                       MIN(length - (element->component.userid & 0xF) *
+                                        MAX_CHAR_PER_LINE,
+                           MAX_CHAR_PER_LINE));
             return 1;
         }
         // nothing to draw for this line
         return 0;
     }
-    return 1;
+    return &tmp_element;
 }
 
 unsigned int ui_details_blue_button(unsigned int button_mask,
@@ -492,13 +506,20 @@ const char *ui_transaction_blue_values[3];
 const char *const ui_transaction_blue_details_name[][5] = {
     /*TRANSACTION_FULL*/
     {
-        "AMOUNT", "ADDRESS", "FEES", "CONFIRM TRANSACTION",
+        "AMOUNT",
+        "ADDRESS",
+        "FEES",
+        "CONFIRM TRANSACTION",
         "Transaction details",
     },
 
     /*TRANSACTION_OUTPUT*/
     {
-        "OUTPUT#", "ADDRESS", "AMOUNT", "CONFIRM OUTPUT", "Transaction output",
+        "OUTPUT#",
+        "ADDRESS",
+        "AMOUNT",
+        "CONFIRM OUTPUT",
+        "Transaction output",
     },
 
     /*TRANSACTION_FINALIZE*/
@@ -506,12 +527,20 @@ const char *const ui_transaction_blue_details_name[][5] = {
 
     /*TRANSACTION_P2SH*/
     {
-        NULL, NULL, NULL, "CONFIRM P2SH", "P2SH Transaction",
+        NULL,
+        NULL,
+        NULL,
+        "CONFIRM P2SH",
+        "P2SH Transaction",
     },
 
     /*TRANSACTION_MESSAGE*/
     {
-        "HASH", NULL, NULL, "SIGN MESSAGE", "Message signature",
+        "HASH",
+        NULL,
+        NULL,
+        "SIGN MESSAGE",
+        "Message signature",
     },
 };
 
@@ -805,8 +834,9 @@ const bagl_element_t ui_transaction_blue[] = {
 
 const bagl_element_t *
 ui_transaction_blue_prepro(const bagl_element_t *element) {
+    copy_element_and_map_coin_colors(element);
     if (element->component.userid == 0) {
-        return 1;
+        return &tmp_element;
     }
     // none elements are skipped
     if ((element->component.type & (~BAGL_FLAG_TOUCHABLE)) == BAGL_NONE) {
@@ -815,12 +845,11 @@ ui_transaction_blue_prepro(const bagl_element_t *element) {
         switch (element->component.userid & 0xF0) {
         // icon
         case 0x40:
-            return 1;
+            return &tmp_element;
             break;
 
         // TITLE
         case 0x60:
-            os_memmove(&tmp_element, element, sizeof(bagl_element_t));
             tmp_element.text =
                 ui_transaction_blue_details_name[G_ui_transaction_blue_state]
                                                 [3];
@@ -829,7 +858,6 @@ ui_transaction_blue_prepro(const bagl_element_t *element) {
 
         // SUBLINE
         case 0x50:
-            os_memmove(&tmp_element, element, sizeof(bagl_element_t));
             tmp_element.text =
                 ui_transaction_blue_details_name[G_ui_transaction_blue_state]
                                                 [4];
@@ -843,7 +871,6 @@ ui_transaction_blue_prepro(const bagl_element_t *element) {
                                                   0xF]) {
                 return NULL;
             }
-            os_memmove(&tmp_element, element, sizeof(bagl_element_t));
             tmp_element.text =
                 ui_transaction_blue_details_name[G_ui_transaction_blue_state]
                                                 [element->component.userid &
@@ -859,7 +886,6 @@ ui_transaction_blue_prepro(const bagl_element_t *element) {
                 return NULL;
             }
             // always display the value
-            os_memmove(&tmp_element, element, sizeof(bagl_element_t));
             tmp_element.text =
                 ui_transaction_blue_values[(element->component.userid & 0xF)];
 
@@ -892,11 +918,11 @@ ui_transaction_blue_prepro(const bagl_element_t *element) {
             return ui_transaction_blue_details_name[G_ui_transaction_blue_state]
                                                    [element->component.userid &
                                                     0xF] != NULL
-                       ? element
+                       ? &tmp_element
                        : NULL;
         }
     }
-    return element;
+    return &tmp_element;
 }
 unsigned int ui_transaction_blue_button(unsigned int button_mask,
                                         unsigned int button_mask_counter) {
@@ -1011,6 +1037,7 @@ const bagl_element_t ui_display_address_blue[] = {
 unsigned int ui_display_address_blue_prepro(const bagl_element_t *element) {
     bagl_icon_details_t *icon_details = &vars.tmpqr.icon_details;
     bagl_element_t *icon_component = element;
+    copy_element_and_map_coin_colors(element);
     if (element->component.userid > 0) {
         unsigned int length = strlen(G_io_apdu_buffer + 200);
         switch (element->component.userid) {
@@ -1073,18 +1100,17 @@ unsigned int ui_display_address_blue_prepro(const bagl_element_t *element) {
                            G_io_apdu_buffer + 200 +
                                (element->component.userid & 0xF) *
                                    MAX_CHAR_PER_LINE,
-                           MIN(length -
-                                   (element->component.userid & 0xF) *
-                                       MAX_CHAR_PER_LINE,
+                           MIN(length - (element->component.userid & 0xF) *
+                                            MAX_CHAR_PER_LINE,
                                MAX_CHAR_PER_LINE));
-                return 1;
+                return &tmp_element;
             }
             break;
         }
         // nothing to draw for this line
         return 0;
     }
-    return 1;
+    return &tmp_element;
 }
 unsigned int ui_display_address_blue_button(unsigned int button_mask,
                                             unsigned int button_mask_counter) {
@@ -1477,8 +1503,8 @@ const bagl_element_t ui_finalize_nanos[] = {
      NULL},
 
     /* TODO
-    {{BAGL_LABELINE                       , 0x02,   0,  12, 128,  12, 0, 0, 0
-    , 0xFFFFFF, 0x000000,
+    {{BAGL_LABELINE                       , 0x02,   0,  12, 128,  12, 0, 0, 0 ,
+    0xFFFFFF, 0x000000,
     BAGL_FONT_OPEN_SANS_REGULAR_11px|BAGL_FONT_ALIGNMENT_CENTER, 0  }, "Amount",
     0, 0, 0, NULL, NULL, NULL },
     {{BAGL_LABELINE                       , 0x02,  23,  26,  82,  12, 0x80|10,
@@ -1654,17 +1680,13 @@ void ui_idle(void) {
     ux_step_count = 0;
 
 #if defined(TARGET_BLUE)
-    UX_DISPLAY(ui_idle_blue, NULL);
+    UX_DISPLAY(ui_idle_blue, ui_idle_blue_prepro);
 #elif defined(TARGET_NANOS)
     UX_MENU_DISPLAY(0, menu_main, NULL);
 #endif // #if TARGET_ID
 }
 
 #ifdef TARGET_BLUE
-unsigned int io_seproxyhal_touch_settings(const bagl_element_t *e) {
-    UX_DISPLAY(ui_settings_blue, ui_settings_blue_prepro);
-    return 0; // do not redraw button, screen has switched
-}
 
 unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e) {
     // go back to the home screen
@@ -1923,7 +1945,7 @@ unsigned char io_event(unsigned char channel) {
               SEPROXYHAL_TAG_STATUS_EVENT_FLAG_USB_POWERED)) {
             THROW(EXCEPTION_IO_RESET);
         }
-    // no break is intentional
+        // no break is intentional
     default:
         UX_DEFAULT_EVENT();
         break;
@@ -2336,7 +2358,7 @@ unsigned int btchip_bagl_confirm_full_output() {
 }
 
 unsigned int btchip_bagl_confirm_single_output() {
-// TODO : remove when supporting multi output
+    // TODO : remove when supporting multi output
 #if defined(TARGET_BLUE)
     if (btchip_context_D.transactionContext.consumeP2SH) {
         ui_transaction_p2sh_blue_init();
@@ -2485,12 +2507,21 @@ __attribute__((section(".boot"))) int main(int arg0) {
     strcpy(name, COIN_COINID_NAME);
     unsigned char name_short[sizeof(COIN_COINID_SHORT)];
     strcpy(name_short, COIN_COINID_SHORT);
+#ifdef TARGET_BLUE
+    unsigned char header[sizeof(COIN_COINID_HEADER)];
+    strcpy(header, COIN_COINID_HEADER);
+#endif // TARGET_BLUE
 #ifdef COIN_NATIVE_SEGWIT_PREFIX
     unsigned char native_segwit_prefix[sizeof(COIN_NATIVE_SEGWIT_PREFIX)];
     strcpy(native_segwit_prefix, COIN_NATIVE_SEGWIT_PREFIX);
 #endif
     btchip_altcoin_config_t coin_config;
     os_memmove(&coin_config, &C_coin_config, sizeof(coin_config));
+#ifdef TARGET_BLUE
+    coin_config.header_text = header;
+    coin_config.color_header = COIN_COLOR_HDR;
+    coin_config.color_dashboard = COIN_COLOR_DB;
+#endif // TARGET_BLUE
     coin_config.coinid = coinid;
     coin_config.name = name;
     coin_config.name_short = name_short;
@@ -2512,7 +2543,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
         }
     }
     END_TRY;
-// no return
+    // no return
 #else
     // exit critical section
     __asm volatile("cpsie i");
@@ -2550,7 +2581,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
 #if defined(TARGET_BLUE)
                 // setup the status bar colors (remembered after wards, even
                 // more if another app does not resetup after app switch)
-                UX_SET_STATUS_BAR_COLOR(0xFFFFFF, COLOR_APP);
+                UX_SET_STATUS_BAR_COLOR(0xFFFFFF, G_coin_config->color_header);
 #endif // TARGET_ID
 
                 ui_idle();
