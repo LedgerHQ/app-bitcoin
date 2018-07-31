@@ -109,10 +109,10 @@ else ifeq ($(COIN),pivx)
 DEFINES   += COIN_P2PKH_VERSION=30 COIN_P2SH_VERSION=13 COIN_FAMILY=1 COIN_COINID=\"DarkNet\" COIN_COINID_HEADER=\"PIVX\" COIN_COLOR_HDR=0x46385D COIN_COLOR_DB=0x9E96AA COIN_COINID_NAME=\"PivX\" COIN_COINID_SHORT=\"PIV\" COIN_KIND=COIN_KIND_PIVX
 APPNAME ="PivX"
 APP_LOAD_PARAMS += --path $(APP_PATH)
-else ifeq ($(COIN),stealthcoin)
-# Stealthcoin
-DEFINES   += COIN_P2PKH_VERSION=62 COIN_P2SH_VERSION=85 COIN_FAMILY=2 COIN_COINID=\"StealthCoin\" COIN_COINID_HEADER=\"STEALTH\" COIN_COLOR_HDR=0x000000 COIN_COLOR_DB=0x808080 COIN_COINID_NAME=\"Stealthcoin\" COIN_COINID_SHORT=\"XST\" COIN_KIND=COIN_KIND_STEALTHCOIN COIN_FLAGS=FLAG_PEERCOIN_UNITS\|FLAG_PEERCOIN_SUPPORT
-APPNAME ="Stealthcoin"
+else ifeq ($(COIN),stealth)
+# Stealth
+DEFINES   += COIN_P2PKH_VERSION=62 COIN_P2SH_VERSION=85 COIN_FAMILY=2 COIN_COINID=\"Stealth\" COIN_COINID_HEADER=\"STEALTH\" COIN_COLOR_HDR=0x000000 COIN_COLOR_DB=0x808080 COIN_COINID_NAME=\"Stealth\" COIN_COINID_SHORT=\"XST\" COIN_KIND=COIN_KIND_STEALTH COIN_FLAGS=FLAG_PEERCOIN_UNITS\|FLAG_PEERCOIN_SUPPORT
+APPNAME ="Stealth"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),viacoin)
 # Viacoin
@@ -150,7 +150,7 @@ APPNAME ="Machinecoin"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, zencash, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealthcoin, digibyte, qtum, hcash, bitcoin_private, machinecoin) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, zencash, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealth, digibyte, qtum, hcash, bitcoin_private, machinecoin) 
 endif
 endif
 
