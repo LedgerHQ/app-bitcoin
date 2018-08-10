@@ -1,11 +1,11 @@
-# blue-app-btc
+# blue-app-counoscoin
 Counoscoin wallet application for Ledger Blue and Nano S
 
 This follows the beta specification at https://ledgerhq.github.io/btchip-doc/counoscoin-technical-beta.html - with the regular set of APDUs for standard wallet operations enabled.
 
 Can be tested quickly tested with the Python API at https://github.com/LedgerHQ/btchip-python and Electrum (force noPin = True in getClient in plugins/ledger/ledger.py) 
 
-This application is compatible with the Ledger Counoscoin Wallet Chrome Application available on Github at https://github.com/LedgerHQ/blue-app-btc and on Chrome Web Store at https://chrome.google.com/webstore/detail/ledger-wallet-counoscoin/kkdpmhnladdopljabkgpacgpliggeeaf  
+This application is compatible with the Ledger Counoscoin Wallet Chrome Application available on Github at https://github.com/Ramin-Bateni/blue-app-counoscoin and on Chrome Web Store at https://chrome.google.com/webstore/detail/ledger-wallet-counoscoin/kkdpmhnladdopljabkgpacgpliggeeaf  
 
 ## Using the beta high level communication API (1.1.2+)
 
