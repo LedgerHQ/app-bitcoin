@@ -266,7 +266,7 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_QTUM,
     COIN_KIND_HCASH,
     COIN_KIND_BITCOIN_PRIVATE,
-    COIN_KIND_ZENCASH,
+    COIN_KIND_HORIZEN,
     COIN_KIND_ZCOIN
 } btchip_coin_kind_t;
 
