@@ -80,10 +80,10 @@ else ifeq ($(COIN),zcash)
 DEFINES   += COIN_P2PKH_VERSION=7352 COIN_P2SH_VERSION=7357 COIN_FAMILY=1 COIN_COINID=\"Zcash\" COIN_COINID_HEADER=\"ZCASH\" COIN_COLOR_HDR=0x3790CA COIN_COLOR_DB=0x9BC8E5 COIN_COINID_NAME=\"Zcash\" COIN_COINID_SHORT=\"ZEC\" COIN_KIND=COIN_KIND_ZCASH
 APPNAME ="Zcash"
 APP_LOAD_PARAMS += --path $(APP_PATH)
-else ifeq ($(COIN),zencash)
-# ZenCash
-DEFINES   += COIN_P2PKH_VERSION=8329 COIN_P2SH_VERSION=8342 COIN_FAMILY=4 COIN_COINID=\"Zencash\" COIN_COINID_HEADER=\"ZENCASH\" COIN_COLOR_HDR=0xFF4300 COIN_COLOR_DB=0xFF8356 COIN_COINID_NAME=\"Zencash\" COINID=$(COIN) COIN_COINID_SHORT=\"ZEN\" COIN_KIND=COIN_KIND_ZENCASH
-APPNAME ="ZenCash"
+else ifeq ($(COIN),horizen)
+# Horizen
+DEFINES   += COIN_P2PKH_VERSION=8329 COIN_P2SH_VERSION=8342 COIN_FAMILY=4 COIN_COINID=\"Horizen\" COIN_COINID_HEADER=\"HORIZEN\" COIN_COLOR_HDR=0xFF4300 COIN_COLOR_DB=0xFF8356 COIN_COINID_NAME=\"Horizen\" COINID=$(COIN) COIN_COINID_SHORT=\"ZEN\" COIN_KIND=COIN_KIND_HORIZEN
+APPNAME ="Horizen"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),komodo)
 # Komodo
@@ -154,7 +154,7 @@ APPNAME ="Actinium"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, zencash, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealth, digibyte, qtum, hcash, bitcoin_private, actinium) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealth, digibyte, qtum, hcash, bitcoin_private, zcoin, actinium)
 endif
 endif
 
@@ -241,3 +241,5 @@ include $(BOLOS_SDK)/Makefile.rules
 #add dependency on custom makefile filename
 dep/%.d: %.c Makefile
 
+listvariants:
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin posw pivx viacoin vertcoin stealth digibyte qtum hcash bitcoin_private zcoin
