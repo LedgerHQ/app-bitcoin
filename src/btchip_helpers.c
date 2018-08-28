@@ -67,7 +67,7 @@ unsigned char btchip_output_script_is_regular(unsigned char *buffer) {
             return 1;
         }
     }
-    if (G_coin_config->kind == COIN_KIND_ZENCASH) {
+    if (G_coin_config->kind == COIN_KIND_HORIZEN) {
         if ((os_memcmp(buffer, ZEN_OUTPUT_SCRIPT_PRE,
                        sizeof(ZEN_OUTPUT_SCRIPT_PRE)) == 0) &&
             (os_memcmp(buffer + sizeof(ZEN_OUTPUT_SCRIPT_PRE) + 20,
@@ -88,7 +88,7 @@ unsigned char btchip_output_script_is_regular(unsigned char *buffer) {
 }
 
 unsigned char btchip_output_script_is_p2sh(unsigned char *buffer) {
-    if (G_coin_config->kind == COIN_KIND_ZENCASH) {
+    if (G_coin_config->kind == COIN_KIND_HORIZEN) {
         if ((os_memcmp(buffer, ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE,
                        sizeof(ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE)) == 0) &&
             (os_memcmp(buffer + sizeof(ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE) + 20,
