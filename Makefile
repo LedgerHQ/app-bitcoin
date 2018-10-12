@@ -27,7 +27,7 @@ APP_LOAD_PARAMS= --curve secp256k1 $(COMMON_LOAD_PARAMS)
 
 APPVERSION_M=1
 APPVERSION_N=2
-APPVERSION_P=9
+APPVERSION_P=10
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 APP_LOAD_FLAGS=--appFlags 0x50 --dep Bitcoin:$(APPVERSION)
 
@@ -90,6 +90,11 @@ else ifeq ($(COIN),komodo)
 DEFINES   += COIN_P2PKH_VERSION=60 COIN_P2SH_VERSION=85 COIN_FAMILY=1 COIN_COINID=\"Komodo\" COIN_COINID_HEADER=\"KOMODO\" COIN_COLOR_HDR=0x326464 COIN_COLOR_DB=0x99b2b2 COIN_COINID_NAME=\"Komodo\" COIN_COINID_SHORT=\"KMD\" COIN_KIND=COIN_KIND_KOMODO
 APPNAME ="Komodo"
 APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),lbry)
+# LBRY
+DEFINES   += COIN_P2PKH_VERSION=85 COIN_P2SH_VERSION=122 COIN_FAMILY=1 COIN_COINID=\"LBRY\" COIN_COINID_HEADER=\"LBRY\" COIN_COLOR_HDR=0x155B4A COIN_COLOR_DB=0xFEDBA9 COIN_COINID_NAME=\"LBRY\" COIN_COINID_SHORT=\"LBC\" COIN_KIND=COIN_KIND_LBRY
+APPNAME ="LBRY"
+APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),stratis)
 # Stratis 
 DEFINES   += COIN_P2PKH_VERSION=63 COIN_P2SH_VERSION=125 COIN_FAMILY=2 COIN_COINID=\"Stratis\" COIN_COINID_HEADER=\"STRATIS\" COIN_COLOR_HDR=0x3790CA COIN_COLOR_DB=0x9BC8E5 COIN_COINID_NAME=\"Stratis\" COIN_COINID_SHORT=\"STRAT\" COIN_KIND=COIN_KIND_STRATIS COIN_FLAGS=FLAG_PEERCOIN_SUPPORT
@@ -149,7 +154,7 @@ APPNAME ="Bitcoin Private"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealth, digibyte, qtum, hcash, bitcoin_private, zcoin) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealth, digibyte, qtum, hcash, bitcoin_private, zcoin, lbry) 
 endif
 endif
 
