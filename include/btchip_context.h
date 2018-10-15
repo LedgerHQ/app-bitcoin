@@ -267,7 +267,8 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_HCASH,
     COIN_KIND_BITCOIN_PRIVATE,
     COIN_KIND_HORIZEN,
-    COIN_KIND_ZCOIN
+    COIN_KIND_ZCOIN, 
+    COIN_KIND_PRIMECOIN
 } btchip_coin_kind_t;
 
 typedef struct btchip_altcoin_config_s {
