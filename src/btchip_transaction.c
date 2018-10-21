@@ -199,12 +199,16 @@ void transaction_parse(unsigned char parseMode) {
                                 blake2b_update(&btchip_context_D.transactionHashFull.blake2b, btchip_context_D.segwit.cache.hashedSequence, sizeof(btchip_context_D.segwit.cache.hashedSequence));
                                 blake2b_update(&btchip_context_D.transactionHashFull.blake2b, btchip_context_D.segwit.cache.hashedOutputs, sizeof(btchip_context_D.segwit.cache.hashedOutputs));
                                 blake2b_update(&btchip_context_D.transactionHashFull.blake2b, OVERWINTER_NO_JOINSPLITS, 32);
-                                blake2b_update(&btchip_context_D.transactionHashFull.blake2b, OVERWINTER_NO_JOINSPLITS, 32); // sapling hashShieldedSpends
-                                blake2b_update(&btchip_context_D.transactionHashFull.blake2b, OVERWINTER_NO_JOINSPLITS, 32); // sapling hashShieldedOutputs
+                                if (btchip_context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING) {
+                                    blake2b_update(&btchip_context_D.transactionHashFull.blake2b, OVERWINTER_NO_JOINSPLITS, 32); // sapling hashShieldedSpends
+                                    blake2b_update(&btchip_context_D.transactionHashFull.blake2b, OVERWINTER_NO_JOINSPLITS, 32); // sapling hashShieldedOutputs
+                                }
                                 blake2b_update(&btchip_context_D.transactionHashFull.blake2b, btchip_context_D.nLockTime, sizeof(btchip_context_D.nLockTime));
                                 blake2b_update(&btchip_context_D.transactionHashFull.blake2b, btchip_context_D.nExpiryHeight, sizeof(btchip_context_D.nExpiryHeight));
                                 os_memset(valueBalance, 0, sizeof(valueBalance));
-                                blake2b_update(&btchip_context_D.transactionHashFull.blake2b, valueBalance, sizeof(valueBalance)); // sapling valueBalance
+                                if (btchip_context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING) {
+                                    blake2b_update(&btchip_context_D.transactionHashFull.blake2b, valueBalance, sizeof(valueBalance)); // sapling valueBalance
+                                }
                                 blake2b_update(&btchip_context_D.transactionHashFull.blake2b, btchip_context_D.sigHashType, sizeof(btchip_context_D.sigHashType));
                             }
                             else {
