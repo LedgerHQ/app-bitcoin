@@ -19,6 +19,9 @@
 #include "btchip_apdu_constants.h"
 #include "blake2b.h"
 
+#define CONSENSUS_BRANCH_ID_OVERWINTER 0x5ba81b19
+#define CONSENSUS_BRANCH_ID_SAPLING 0x76b809bb
+
 #define DEBUG_LONG "%ld"
 
 void check_transaction_available(unsigned char x) {
@@ -154,8 +157,10 @@ void transaction_parse(unsigned char parseMode) {
                     if (btchip_context_D.usingOverwinter) {
                         if (btchip_context_D.segwitParsedOnce) {
                             uint8_t parameters[16];
-                            os_memmove(parameters, OVERWINTER_PARAM_SIGHASH, 16);
-                            btchip_write_u32_le(parameters + 12, G_coin_config->forkid);                        
+                            os_memmove(parameters, OVERWINTER_PARAM_SIGHASH, 16);                            
+                            btchip_write_u32_le(parameters + 12, 
+                                btchip_context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING ? 
+                                CONSENSUS_BRANCH_ID_SAPLING : CONSENSUS_BRANCH_ID_OVERWINTER);                        
                             blake2b_init(&btchip_context_D.transactionHashFull.blake2b, 32, NULL, 0, parameters, 16);
                         }
                     }
@@ -192,7 +197,6 @@ void transaction_parse(unsigned char parseMode) {
                                  sizeof(btchip_context_D.segwit.cache
                                             .hashedSequence)));
                             if (btchip_context_D.usingOverwinter) {
-                                unsigned char valueBalance[8];
                                 blake2b_update(&btchip_context_D.transactionHashFull.blake2b, btchip_context_D.transactionVersion, sizeof(btchip_context_D.transactionVersion));
                                 blake2b_update(&btchip_context_D.transactionHashFull.blake2b, btchip_context_D.nVersionGroupId, sizeof(btchip_context_D.nVersionGroupId)); 
                                 blake2b_update(&btchip_context_D.transactionHashFull.blake2b, btchip_context_D.segwit.cache.hashedPrevouts, sizeof(btchip_context_D.segwit.cache.hashedPrevouts));
@@ -205,8 +209,9 @@ void transaction_parse(unsigned char parseMode) {
                                 }
                                 blake2b_update(&btchip_context_D.transactionHashFull.blake2b, btchip_context_D.nLockTime, sizeof(btchip_context_D.nLockTime));
                                 blake2b_update(&btchip_context_D.transactionHashFull.blake2b, btchip_context_D.nExpiryHeight, sizeof(btchip_context_D.nExpiryHeight));
-                                os_memset(valueBalance, 0, sizeof(valueBalance));
                                 if (btchip_context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING) {
+                                    unsigned char valueBalance[8];
+                                    os_memset(valueBalance, 0, sizeof(valueBalance));
                                     blake2b_update(&btchip_context_D.transactionHashFull.blake2b, valueBalance, sizeof(valueBalance)); // sapling valueBalance
                                 }
                                 blake2b_update(&btchip_context_D.transactionHashFull.blake2b, btchip_context_D.sigHashType, sizeof(btchip_context_D.sigHashType));

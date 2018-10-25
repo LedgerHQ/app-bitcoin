@@ -116,7 +116,7 @@ unsigned short btchip_apdu_hash_sign() {
                   BTCHIP_OPTION_FREE_SIGHASHTYPE) == 0)) {
                 // if bitcoin cash OR forkid is set, then use the fork id
                 if (G_coin_config->kind == COIN_KIND_BITCOIN_CASH ||
-                    (G_coin_config->forkid && (G_coin_config->kind != COIN_KIND_ZCASH))) {
+                    (G_coin_config->forkid)) {
 #define SIGHASH_FORKID 0x40
                     if (sighashType != (SIGHASH_ALL | SIGHASH_FORKID)) {
                         sw = BTCHIP_SW_INCORRECT_DATA;
