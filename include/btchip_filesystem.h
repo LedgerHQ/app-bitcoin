@@ -68,6 +68,8 @@ typedef struct btchip_storage_s {
 
     unsigned char fidoTransport;
 
+    uint8_t pubKeyRequestRestriction;
+
 } btchip_storage_t;
 
 // the global nvram memory variable
