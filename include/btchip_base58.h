@@ -19,9 +19,10 @@
 
 #define BTCHIP_BASE58_H
 
-unsigned char btchip_decode_base58(unsigned char WIDE *in, unsigned char length,
-                                   unsigned char *out, unsigned char maxoutlen);
-unsigned char btchip_encode_base58(unsigned char WIDE *in, unsigned char length,
-                                   unsigned char *out, unsigned char maxoutlen);
+int btchip_decode_base58(const char WIDE *in, unsigned char length,
+                         unsigned char *out, size_t *outlen);
+
+int btchip_encode_base58(const unsigned char WIDE *in, size_t length,
+                         unsigned char *out, size_t *outlen);
 
 #endif
