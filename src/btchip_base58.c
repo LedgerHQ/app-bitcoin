@@ -20,7 +20,7 @@
 #define MAX_DEC_INPUT_SIZE 164
 #define MAX_ENC_INPUT_SIZE 120
 
-int btchip_decode_base58(const char WIDE *in, unsigned char length,
+int btchip_decode_base58(const char WIDE *in, size_t length,
                          unsigned char *out, size_t *outlen) {
   unsigned char tmp[MAX_DEC_INPUT_SIZE];
   unsigned char buffer[MAX_DEC_INPUT_SIZE] = {0};
@@ -31,7 +31,7 @@ int btchip_decode_base58(const char WIDE *in, unsigned char length,
   if (length > MAX_DEC_INPUT_SIZE) {
     return -1;
   }
-  memmove(tmp, in, length);
+  os_memmove(tmp, in, length);
   L_DEBUG_BUF(("To decode\n", tmp, length));
   for (i = 0; i < length; i++) {
     if (in[i] >= sizeof(BASE58TABLE)) {
@@ -70,7 +70,7 @@ int btchip_decode_base58(const char WIDE *in, unsigned char length,
     return -1;
   }
 
-  memmove(out, buffer + j - zeroCount, length);
+  os_memmove(out, buffer + j - zeroCount, length);
   L_DEBUG_BUF(("Decoded\n", out, length));
   *outlen = length;
   return 0;
@@ -99,7 +99,7 @@ int btchip_encode_base58(const unsigned char WIDE *in, size_t length,
   stopAt = outputSize - 1;
   for (startAt = zeroCount; startAt < length; startAt++) {
     int carry = in[startAt];
-    for (j = outputSize - 1; j >= 0; j--) {
+    for (j = outputSize - 1; (int)j >= 0; j--) {
       carry += 256 * buffer[j];
       buffer[j] = carry % 58;
       carry /= 58;
