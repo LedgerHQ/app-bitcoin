@@ -119,6 +119,7 @@ unsigned int
 io_seproxyhal_touch_message_signature_verify_ok(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_display_cancel(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_display_ok(const bagl_element_t *e);
+unsigned int io_seproxyhal_touch_settings(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e);
 void ui_idle(void);
 
@@ -178,11 +179,13 @@ const bagl_element_t ui_idle_blue[] = {
      NULL,
      NULL,
      NULL},
+     // Settings icon
+     {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00,   0,  19,  56,  44, 0, 0, BAGL_FILL, COLOR_APP, 
+     COLOR_APP_LIGHT, BAGL_FONT_SYMBOLS_0|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE, 0 },
+    BAGL_FONT_SYMBOLS_0_SETTINGS, 0, COLOR_APP, 0xFFFFFF, io_seproxyhal_touch_settings, NULL, NULL},
+
     {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 264, 19, 56, 44, 0, 0,
-      BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT,
-      BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_CENTER |
-          BAGL_FONT_ALIGNMENT_MIDDLE,
-      0},
+     BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT, BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_CENTER | BAGL_FONT_ALIGNMENT_MIDDLE, 0},
      BAGL_FONT_SYMBOLS_0_DASHBOARD,
      0,
      COLOR_APP,
@@ -242,11 +245,88 @@ unsigned int ui_idle_blue_button(unsigned int button_mask,
                                  unsigned int button_mask_counter) {
     return 0;
 }
+
+const bagl_element_t * ui_settings_blue_toggle_pubKeyRequestRestriction(const bagl_element_t * e) {
+    // swap setting and request redraw of settings elements
+    uint8_t setting = N_btchip.pubKeyRequestRestriction?0:1;
+    nvm_write(&N_btchip.pubKeyRequestRestriction, (void*)&setting, sizeof(uint8_t));
+     // only refresh settings mutable drawn elements
+    UX_REDISPLAY_IDX(7);
+     // won't redisplay the bagl_none
+    return 0;
+}
+ // don't perform any draw/color change upon finger event over settings
+const bagl_element_t* ui_settings_out_over(const bagl_element_t* e) {
+  return NULL;
+}
+ unsigned int ui_settings_back_callback(const bagl_element_t* e) {
+  // go back to idle
+  ui_idle();
+  return 0;
+}
+ const bagl_element_t ui_settings_blue[] = {
+  // type                               userid    x    y   w    h  str rad fill      fg        bg      fid iid  txt   touchparams...       ]
+  {{BAGL_RECTANGLE, 0x00,   0,  68, 320, 413, 0, 0, BAGL_FILL, COLOR_BG_1, 0x000000, 0, 0   }, NULL, 0, 0, 0, NULL, NULL, NULL },
+   // erase screen (only under the status bar)
+  {{BAGL_RECTANGLE, 0x00,   0,  20, 320,  48, 0, 0, BAGL_FILL, COLOR_APP, COLOR_APP, 0, 0   }, NULL, 0, 0, 0, NULL, NULL, NULL},
+   /// TOP STATUS BAR
+  {{BAGL_LABELINE, 0x00,   0,  45, 320,  30, 0, 0, BAGL_FILL, 0xFFFFFF, COLOR_APP, BAGL_FONT_OPEN_SANS_SEMIBOLD_10_13PX|BAGL_FONT_ALIGNMENT_CENTER, 0   }, "SETTINGS", 0, 0, 0, NULL, NULL, NULL},
+   {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00,   0,  19,  50,  44, 0, 0, BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT, BAGL_FONT_SYMBOLS_0|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE, 0 }, BAGL_FONT_SYMBOLS_0_LEFT, 0, COLOR_APP, 0xFFFFFF, ui_settings_back_callback, NULL, NULL},
+  //{{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 264,  19,  56,  44, 0, 0, BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT, BAGL_FONT_SYMBOLS_0|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE, 0 }, BAGL_FONT_SYMBOLS_0_DASHBOARD, 0, COLOR_APP, 0xFFFFFF, io_seproxyhal_touch_exit, NULL, NULL},
+   {{BAGL_LABELINE, 0x00,  30, 105, 160,  30, 0, 0, BAGL_FILL, 0x000000, COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0   }, "Privacy restriction", 0, 0, 0, NULL, NULL, NULL},
+  {{BAGL_LABELINE, 0x00,  30, 126, 260,  30, 0, 0, BAGL_FILL, 0x999999, COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, 0   }, "Export public keys only after user approval", 0, 0, 0, NULL, NULL, NULL},
+  {{BAGL_NONE   | BAGL_FLAG_TOUCHABLE, 0x00,   0,  78, 320,  68, 0, 0, BAGL_FILL, 0xFFFFFF, 0x000000, 0 , 0   }, NULL, 0, 0xEEEEEE, 0x000000, ui_settings_blue_toggle_pubKeyRequestRestriction, ui_settings_out_over, ui_settings_out_over },
+   {{BAGL_ICON, 0x01, 258,  98,  32,  18, 0, 0, BAGL_FILL, 0x000000, COLOR_BG_1, 0, 0   }, NULL, 0, 0, 0, NULL, NULL, NULL}
+};
+ const bagl_element_t * ui_settings_blue_prepro(const bagl_element_t * e) {
+  copy_element_and_map_coin_colors(e);
+  // none elements are skipped
+  if ((e->component.type&(~BAGL_FLAG_TOUCHABLE)) == BAGL_NONE) {
+    return 0;
+  }
+  // swap icon buffer to be displayed depending on if corresponding setting is enabled or not.
+  if (e->component.userid) {
+    switch(e->component.userid) {
+      case 0x01:
+        // swap icon content
+        if (N_btchip.pubKeyRequestRestriction) {
+          tmp_element.text = &C_blue_icon_toggle_set;
+        }
+        else {
+          tmp_element.text = &C_blue_icon_toggle_reset;
+        }
+        break;
+    }
+  }
+  return &tmp_element;
+}
+
+unsigned int ui_settings_blue_button(unsigned int button_mask, unsigned int button_mask_counter) {
+  return 0;  
+}
+
 #endif // #if defined(TARGET_BLUE)
 
 #if defined(TARGET_NANOS)
 
 const ux_menu_entry_t menu_main[];
+const ux_menu_entry_t menu_settings[];
+
+// change the setting
+void menu_settings_pubKeyRequestRestriction_change(unsigned int enabled) {
+    nvm_write((void *)&N_btchip.pubKeyRequestRestriction, &enabled, 1);
+    // go back to the menu entry
+    UX_MENU_DISPLAY(0, menu_main, NULL);
+}
+ const ux_menu_entry_t menu_settings_pubKeyRequestRestriction[] = {
+  {NULL, menu_settings_pubKeyRequestRestriction_change, 0, NULL, "Unrestricted", NULL, 0, 0},
+  {NULL, menu_settings_pubKeyRequestRestriction_change, 1, NULL, "Restricted", NULL, 0, 0},
+  UX_MENU_END
+};
+ const ux_menu_entry_t menu_settings[] = {
+    {menu_settings_pubKeyRequestRestriction, NULL, 0, NULL, "Public keys", "requests", 0, 0},
+    {menu_main, NULL, 1, &C_nanos_icon_back, "Back", NULL, 61, 40},
+    UX_MENU_END};
 
 const ux_menu_entry_t menu_about[] = {
     {NULL, NULL, 0, NULL, "Version", APPVERSION, 0, 0},
@@ -257,6 +337,7 @@ const ux_menu_entry_t menu_main[] = {
     //{NULL, NULL, 0, &NAME3(C_nanos_badge_, COINID, ), "Use wallet to", "view
     // accounts", 33, 12},
     {NULL, NULL, 0, NULL, "Use wallet to", "view accounts", 0, 0},
+    {menu_settings, NULL, 0, NULL, "Settings", NULL, 0, 0},
     {menu_about, NULL, 0, NULL, "About", NULL, 0, 0},
     {NULL, os_sched_exit, 0, &C_nanos_icon_dashboard, "Quit app", NULL, 50, 29},
     UX_MENU_END};
@@ -1034,6 +1115,164 @@ const bagl_element_t ui_display_address_blue[] = {
      NULL},
 };
 
+
+const bagl_element_t ui_display_token_blue[] = {
+    {{BAGL_RECTANGLE, 0x00, 0, 68, 320, 413, 0, 0, BAGL_FILL, COLOR_BG_1,
+      0x000000, 0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     // erase screen (only under the status bar)
+    {{BAGL_RECTANGLE, 0x00, 0, 20, 320, 48, 0, 0, BAGL_FILL, COLOR_APP,
+      COLOR_APP, 0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     /// TOP STATUS BAR
+    {{BAGL_LABELINE, 0x00, 0, 45, 320, 30, 0, 0, BAGL_FILL, 0xFFFFFF, COLOR_APP,
+      BAGL_FONT_OPEN_SANS_SEMIBOLD_10_13PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "CHECK IF TOKENS ARE IDENTICAL",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     //{{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 264,  19,  56,  44, 0, 0,
+    //BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT,
+    //BAGL_FONT_SYMBOLS_0|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE,
+    //0 }, BAGL_FONT_SYMBOLS_0_DASHBOARD, 0, COLOR_APP, 0xFFFFFF,
+    //io_seproxyhal_touch_exit, NULL, NULL},
+     {{BAGL_LABELINE, 0x00, 30, 185, 260, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Token:",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     {{BAGL_LABELINE, 0x10, 30, 220, 260, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_22_30PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     vars.tmpqr.addressSummary,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 40, 414, 115, 36, 0, 18,
+      BAGL_FILL, 0xCCCCCC, COLOR_BG_1,
+      BAGL_FONT_OPEN_SANS_REGULAR_11_14PX | BAGL_FONT_ALIGNMENT_CENTER |
+          BAGL_FONT_ALIGNMENT_MIDDLE,
+      0},
+     "REJECT",
+     0,
+     0xB7B7B7,
+     COLOR_BG_1,
+     io_seproxyhal_touch_display_cancel,
+     NULL,
+     NULL},
+    {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 165, 414, 115, 36, 0, 18,
+      BAGL_FILL, 0x41ccb4, COLOR_BG_1,
+      BAGL_FONT_OPEN_SANS_REGULAR_11_14PX | BAGL_FONT_ALIGNMENT_CENTER |
+          BAGL_FONT_ALIGNMENT_MIDDLE,
+      0},
+     "APPROVE",
+     0,
+     0x3ab7a2,
+     COLOR_BG_1,
+     io_seproxyhal_touch_display_ok,
+     NULL,
+     NULL},
+};
+ const bagl_element_t ui_request_pubkey_approval_blue[] = {
+    {{BAGL_RECTANGLE, 0x00, 0, 68, 320, 413, 0, 0, BAGL_FILL, COLOR_BG_1,
+      0x000000, 0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     // erase screen (only under the status bar)
+    {{BAGL_RECTANGLE, 0x00, 0, 20, 320, 48, 0, 0, BAGL_FILL, COLOR_APP,
+      COLOR_APP, 0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     /// TOP STATUS BAR
+    {{BAGL_LABELINE, 0x00, 0, 45, 320, 30, 0, 0, BAGL_FILL, 0xFFFFFF, COLOR_APP,
+      BAGL_FONT_OPEN_SANS_SEMIBOLD_10_13PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "PUBLIC KEY EXPORT",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     //{{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 264,  19,  56,  44, 0, 0,
+    //BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT,
+    //BAGL_FONT_SYMBOLS_0|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE,
+    //0 }, BAGL_FONT_SYMBOLS_0_DASHBOARD, 0, COLOR_APP, 0xFFFFFF,
+    //io_seproxyhal_touch_exit, NULL, NULL},
+     {{BAGL_LABELINE, 0x00, 0, 160, 320, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "A remote app is requesting access ",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     {{BAGL_LABELINE, 0x00, 0, 180, 320, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "to your public keys",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 40, 414, 115, 36, 0, 18,
+      BAGL_FILL, 0xCCCCCC, COLOR_BG_1,
+      BAGL_FONT_OPEN_SANS_REGULAR_11_14PX | BAGL_FONT_ALIGNMENT_CENTER |
+          BAGL_FONT_ALIGNMENT_MIDDLE,
+      0},
+     "REJECT",
+     0,
+     0xB7B7B7,
+     COLOR_BG_1,
+     io_seproxyhal_touch_display_cancel,
+     NULL,
+     NULL},
+    {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 165, 414, 115, 36, 0, 18,
+      BAGL_FILL, 0x41ccb4, COLOR_BG_1,
+      BAGL_FONT_OPEN_SANS_REGULAR_11_14PX | BAGL_FONT_ALIGNMENT_CENTER |
+          BAGL_FONT_ALIGNMENT_MIDDLE,
+      0},
+     "APPROVE",
+     0,
+     0x3ab7a2,
+     COLOR_BG_1,
+     io_seproxyhal_touch_display_ok,
+     NULL,
+     NULL},
+};
+
 unsigned int ui_display_address_blue_prepro(const bagl_element_t *element) {
     bagl_icon_details_t *icon_details = &vars.tmpqr.icon_details;
     bagl_element_t *icon_component = element;
@@ -1112,10 +1351,23 @@ unsigned int ui_display_address_blue_prepro(const bagl_element_t *element) {
     }
     return &tmp_element;
 }
+
 unsigned int ui_display_address_blue_button(unsigned int button_mask,
                                             unsigned int button_mask_counter) {
     return 0;
 }
+
+unsigned int ui_display_token_blue_button(unsigned int button_mask,
+                                            unsigned int button_mask_counter)
+{
+    return 0;
+}
+ unsigned int ui_request_pubkey_approval_blue_button(unsigned int button_mask,
+                                            unsigned int button_mask_counter)
+{
+    return 0;
+}
+
 #endif // #if defined(TARGET_BLUE)
 
 #if defined(TARGET_NANOS)
@@ -1199,6 +1451,111 @@ const bagl_element_t ui_display_address_nanos[] = {
     //NULL, NULL },
 };
 
+const bagl_element_t ui_display_token_nanos[] = {
+    // type                               userid    x    y   w    h  str rad
+    // fill      fg        bg      fid iid  txt   touchparams...       ]
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     {{BAGL_ICON, 0x00, 3, 12, 7, 7, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CROSS},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_ICON, 0x00, 117, 13, 8, 6, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CHECK},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     //{{BAGL_ICON                           , 0x01,  21,   9,  14,  14, 0, 0, 0
+    //, 0xFFFFFF, 0x000000, 0, BAGL_GLYPH_ICON_TRANSACTION_BADGE  }, NULL, 0, 0,
+    //0, NULL, NULL, NULL },
+    {{BAGL_LABELINE, 0x01, 0, 12, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Confirm token",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x01, 0, 26, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     G_io_apdu_buffer + 199,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+};
+ const bagl_element_t ui_request_pubkey_approval_nanos[] = {
+    // type                               userid    x    y   w    h  str rad
+    // fill      fg        bg      fid iid  txt   touchparams...       ]
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF,
+      0, 0},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     {{BAGL_ICON, 0x00, 3, 12, 7, 7, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CROSS},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_ICON, 0x00, 117, 13, 8, 6, 0, 0, 0, 0xFFFFFF, 0x000000, 0,
+      BAGL_GLYPH_ICON_CHECK},
+     NULL,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     //{{BAGL_ICON                           , 0x01,  21,   9,  14,  14, 0, 0, 0
+    //, 0xFFFFFF, 0x000000, 0, BAGL_GLYPH_ICON_TRANSACTION_BADGE  }, NULL, 0, 0,
+    //0, NULL, NULL, NULL },
+    {{BAGL_LABELINE, 0x01, 0, 12, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "Export",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+    {{BAGL_LABELINE, 0x01, 0, 26, 128, 12, 0, 0, 0, 0xFFFFFF, 0x000000,
+      BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     "public key?",
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+};
+
 unsigned int ui_display_address_nanos_prepro(const bagl_element_t *element) {
     if (element->component.userid > 0) {
         unsigned int display = (ux_step == element->component.userid - 1);
@@ -1219,6 +1576,10 @@ unsigned int ui_display_address_nanos_prepro(const bagl_element_t *element) {
 }
 
 unsigned int ui_display_address_nanos_button(unsigned int button_mask,
+                                             unsigned int button_mask_counter);
+unsigned int ui_display_token_nanos_button(unsigned int button_mask,
+                                             unsigned int button_mask_counter);
+unsigned int ui_request_pubkey_approval_nanos_button(unsigned int button_mask,
                                              unsigned int button_mask_counter);
 
 const bagl_element_t ui_verify_nanos[] = {
@@ -1688,6 +2049,11 @@ void ui_idle(void) {
 
 #ifdef TARGET_BLUE
 
+unsigned int io_seproxyhal_touch_settings(const bagl_element_t *e) {
+  UX_DISPLAY(ui_settings_blue, ui_settings_blue_prepro);
+  return 0; // do not redraw button, screen has switched
+}
+
 unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e) {
     // go back to the home screen
     os_sched_exit(0);
@@ -1813,6 +2179,35 @@ unsigned int ui_display_address_nanos_button(unsigned int button_mask,
         break;
 
     case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
+        io_seproxyhal_touch_display_ok(NULL);
+        break;
+    }
+    return 0;
+}
+
+unsigned int ui_display_token_nanos_button(unsigned int button_mask,
+                                             unsigned int button_mask_counter)
+{
+    switch (button_mask)
+    {
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT:
+        io_seproxyhal_touch_display_cancel(NULL);
+        break;
+     case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
+        io_seproxyhal_touch_display_ok(NULL);
+        break;
+    }
+    return 0;
+}
+ unsigned int ui_request_pubkey_approval_nanos_button(unsigned int button_mask,
+                                             unsigned int button_mask_counter)
+{
+    switch (button_mask)
+    {
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT:
+        io_seproxyhal_touch_display_cancel(NULL);
+        break;
+     case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
         io_seproxyhal_touch_display_ok(NULL);
         break;
     }
@@ -2005,10 +2400,6 @@ error:
     return 0;
 }
 
-#define OMNI_ASSETID 1
-#define MAIDSAFE_ASSETID 3
-#define USDT_ASSETID 31
-
 uint8_t prepare_single_output() {
     // TODO : special display for OP_RETURN
     unsigned char amount[8];
@@ -2028,7 +2419,7 @@ uint8_t prepare_single_output() {
         btchip_context_D.currentOutput + offset);
     if (btchip_output_script_is_op_return(btchip_context_D.currentOutput +
                                           offset)) {
-            strcpy(vars.tmp.fullAddress, "OP_RETURN");
+        strcpy(vars.tmp.fullAddress, "OP_RETURN");
     } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
                btchip_output_script_is_op_create(
                    btchip_context_D.currentOutput + offset)) {
@@ -2085,42 +2476,15 @@ uint8_t prepare_single_output() {
 
     // Prepare amount
 
-    // Handle Omni simple send
-    if ((btchip_context_D.currentOutput[offset + 2] == 0x14) && 
-        (os_memcmp(btchip_context_D.currentOutput + offset + 3, "omni", 4) == 0) &&
-        (os_memcmp(btchip_context_D.currentOutput + offset + 3 + 4, "\0\0\0\0", 4) == 0)) {
-            uint8_t headerLength;
-            uint32_t omniAssetId = btchip_read_u32(btchip_context_D.currentOutput + offset + 3 + 4 + 4, 1, 0);
-            switch(omniAssetId) {
-                case OMNI_ASSETID:
-                    strcpy(vars.tmp.fullAmount, "OMNI ");
-                    break;                
-                case USDT_ASSETID:
-                    strcpy(vars.tmp.fullAmount, "USDT ");
-                    break;
-                case MAIDSAFE_ASSETID:                    
-                    strcpy(vars.tmp.fullAmount, "MAID ");
-                    break;
-                default:
-                    snprintf(vars.tmp.fullAmount, sizeof(vars.tmp.fullAmount), "OMNI asset %d ", omniAssetId);
-                    break;
-            }                
-            headerLength = strlen(vars.tmp.fullAmount);
-            btchip_context_D.tmp = vars.tmp.fullAmount + headerLength;
-            textSize = btchip_convert_hex_amount_to_displayable(btchip_context_D.currentOutput + offset + 3 + 4 + 4 + 4);
-            vars.tmp.fullAmount[textSize + headerLength] = '\0';
-    }
-    else {
-        os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId,
+    os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId,
                btchip_context_D.shortCoinIdLength);
-        vars.tmp.fullAmount[btchip_context_D.shortCoinIdLength] = ' ';
-        btchip_context_D.tmp =
-            (unsigned char *)(vars.tmp.fullAmount +
+    vars.tmp.fullAmount[btchip_context_D.shortCoinIdLength] = ' ';
+    btchip_context_D.tmp =
+        (unsigned char *)(vars.tmp.fullAmount +
                           btchip_context_D.shortCoinIdLength + 1);
-        textSize = btchip_convert_hex_amount_to_displayable(amount);
-        vars.tmp.fullAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
-            '\0';
-    }
+    textSize = btchip_convert_hex_amount_to_displayable(amount);
+    vars.tmp.fullAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
+        '\0';
 
     return 1;
 }
@@ -2132,7 +2496,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
     unsigned int currentPos = 0;
     unsigned char amount[8], totalOutputAmount[8], fees[8];
     char tmp[80];
-    unsigned char outputPos = 0, changeFound = 0, specialOpFound = 0;
+    unsigned char outputPos = 0, changeFound = 0;
     if (btchip_context_D.transactionContext.relaxed &&
         !btchip_context_D.transactionContext.consumeP2SH) {
         if (!checkOnly) {
@@ -2182,18 +2546,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         isOpCreate = btchip_output_script_is_op_create(
             btchip_context_D.currentOutput + offset);
         isOpCall = btchip_output_script_is_op_call(
-            btchip_context_D.currentOutput + offset);        
-        // Always notify OP_RETURN to the user
-        if (nullAmount && isOpReturn) {
-            if (!checkOnly) {
-                PRINTF("Error : Unexpected OP_RETURN");
-            }
-            goto error;
-        }
-        if ((nullAmount && isOpReturn) || 
-             ((G_coin_config->kind == COIN_KIND_QTUM) && (isOpCall || isOpCreate))) {
-            specialOpFound = 1;
-        }        
+            btchip_context_D.currentOutput + offset);
         if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                              offset) &&
             !isP2sh && !(nullAmount && isOpReturn) &&
@@ -2244,12 +2597,6 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         }
         goto error;
     }
-    if ((numberOutputs > 1) && (!changeFound || !specialOpFound)) {
-        if (!checkOnly) {
-            PRINTF("Error : too many inputs");
-        }
-        goto error;
-    }    
     if (transaction_amount_sub_be(
             fees, btchip_context_D.transactionContext.transactionAmount,
             totalOutputAmount)) {
@@ -2506,6 +2853,36 @@ unsigned int btchip_bagl_display_public_key() {
 #endif // #if TARGET_ID
     return 1;
 }
+
+unsigned int btchip_bagl_display_token()
+{
+    // setup qrcode of the address in the apdu buffer
+    strcat(G_io_apdu_buffer + 200, " ");
+ #if defined(TARGET_BLUE)
+    
+    UX_DISPLAY(ui_display_token_blue, ui_display_address_blue_prepro);
+#elif defined(TARGET_NANOS)
+    // append and prepend a white space to the address
+    G_io_apdu_buffer[199] = ' ';
+    ux_step = 0;
+    ux_step_count = 1;
+    UX_DISPLAY(ui_display_token_nanos, NULL);
+#endif // #if TARGET_ID
+    return 1;
+}
+ unsigned int btchip_bagl_request_pubkey_approval()
+{
+ #if defined(TARGET_BLUE)
+     UX_DISPLAY(ui_request_pubkey_approval_blue, ui_display_address_blue_prepro);
+#elif defined(TARGET_NANOS)
+    // append and prepend a white space to the address
+    ux_step = 0;
+    ux_step_count = 1;
+    UX_DISPLAY(ui_request_pubkey_approval_nanos, NULL);
+#endif // #if TARGET_ID
+    return 1;
+}
+
 
 void app_exit(void) {
     BEGIN_TRY_L(exit) {
