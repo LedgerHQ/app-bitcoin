@@ -44,7 +44,7 @@ static void btchip_apdu_hash_input_finalize_full_reset(void) {
 
 static bool check_output_displayable() {
     bool displayable = true;
-    unsigned char amount[8], isOpReturn, isP2sh, isNativeSegwit, j,
+    unsigned char amount[8], isOpReturn, isP2sh, isNativeSegwit, isUnsupported, j,
         nullAmount = 1;
     unsigned char isOpCreate, isOpCall;
 
@@ -68,16 +68,13 @@ static bool check_output_displayable() {
         btchip_output_script_is_op_create(btchip_context_D.currentOutput + 8);
     isOpCall =
         btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8);
-    if (((G_coin_config->kind == COIN_KIND_QTUM) &&
+    isUnsupported = (((G_coin_config->kind == COIN_KIND_QTUM) &&
          !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
          !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate && !isOpCall) ||
         (!(G_coin_config->kind == COIN_KIND_QTUM) &&
          !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
-         !isP2sh && !(nullAmount && isOpReturn))) {
-        PRINTF("Error : Unrecognized input script");
-        THROW(EXCEPTION);
-    }
-    if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {
+         !isP2sh && !(nullAmount && isOpReturn)));
+    if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn && !isUnsupported) {
         bool changeFound = false;
         unsigned char addressOffset =
             (isNativeSegwit ? OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET

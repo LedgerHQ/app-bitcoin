@@ -2438,9 +2438,11 @@ uint8_t prepare_single_output() {
                                                offset)) {
         addressOffset = offset + 4;
         version = btchip_context_D.payToAddressVersion;
-    } else {
+    } else if (btchip_output_script_is_p2sh(btchip_context_D.currentOutput + offset)) {
         addressOffset = offset + 3;
         version = btchip_context_D.payToScriptHashVersion;
+    } else {
+        strcpy(vars.tmp.fullAddress, "SPECIAL SCRIPT");
     }
     if (vars.tmp.fullAddress[0] == 0) {
         if (!nativeSegwit) {
