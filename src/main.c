@@ -2400,6 +2400,10 @@ error:
     return 0;
 }
 
+#define OMNI_ASSETID 1
+#define MAIDSAFE_ASSETID 3
+#define USDT_ASSETID 31
+
 uint8_t prepare_single_output() {
     // TODO : special display for OP_RETURN
     unsigned char amount[8];
@@ -2419,7 +2423,7 @@ uint8_t prepare_single_output() {
         btchip_context_D.currentOutput + offset);
     if (btchip_output_script_is_op_return(btchip_context_D.currentOutput +
                                           offset)) {
-        strcpy(vars.tmp.fullAddress, "OP_RETURN");
+            strcpy(vars.tmp.fullAddress, "OP_RETURN");
     } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
                btchip_output_script_is_op_create(
                    btchip_context_D.currentOutput + offset)) {
@@ -2476,15 +2480,42 @@ uint8_t prepare_single_output() {
 
     // Prepare amount
 
-    os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId,
+    // Handle Omni simple send
+    if ((btchip_context_D.currentOutput[offset + 2] == 0x14) && 
+        (os_memcmp(btchip_context_D.currentOutput + offset + 3, "omni", 4) == 0) &&
+        (os_memcmp(btchip_context_D.currentOutput + offset + 3 + 4, "\0\0\0\0", 4) == 0)) {
+            uint8_t headerLength;
+            uint32_t omniAssetId = btchip_read_u32(btchip_context_D.currentOutput + offset + 3 + 4 + 4, 1, 0);
+            switch(omniAssetId) {
+                case OMNI_ASSETID:
+                    strcpy(vars.tmp.fullAmount, "OMNI ");
+                    break;                
+                case USDT_ASSETID:
+                    strcpy(vars.tmp.fullAmount, "USDT ");
+                    break;
+                case MAIDSAFE_ASSETID:                    
+                    strcpy(vars.tmp.fullAmount, "MAID ");
+                    break;
+                default:
+                    snprintf(vars.tmp.fullAmount, sizeof(vars.tmp.fullAmount), "OMNI asset %d ", omniAssetId);
+                    break;
+            }                
+            headerLength = strlen(vars.tmp.fullAmount);
+            btchip_context_D.tmp = vars.tmp.fullAmount + headerLength;
+            textSize = btchip_convert_hex_amount_to_displayable(btchip_context_D.currentOutput + offset + 3 + 4 + 4 + 4);
+            vars.tmp.fullAmount[textSize + headerLength] = '\0';
+    }
+    else {
+        os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId,
                btchip_context_D.shortCoinIdLength);
-    vars.tmp.fullAmount[btchip_context_D.shortCoinIdLength] = ' ';
-    btchip_context_D.tmp =
-        (unsigned char *)(vars.tmp.fullAmount +
+        vars.tmp.fullAmount[btchip_context_D.shortCoinIdLength] = ' ';
+        btchip_context_D.tmp =
+            (unsigned char *)(vars.tmp.fullAmount +
                           btchip_context_D.shortCoinIdLength + 1);
-    textSize = btchip_convert_hex_amount_to_displayable(amount);
-    vars.tmp.fullAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
-        '\0';
+        textSize = btchip_convert_hex_amount_to_displayable(amount);
+        vars.tmp.fullAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
+            '\0';
+    }
 
     return 1;
 }
@@ -2496,7 +2527,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
     unsigned int currentPos = 0;
     unsigned char amount[8], totalOutputAmount[8], fees[8];
     char tmp[80];
-    unsigned char outputPos = 0, changeFound = 0;
+    unsigned char outputPos = 0, changeFound = 0, specialOpFound = 0;
     if (btchip_context_D.transactionContext.relaxed &&
         !btchip_context_D.transactionContext.consumeP2SH) {
         if (!checkOnly) {
@@ -2546,7 +2577,18 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         isOpCreate = btchip_output_script_is_op_create(
             btchip_context_D.currentOutput + offset);
         isOpCall = btchip_output_script_is_op_call(
-            btchip_context_D.currentOutput + offset);
+            btchip_context_D.currentOutput + offset);        
+        // Always notify OP_RETURN to the user
+        if (nullAmount && isOpReturn) {
+            if (!checkOnly) {
+                PRINTF("Error : Unexpected OP_RETURN");
+            }
+            goto error;
+        }
+        if ((nullAmount && isOpReturn) || 
+             ((G_coin_config->kind == COIN_KIND_QTUM) && (isOpCall || isOpCreate))) {
+            specialOpFound = 1;
+        }        
         if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                              offset) &&
             !isP2sh && !(nullAmount && isOpReturn) &&
@@ -2597,6 +2639,12 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         }
         goto error;
     }
+    if ((numberOutputs > 1) && (!changeFound || !specialOpFound)) {
+        if (!checkOnly) {
+            PRINTF("Error : too many inputs");
+        }
+        goto error;
+    }    
     if (transaction_amount_sub_be(
             fees, btchip_context_D.transactionContext.transactionAmount,
             totalOutputAmount)) {
