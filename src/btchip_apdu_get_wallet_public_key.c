@@ -173,11 +173,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         os_memmove(G_io_apdu_buffer + 200, G_io_apdu_buffer + 67, keyLength);
         G_io_apdu_buffer[200 + keyLength] = '\0';
         btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
-        if (!btchip_bagl_display_public_key()) {
-            btchip_context_D.io_flags &= ~IO_ASYNCH_REPLY;
-            btchip_context_D.outLength = 0;
-            return BTCHIP_SW_INCORRECT_DATA;
-        }
+        btchip_bagl_display_public_key();
     }
     else if(display_request_token)
     {
@@ -185,20 +181,12 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         snprintf(G_io_apdu_buffer + 200, 9, "%02x", request_token);
         G_io_apdu_buffer[200 + 8] = '\0';
         btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
-        if (!btchip_bagl_display_token()) {
-            btchip_context_D.io_flags &= ~IO_ASYNCH_REPLY;
-            btchip_context_D.outLength = 0;
-            return BTCHIP_SW_INCORRECT_DATA;
-        }
+        btchip_bagl_display_token();
     }
     else if(require_user_approval)
     {
         btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
-        if (!btchip_bagl_request_pubkey_approval()) {
-            btchip_context_D.io_flags &= ~IO_ASYNCH_REPLY;
-            btchip_context_D.outLength = 0;
-            return BTCHIP_SW_INCORRECT_DATA;
-        }
+        btchip_bagl_request_pubkey_approval();
     }
 
     return BTCHIP_SW_OK;
