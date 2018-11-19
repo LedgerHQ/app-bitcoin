@@ -104,7 +104,7 @@ int btchip_encode_base58(const unsigned char WIDE *in, size_t length,
       buffer[j] = carry % 58;
       carry /= 58;
 
-      if (j < stopAt - 1 && carry == 0) {
+      if (j <= stopAt - 1 && carry == 0) {
         break;
       }
     }
