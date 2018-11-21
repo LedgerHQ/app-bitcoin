@@ -273,8 +273,8 @@ const bagl_element_t* ui_settings_out_over(const bagl_element_t* e) {
   {{BAGL_LABELINE, 0x00,   0,  45, 320,  30, 0, 0, BAGL_FILL, 0xFFFFFF, COLOR_APP, BAGL_FONT_OPEN_SANS_SEMIBOLD_10_13PX|BAGL_FONT_ALIGNMENT_CENTER, 0   }, "SETTINGS", 0, 0, 0, NULL, NULL, NULL},
    {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00,   0,  19,  50,  44, 0, 0, BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT, BAGL_FONT_SYMBOLS_0|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE, 0 }, BAGL_FONT_SYMBOLS_0_LEFT, 0, COLOR_APP, 0xFFFFFF, ui_settings_back_callback, NULL, NULL},
   //{{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 264,  19,  56,  44, 0, 0, BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT, BAGL_FONT_SYMBOLS_0|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE, 0 }, BAGL_FONT_SYMBOLS_0_DASHBOARD, 0, COLOR_APP, 0xFFFFFF, io_seproxyhal_touch_exit, NULL, NULL},
-   {{BAGL_LABELINE, 0x00,  30, 105, 160,  30, 0, 0, BAGL_FILL, 0x000000, COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0   }, "Privacy restriction", 0, 0, 0, NULL, NULL, NULL},
-  {{BAGL_LABELINE, 0x00,  30, 126, 260,  30, 0, 0, BAGL_FILL, 0x999999, COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, 0   }, "Export public keys only after user approval", 0, 0, 0, NULL, NULL, NULL},
+   {{BAGL_LABELINE, 0x00,  30, 105, 160,  30, 0, 0, BAGL_FILL, 0x000000, COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0   }, "Public key export", 0, 0, 0, NULL, NULL, NULL},
+  {{BAGL_LABELINE, 0x00,  30, 126, 260,  30, 0, 0, BAGL_FILL, 0x999999, COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, 0   }, "Enable to approve export requests manually", 0, 0, 0, NULL, NULL, NULL},
   {{BAGL_NONE   | BAGL_FLAG_TOUCHABLE, 0x00,   0,  78, 320,  68, 0, 0, BAGL_FILL, 0xFFFFFF, 0x000000, 0 , 0   }, NULL, 0, 0xEEEEEE, 0x000000, ui_settings_blue_toggle_pubKeyRequestRestriction, ui_settings_out_over, ui_settings_out_over },
    {{BAGL_ICON, 0x01, 258,  98,  32,  18, 0, 0, BAGL_FILL, 0x000000, COLOR_BG_1, 0, 0   }, NULL, 0, 0, 0, NULL, NULL, NULL}
 };
@@ -319,12 +319,12 @@ void menu_settings_pubKeyRequestRestriction_change(unsigned int enabled) {
     UX_MENU_DISPLAY(0, menu_main, NULL);
 }
  const ux_menu_entry_t menu_settings_pubKeyRequestRestriction[] = {
-  {NULL, menu_settings_pubKeyRequestRestriction_change, 0, NULL, "Unrestricted", NULL, 0, 0},
-  {NULL, menu_settings_pubKeyRequestRestriction_change, 1, NULL, "Restricted", NULL, 0, 0},
+  {NULL, menu_settings_pubKeyRequestRestriction_change, 1, NULL, "Manual approval", NULL, 0, 0},
+  {NULL, menu_settings_pubKeyRequestRestriction_change, 0, NULL, "Auto approval", NULL, 0, 0},
   UX_MENU_END
 };
  const ux_menu_entry_t menu_settings[] = {
-    {menu_settings_pubKeyRequestRestriction, NULL, 0, NULL, "Public keys", "requests", 0, 0},
+    {menu_settings_pubKeyRequestRestriction, NULL, 0, NULL, "Public key", "export approval", 0, 0},
     {menu_main, NULL, 1, &C_nanos_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 
@@ -1229,18 +1229,9 @@ const bagl_element_t ui_display_token_blue[] = {
     //BAGL_FONT_SYMBOLS_0|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE,
     //0 }, BAGL_FONT_SYMBOLS_0_DASHBOARD, 0, COLOR_APP, 0xFFFFFF,
     //io_seproxyhal_touch_exit, NULL, NULL},
-     {{BAGL_LABELINE, 0x00, 0, 160, 320, 30, 0, 0, BAGL_FILL, 0x000000,
-      COLOR_BG_1, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "A remote app is requesting access ",
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
      {{BAGL_LABELINE, 0x00, 0, 180, 320, 30, 0, 0, BAGL_FILL, 0x000000,
       COLOR_BG_1, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "to your public keys",
+     "Approve to export your public keys",
      0,
      0,
      0,
@@ -2856,7 +2847,7 @@ void btchip_bagl_confirm_message_signature() {
 #endif // #if TARGET_ID
 }
 
-unsigned int btchip_bagl_display_public_key() {
+void btchip_bagl_display_public_key() {
     // setup qrcode of the address in the apdu buffer
     strcat(G_io_apdu_buffer + 200, " ");
 
@@ -2899,10 +2890,9 @@ unsigned int btchip_bagl_display_public_key() {
     ux_step_count = 2;
     UX_DISPLAY(ui_display_address_nanos, ui_display_address_nanos_prepro);
 #endif // #if TARGET_ID
-    return 1;
 }
 
-unsigned int btchip_bagl_display_token()
+void btchip_bagl_display_token()
 {
     // setup qrcode of the address in the apdu buffer
     strcat(G_io_apdu_buffer + 200, " ");
@@ -2916,9 +2906,9 @@ unsigned int btchip_bagl_display_token()
     ux_step_count = 1;
     UX_DISPLAY(ui_display_token_nanos, NULL);
 #endif // #if TARGET_ID
-    return 1;
 }
- unsigned int btchip_bagl_request_pubkey_approval()
+
+void btchip_bagl_request_pubkey_approval()
 {
  #if defined(TARGET_BLUE)
      UX_DISPLAY(ui_request_pubkey_approval_blue, ui_display_address_blue_prepro);
@@ -2928,7 +2918,6 @@ unsigned int btchip_bagl_display_token()
     ux_step_count = 1;
     UX_DISPLAY(ui_request_pubkey_approval_nanos, NULL);
 #endif // #if TARGET_ID
-    return 1;
 }
 
 
