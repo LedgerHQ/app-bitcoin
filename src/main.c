@@ -2856,7 +2856,7 @@ void btchip_bagl_confirm_message_signature() {
 #endif // #if TARGET_ID
 }
 
-unsigned int btchip_bagl_display_public_key() {
+void btchip_bagl_display_public_key() {
     // setup qrcode of the address in the apdu buffer
     strcat(G_io_apdu_buffer + 200, " ");
 
@@ -2899,10 +2899,9 @@ unsigned int btchip_bagl_display_public_key() {
     ux_step_count = 2;
     UX_DISPLAY(ui_display_address_nanos, ui_display_address_nanos_prepro);
 #endif // #if TARGET_ID
-    return 1;
 }
 
-unsigned int btchip_bagl_display_token()
+void btchip_bagl_display_token()
 {
     // setup qrcode of the address in the apdu buffer
     strcat(G_io_apdu_buffer + 200, " ");
@@ -2916,9 +2915,9 @@ unsigned int btchip_bagl_display_token()
     ux_step_count = 1;
     UX_DISPLAY(ui_display_token_nanos, NULL);
 #endif // #if TARGET_ID
-    return 1;
 }
- unsigned int btchip_bagl_request_pubkey_approval()
+
+void btchip_bagl_request_pubkey_approval()
 {
  #if defined(TARGET_BLUE)
      UX_DISPLAY(ui_request_pubkey_approval_blue, ui_display_address_blue_prepro);
@@ -2928,7 +2927,6 @@ unsigned int btchip_bagl_display_token()
     ux_step_count = 1;
     UX_DISPLAY(ui_request_pubkey_approval_nanos, NULL);
 #endif // #if TARGET_ID
-    return 1;
 }
 
 
