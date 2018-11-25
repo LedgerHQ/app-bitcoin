@@ -236,7 +236,6 @@ unsigned short btchip_public_key_to_encoded_base58(
     unsigned char checksumBuffer[32];
     cx_sha256_t hash;
     unsigned char versionSize = (version > 255 ? 2 : 1);
-    size_t outputLen;
 
     if (!alreadyHashed) {
         L_DEBUG_BUF(("To hash\n", in, inlen));
@@ -259,12 +258,7 @@ unsigned short btchip_public_key_to_encoded_base58(
 
     L_DEBUG_BUF(("Checksum\n", checksumBuffer, 4));
     os_memmove(tmpBuffer + 20 + versionSize, checksumBuffer, 4);
-
-    outputLen = outlen;
-    if (btchip_encode_base58(tmpBuffer, 24 + versionSize, out, &outputLen) < 0) {
-        THROW(EXCEPTION);
-    }
-    return outputLen;
+    return btchip_encode_base58(tmpBuffer, 24 + versionSize, out, outlen);
 }
 
 void btchip_swap_bytes(unsigned char *target, unsigned char *source,
@@ -281,11 +275,7 @@ unsigned short btchip_decode_base58_address(unsigned char WIDE *in,
                                             unsigned short outlen) {
     unsigned char hashBuffer[32];
     cx_sha256_t hash;
-    size_t outputLen = outlen;
-    if (btchip_decode_base58((char *)in, inlen, out, &outputLen) < 0) {
-        THROW(EXCEPTION);
-    }
-    outlen = outputLen;
+    outlen = btchip_decode_base58(in, inlen, out, outlen);
 
     // Compute hash to verify address
     cx_sha256_init(&hash);

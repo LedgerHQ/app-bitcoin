@@ -72,8 +72,9 @@ void btchip_context_init() {
         SB_CHECK(N_btchip.bkp.config.operationMode);
     }
     if (!N_btchip.storageInitialized) {
-        unsigned char initialized = 1;
+        unsigned char initialized = 1, denied=1;
 
+        nvm_write((void *)&N_btchip.pubKeyRequestRestriction, &denied, 1);
         nvm_write((void *)&N_btchip.storageInitialized, &initialized, 1);
     }
 }
