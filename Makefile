@@ -152,9 +152,14 @@ else ifeq ($(COIN),gamecredits)
 DEFINES   += COIN_P2PKH_VERSION=38 COIN_P2SH_VERSION=62 COIN_FAMILY=1 COIN_COINID=\"GameCredits\" COIN_COINID_HEADER=\"GAMECREDITS\" COIN_COLOR_HDR=0x98C01F COIN_COLOR_DB=0xA1A2A7 COIN_COINID_NAME=\"GameCredits\" COIN_COINID_SHORT=\"GAME\" COIN_KIND=COIN_KIND_GAMECREDITS COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
 APPNAME ="GameCredits"
 APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),zclassic)
+# ZClassic
+DEFINES   += COIN_P2PKH_VERSION=7461 COIN_P2SH_VERSION=7354 COIN_FAMILY=1 COIN_COINID=\"ZClassic\" COIN_COINID_HEADER=\"ZCLASSIC\" COIN_COLOR_HDR=0xc87035 COIN_COLOR_DB=0xc78457 COIN_COINID_NAME=\"ZClassic\" COIN_COINID_SHORT=\"ZCL\" COIN_KIND=COIN_KIND_ZCLASSIC
+APPNAME ="ZClassic"
+APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealth, digibyte, qtum, hcash, bitcoin_private, zcoin, gamecredits) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealth, digibyte, qtum, hcash, bitcoin_private, zcoin, gamecredits, zclassic) 
 endif
 endif
 
@@ -242,4 +247,4 @@ include $(BOLOS_SDK)/Makefile.rules
 dep/%.d: %.c Makefile
 
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash horizen komodo stratis peercoin posw pivx viacoin vertcoin stealth digibyte qtum hcash bitcoin_private zcoin gamecredits
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash horizen komodo stratis peercoin posw pivx viacoin vertcoin stealth digibyte qtum hcash bitcoin_private zcoin gamecredits zclassic
