@@ -317,7 +317,7 @@ void btchip_private_derive_keypair(unsigned char WIDE *bip32Path,
 
 // Check if the values of the BIP44 change path are normal:
 // Account < 100, change == 1, address index < 50000
-// return 1 if the path is unusual
+// return 1 if the path is unusual, or not compliant with BIP44
 unsigned char bip44_change_path_guard(unsigned char WIDE *bip32Path) {
 
     unsigned char i;
@@ -325,7 +325,8 @@ unsigned char bip44_change_path_guard(unsigned char WIDE *bip32Path) {
     unsigned char privateComponent[32];
 
     if (bip32Path[0] != BIP44_PATH_LEN) {
-        THROW(INVALID_PARAMETER);
+        // this path is not a regular BIP44 change path
+        return 1;
     }
     bip32Path++;
     for (i = 0; i < BIP44_PATH_LEN; i++) {
@@ -344,7 +345,7 @@ unsigned char bip44_change_path_guard(unsigned char WIDE *bip32Path) {
 }
 
 // Print a BIP32 path as an ascii string to display on the device screen
-// On the Ledger Blue, if the string is longer than 30 char, the string will be split in two lines
+// On the Ledger Blue, if the string is longer than 30 char, the string will be split in multiple lines
 unsigned char bip32_print_path(unsigned char WIDE *bip32Path, char* out, unsigned char max_out_len) {
 
     unsigned char bip32PathLength;
@@ -370,18 +371,22 @@ unsigned char bip32_print_path(unsigned char WIDE *bip32Path, char* out, unsigne
         snprintf(out+offset, max_out_len-offset, "%u", current_level);
         offset = strnlen(out, max_out_len);
         if(offset >= max_out_len - 2) THROW(EXCEPTION_OVERFLOW);
-        if(hardened) out[offset++] = '\'';
+        if(hardened) out[offset++] = '\''; 
 
         out[offset++] = '/';
         out[offset] = '\0';
     }
+    // remove last '/'
     out[offset-1] = '\0';
 
 #if defined(TARGET_BLUE)
-    // if the path is longer than 30 char, split the string in two 
-    if(offset-1 > 30) {
-        os_memmove(out+30, out+29, offset-30);
-        out[29] = '\0';
+    // if the path is longer than 30 char, split the string in multiple strings of length 30 
+    uint8_t len=strnlen(out, MAX_CHANGE_PATH_ASCII_LENGTH);
+    uint8_t num_split = len/30;
+
+    for(i = 1; i<= num_split; i++) {
+        os_memmove(out+30*i, out+(30*i-1), len-29*i);
+        out[30*i-1] = '\0';
     }
 #endif
 

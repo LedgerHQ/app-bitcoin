@@ -66,7 +66,7 @@ union {
 
     struct {
         // A bip44 path contains 5 elements, which max length in ascii is 10 char + optional quote "'" + "/" + \0"
-        char bip44_change_path [MAX_BIP44_ASCII_PATH_LENGTH];  
+        char change_path [MAX_CHANGE_PATH_ASCII_LENGTH];  
     } tmp_warning;
 
     unsigned int dummy; // ensure the whole vars is aligned for the CM0 to
@@ -104,7 +104,7 @@ union {
     } tmp;
 
     struct {
-        char bip44_change_path [MAX_BIP44_ASCII_PATH_LENGTH];  
+        char change_path [MAX_CHANGE_PATH_ASCII_LENGTH];  
     } tmp_warning;
 
     /*
@@ -1361,7 +1361,7 @@ const bagl_element_t ui_request_change_path_approval_blue[] = {
      NULL},
     {{BAGL_LABELINE, 0x00, 30, 297, 260, 30, 0, 0, BAGL_FILL, 0x000000,
       COLOR_BG_1, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     vars.tmp_warning.bip44_change_path,
+     vars.tmp_warning.change_path,
      0,
      0,
      0,
@@ -1370,7 +1370,25 @@ const bagl_element_t ui_request_change_path_approval_blue[] = {
      NULL},
      {{BAGL_LABELINE, 0x00, 30, 314, 260, 30, 0, 0, BAGL_FILL, 0x000000,
       COLOR_BG_1, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     vars.tmp_warning.bip44_change_path+30,
+     vars.tmp_warning.change_path+30,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     {{BAGL_LABELINE, 0x00, 30, 331, 260, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     vars.tmp_warning.change_path+60,
+     0,
+     0,
+     0,
+     NULL,
+     NULL,
+     NULL},
+     {{BAGL_LABELINE, 0x00, 30, 348, 260, 30, 0, 0, BAGL_FILL, 0x000000,
+      COLOR_BG_1, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
+     vars.tmp_warning.change_path+90,
      0,
      0,
      0,
@@ -1747,7 +1765,7 @@ const bagl_element_t ui_request_change_path_approval_nanos[] = {
      NULL},
     {{BAGL_LABELINE, 0xF3, 14, 26, 100, 12, 0x80 | 10, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 26},
-     vars.tmp_warning.bip44_change_path,
+     vars.tmp_warning.change_path,
      0,
      0,
      0,
@@ -3223,9 +3241,9 @@ void btchip_bagl_request_pubkey_approval()
 #endif // #if TARGET_ID
 }
 
-void btchip_bagl_request_change_path_approval(unsigned char* bip44_change_path)
+void btchip_bagl_request_change_path_approval(unsigned char* change_path)
 {
-    bip32_print_path(bip44_change_path, vars.tmp_warning.bip44_change_path, MAX_BIP44_ASCII_PATH_LENGTH);
+    bip32_print_path(change_path, vars.tmp_warning.change_path, MAX_CHANGE_PATH_ASCII_LENGTH);
  #if defined(TARGET_BLUE)
     UX_DISPLAY(ui_request_change_path_approval_blue, NULL);
 #elif defined(TARGET_NANOS)

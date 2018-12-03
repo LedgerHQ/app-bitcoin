@@ -100,11 +100,6 @@ unsigned short btchip_apdu_get_wallet_public_key() {
     PRINTF("pin ok\n");
 
     btchip_private_derive_keypair(keyPath, 1, chainCode);
-    /*if(bip44_change_path_guard(keyPath)) {
-        btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
-        btchip_bagl_request_change_path_approval(keyPath);
-        return 0x9000;
-    }*/
     
 
     G_io_apdu_buffer[0] = 65;
