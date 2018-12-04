@@ -23,6 +23,17 @@
 
 #define MAX_BIP32_PATH 10
 #define MAX_BIP32_PATH_LENGTH (4 * MAX_BIP32_PATH) + 1
+#define BIP44_PATH_LEN 5
+#define BIP44_PURPOSE_OFFSET 0
+#define BIP44_COIN_TYPE_OFFSET 1
+#define BIP44_ACCOUNT_OFFSET 2
+#define BIP44_CHANGE_OFFSET 3
+#define BIP44_ADDRESS_INDEX_OFFSET 4
+#define MAX_BIP44_ACCOUNT_RECOMMENDED 100
+#define BIP44_CHANGE_FLAG 1
+#define MAX_BIP44_ADDRESS_INDEX_RECOMMENDED 50000
+// A path contains 10 elements max, which max length in ascii is 10 char + optional quote "'" + "/" + \0"
+#define MAX_CHANGE_PATH_ASCII_LENGTH 10*(10+2) +1 
 
 struct btchip_transaction_summary_data_s {
     unsigned char
