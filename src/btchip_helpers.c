@@ -320,18 +320,28 @@ void btchip_private_derive_keypair(unsigned char WIDE *bip32Path,
 // return 1 if the path is unusual, or not compliant with BIP44
 unsigned char bip44_change_path_guard(unsigned char WIDE *bip32Path) {
 
-    unsigned char i;
-    unsigned int bip32PathInt[BIP44_PATH_LEN];
+    unsigned char i, path_len;
+    unsigned int bip32PathInt[MAX_BIP32_PATH];
     unsigned char privateComponent[32];
-
-    if (bip32Path[0] != BIP44_PATH_LEN) {
-        // this path is not a regular BIP44 change path
-        return 1;
-    }
+    
+    path_len = bip32Path[0];
     bip32Path++;
-    for (i = 0; i < BIP44_PATH_LEN; i++) {
+    if (path_len > MAX_BIP32_PATH) {
+        THROW(INVALID_PARAMETER);
+    }
+    
+    for (i = 0; i < path_len; i++) {
         bip32PathInt[i] = btchip_read_u32(bip32Path, 1, 0);
         bip32Path += 4;
+    }    
+
+    // If the path length is not compliant with BIP44 or if the purpose/coin type don't match regular usage
+    if(path_len != BIP44_PATH_LEN ||
+       ((bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 44 &&
+       (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 49) ||
+       ((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) != G_coin_config->p2pkh_version && 
+       (bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) != G_coin_config->p2sh_version)) {
+        return 1;
     }
 
     // If the account or address index is very high or if the change isn't 1, return a warning

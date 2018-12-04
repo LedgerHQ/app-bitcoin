@@ -1172,7 +1172,7 @@ const bagl_element_t ui_display_token_blue[] = {
      NULL},
      {{BAGL_LABELINE, 0x10, 30, 220, 260, 30, 0, 0, BAGL_FILL, 0x000000,
       COLOR_BG_1, BAGL_FONT_OPEN_SANS_REGULAR_22_30PX | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     vars.tmpqr.addressSummary,
+     G_io_apdu_buffer+200,
      0,
      0,
      0,
@@ -1497,6 +1497,24 @@ unsigned int ui_display_address_blue_prepro(const bagl_element_t *element) {
         // nothing to draw for this line
         return 0;
     }
+    return &tmp_element;
+}
+
+unsigned int ui_display_token_blue_prepro(const bagl_element_t *element) {
+    os_memmove(&tmp_element, element, sizeof(bagl_element_t));
+    copy_element_and_map_coin_colors(element);
+    return &tmp_element;
+}
+
+unsigned int ui_request_pubkey_approval_blue_prepro(const bagl_element_t *element) {
+    os_memmove(&tmp_element, element, sizeof(bagl_element_t));
+    copy_element_and_map_coin_colors(element);
+    return &tmp_element;
+}
+
+unsigned int ui_request_change_path_approval_blue_prepro(const bagl_element_t *element) {
+    os_memmove(&tmp_element, element, sizeof(bagl_element_t));
+    copy_element_and_map_coin_colors(element);
     return &tmp_element;
 }
 
@@ -2576,9 +2594,8 @@ void ui_message_signature_blue_init(void) {
         io_seproxyhal_touch_message_signature_verify_ok;
     ui_transaction_blue_cancel = (bagl_element_callback_t)
         io_seproxyhal_touch_message_signature_verify_cancel;
-    snprintf(vars.tmp.fullAmount, 65, "%.*H", 32, vars.tmp.fullAmount);
     G_ui_transaction_blue_state = TRANSACTION_MESSAGE;
-    ui_transaction_blue_values[0] = vars.tmp.fullAmount;
+    ui_transaction_blue_values[0] = vars.tmp.fullAddress;
     ui_transaction_blue_values[1] = NULL;
     ui_transaction_blue_values[2] = NULL;
     ui_transaction_blue_init();
@@ -3219,7 +3236,7 @@ void btchip_bagl_display_token()
     strcat(G_io_apdu_buffer + 200, " ");
  #if defined(TARGET_BLUE)
     
-    UX_DISPLAY(ui_display_token_blue, NULL);
+    UX_DISPLAY(ui_display_token_blue, ui_display_token_blue_prepro);
 #elif defined(TARGET_NANOS)
     // append and prepend a white space to the address
     G_io_apdu_buffer[199] = ' ';
@@ -3232,7 +3249,7 @@ void btchip_bagl_display_token()
 void btchip_bagl_request_pubkey_approval()
 {
  #if defined(TARGET_BLUE)
-     UX_DISPLAY(ui_request_pubkey_approval_blue, NULL);
+     UX_DISPLAY(ui_request_pubkey_approval_blue, ui_request_pubkey_approval_blue_prepro);
 #elif defined(TARGET_NANOS)
     // append and prepend a white space to the address
     ux_step = 0;
@@ -3245,7 +3262,7 @@ void btchip_bagl_request_change_path_approval(unsigned char* change_path)
 {
     bip32_print_path(change_path, vars.tmp_warning.change_path, MAX_CHANGE_PATH_ASCII_LENGTH);
  #if defined(TARGET_BLUE)
-    UX_DISPLAY(ui_request_change_path_approval_blue, NULL);
+    UX_DISPLAY(ui_request_change_path_approval_blue, ui_request_change_path_approval_blue_prepro);
 #elif defined(TARGET_NANOS)
     // append and prepend a white space to the address
     ux_step = 0;
