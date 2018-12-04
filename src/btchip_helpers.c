@@ -348,9 +348,7 @@ unsigned char bip44_change_path_guard(unsigned char WIDE *bip32Path) {
     // If the path length is not compliant with BIP44 or if the purpose/coin type don't match regular usage
     if(path_len != BIP44_PATH_LEN ||
        ((bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 44 &&
-       (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 49) ||
-       ((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) != G_coin_config->p2pkh_version && 
-       (bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) != G_coin_config->p2sh_version)) {
+       (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 49)) {
         return 1;
     }
 
