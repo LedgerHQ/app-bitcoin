@@ -80,6 +80,7 @@ union {
         char fullAddress[65];
         // the address
         char feesAmount[40]; // fees
+        char output_numbering[10];
     } tmp;
 
     struct {
@@ -1258,10 +1259,10 @@ void ui_transaction_output_blue_init(void) {
         (bagl_element_callback_t)io_seproxyhal_touch_verify_cancel;
     G_ui_transaction_blue_state = TRANSACTION_OUTPUT;
     snprintf(
-        vars.tmp.addressSummary, sizeof(vars.tmp.addressSummary), "%d / %d",
+        vars.tmp.output_numbering, sizeof(vars.tmp.output_numbering), "%d / %d",
         btchip_context_D.totalOutputs - btchip_context_D.remainingOutputs + 1,
         btchip_context_D.totalOutputs);
-    ui_transaction_blue_values[0] = vars.tmp.addressSummary;
+    ui_transaction_blue_values[0] = vars.tmp.output_numbering;
     ui_transaction_blue_values[1] = vars.tmp.fullAddress;
     ui_transaction_blue_values[2] = vars.tmp.fullAmount;
     ui_transaction_blue_init();
