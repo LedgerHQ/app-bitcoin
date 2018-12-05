@@ -1220,9 +1220,10 @@ unsigned int ui_display_token_nanos_button(unsigned int button_mask,
     {
         if(button_mask == (BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT))
         {
-                // if we were looping over a single element, disable this loop
+                // if we were looping over a single element, disable this loop and diffuse the redisplay timeout (used by scrolling text)
                 if(ux_loop_over_curr_element) {
                     ux_loop_over_curr_element = 0;
+                    ux.callback_interval_ms = 0;
                 }
                 // prepare next screen
                 ux_step = (ux_step + 1) % ux_step_count;
