@@ -154,6 +154,8 @@ unsigned int
 io_seproxyhal_touch_message_signature_verify_ok(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_display_cancel(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_display_ok(const bagl_element_t *e);
+unsigned int io_seproxyhal_touch_display_token_cancel(const bagl_element_t *e);
+unsigned int io_seproxyhal_touch_display_token_ok(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_settings(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e);
 void ui_idle(void);
@@ -616,9 +618,9 @@ const bagl_element_t ui_display_token_blue[] = {
     UI_BLUE_BACKGROUND("CHECK IF TOKENS ARE IDENTICAL"),
 
     UI_BLUE_TEXT(0, 30, 185, 260, "Token:", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0x10, 30, 220, 260, G_io_apdu_buffer+200, BAGL_FONT_OPEN_SANS_REGULAR_22_30PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x10, 30, 220, 260, G_io_apdu_buffer+200, BAGL_FONT_OPEN_SANS_LIGHT_16_22PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
 
-    UI_BLUE_BUTTONS_REJECT_OR_CONFIRM("REJECT", "CONFIRM", io_seproxyhal_touch_display_cancel, io_seproxyhal_touch_display_ok)
+    UI_BLUE_BUTTONS_REJECT_OR_CONFIRM("REJECT", "CONFIRM", io_seproxyhal_touch_display_token_cancel, io_seproxyhal_touch_display_token_ok)
 };
 
  const bagl_element_t ui_request_pubkey_approval_blue[] = {
@@ -1099,6 +1101,26 @@ unsigned int io_seproxyhal_touch_display_ok(const bagl_element_t *e) {
     return 0; // DO NOT REDRAW THE BUTTON
 }
 
+unsigned int io_seproxyhal_touch_display_token_cancel(const bagl_element_t *e) {
+    // revoke previous valid token if there was one 
+    btchip_context_D.has_valid_token = false;
+    // user denied the token, tell the USB side
+    btchip_bagl_user_action_display(0);
+    // redraw ui
+    ui_idle();
+    return 0; // DO NOT REDRAW THE BUTTON
+}
+
+unsigned int io_seproxyhal_touch_display_token_ok(const bagl_element_t *e) {
+    // Set the valid token flag
+    btchip_context_D.has_valid_token = true;
+    // user approved the token, tell the USB side
+    btchip_bagl_user_action_display(1);
+    // redraw ui
+    ui_idle();
+    return 0; // DO NOT REDRAW THE BUTTON
+}
+
 #if defined(TARGET_NANOS)
 unsigned int ui_verify_nanos_button(unsigned int button_mask,
                                     unsigned int button_mask_counter) {
@@ -1177,10 +1199,10 @@ unsigned int ui_display_token_nanos_button(unsigned int button_mask,
     switch (button_mask)
     {
     case BUTTON_EVT_RELEASED | BUTTON_LEFT:
-        io_seproxyhal_touch_display_cancel(NULL);
+        io_seproxyhal_touch_display_token_cancel(NULL);
         break;
      case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
-        io_seproxyhal_touch_display_ok(NULL);
+        io_seproxyhal_touch_display_token_ok(NULL);
         break;
     }
     return 0;

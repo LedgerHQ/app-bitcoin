@@ -168,6 +168,10 @@ struct btchip_context_s {
 
     /** Non protected transaction context */
 
+    /** Last U2F Token streamed by host to attempt pubkey request */
+    unsigned char last_token[4];
+    unsigned char has_valid_token;
+
     /** Full transaction hash context */
     cx_sha256_t transactionHashFull;
     /** Authorization transaction hash context */
