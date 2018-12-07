@@ -44,27 +44,28 @@ unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 #define COLOR_BG_1 0xF9F9F9
 #define COLOR_APP COIN_COLOR_HDR      // bitcoin 0xFCB653
 #define COLOR_APP_LIGHT COIN_COLOR_DB // bitcoin 0xFEDBA9
-#define BLACK 0x000000
-#define WHITE 0xFFFFFF
-#define GRAY 0x999999
+#define COLOR_BLACK 0x000000
+#define COLOR_WHITE 0xFFFFFF
+#define COLOR_GRAY 0x999999
+#define COLOR_LIGHT_GRAY 0xEEEEEE
 
-#define UI_NANOS_BACKGROUND() {{BAGL_RECTANGLE,0,0,0,128,32,0,0,BAGL_FILL,0,0xFFFFFF,0,0},NULL,0,0,0,NULL,NULL,NULL}
-#define UI_NANOS_ICON_LEFT(userid, glyph) {{BAGL_ICON,userid,3,12,7,7,0,0,0,0xFFFFFF,0,0,glyph},NULL,0,0,0,NULL,NULL,NULL}
-#define UI_NANOS_ICON_RIGHT(userid, glyph) {{BAGL_ICON,userid,117,13,8,6,0,0,0,0xFFFFFF,0,0,glyph},NULL,0,0,0,NULL,NULL,NULL}
-#define UI_NANOS_TEXT(userid, x, y, w, text, font) {{BAGL_LABELINE,userid,x,y,w,12,0,0,0,0xFFFFFF,0,font|BAGL_FONT_ALIGNMENT_CENTER,0},(char *)text,0,0,0,NULL,NULL,NULL}
+#define UI_NANOS_BACKGROUND() {{BAGL_RECTANGLE,0,0,0,128,32,0,0,BAGL_FILL,0,COLOR_WHITE,0,0},NULL,0,0,0,NULL,NULL,NULL}
+#define UI_NANOS_ICON_LEFT(userid, glyph) {{BAGL_ICON,userid,3,12,7,7,0,0,0,COLOR_WHITE,0,0,glyph},NULL,0,0,0,NULL,NULL,NULL}
+#define UI_NANOS_ICON_RIGHT(userid, glyph) {{BAGL_ICON,userid,117,13,8,6,0,0,0,COLOR_WHITE,0,0,glyph},NULL,0,0,0,NULL,NULL,NULL}
+#define UI_NANOS_TEXT(userid, x, y, w, text, font) {{BAGL_LABELINE,userid,x,y,w,12,0,0,0,COLOR_WHITE,0,font|BAGL_FONT_ALIGNMENT_CENTER,0},(char *)text,0,0,0,NULL,NULL,NULL}
 // Only one scrolling text per screen can be displayed
-#define UI_NANOS_SCROLLING_TEXT(userid, x, y, w, text, font) {{BAGL_LABELINE,userid,x,y,w,12,0x80|10,0,0,0xFFFFFF,0,font|BAGL_FONT_ALIGNMENT_CENTER,26},(char *)text,0,0,0,NULL,NULL,NULL}
+#define UI_NANOS_SCROLLING_TEXT(userid, x, y, w, text, font) {{BAGL_LABELINE,userid,x,y,w,12,0x80|10,0,0,COLOR_WHITE,0,font|BAGL_FONT_ALIGNMENT_CENTER,26},(char *)text,0,0,0,NULL,NULL,NULL}
 
-#define UI_BLUE_BACKGROUND(title) {{BAGL_RECTANGLE, 0x00, 0, 68, 320, 413, 0, 0, BAGL_FILL, COLOR_BG_1,0x000000, 0, 0},NULL,0,0,0,NULL,NULL,NULL}, \
+#define UI_BLUE_BACKGROUND(title) {{BAGL_RECTANGLE, 0x00, 0, 68, 320, 413, 0, 0, BAGL_FILL, COLOR_BG_1,COLOR_BLACK, 0, 0},NULL,0,0,0,NULL,NULL,NULL}, \
 {{BAGL_RECTANGLE, 0x00, 0, 20, 320, 48, 0, 0, BAGL_FILL, COLOR_APP, COLOR_APP, 0, 0},NULL,0,0,0,NULL,NULL,NULL}, \
-{{BAGL_LABELINE, 0x01, 0, 45, 320, 30, 0, 0, BAGL_FILL, 0xFFFFFF, COLOR_APP, BAGL_FONT_OPEN_SANS_SEMIBOLD_10_13PX | BAGL_FONT_ALIGNMENT_CENTER, 0},title,0,0,0,NULL,NULL,NULL}
-#define UI_BLUE_BUTTON_SETTINGS(setting_cb) {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 0, 19, 56, 44, 0, 0, BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT, BAGL_FONT_SYMBOLS_0|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE, 0 }, BAGL_FONT_SYMBOLS_0_SETTINGS, 0, COLOR_APP, 0xFFFFFF, setting_cb, NULL, NULL}
-#define UI_BLUE_BUTTON_GO_BACK(back_cb) {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 0, 19, 50, 44, 0, 0, BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT, BAGL_FONT_SYMBOLS_0|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE, 0 }, BAGL_FONT_SYMBOLS_0_LEFT, 0, COLOR_APP, 0xFFFFFF, back_cb, NULL, NULL}
+{{BAGL_LABELINE, 0x01, 0, 45, 320, 30, 0, 0, BAGL_FILL, COLOR_WHITE, COLOR_APP, BAGL_FONT_OPEN_SANS_SEMIBOLD_10_13PX | BAGL_FONT_ALIGNMENT_CENTER, 0},title,0,0,0,NULL,NULL,NULL}
+#define UI_BLUE_BUTTON_SETTINGS(setting_cb) {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 0, 19, 56, 44, 0, 0, BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT, BAGL_FONT_SYMBOLS_0|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE, 0 }, BAGL_FONT_SYMBOLS_0_SETTINGS, 0, COLOR_APP, COLOR_WHITE, setting_cb, NULL, NULL}
+#define UI_BLUE_BUTTON_GO_BACK(back_cb) {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 0, 19, 50, 44, 0, 0, BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT, BAGL_FONT_SYMBOLS_0|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE, 0 }, BAGL_FONT_SYMBOLS_0_LEFT, 0, COLOR_APP, COLOR_WHITE, back_cb, NULL, NULL}
 #define UI_BLUE_ICON(userid, x, y, width, height, icon, bg_color){{BAGL_ICON, userid, x, y, width, height, 0, 0, BAGL_FILL, 0, bg_color, 0, 0},icon,0,0,0,NULL,NULL,NULL}
 // Toggle icon should be set/updated within a preprocessor
-#define UI_BLUE_TOGGLE(x, y, bg_color) {{BAGL_ICON, 0x01, x, y, 320, 18, 0, 0, BAGL_FILL, 0x000000, bg_color, 0, 0 }, NULL, 0, 0, 0, NULL, NULL, NULL}
-#define UI_BLUE_TOUCHZONE(x, y, x_max, y_max, tap_cb, out_cb, over_cb) {{BAGL_NONE|BAGL_FLAG_TOUCHABLE, 0x00, x, y, x_max, y_max, 0, 0, BAGL_FILL, 0xFFFFFF, 0x000000, 0 , 0}, NULL, 0, 0xEEEEEE, 0x000000, tap_cb, out_cb, over_cb}
-#define UI_BLUE_BUTTON_EXIT(exit_cb) {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 264, 19, 56, 44, 0, 0, BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT, BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_CENTER | BAGL_FONT_ALIGNMENT_MIDDLE, 0}, BAGL_FONT_SYMBOLS_0_DASHBOARD, 0, COLOR_APP, 0xFFFFFF, exit_cb, NULL, NULL}
+#define UI_BLUE_TOGGLE(x, y, bg_color) {{BAGL_ICON, 0x01, x, y, 320, 18, 0, 0, BAGL_FILL, COLOR_BLACK, bg_color, 0, 0 }, NULL, 0, 0, 0, NULL, NULL, NULL}
+#define UI_BLUE_TOUCHZONE(x, y, x_max, y_max, tap_cb, out_cb, over_cb) {{BAGL_NONE|BAGL_FLAG_TOUCHABLE, 0x00, x, y, x_max, y_max, 0, 0, BAGL_FILL, COLOR_WHITE, COLOR_BLACK, 0 , 0}, NULL, 0, COLOR_LIGHT_GRAY, COLOR_BLACK, tap_cb, out_cb, over_cb}
+#define UI_BLUE_BUTTON_EXIT(exit_cb) {{BAGL_RECTANGLE | BAGL_FLAG_TOUCHABLE, 0x00, 264, 19, 56, 44, 0, 0, BAGL_FILL, COLOR_APP, COLOR_APP_LIGHT, BAGL_FONT_SYMBOLS_0 | BAGL_FONT_ALIGNMENT_CENTER | BAGL_FONT_ALIGNMENT_MIDDLE, 0}, BAGL_FONT_SYMBOLS_0_DASHBOARD, 0, COLOR_APP, COLOR_WHITE, exit_cb, NULL, NULL}
 // Displays standard interface for approval: 2 buttons at the bottom of the screen, one to cancel and one to proceed
 #define UI_BLUE_BUTTONS_REJECT_OR_CONFIRM(reject_text, confirm_text, reject_cb, confirm_cb) {{BAGL_RECTANGLE|BAGL_FLAG_TOUCHABLE,0x00,40,414,115,36,0,18,BAGL_FILL,0xCCCCCC,COLOR_BG_1,BAGL_FONT_OPEN_SANS_REGULAR_11_14PX|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE,0},reject_text,0,0xB7B7B7,COLOR_BG_1,reject_cb,NULL,NULL},{{BAGL_RECTANGLE|BAGL_FLAG_TOUCHABLE,0x00,165,414,115,36,0,18,BAGL_FILL,0x41ccb4,COLOR_BG_1,BAGL_FONT_OPEN_SANS_REGULAR_11_14PX|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE,0},confirm_text,0,0x3ab7a2,COLOR_BG_1,confirm_cb,NULL,NULL}
 #define UI_BLUE_TEXT(userid, x, y, w, text, font, flags, text_color, bg_color) {{BAGL_LABELINE,userid,x,y,w,30,0,0,BAGL_FILL,text_color,bg_color,font|flags,0},(char *)text,0,0,0,NULL,NULL,NULL}
@@ -188,10 +189,10 @@ const bagl_element_t ui_idle_blue[] = {
     UI_BLUE_BACKGROUND(NULL),
     UI_BLUE_BUTTON_SETTINGS(io_seproxyhal_touch_settings),
     UI_BLUE_BUTTON_EXIT(io_seproxyhal_touch_exit),
-    UI_BLUE_TEXT(0, 0, 270, 320, "Open your wallet", BAGL_FONT_OPEN_SANS_LIGHT_16_22PX, BAGL_FONT_ALIGNMENT_CENTER,  BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 308, 320, "Connect your Ledger Blue and open your", BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 331, 320, "preferred wallet to view your accounts.", BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 450, 320, "Validation requests will show automatically.", BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, BAGL_FONT_ALIGNMENT_CENTER, GRAY, COLOR_BG_1)
+    UI_BLUE_TEXT(0, 0, 270, 320, "Open your wallet", BAGL_FONT_OPEN_SANS_LIGHT_16_22PX, BAGL_FONT_ALIGNMENT_CENTER,  COLOR_COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 308, 320, "Connect your Ledger Blue and open your", BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 331, 320, "preferred wallet to view your accounts.", BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 450, 320, "Validation requests will show automatically.", BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_GRAY, COLOR_BG_1)
 
 };
 
@@ -221,8 +222,8 @@ const bagl_element_t* ui_settings_out_over(const bagl_element_t* e) {
  const bagl_element_t ui_settings_blue[] = {
     UI_BLUE_BACKGROUND("SETTINGS"),
     UI_BLUE_BUTTON_GO_BACK(ui_settings_back_callback),
-    UI_BLUE_TEXT(0, 30, 105, 160, "Privacy restriction", BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, BLACK, COLOR_BG_1),     
-    UI_BLUE_TEXT(0, 30, 126, 260, "Export public keys only after user approval", BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, BAGL_FONT_ALIGNMENT_LEFT, GRAY, COLOR_BG_1),     
+    UI_BLUE_TEXT(0, 30, 105, 160, "Privacy restriction", BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_COLOR_BLACK, COLOR_BG_1),     
+    UI_BLUE_TEXT(0, 30, 126, 260, "Export public keys only after user approval", BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_GRAY, COLOR_BG_1),     
     UI_BLUE_TOUCHZONE(0, 78, 320, 68, ui_settings_blue_toggle_pubKeyRequestRestriction, ui_settings_out_over, ui_settings_out_over),
     UI_BLUE_TOGGLE(258, 98, COLOR_BG_1)
 };
@@ -309,19 +310,19 @@ ui_details_blue_back_callback(const bagl_element_t *element) {
 const bagl_element_t ui_details_blue[] = {
     UI_BLUE_BACKGROUND(NULL),
     UI_BLUE_BUTTON_GO_BACK(ui_details_blue_back_callback),
-    UI_BLUE_TEXT(0, 30, 106, 320, "VALUE", BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, BAGL_FONT_ALIGNMENT_LEFT, GRAY, COLOR_BG_1),
-    UI_BLUE_TEXT(0x10, 30, 136, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0x11, 30, 159, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0x12, 30, 182, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0x13, 30, 205, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0x14, 30, 228, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0x15, 30, 251, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0x16, 30, 274, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0x17, 30, 297, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0x18, 30, 320, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 30, 106, 320, "VALUE", BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_GRAY, COLOR_BG_1),
+    UI_BLUE_TEXT(0x10, 30, 136, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x11, 30, 159, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x12, 30, 182, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x13, 30, 205, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x14, 30, 228, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x15, 30, 251, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x16, 30, 274, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x17, 30, 297, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x18, 30, 320, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_BLACK, COLOR_BG_1),
     //"..." at the end if too much
-    UI_BLUE_TEXT(0x19, 30, 343, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, GRAY, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 450, 320, "Review the whole value before continuing.", BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, BAGL_FONT_ALIGNMENT_CENTER, GRAY, COLOR_BG_1)
+    UI_BLUE_TEXT(0x19, 30, 343, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_GRAY, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 450, 320, "Review the whole value before continuing.", BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_GRAY, COLOR_BG_1)
 };
 
 const bagl_element_t *ui_details_blue_prepro(const bagl_element_t *element) {
@@ -463,39 +464,39 @@ const bagl_element_t *ui_transaction_blue_3_details(const bagl_element_t *e) {
 
 const bagl_element_t ui_transaction_blue[] = {
     UI_BLUE_BACKGROUND(NULL),
-    UI_BLUE_TEXT(0, 30, 106, 320, "VALUE", BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, BAGL_FONT_ALIGNMENT_LEFT, GRAY, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 30, 106, 320, "VALUE", BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_GRAY, COLOR_BG_1),
     UI_BLUE_ICON(0x40, 30, 98, 50, 50, &C_blue_badge_transaction, COLOR_BG_1),
     // becomes a line in preprocessor
-    UI_BLUE_TEXT(0x50, 100, 117, 320, NULL, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 100, 138, 320, "Check and confirm values", BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, 0, GRAY, COLOR_BG_1),
+    UI_BLUE_TEXT(0x50, 100, 117, 320, NULL, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 100, 138, 320, "Check and confirm values", BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, 0, COLOR_GRAY, COLOR_BG_1),
 
     // First detail zone
-    UI_BLUE_TEXT(0x70, 30, 196, 100, NULL, BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, 0, BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x70, 30, 196, 100, NULL, BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, 0, COLOR_BLACK, COLOR_BG_1),
     // x-18 when ...
-    UI_BLUE_TEXT(0x10, 130, 200, 160, NULL, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_RIGHT, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0x20, 284, 196, 6, BAGL_FONT_SYMBOLS_0_MINIRIGHT, BAGL_FONT_SYMBOLS_0, BAGL_FONT_ALIGNMENT_RIGHT, GRAY, COLOR_BG_1),
+    UI_BLUE_TEXT(0x10, 130, 200, 160, NULL, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_RIGHT, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x20, 284, 196, 6, BAGL_FONT_SYMBOLS_0_MINIRIGHT, BAGL_FONT_SYMBOLS_0, BAGL_FONT_ALIGNMENT_RIGHT, COLOR_GRAY, COLOR_BG_1),
     UI_BLUE_TOUCHZONE(0, 168, 320, 48, ui_transaction_blue_1_details, ui_menu_item_out_over, ui_menu_item_out_over),
     {{BAGL_RECTANGLE, 0x20, 0, 168, 5, 48, 0, 0, BAGL_FILL, COLOR_BG_1, COLOR_BG_1, 0, 0}, 
     NULL, 0, 0x41CCB4, 0, NULL, NULL, NULL},
 
     // separator when second details is to be displayed
-    {{BAGL_RECTANGLE, 0x31, 30, 216, 260, 1, 1, 0, 0, 0xEEEEEE, COLOR_BG_1, 0, 0},
+    {{BAGL_RECTANGLE, 0x31, 30, 216, 260, 1, 1, 0, 0, COLOR_LIGHT_GRAY, COLOR_BG_1, 0, 0},
      NULL, 0, 0, 0, NULL, NULL, NULL},
-    UI_BLUE_TEXT(0x71, 30, 245, 100, NULL, BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, 0, BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x71, 30, 245, 100, NULL, BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, 0, COLOR_BLACK, COLOR_BG_1),
     // x-18 when ...
-    UI_BLUE_TEXT(0x11, 130, 245, 160, NULL, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_RIGHT, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0x21, 284, 245, 6, BAGL_FONT_SYMBOLS_0_MINIRIGHT, BAGL_FONT_SYMBOLS_0, BAGL_FONT_ALIGNMENT_RIGHT, GRAY, COLOR_BG_1),
+    UI_BLUE_TEXT(0x11, 130, 245, 160, NULL, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_RIGHT, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x21, 284, 245, 6, BAGL_FONT_SYMBOLS_0_MINIRIGHT, BAGL_FONT_SYMBOLS_0, BAGL_FONT_ALIGNMENT_RIGHT, COLOR_GRAY, COLOR_BG_1),
     UI_BLUE_TOUCHZONE(0, 217, 320, 48, ui_transaction_blue_2_details, ui_menu_item_out_over, ui_menu_item_out_over),
     {{BAGL_RECTANGLE, 0x21, 0, 217, 5, 48, 0, 0, BAGL_FILL, COLOR_BG_1, COLOR_BG_1, 0, 0}, 
     NULL, 0, 0x41CCB4, 0, NULL, NULL, NULL},
 
     // separator when second details is to be displayed
-    {{BAGL_RECTANGLE, 0x32, 30, 265, 260, 1, 1, 0, 0, 0xEEEEEE, COLOR_BG_1, 0, 0},
+    {{BAGL_RECTANGLE, 0x32, 30, 265, 260, 1, 1, 0, 0, COLOR_LIGHT_GRAY, COLOR_BG_1, 0, 0},
      NULL, 0, 0, 0, NULL, NULL, NULL},
-    UI_BLUE_TEXT(0x72, 30, 294, 100, NULL, BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, 0, BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x72, 30, 294, 100, NULL, BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, 0, COLOR_BLACK, COLOR_BG_1),
     // x-18 when ...
-    UI_BLUE_TEXT(0x12, 130, 294, 160, NULL, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_RIGHT, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0x22, 284, 294, 6, BAGL_FONT_SYMBOLS_0_MINIRIGHT, BAGL_FONT_SYMBOLS_0, BAGL_FONT_ALIGNMENT_RIGHT, GRAY, COLOR_BG_1),
+    UI_BLUE_TEXT(0x12, 130, 294, 160, NULL, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_RIGHT, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x22, 284, 294, 6, BAGL_FONT_SYMBOLS_0_MINIRIGHT, BAGL_FONT_SYMBOLS_0, BAGL_FONT_ALIGNMENT_RIGHT, COLOR_GRAY, COLOR_BG_1),
     UI_BLUE_TOUCHZONE(0, 266, 320, 48, ui_transaction_blue_3_details, ui_menu_item_out_over, ui_menu_item_out_over),
     {{BAGL_RECTANGLE, 0x22, 0, 266, 5, 48, 0, 0, BAGL_FILL, COLOR_BG_1, COLOR_BG_1, 0, 0}, // WHY OVER ACTIVATE WHE TOUCING OUT OF RECTANGLE ? ASK OTO
     NULL, 0, 0x41CCB4, 0, NULL, NULL, NULL},
@@ -603,12 +604,12 @@ unsigned int ui_transaction_blue_button(unsigned int button_mask,
 
 const bagl_element_t ui_display_address_blue[] = {
     UI_BLUE_BACKGROUND("CONFIRM ACCOUNT"),
-    UI_BLUE_TEXT(0, 30, 106, 320, "ACCOUNT", BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, 0, GRAY, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 30, 106, 320, "ACCOUNT", BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, 0, COLOR_GRAY, COLOR_BG_1),
 
-    UI_BLUE_TEXT(0x10, 30, 126, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0x11, 30, 139, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0, BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x10, 30, 126, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x11, 30, 139, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0, COLOR_BLACK, COLOR_BG_1),
 
-    {{BAGL_RECTANGLE, 0x02, 320 / 2 - 0x1D * 8 / 2, 150, 8, 8, 0, 0, BAGL_FILL,0xFFFFFF, 0x000000, 0, 0}, NULL, 0, 0, 0, NULL, NULL, NULL},
+    {{BAGL_RECTANGLE, 0x02, 320 / 2 - 0x1D * 8 / 2, 150, 8, 8, 0, 0, BAGL_FILL,COLOR_WHITE, COLOR_BLACK, 0, 0}, NULL, 0, 0, 0, NULL, NULL, NULL},
 
     UI_BLUE_BUTTONS_REJECT_OR_CONFIRM("REJECT", "CONFIRM", io_seproxyhal_touch_display_cancel, io_seproxyhal_touch_display_ok)
 };
@@ -617,8 +618,8 @@ const bagl_element_t ui_display_address_blue[] = {
 const bagl_element_t ui_display_token_blue[] = {
     UI_BLUE_BACKGROUND("CHECK IF TOKENS ARE IDENTICAL"),
 
-    UI_BLUE_TEXT(0, 30, 185, 260, "Token:", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0x10, 30, 220, 260, G_io_apdu_buffer+200, BAGL_FONT_OPEN_SANS_LIGHT_16_22PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 30, 185, 260, "Token:", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x10, 30, 220, 260, G_io_apdu_buffer+200, BAGL_FONT_OPEN_SANS_LIGHT_16_22PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
 
     UI_BLUE_BUTTONS_REJECT_OR_CONFIRM("REJECT", "CONFIRM", io_seproxyhal_touch_display_token_cancel, io_seproxyhal_touch_display_token_ok)
 };
@@ -626,8 +627,8 @@ const bagl_element_t ui_display_token_blue[] = {
  const bagl_element_t ui_request_pubkey_approval_blue[] = {
     UI_BLUE_BACKGROUND("PUBLIC KEY EXPORT"),
 
-    UI_BLUE_TEXT(0, 0, 160, 320, "A remote app is requesting access", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 180, 320, "to your public keys", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 160, 320, "A remote app is requesting access", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 180, 320, "to your public keys", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
 
     UI_BLUE_BUTTONS_REJECT_OR_CONFIRM("REJECT", "CONFIRM", io_seproxyhal_touch_display_cancel, io_seproxyhal_touch_display_ok)
 };
@@ -636,14 +637,14 @@ const bagl_element_t ui_request_change_path_approval_blue[] = {
     UI_BLUE_BACKGROUND("WARNING"),
 
     UI_BLUE_ICON(0x40, 135, 95, 50, 50, &C_blue_badge_warning, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 185, 320, "The change path is unusual.", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 203, 320, "Reject if you're not sure.", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 220, 320, "Contact Ledger support for help.", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 271, 320, "Change path:", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 297, 320, vars.tmp_warning.change_path, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 314, 320, vars.tmp_warning.change_path+30, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 331, 320, vars.tmp_warning.change_path+60, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 348, 320, vars.tmp_warning.change_path+90, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 185, 320, "The change path is unusual.", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 203, 320, "Reject if you're not sure.", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 220, 320, "Contact Ledger support for help.", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 271, 320, "Change path:", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 297, 320, vars.tmp_warning.change_path, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 314, 320, vars.tmp_warning.change_path+30, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 331, 320, vars.tmp_warning.change_path+60, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 348, 320, vars.tmp_warning.change_path+90, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
 
 
     UI_BLUE_BUTTONS_REJECT_OR_CONFIRM("REJECT", "CONFIRM", io_seproxyhal_touch_display_cancel, io_seproxyhal_touch_display_ok)
@@ -672,8 +673,8 @@ unsigned int ui_display_address_blue_prepro(const bagl_element_t *element) {
             x = 0;
             tmp_element.component.fgcolor =
                 vars.tmpqr.qrcode[1 + (bit >> 3)] & (1 << (bit & 0x7))
-                    ? 0x00000000
-                    : 0xFFFFFFFF;
+                    ? COLOR_BLACK
+                    : COLOR_WHITE;
             tmp_element.component.x = x_off + x * PIXEL_SIZE;
             tmp_element.component.y = y_off + y * PIXEL_SIZE;
             bit++;
@@ -686,11 +687,11 @@ unsigned int ui_display_address_blue_prepro(const bagl_element_t *element) {
                     io_seproxyhal_display(&tmp_element);
                     // tmp_element.component.fgcolor =
                     // vars.tmpqr.qrcode[1+((y*0x1D+x)>>3)]&(1<<((y*0x1D+x)&0x7))
-                    // ? 0x00000000: 0xFFFFFFFF;
+                    // ? COLOR_BLACK: COLOR_WHITE;
                     tmp_element.component.fgcolor =
                         vars.tmpqr.qrcode[1 + (bit >> 3)] & (1 << (bit & 0x7))
-                            ? 0x00000000
-                            : 0xFFFFFFFF;
+                            ? COLOR_BLACK
+                            : COLOR_WHITE;
                     tmp_element.component.x = x_off + x * PIXEL_SIZE;
                     tmp_element.component.y = y_off + y * PIXEL_SIZE;
                     bit++;
@@ -916,11 +917,11 @@ const bagl_element_t ui_finalize_nanos[] = {
 
     /* TODO
     {{BAGL_LABELINE                       , 0x02,   0,  12, 128,  12, 0, 0, 0 ,
-    0xFFFFFF, 0x000000,
+    COLOR_WHITE, COLOR_BLACK,
     BAGL_FONT_OPEN_SANS_REGULAR_11px|BAGL_FONT_ALIGNMENT_CENTER, 0  }, "Amount",
     0, 0, 0, NULL, NULL, NULL },
     {{BAGL_LABELINE                       , 0x02,  23,  26,  82,  12, 0x80|10,
-    0, 0        , 0xFFFFFF, 0x000000,
+    0, 0        , COLOR_WHITE, COLOR_BLACK,
     BAGL_FONT_OPEN_SANS_EXTRABOLD_11px|BAGL_FONT_ALIGNMENT_CENTER, 26  },
     vars.tmp.fullAmount, 0, 0, 0, NULL, NULL, NULL },
     */
@@ -2102,7 +2103,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
 #if defined(TARGET_BLUE)
                 // setup the status bar colors (remembered after wards, even
                 // more if another app does not resetup after app switch)
-                UX_SET_STATUS_BAR_COLOR(0xFFFFFF, G_coin_config->color_header);
+                UX_SET_STATUS_BAR_COLOR(COLOR_WHITE, G_coin_config->color_header);
 #endif // TARGET_ID
 
                 ui_idle();
