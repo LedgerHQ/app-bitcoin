@@ -189,9 +189,9 @@ const bagl_element_t ui_idle_blue[] = {
     UI_BLUE_BACKGROUND(NULL),
     UI_BLUE_BUTTON_SETTINGS(io_seproxyhal_touch_settings),
     UI_BLUE_BUTTON_EXIT(io_seproxyhal_touch_exit),
-    UI_BLUE_TEXT(0, 0, 270, 320, "Open your wallet", BAGL_FONT_OPEN_SANS_LIGHT_16_22PX, BAGL_FONT_ALIGNMENT_CENTER,  COLOR_COLOR_BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 308, 320, "Connect your Ledger Blue and open your", BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_COLOR_BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 331, 320, "preferred wallet to view your accounts.", BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 270, 320, "Open your wallet", BAGL_FONT_OPEN_SANS_LIGHT_16_22PX, BAGL_FONT_ALIGNMENT_CENTER,  COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 308, 320, "Connect your Ledger Blue and open your", BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 331, 320, "preferred wallet to view your accounts.", BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
     UI_BLUE_TEXT(0, 0, 450, 320, "Validation requests will show automatically.", BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_GRAY, COLOR_BG_1)
 
 };
@@ -222,8 +222,8 @@ const bagl_element_t* ui_settings_out_over(const bagl_element_t* e) {
  const bagl_element_t ui_settings_blue[] = {
     UI_BLUE_BACKGROUND("SETTINGS"),
     UI_BLUE_BUTTON_GO_BACK(ui_settings_back_callback),
-    UI_BLUE_TEXT(0, 30, 105, 160, "Privacy restriction", BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_COLOR_BLACK, COLOR_BG_1),     
-    UI_BLUE_TEXT(0, 30, 126, 260, "Export public keys only after user approval", BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_GRAY, COLOR_BG_1),     
+    UI_BLUE_TEXT(0, 30, 105, 160, "Public key export", BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_BLACK, COLOR_BG_1),     
+    UI_BLUE_TEXT(0, 30, 126, 260, "Enable to approve export requests manually", BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_GRAY, COLOR_BG_1),     
     UI_BLUE_TOUCHZONE(0, 78, 320, 68, ui_settings_blue_toggle_pubKeyRequestRestriction, ui_settings_out_over, ui_settings_out_over),
     UI_BLUE_TOGGLE(258, 98, COLOR_BG_1)
 };
@@ -268,12 +268,12 @@ void menu_settings_pubKeyRequestRestriction_change(unsigned int enabled) {
     UX_MENU_DISPLAY(0, menu_main, NULL);
 }
  const ux_menu_entry_t menu_settings_pubKeyRequestRestriction[] = {
-  {NULL, menu_settings_pubKeyRequestRestriction_change, 0, NULL, "Unrestricted", NULL, 0, 0},
-  {NULL, menu_settings_pubKeyRequestRestriction_change, 1, NULL, "Restricted", NULL, 0, 0},
+  {NULL, menu_settings_pubKeyRequestRestriction_change, 1, NULL, "Manual approval", NULL, 0, 0},
+  {NULL, menu_settings_pubKeyRequestRestriction_change, 0, NULL, "Auto approval", NULL, 0, 0},
   UX_MENU_END
 };
  const ux_menu_entry_t menu_settings[] = {
-    {menu_settings_pubKeyRequestRestriction, NULL, 0, NULL, "Public keys", "requests", 0, 0},
+    {menu_settings_pubKeyRequestRestriction, NULL, 0, NULL, "Public keys", "export approval", 0, 0},
     {menu_main, NULL, 1, &C_nanos_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 
@@ -616,10 +616,11 @@ const bagl_element_t ui_display_address_blue[] = {
 
 
 const bagl_element_t ui_display_token_blue[] = {
-    UI_BLUE_BACKGROUND("CHECK IF TOKENS ARE IDENTICAL"),
+    UI_BLUE_BACKGROUND("PUBLIC KEY EXPORT"),
 
-    UI_BLUE_TEXT(0, 30, 185, 260, "Token:", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0x10, 30, 220, 260, G_io_apdu_buffer+200, BAGL_FONT_OPEN_SANS_LIGHT_16_22PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 30, 185, 260, "Check if the following token is", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 30, 201, 260, "identical on both devices:", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0x10, 30, 240, 260, G_io_apdu_buffer+200, BAGL_FONT_OPEN_SANS_LIGHT_16_22PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
 
     UI_BLUE_BUTTONS_REJECT_OR_CONFIRM("REJECT", "CONFIRM", io_seproxyhal_touch_display_token_cancel, io_seproxyhal_touch_display_token_ok)
 };
@@ -627,8 +628,7 @@ const bagl_element_t ui_display_token_blue[] = {
  const bagl_element_t ui_request_pubkey_approval_blue[] = {
     UI_BLUE_BACKGROUND("PUBLIC KEY EXPORT"),
 
-    UI_BLUE_TEXT(0, 0, 160, 320, "A remote app is requesting access", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 180, 320, "to your public keys", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 160, 320, "Approve to export your public keys", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
 
     UI_BLUE_BUTTONS_REJECT_OR_CONFIRM("REJECT", "CONFIRM", io_seproxyhal_touch_display_cancel, io_seproxyhal_touch_display_ok)
 };
