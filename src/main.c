@@ -93,7 +93,7 @@ union {
 
     struct {
         // A bip44 path contains 5 elements, which max length in ascii is 10 char + optional quote "'" + "/" + \0"
-        char change_path [MAX_CHANGE_PATH_ASCII_LENGTH];  
+        char derivation_path [MAX_DERIV_PATH_ASCII_LENGTH];  
     } tmp_warning;
 
     unsigned int dummy; // ensure the whole vars is aligned for the CM0 to
@@ -131,7 +131,7 @@ union {
     } tmp;
 
     struct {
-        char change_path [MAX_CHANGE_PATH_ASCII_LENGTH];  
+        char derivation_path [MAX_DERIV_PATH_ASCII_LENGTH];  
     } tmp_warning;
 
     /*
@@ -641,10 +641,10 @@ const bagl_element_t ui_request_change_path_approval_blue[] = {
     UI_BLUE_TEXT(0, 0, 203, 320, "Reject if you're not sure.", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
     UI_BLUE_TEXT(0, 0, 220, 320, "Contact Ledger support for help.", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
     UI_BLUE_TEXT(0, 0, 271, 320, "Change path:", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 297, 320, vars.tmp_warning.change_path, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 314, 320, vars.tmp_warning.change_path+30, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 331, 320, vars.tmp_warning.change_path+60, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
-    UI_BLUE_TEXT(0, 0, 348, 320, vars.tmp_warning.change_path+90, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 297, 320, vars.tmp_warning.derivation_path, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 314, 320, vars.tmp_warning.derivation_path+30, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 331, 320, vars.tmp_warning.derivation_path+60, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 348, 320, vars.tmp_warning.derivation_path+90, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
 
 
     UI_BLUE_BUTTONS_REJECT_OR_CONFIRM("REJECT", "CONFIRM", io_seproxyhal_touch_display_cancel, io_seproxyhal_touch_display_ok)
@@ -776,14 +776,32 @@ unsigned int ui_request_change_path_approval_blue_button(unsigned int button_mas
 const bagl_element_t ui_display_address_nanos[] = {
 
     UI_NANOS_BACKGROUND(),
-    UI_NANOS_ICON_LEFT(0, BAGL_GLYPH_ICON_CROSS),
-    UI_NANOS_ICON_RIGHT(0, BAGL_GLYPH_ICON_CHECK),
-    UI_NANOS_TEXT(1, 0, 12, 128, "Confirm", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
-    UI_NANOS_TEXT(1, 0, 26, 128, "address", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
 
-    UI_NANOS_TEXT(2, 0, 12, 128, "Address", BAGL_FONT_OPEN_SANS_REGULAR_11px),
+    /* Displayed when derivation path is unusual */
+
+    UI_NANOS_TEXT(1, 0, 22, 128, "Warning !", BAGL_FONT_OPEN_SANS_LIGHT_16px),
+
+    UI_NANOS_TEXT(2, 0, 12, 128, "The derivation", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+    UI_NANOS_TEXT(2, 0, 26, 128, "path is unusual", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    UI_NANOS_TEXT(3, 0, 12, 128, "Derivation path", BAGL_FONT_OPEN_SANS_REGULAR_11px),
+    UI_NANOS_SCROLLING_TEXT(0x83, 15, 26, 98, vars.tmp_warning.derivation_path, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    UI_NANOS_ICON_LEFT(4, BAGL_GLYPH_ICON_CROSS),
+    UI_NANOS_ICON_RIGHT(4, BAGL_GLYPH_ICON_CHECK),
+    UI_NANOS_TEXT(4, 0, 12, 128, "Reject if you're", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+    UI_NANOS_TEXT(4, 0, 26, 128, "not sure", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    /* Always displayed */
+
+    UI_NANOS_ICON_LEFT(5, BAGL_GLYPH_ICON_CROSS),
+    UI_NANOS_ICON_RIGHT(5, BAGL_GLYPH_ICON_CHECK),
+    UI_NANOS_TEXT(5, 0, 12, 128, "Confirm", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+    UI_NANOS_TEXT(5, 0, 26, 128, "address", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    UI_NANOS_TEXT(6, 0, 12, 128, "Address", BAGL_FONT_OPEN_SANS_REGULAR_11px),
     // Hax, avoid wasting space
-    UI_NANOS_SCROLLING_TEXT(2, 23, 26, 82, G_io_apdu_buffer + 199, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px)
+    UI_NANOS_SCROLLING_TEXT(0x86, 15, 26, 98, G_io_apdu_buffer + 199, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px)
 };
 
 const bagl_element_t ui_display_token_nanos[] = {
@@ -813,7 +831,7 @@ const bagl_element_t ui_request_change_path_approval_nanos[] = {
     UI_NANOS_TEXT(2, 0, 26, 128, "is unusual", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
 
     UI_NANOS_TEXT(3, 0, 12, 128, "Change path", BAGL_FONT_OPEN_SANS_REGULAR_11px),
-    UI_NANOS_SCROLLING_TEXT(0xF3, 15, 26, 98, vars.tmp_warning.change_path, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+    UI_NANOS_SCROLLING_TEXT(0x83, 15, 26, 98, vars.tmp_warning.derivation_path, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
 
     UI_NANOS_ICON_LEFT(4, BAGL_GLYPH_ICON_CROSS),
     UI_NANOS_ICON_RIGHT(4, BAGL_GLYPH_ICON_CHECK),
@@ -822,16 +840,26 @@ const bagl_element_t ui_request_change_path_approval_nanos[] = {
 };
 
 unsigned int ui_display_address_nanos_prepro(const bagl_element_t *element) {
+
     if (element->component.userid > 0) {
-        unsigned int display = (ux_step == element->component.userid - 1);
+        unsigned int display = (ux_step == (0x7F & element->component.userid) - 1);
         if (display) {
             switch (element->component.userid) {
-            case 1:
-                UX_CALLBACK_SET_INTERVAL(2000);
-                break;
-            case 2:
+            case 0x83: 
+                ux_loop_over_curr_element = 1;
                 UX_CALLBACK_SET_INTERVAL(MAX(
                     3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
+                break;
+            case 5:
+                UX_CALLBACK_SET_INTERVAL(2000);
+                ux_loop_over_curr_element = 0; // allow next timer to increment ux_step when triggered
+                break;
+            case 0x86:
+                UX_CALLBACK_SET_INTERVAL(MAX(
+                    3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
+                // ugly ux tricks, loops around last 2 screens
+                ux_step -= 1; // loops back to previous element on next redraw
+                ux_loop_over_curr_element = 1; // when the timer will trigger, ux_step won't be incremented, only redraw
                 break;
             }
         }
@@ -842,14 +870,12 @@ unsigned int ui_display_address_nanos_prepro(const bagl_element_t *element) {
 
 unsigned int ui_request_change_path_approval_nanos_prepro(const bagl_element_t *element) {
     if (element->component.userid > 0) {
-        unsigned int display = (ux_step == (0x0F & element->component.userid) - 1);
+        unsigned int display = (ux_step == (0x7F & element->component.userid) - 1);
         if (display) {
-            switch (element->component.userid) {
-            case 0xF3:
+            if (element->component.userid & 0x80) {
                 ux_loop_over_curr_element = 1;
                 UX_CALLBACK_SET_INTERVAL(MAX(
                     3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
-                break;
             }
         }
         return display;
@@ -1182,14 +1208,47 @@ ui_verify_message_signature_nanos_button(unsigned int button_mask,
 
 unsigned int ui_display_address_nanos_button(unsigned int button_mask,
                                              unsigned int button_mask_counter) {
-    switch (button_mask) {
-    case BUTTON_EVT_RELEASED | BUTTON_LEFT:
-        io_seproxyhal_touch_display_cancel(NULL);
-        break;
-
-    case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
-        io_seproxyhal_touch_display_ok(NULL);
-        break;
+    if (ux_step == 3)
+    {
+        switch (button_mask)
+        {
+        case BUTTON_EVT_RELEASED | BUTTON_LEFT:
+            io_seproxyhal_touch_display_cancel(NULL);
+            break;
+        case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
+            // prepare next screen
+            ux_step = (ux_step + 1) % ux_step_count;
+            // redisplay screen
+            UX_REDISPLAY();
+            break;
+        }
+    }
+    else if (ux_step >= 4)
+    {
+        switch (button_mask)
+        {
+        case BUTTON_EVT_RELEASED | BUTTON_LEFT:
+            io_seproxyhal_touch_display_cancel(NULL);
+            break;
+        case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
+            io_seproxyhal_touch_display_ok(NULL);
+            break;
+        }
+    }
+    else
+    {
+        if(button_mask == (BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT))
+        {
+                // if we were looping over a single element, disable this loop and diffuse the redisplay timeout (used by scrolling text)
+                if(ux_loop_over_curr_element) {
+                    ux_loop_over_curr_element = 0;
+                    ux.callback_interval_ms = 0;
+                }
+                // prepare next screen
+                ux_step = (ux_step + 1) % ux_step_count;
+                // redisplay screen
+                UX_REDISPLAY();
+        }
     }
     return 0;
 }
@@ -1900,10 +1959,12 @@ void btchip_bagl_confirm_message_signature() {
 #endif // #if TARGET_ID
 }
 
-void btchip_bagl_display_public_key() {
-    // setup qrcode of the address in the apdu buffer
+void btchip_bagl_display_public_key(unsigned char* derivation_path) {
+    // append a white space at the end of the address to avoid glitch on nano S
     strcat(G_io_apdu_buffer + 200, " ");
 
+    bip32_print_path(derivation_path, vars.tmp_warning.derivation_path, MAX_DERIV_PATH_ASCII_LENGTH);
+    uint8_t is_derivation_path_unusual = bip44_derivation_guard(derivation_path, false);
 #if defined(TARGET_BLUE)
     // must assert spi buffer is longer than the requested qrcode len.
     // sizeof(data and temp buffer) >=
@@ -1937,10 +1998,10 @@ void btchip_bagl_display_public_key() {
 
     UX_DISPLAY(ui_display_address_blue, ui_display_address_blue_prepro);
 #elif defined(TARGET_NANOS)
-    // append and prepend a white space to the address
+    // prepend a white space to the address
     G_io_apdu_buffer[199] = ' ';
-    ux_step = 0;
-    ux_step_count = 2;
+    ux_step = is_derivation_path_unusual?0:4;
+    ux_step_count = 6;
     UX_DISPLAY(ui_display_address_nanos, ui_display_address_nanos_prepro);
 #endif // #if TARGET_ID
 }
@@ -1970,7 +2031,7 @@ void btchip_bagl_request_pubkey_approval()
 
 void btchip_bagl_request_change_path_approval(unsigned char* change_path)
 {
-    bip32_print_path(change_path, vars.tmp_warning.change_path, MAX_CHANGE_PATH_ASCII_LENGTH);
+    bip32_print_path(change_path, vars.tmp_warning.derivation_path, MAX_DERIV_PATH_ASCII_LENGTH);
  #if defined(TARGET_BLUE)
     UX_DISPLAY(ui_request_change_path_approval_blue, ui_request_change_path_approval_blue_prepro);
 #elif defined(TARGET_NANOS)

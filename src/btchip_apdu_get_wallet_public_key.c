@@ -174,7 +174,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         os_memmove(G_io_apdu_buffer + 200, G_io_apdu_buffer + 67, keyLength);
         G_io_apdu_buffer[200 + keyLength] = '\0';
         btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
-        btchip_bagl_display_public_key();
+        btchip_bagl_display_public_key(keyPath);
     }
     // If the token requested has already been approved in a previous call, the source is trusted so don't ask for approval again
     else if(display_request_token && 

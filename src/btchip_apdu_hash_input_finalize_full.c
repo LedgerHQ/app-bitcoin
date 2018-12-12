@@ -305,7 +305,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                 btchip_context_D.tmpCtx.output.changeAccepted = 0;
 
                 // if the bip44 change path provided is not canonical or its index are unsual, ask for user approval
-                if(bip44_change_path_guard(transactionSummary->summarydata.keyPath)) {
+                if(bip44_derivation_guard(transactionSummary->summarydata.keyPath, true)) {
                     btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
                     btchip_context_D.outputParsingState = BTCHIP_BIP44_CHANGE_PATH_VALIDATION;
                     btchip_bagl_request_change_path_approval(transactionSummary->summarydata.keyPath);

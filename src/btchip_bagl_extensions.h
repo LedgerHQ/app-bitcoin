@@ -24,7 +24,7 @@ void btchip_bagl_confirm_message_signature(void);
 void btchip_bagl_user_action_message_signing(unsigned char confirming);
 
 // Public key display
-void btchip_bagl_display_public_key(void);
+void btchip_bagl_display_public_key(unsigned char *derivation_path);
 void btchip_bagl_user_action_display(unsigned char confirming);
 
 #endif
