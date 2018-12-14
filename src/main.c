@@ -2101,7 +2101,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
     unsigned int currentPos = 0;
     unsigned char amount[8], totalOutputAmount[8], fees[8];
     char tmp[80];
-    unsigned char outputPos = 0, changeFound = 0;
+    unsigned char outputPos = 0, changeFound = 0, specialOpFound = 0;
     if (btchip_context_D.transactionContext.relaxed &&
         !btchip_context_D.transactionContext.consumeP2SH) {
         if (!checkOnly) {
@@ -2152,6 +2152,13 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
             btchip_context_D.currentOutput + offset);
         isOpCall = btchip_output_script_is_op_call(
             btchip_context_D.currentOutput + offset);
+	// Always notify OP_RETURN to the user
+	if (nullAmount && isOpReturn) {
+		goto error;
+	}
+	if ((G_coin_config->kind == COIN_KIND_QTUM) && (isOpCall || isOpCreate)) {
+		specialOpFound = 1;
+	}
         if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                              offset) &&
             !isP2sh && !(nullAmount && isOpReturn) &&
@@ -2201,6 +2208,9 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
             PRINTF("Error : change output not found");
         }
         goto error;
+    }
+    if ((numberOutputs > 1) && (!changeFound || !specialOpFound)) {
+	    goto error;
     }
     if (transaction_amount_sub_be(
             fees, btchip_context_D.transactionContext.transactionAmount,
