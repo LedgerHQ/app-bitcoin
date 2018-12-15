@@ -67,6 +67,13 @@ unsigned char transaction_amount_sub_be(unsigned char *target,
         }
         target[8 - 1 - i] = (unsigned char)(tmpA - tmpB);
     }
+
+    // allow device to sign Komodo reward claim transactions
+    // (the outputs are intentionnally larger than the inputs)
+    if (G_coin_config->kind == COIN_KIND_KOMODO) {
+	    borrow = 0;
+    }
+
     return borrow;
 }
 

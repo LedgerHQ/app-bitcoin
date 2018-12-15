@@ -65,6 +65,8 @@ void btchip_private_derive_keypair(unsigned char WIDE *bip32Path,
                                    unsigned char derivePublic,
                                    unsigned char *out_chainCode);
 
+unsigned char bip44_change_path_guard(unsigned char WIDE *bip32Path);
+
 // void btchip_set_check_internal_structure_integrity(unsigned char
 // setParameter);
 #define btchip_set_check_internal_structure_integrity(x)

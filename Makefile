@@ -253,3 +253,4 @@ dep/%.d: %.c Makefile
 
 listvariants:
 	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash horizen komodo stratis peercoin posw pivx viacoin vertcoin stealth digibyte qtum hcash bitcoin_private zcoin gamecredits zclassic unobtanium
+
