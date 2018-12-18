@@ -325,10 +325,11 @@ void btchip_private_derive_keypair(unsigned char WIDE *bip32Path,
     os_memset(privateComponent, 0, sizeof(privateComponent));
 }
 
-// Check if the values of the BIP44 change path are normal:
-// Account < 100, change == 1, address index < 50000
-// return 1 if the path is unusual, or not compliant with BIP44
-unsigned char bip44_change_path_guard(unsigned char WIDE *bip32Path) {
+/* 
+Checks if the values of a derivation path are within "normal" (arbitrary) ranges:
+Account < 100, change == 1 or 0, address index < 50000
+Returns 1 if the path is unusual, or not compliant with BIP44*/
+unsigned char bip44_derivation_guard(unsigned char WIDE *bip32Path, bool is_change_path) {
 
     unsigned char i, path_len;
     unsigned int bip32PathInt[MAX_BIP32_PATH];
@@ -348,13 +349,14 @@ unsigned char bip44_change_path_guard(unsigned char WIDE *bip32Path) {
     // If the path length is not compliant with BIP44 or if the purpose/coin type don't match regular usage
     if(path_len != BIP44_PATH_LEN ||
        ((bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 44 &&
-       (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 49)) {
+       (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 49 &&
+       (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 84)) {
         return 1;
     }
 
     // If the account or address index is very high or if the change isn't 1, return a warning
     if((bip32PathInt[BIP44_ACCOUNT_OFFSET]^0x80000000) > MAX_BIP44_ACCOUNT_RECOMMENDED ||
-       bip32PathInt[BIP44_CHANGE_OFFSET] != BIP44_CHANGE_FLAG ||
+       bip32PathInt[BIP44_CHANGE_OFFSET] != is_change_path?1:0 ||
        bip32PathInt[BIP44_ADDRESS_INDEX_OFFSET] > MAX_BIP44_ADDRESS_INDEX_RECOMMENDED) {
         return 1;
     }
@@ -377,7 +379,8 @@ unsigned char bip32_print_path(unsigned char WIDE *bip32Path, char* out, unsigne
         THROW(INVALID_PARAMETER);
     }
     bip32Path++;
-    offset=0;
+    out[0] = ' ';
+    offset=1;
     for (i = 0; i < bip32PathLength; i++) {
         current_level = btchip_read_u32(bip32Path, 1, 0);
         hardened = (bool)(current_level & 0x80000000);
@@ -399,7 +402,7 @@ unsigned char bip32_print_path(unsigned char WIDE *bip32Path, char* out, unsigne
 
 #if defined(TARGET_BLUE)
     // if the path is longer than 30 char, split the string in multiple strings of length 30 
-    uint8_t len=strnlen(out, MAX_CHANGE_PATH_ASCII_LENGTH);
+    uint8_t len=strnlen(out, MAX_DERIV_PATH_ASCII_LENGTH);
     uint8_t num_split = len/30;
 
     for(i = 1; i<= num_split; i++) {

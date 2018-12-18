@@ -80,7 +80,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
 
     if(display_request_token){
         uint8_t request_token_offset = ISO_OFFSET_CDATA + G_io_apdu_buffer[ISO_OFFSET_CDATA]*4 + 1;
-        request_token = btchip_read_u32(G_io_apdu_buffer + request_token_offset, true, true);
+        request_token = btchip_read_u32(G_io_apdu_buffer + request_token_offset, true, false);
     }
 
     SB_CHECK(N_btchip.bkp.config.operationMode);
@@ -174,12 +174,17 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         os_memmove(G_io_apdu_buffer + 200, G_io_apdu_buffer + 67, keyLength);
         G_io_apdu_buffer[200 + keyLength] = '\0';
         btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
-        btchip_bagl_display_public_key();
+        btchip_bagl_display_public_key(keyPath);
     }
-    else if(display_request_token)
+    // If the token requested has already been approved in a previous call, the source is trusted so don't ask for approval again
+    else if(display_request_token && 
+           (!btchip_context_D.has_valid_token || os_memcmp(&request_token, btchip_context_D.last_token, 4)))
     {
+        // disable the has_valid_token flag and store the new token
+        btchip_context_D.has_valid_token = false;
+        os_memcpy(btchip_context_D.last_token, &request_token, 4);
         // Hax, avoid wasting space
-        snprintf(G_io_apdu_buffer + 200, 9, "%02x", request_token);
+        snprintf(G_io_apdu_buffer + 200, 9, "%08X", request_token);
         G_io_apdu_buffer[200 + 8] = '\0';
         btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
         btchip_bagl_display_token();
