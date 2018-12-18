@@ -100,6 +100,36 @@ union {
                         // operate correctly
 } vars;
 
+void load_qr_code(unsigned char *data){
+    // must assert spi buffer is longer than the requested qrcode len.
+    // sizeof(data and temp buffer) >=
+    // qrcodegen_BUFFER_LEN_FOR_VERSION(guessed_qrcode_version)
+
+    // encode the address as a QRcode
+    os_memset(&vars.tmpqr, 0, sizeof(vars.tmpqr));
+    // use G_io_seproxyhal_spi_buffer as
+    if (qrcodegen_encodeBinary(
+            data, strlen(data),
+            G_io_seproxyhal_spi_buffer, sizeof(G_io_seproxyhal_spi_buffer),
+            // the edge qrcode size will be discarded when drawing
+            &vars.tmpqr.qrcode, sizeof(vars.tmpqr.qrcode), qrcodegen_Ecc_LOW,
+            qrcodegen_VERSION_MIN,
+            3, // buffer is not designed to handle more than version 3
+            qrcodegen_Mask_AUTO, 0)) {
+        vars.tmpqr.icon_details.width = vars.tmpqr.qrcode[0];
+        vars.tmpqr.icon_details.height = vars.tmpqr.qrcode[0];
+        vars.tmpqr.icon_details.bpp = 1;
+
+        // magnify on the fly without consuming RAM
+        vars.tmpqr.colors[0] = -1;
+
+        vars.tmpqr.icon_details.colors = &vars.tmpqr.colors[0];
+        vars.tmpqr.icon_details.bitmap = &vars.tmpqr.qrcode[1];
+        // os_memmove(&vars.tmpqr.icon, &C_qrcode_icon_initializer,
+        // sizeof(C_qrcode_icon_initializer));
+    }
+}
+
 unsigned int map_color(unsigned int color) {
     switch (color) {
     case COLOR_APP:
@@ -155,6 +185,7 @@ unsigned int
 io_seproxyhal_touch_message_signature_verify_ok(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_display_cancel(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_display_ok(const bagl_element_t *e);
+unsigned int io_seproxyhal_touch_display_address_blue(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_display_token_cancel(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_display_token_ok(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_settings(const bagl_element_t *e);
@@ -602,6 +633,23 @@ unsigned int ui_transaction_blue_button(unsigned int button_mask,
     return 0;
 }
 
+const bagl_element_t ui_display_derivation_warning[] = {
+    UI_BLUE_BACKGROUND("WARNING"),
+
+    UI_BLUE_ICON(0x40, 135, 95, 50, 50, &C_blue_badge_warning, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 185, 320, "The derivation path is unusual.", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 203, 320, "Reject if you're not sure.", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 220, 320, "Contact Ledger support for help.", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 271, 320, "Derivation path:", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 297, 320, vars.tmp_warning.derivation_path, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 314, 320, vars.tmp_warning.derivation_path+30, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 331, 320, vars.tmp_warning.derivation_path+60, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 348, 320, vars.tmp_warning.derivation_path+90, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+
+
+    UI_BLUE_BUTTONS_REJECT_OR_CONFIRM("REJECT", "CONFIRM", io_seproxyhal_touch_display_cancel, io_seproxyhal_touch_display_address_blue)
+};
+
 const bagl_element_t ui_display_address_blue[] = {
     UI_BLUE_BACKGROUND("CONFIRM ACCOUNT"),
     UI_BLUE_TEXT(0, 30, 106, 320, "ACCOUNT", BAGL_FONT_OPEN_SANS_SEMIBOLD_8_11PX, 0, COLOR_GRAY, COLOR_BG_1),
@@ -730,21 +778,23 @@ unsigned int ui_display_address_blue_prepro(const bagl_element_t *element) {
 }
 
 unsigned int ui_display_token_blue_prepro(const bagl_element_t *element) {
-    os_memmove(&tmp_element, element, sizeof(bagl_element_t));
     copy_element_and_map_coin_colors(element);
-    return &tmp_element;
+    return element;
 }
 
 unsigned int ui_request_pubkey_approval_blue_prepro(const bagl_element_t *element) {
-    os_memmove(&tmp_element, element, sizeof(bagl_element_t));
     copy_element_and_map_coin_colors(element);
-    return &tmp_element;
+    return element;
 }
 
 unsigned int ui_request_change_path_approval_blue_prepro(const bagl_element_t *element) {
-    os_memmove(&tmp_element, element, sizeof(bagl_element_t));
     copy_element_and_map_coin_colors(element);
-    return &tmp_element;
+    return element;
+}
+
+unsigned int ui_display_derivation_warning_button(unsigned int button_mask,
+                                            unsigned int button_mask_counter) {
+    return 0;
 }
 
 unsigned int ui_display_address_blue_button(unsigned int button_mask,
@@ -1073,6 +1123,12 @@ unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e) {
     // go back to the home screen
     os_sched_exit(0);
     return 0; // DO NOT REDRAW THE BUTTON
+}
+
+unsigned int io_seproxyhal_touch_display_address_blue(const bagl_element_t *e) {
+    load_qr_code(G_io_apdu_buffer + 200);
+    UX_DISPLAY(ui_display_address_blue, ui_display_address_blue_prepro);
+    return 0; 
 }
 #endif // TARGET_BLUE
 
@@ -1965,38 +2021,17 @@ void btchip_bagl_display_public_key(unsigned char* derivation_path) {
 
     bip32_print_path(derivation_path, vars.tmp_warning.derivation_path, MAX_DERIV_PATH_ASCII_LENGTH);
     uint8_t is_derivation_path_unusual = bip44_derivation_guard(derivation_path, false);
-#if defined(TARGET_BLUE)
-    // must assert spi buffer is longer than the requested qrcode len.
-    // sizeof(data and temp buffer) >=
-    // qrcodegen_BUFFER_LEN_FOR_VERSION(guessed_qrcode_version)
 
-    // encode the address as a QRcode
-    os_memset(&vars.tmpqr, 0, sizeof(vars.tmpqr));
-    // use G_io_seproxyhal_spi_buffer as
-    if (qrcodegen_encodeBinary(
-            G_io_apdu_buffer + 200, strlen(G_io_apdu_buffer + 200),
-            G_io_seproxyhal_spi_buffer, sizeof(G_io_seproxyhal_spi_buffer),
-            // the edge qrcode size will be discarded when drawing
-            &vars.tmpqr.qrcode, sizeof(vars.tmpqr.qrcode), qrcodegen_Ecc_LOW,
-            qrcodegen_VERSION_MIN,
-            3, // buffer is not designed to handle more than version 3
-            qrcodegen_Mask_AUTO, 0)) {
-        vars.tmpqr.icon_details.width = vars.tmpqr.qrcode[0];
-        vars.tmpqr.icon_details.height = vars.tmpqr.qrcode[0];
-        vars.tmpqr.icon_details.bpp = 1;
 #if defined(TARGET_BLUE)
-        // mgnify on the fly without consuming RAM
-        vars.tmpqr.colors[0] = -1;
-#else
-        vars.tmpqr.colors[1] = -1;
-#endif
-        vars.tmpqr.icon_details.colors = &vars.tmpqr.colors[0];
-        vars.tmpqr.icon_details.bitmap = &vars.tmpqr.qrcode[1];
-        // os_memmove(&vars.tmpqr.icon, &C_qrcode_icon_initializer,
-        // sizeof(C_qrcode_icon_initializer));
+
+    if(is_derivation_path_unusual){
+        UX_DISPLAY(ui_display_derivation_warning, ui_request_change_path_approval_blue_prepro);
     }
-
-    UX_DISPLAY(ui_display_address_blue, ui_display_address_blue_prepro);
+    else{
+        load_qr_code(G_io_apdu_buffer + 200);
+        UX_DISPLAY(ui_display_address_blue, ui_display_address_blue_prepro);
+    }
+    
 #elif defined(TARGET_NANOS)
     // prepend a white space to the address
     G_io_apdu_buffer[199] = ' ';
