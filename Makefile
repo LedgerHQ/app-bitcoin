@@ -157,6 +157,11 @@ else ifeq ($(COIN),zclassic)
 DEFINES   += COIN_P2PKH_VERSION=7352 COIN_P2SH_VERSION=7357 COIN_FAMILY=1 COIN_COINID=\"ZClassic\" COIN_COINID_HEADER=\"ZCLASSIC\" COIN_COLOR_HDR=0xc87035 COIN_COLOR_DB=0xc78457 COIN_COINID_NAME=\"ZClassic\" COIN_COINID_SHORT=\"ZCL\" COIN_KIND=COIN_KIND_ZCLASSIC
 APPNAME ="ZClassic"
 APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),anon)
+# ANON
+DEFINES   += COIN_P2PKH_VERSION=1410 COIN_P2SH_VERSION=21385 COIN_FAMILY=1 COIN_COINID=\"ANON\" COIN_COINID_HEADER=\"ANON\" COIN_COLOR_HDR=0xed1e24 COIN_COLOR_DB=0xf04248 COIN_COINID_NAME=\"ANON\" COIN_COINID_SHORT=\"ANON\" COIN_KIND=COIN_KIND_ANON
+APPNAME ="ANON"
+APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
 $(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealth, digibyte, qtum, hcash, bitcoin_private, zcoin, gamecredits, zclassic) 
