@@ -85,6 +85,7 @@ enum btchip_output_parsing_state_e {
     BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS = 0x01,
     BTCHIP_OUTPUT_PARSING_OUTPUT = 0x02,
     BTCHIP_OUTPUT_FINALIZE_TX = 0x03,
+    BTCHIP_BIP44_CHANGE_PATH_VALIDATION = 0x04,
     BTCHIP_OUTPUT_HANDLE_LEGACY = 0xFF
 };
 typedef enum btchip_output_parsing_state_e btchip_output_parsing_state_t;
@@ -166,6 +167,10 @@ struct btchip_context_s {
     unsigned char shortCoinIdLength;        
 
     /** Non protected transaction context */
+
+    /** Last U2F Token streamed by host to attempt pubkey request */
+    unsigned char last_token[4];
+    unsigned char has_valid_token;
 
     /** Full transaction hash context */
     cx_sha256_t transactionHashFull;
@@ -269,7 +274,8 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_HORIZEN,
     COIN_KIND_GAMECREDITS,
     COIN_KIND_ZCOIN,
-    COIN_KIND_UNOBTANIUM
+    COIN_KIND_UNOBTANIUM,
+    COIN_KIND_ZCLASSIC
 } btchip_coin_kind_t;
 
 typedef struct btchip_altcoin_config_s {

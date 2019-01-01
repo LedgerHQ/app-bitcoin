@@ -236,6 +236,7 @@ unsigned short btchip_public_key_to_encoded_base58(
     unsigned char checksumBuffer[32];
     cx_sha256_t hash;
     unsigned char versionSize = (version > 255 ? 2 : 1);
+    size_t outputLen;
 
     if (!alreadyHashed) {
         L_DEBUG_BUF(("To hash\n", in, inlen));
@@ -258,7 +259,12 @@ unsigned short btchip_public_key_to_encoded_base58(
 
     L_DEBUG_BUF(("Checksum\n", checksumBuffer, 4));
     os_memmove(tmpBuffer + 20 + versionSize, checksumBuffer, 4);
-    return btchip_encode_base58(tmpBuffer, 24 + versionSize, out, outlen);
+
+    outputLen = outlen;
+    if (btchip_encode_base58(tmpBuffer, 24 + versionSize, out, &outputLen) < 0) {
+        THROW(EXCEPTION);
+    }
+    return outputLen;
 }
 
 void btchip_swap_bytes(unsigned char *target, unsigned char *source,
@@ -275,7 +281,11 @@ unsigned short btchip_decode_base58_address(unsigned char WIDE *in,
                                             unsigned short outlen) {
     unsigned char hashBuffer[32];
     cx_sha256_t hash;
-    outlen = btchip_decode_base58(in, inlen, out, outlen);
+    size_t outputLen = outlen;
+    if (btchip_decode_base58((char *)in, inlen, out, &outputLen) < 0) {
+        THROW(EXCEPTION);
+    }
+    outlen = outputLen;
 
     // Compute hash to verify address
     cx_sha256_init(&hash);
@@ -313,6 +323,95 @@ void btchip_private_derive_keypair(unsigned char WIDE *bip32Path,
                                privateComponent, out_chainCode);
     btchip_retrieve_keypair_discard(privateComponent, derivePublic);
     os_memset(privateComponent, 0, sizeof(privateComponent));
+}
+
+/* 
+Checks if the values of a derivation path are within "normal" (arbitrary) ranges:
+Account < 100, change == 1 or 0, address index < 50000
+Returns 1 if the path is unusual, or not compliant with BIP44*/
+unsigned char bip44_derivation_guard(unsigned char WIDE *bip32Path, bool is_change_path) {
+
+    unsigned char i, path_len;
+    unsigned int bip32PathInt[MAX_BIP32_PATH];
+    unsigned char privateComponent[32];
+    
+    path_len = bip32Path[0];
+    bip32Path++;
+    if (path_len > MAX_BIP32_PATH) {
+        THROW(INVALID_PARAMETER);
+    }
+    
+    for (i = 0; i < path_len; i++) {
+        bip32PathInt[i] = btchip_read_u32(bip32Path, 1, 0);
+        bip32Path += 4;
+    }    
+
+    // If the path length is not compliant with BIP44 or if the purpose/coin type don't match regular usage
+    if(path_len != BIP44_PATH_LEN ||
+       ((bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 44 &&
+       (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 49 &&
+       (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 84)) {
+        return 1;
+    }
+
+    // If the account or address index is very high or if the change isn't 1, return a warning
+    if((bip32PathInt[BIP44_ACCOUNT_OFFSET]^0x80000000) > MAX_BIP44_ACCOUNT_RECOMMENDED ||
+       bip32PathInt[BIP44_CHANGE_OFFSET] != is_change_path?1:0 ||
+       bip32PathInt[BIP44_ADDRESS_INDEX_OFFSET] > MAX_BIP44_ADDRESS_INDEX_RECOMMENDED) {
+        return 1;
+    }
+
+    return 0;
+}
+
+// Print a BIP32 path as an ascii string to display on the device screen
+// On the Ledger Blue, if the string is longer than 30 char, the string will be split in multiple lines
+unsigned char bip32_print_path(unsigned char WIDE *bip32Path, char* out, unsigned char max_out_len) {
+
+    unsigned char bip32PathLength;
+    unsigned char i, offset;
+    unsigned int current_level;
+    bool hardened;
+    unsigned char privateComponent[32];
+
+    bip32PathLength = bip32Path[0];
+    if (bip32PathLength > MAX_BIP32_PATH) {
+        THROW(INVALID_PARAMETER);
+    }
+    bip32Path++;
+    out[0] = ' ';
+    offset=1;
+    for (i = 0; i < bip32PathLength; i++) {
+        current_level = btchip_read_u32(bip32Path, 1, 0);
+        hardened = (bool)(current_level & 0x80000000);
+        if(hardened) {
+            //remove hardening flag
+            current_level ^= 0x80000000;
+        }
+        bip32Path += 4;
+        snprintf(out+offset, max_out_len-offset, "%u", current_level);
+        offset = strnlen(out, max_out_len);
+        if(offset >= max_out_len - 2) THROW(EXCEPTION_OVERFLOW);
+        if(hardened) out[offset++] = '\''; 
+
+        out[offset++] = '/';
+        out[offset] = '\0';
+    }
+    // remove last '/'
+    out[offset-1] = '\0';
+
+#if defined(TARGET_BLUE)
+    // if the path is longer than 30 char, split the string in multiple strings of length 30 
+    uint8_t len=strnlen(out, MAX_DERIV_PATH_ASCII_LENGTH);
+    uint8_t num_split = len/30;
+
+    for(i = 1; i<= num_split; i++) {
+        os_memmove(out+30*i, out+(30*i-1), len-29*i);
+        out[30*i-1] = '\0';
+    }
+#endif
+
+    return offset -1;
 }
 
 void btchip_transaction_add_output(unsigned char *hash160Address,
