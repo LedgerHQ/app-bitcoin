@@ -303,6 +303,14 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     sizeof(transactionSummary->summarydata.changeAddress));
                 btchip_context_D.tmpCtx.output.changeInitialized = 1;
                 btchip_context_D.tmpCtx.output.changeAccepted = 0;
+
+                // if the bip44 change path provided is not canonical or its index are unsual, ask for user approval
+                if(bip44_derivation_guard(transactionSummary->summarydata.keyPath, true)) {
+                    btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
+                    btchip_context_D.outputParsingState = BTCHIP_BIP44_CHANGE_PATH_VALIDATION;
+                    btchip_bagl_request_change_path_approval(transactionSummary->summarydata.keyPath);
+                }
+
                 goto return_OK;
             }
 
@@ -479,14 +487,22 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
 }
 
 unsigned short btchip_apdu_hash_input_finalize_full() {
+    PRINTF("state=%d\n", btchip_context_D.outputParsingState);
     unsigned short sw = btchip_apdu_hash_input_finalize_full_internal(
         &btchip_context_D.transactionSummary);
     if (btchip_context_D.io_flags & IO_ASYNCH_REPLY) {
         // if the UI reject the processing of the request, then reply
         // immediately
         bool status;
-        if (btchip_context_D.outputParsingState == BTCHIP_OUTPUT_FINALIZE_TX) {
+        if(btchip_context_D.outputParsingState == BTCHIP_BIP44_CHANGE_PATH_VALIDATION) {
+            btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS;
+            return sw;
+        }
+        else if (btchip_context_D.outputParsingState == BTCHIP_OUTPUT_FINALIZE_TX) {
             status = btchip_bagl_finalize_tx();
+        } else if (btchip_context_D.outputParsingState ==
+                   BTCHIP_OUTPUT_HANDLE_LEGACY) {
+            status = btchip_bagl_confirm_full_output();
         } else if (btchip_context_D.outputParsingState ==
                    BTCHIP_OUTPUT_HANDLE_LEGACY) {
             status = btchip_bagl_confirm_full_output();
