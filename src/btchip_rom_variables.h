@@ -25,6 +25,12 @@ extern unsigned char const WIDE BASE58ALPHABET[58];
 
 extern unsigned char const WIDE SIGNMAGIC[SIGNMAGIC_LENGTH];
 
+extern unsigned char const WIDE OVERWINTER_PARAM_PREVOUTS[16];
+extern unsigned char const WIDE OVERWINTER_PARAM_SEQUENCE[16];
+extern unsigned char const WIDE OVERWINTER_PARAM_OUTPUTS[16];
+extern unsigned char const WIDE OVERWINTER_PARAM_SIGHASH[16];
+extern unsigned char const WIDE OVERWINTER_NO_JOINSPLITS[32];
+
 #define HDKEY_VERSION_LENGTH 4
 
 extern unsigned char const WIDE TWOPOWER[8];

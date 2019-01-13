@@ -27,7 +27,7 @@ APP_LOAD_PARAMS= --curve secp256k1 $(COMMON_LOAD_PARAMS)
 
 APPVERSION_M=1
 APPVERSION_N=3
-APPVERSION_P=2
+APPVERSION_P=3
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 APP_LOAD_FLAGS=--appFlags 0x50 --dep Bitcoin:$(APPVERSION)
 
@@ -247,4 +247,4 @@ include $(BOLOS_SDK)/Makefile.rules
 dep/%.d: %.c Makefile
 
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash horizen komodo stratis peercoin posw pivx viacoin vertcoin stealth digibyte qtum hcash bitcoin_private zcoin gamecredits zclassic
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin posw pivx viacoin vertcoin stealth digibyte qtum hcash bitcoin_private zcoin gamecredits zclassic
