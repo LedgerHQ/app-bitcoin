@@ -657,8 +657,8 @@ void transaction_parse(unsigned char parseMode) {
                             unsigned char hashedSequence[32];
                             // Flush the cache
                             if (btchip_context_D.usingOverwinter) {
-                                cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, CX_LAST, hashedPrevouts, 32, hashedPrevouts);
-                                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hashedSequence, 32, hashedSequence);
+                                cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, CX_LAST, hashedPrevouts, 0, hashedPrevouts);
+                                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hashedSequence, 0, hashedSequence);
                             }
                             else {
                                 cx_hash(&btchip_context_D.segwit.hash.hashPrevouts
@@ -719,7 +719,6 @@ void transaction_parse(unsigned char parseMode) {
                                 .transactionState =
                                 BTCHIP_TRANSACTION_PRESIGN_READY;
                             if (btchip_context_D.usingOverwinter) {
-// last				
                                 cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, OVERWINTER_PARAM_OUTPUTS, 16);
                             }
                             else 
