@@ -115,6 +115,7 @@ static bool check_output_displayable() {
             displayable = false;
         }
     }
+
     return displayable;
 }
 
@@ -318,9 +319,14 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             // given data
             // For SegWit, this has been reset to hold hashOutputs
             if (!btchip_context_D.segwitParsedOnce) {
-                cx_hash(&btchip_context_D.transactionHashFull.header, 0,
+                if (btchip_context_D.usingOverwinter) {
+                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, G_io_apdu_buffer + ISO_OFFSET_CDATA + hashOffset, apduLength - hashOffset, NULL);
+                }
+                else {
+                    cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
                         G_io_apdu_buffer + ISO_OFFSET_CDATA + hashOffset,
                         apduLength - hashOffset, NULL);
+                }
             }
 
             if (btchip_context_D.transactionContext.firstSigned) {
@@ -381,16 +387,21 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
 
             if (btchip_context_D.usingSegwit) {
                 if (!btchip_context_D.segwitParsedOnce) {
-                    cx_hash(&btchip_context_D.transactionHashFull.header,
+                    if (btchip_context_D.usingOverwinter) {
+                        cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, btchip_context_D.segwit.cache.hashedOutputs, 0, btchip_context_D.segwit.cache.hashedOutputs);
+                    }
+                    else {
+                        cx_hash(&btchip_context_D.transactionHashFull.sha256.header,
                             CX_LAST,
                             btchip_context_D.segwit.cache.hashedOutputs, 0,
                             btchip_context_D.segwit.cache.hashedOutputs);
-                    cx_sha256_init(&btchip_context_D.transactionHashFull);
-                    cx_hash(&btchip_context_D.transactionHashFull.header,
+                        cx_sha256_init(&btchip_context_D.transactionHashFull.sha256);
+                        cx_hash(&btchip_context_D.transactionHashFull.sha256.header,
                             CX_LAST,
                             btchip_context_D.segwit.cache.hashedOutputs,
                             sizeof(btchip_context_D.segwit.cache.hashedOutputs),
                             btchip_context_D.segwit.cache.hashedOutputs);
+                    }
                     L_DEBUG_BUF(("hashOutputs\n",
                                  btchip_context_D.segwit.cache.hashedOutputs,
                                  32));
@@ -523,6 +534,7 @@ unsigned short btchip_apdu_hash_input_finalize_full() {
 unsigned char btchip_bagl_user_action(unsigned char confirming) {
     unsigned short sw = BTCHIP_SW_OK;
     // confirm and finish the apdu exchange //spaghetti
+
     if (confirming) {
         // Check if all inputs have been confirmed
 
