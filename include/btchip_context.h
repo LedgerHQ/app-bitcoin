@@ -290,7 +290,8 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_HORIZEN,
     COIN_KIND_GAMECREDITS,
     COIN_KIND_ZCOIN, 
-    COIN_KIND_ZCLASSIC
+    COIN_KIND_ZCLASSIC,
+    COIN_KIND_XSN
 } btchip_coin_kind_t;
 
 typedef struct btchip_altcoin_config_s {
