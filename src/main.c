@@ -1538,21 +1538,30 @@ uint8_t prepare_fees() {
     } else {
         unsigned char fees[8];
         unsigned short textSize;
-        if (transaction_amount_sub_be(
+        unsigned char borrow;
+
+        borrow = transaction_amount_sub_be(
                 fees, btchip_context_D.transactionContext.transactionAmount,
-                btchip_context_D.totalOutputAmount)) {
-            PRINTF("Error : Fees not consistent");
-            goto error;
+                btchip_context_D.totalOutputAmount);
+        if (borrow && G_coin_config->kind == COIN_KIND_KOMODO) {
+            os_memmove(vars.tmp.feesAmount, "REWARD", 6);
+            vars.tmp.feesAmount[6] = '\0';
         }
-        os_memmove(vars.tmp.feesAmount, btchip_context_D.shortCoinId,
-                   btchip_context_D.shortCoinIdLength);
-        vars.tmp.feesAmount[btchip_context_D.shortCoinIdLength] = ' ';
-        btchip_context_D.tmp =
-            (unsigned char *)(vars.tmp.feesAmount +
+        else {
+            if (borrow) {
+                PRINTF("Error : Fees not consistent");
+                goto error;
+            }
+            os_memmove(vars.tmp.feesAmount, btchip_context_D.shortCoinId,
+                       btchip_context_D.shortCoinIdLength);
+            vars.tmp.feesAmount[btchip_context_D.shortCoinIdLength] = ' ';
+            btchip_context_D.tmp =
+                (unsigned char *)(vars.tmp.feesAmount +
                               btchip_context_D.shortCoinIdLength + 1);
-        textSize = btchip_convert_hex_amount_to_displayable(fees);
-        vars.tmp.feesAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
-            '\0';
+            textSize = btchip_convert_hex_amount_to_displayable(fees);
+            vars.tmp.feesAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
+                '\0';
+        }
     }
     return 1;
 error:
@@ -1687,6 +1696,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
     unsigned char amount[8], totalOutputAmount[8], fees[8];
     char tmp[80];
     unsigned char outputPos = 0, changeFound = 0, specialOpFound = 0;
+    unsigned char borrow;
     if (btchip_context_D.transactionContext.relaxed &&
         !btchip_context_D.transactionContext.consumeP2SH) {
         if (!checkOnly) {
@@ -1804,9 +1814,10 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         }
         goto error;
     }    
-    if (transaction_amount_sub_be(
+    borrow = transaction_amount_sub_be(
             fees, btchip_context_D.transactionContext.transactionAmount,
-            totalOutputAmount)) {
+            totalOutputAmount);
+    if (borrow && G_coin_config->kind != COIN_KIND_KOMODO) {
         if (!checkOnly) {
             PRINTF("Error : Fees not consistent");
         }
@@ -1907,20 +1918,26 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                         '\0';
 
                     // prepare fee display
-                    os_memmove(vars.tmp.feesAmount,
+                    if (borrow) {
+                        os_memmove(vars.tmp.feesAmount, "REWARD", 6);
+                        vars.tmp.feesAmount[6] = '\0';
+                    }
+                    else {
+                        os_memmove(vars.tmp.feesAmount,
                                btchip_context_D.shortCoinId,
                                btchip_context_D.shortCoinIdLength);
-                    vars.tmp.feesAmount[btchip_context_D.shortCoinIdLength] =
-                        ' ';
-                    btchip_context_D.tmp =
-                        (unsigned char *)(vars.tmp.feesAmount +
+                        vars.tmp.feesAmount[btchip_context_D.shortCoinIdLength] =
+                            ' ';
+                        btchip_context_D.tmp =
+                            (unsigned char *)(vars.tmp.feesAmount +
                                           btchip_context_D.shortCoinIdLength +
                                           1);
-                    textSize = btchip_convert_hex_amount_to_displayable(fees);
-                    vars.tmp
-                        .feesAmount[textSize +
+                        textSize = btchip_convert_hex_amount_to_displayable(fees);
+                        vars.tmp
+                            .feesAmount[textSize +
                                     btchip_context_D.shortCoinIdLength + 1] =
-                        '\0';
+                            '\0';
+                    }
                     break;
                 }
             } else {
