@@ -22,14 +22,14 @@ include $(BOLOS_SDK)/Makefile.defines
 
 APP_PATH = ""
 # All but bitcoin app use dependency onto the bitcoin app/lib
-APP_LOAD_FLAGS=--appFlags 0x50 --dep Bitcoin
 DEFINES_LIB = USE_LIB_BITCOIN
 APP_LOAD_PARAMS= --curve secp256k1 $(COMMON_LOAD_PARAMS) 
 
 APPVERSION_M=1
-APPVERSION_N=2
-APPVERSION_P=8
+APPVERSION_N=3
+APPVERSION_P=6
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
+APP_LOAD_FLAGS=--appFlags 0x50 --dep Bitcoin:$(APPVERSION)
 
 # simplify for tests
 ifndef COIN
@@ -125,7 +125,7 @@ DEFINES   += COIN_P2PKH_VERSION=71 COIN_P2SH_VERSION=5 COIN_FAMILY=1 COIN_COINID
 APPNAME ="Vertcoin"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),digibyte)
-DEFINES   += COIN_P2PKH_VERSION=30 COIN_P2SH_VERSION=5 COIN_FAMILY=1 COIN_COINID=\"DigiByte\" COIN_COINID_HEADER=\"DIGIBYTE\" COIN_COLOR_HDR=0x2864AE COIN_COLOR_DB=0x94B2D7 COIN_COINID_NAME=\"DigiByte\" COIN_COINID_SHORT=\"DBG\" COIN_KIND=COIN_KIND_DIGIBYTE COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
+DEFINES   += COIN_P2PKH_VERSION=30 COIN_P2SH_VERSION=63 COIN_FAMILY=1 COIN_COINID=\"DigiByte\" COIN_COINID_HEADER=\"DIGIBYTE\" COIN_COLOR_HDR=0x2864AE COIN_COLOR_DB=0x94B2D7 COIN_COINID_NAME=\"DigiByte\" COIN_COINID_SHORT=\"DGB\" COIN_NATIVE_SEGWIT_PREFIX=\"dgb1\" COIN_KIND=COIN_KIND_DIGIBYTE COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
 APPNAME ="Digibyte"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),qtum)
@@ -147,14 +147,24 @@ else ifeq ($(COIN),bitcoin_private)
 DEFINES   += COIN_P2PKH_VERSION=4901 COIN_P2SH_VERSION=5039 COIN_FAMILY=1 COIN_COINID=\"BPrivate\" COIN_COINID_HEADER=\"BITCOINPRIVATE\" COIN_COLOR_HDR=0x85bb65 COIN_COLOR_DB=0xc2ddb2 COIN_COINID_NAME=\"BPrivate\" COIN_COINID_SHORT=\"BTCP\" COIN_KIND=COIN_KIND_BITCOIN_PRIVATE COIN_FORKID=42
 APPNAME ="Bitcoin Private"
 APP_LOAD_PARAMS += --path $(APP_PATH)
-else ifeq ($(COIN),actinium)
-# Actinium
-DEFINES   += COIN_P2PKH_VERSION=53 COIN_P2SH_VERSION=55 COIN_FAMILY=1 COIN_COINID=\"Actinium\" COIN_COINID_HEADER=\"ACTINIUM\" COIN_COLOR_HDR=0x189240 COIN_COLOR_DB=0x25D860 COIN_COINID_NAME=\"Actinium\" COIN_COINID_SHORT=\"ACM\" COIN_NATIVE_SEGWIT_PREFIX=\"acm1\" COIN_KIND=COIN_KIND_ACTINIUM COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
-APPNAME ="Actinium"
+else ifeq ($(COIN),gamecredits)
+# GameCredits
+DEFINES   += COIN_P2PKH_VERSION=38 COIN_P2SH_VERSION=62 COIN_FAMILY=1 COIN_COINID=\"GameCredits\" COIN_COINID_HEADER=\"GAMECREDITS\" COIN_COLOR_HDR=0x98C01F COIN_COLOR_DB=0xA1A2A7 COIN_COINID_NAME=\"GameCredits\" COIN_COINID_SHORT=\"GAME\" COIN_KIND=COIN_KIND_GAMECREDITS COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
+APPNAME ="GameCredits"
+APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),zclassic)
+# ZClassic
+DEFINES   += COIN_P2PKH_VERSION=7352 COIN_P2SH_VERSION=7357 COIN_FAMILY=1 COIN_COINID=\"ZClassic\" COIN_COINID_HEADER=\"ZCLASSIC\" COIN_COLOR_HDR=0xc87035 COIN_COLOR_DB=0xc78457 COIN_COINID_NAME=\"ZClassic\" COIN_COINID_SHORT=\"ZCL\" COIN_KIND=COIN_KIND_ZCLASSIC
+APPNAME ="ZClassic"
+APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),xsn)
+# XSN mainnet
+DEFINES   += COIN_P2PKH_VERSION=76 COIN_P2SH_VERSION=16 COIN_FAMILY=1 COIN_COINID=\"XSN\" COIN_COINID_HEADER=\"XSN\" COIN_COLOR_HDR=0x2982D1 COIN_COLOR_DB=0x7FB6E6 COIN_COINID_NAME=\"XSN\" COIN_COINID_SHORT=\"XSN\" COIN_NATIVE_SEGWIT_PREFIX=\"xc\" COIN_KIND=COIN_KIND_XSN COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
+APPNAME ="XSN"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealth, digibyte, qtum, hcash, bitcoin_private, zcoin, actinium) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealth, digibyte, qtum, hcash, bitcoin_private, zcoin, gamecredits, zclassic, xsn) 
 endif
 endif
 
@@ -242,4 +252,4 @@ include $(BOLOS_SDK)/Makefile.rules
 dep/%.d: %.c Makefile
 
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin posw pivx viacoin vertcoin stealth digibyte qtum hcash bitcoin_private zcoin
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin posw pivx viacoin vertcoin stealth digibyte qtum hcash bitcoin_private zcoin gamecredits zclassic xsn
