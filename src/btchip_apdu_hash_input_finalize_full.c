@@ -115,6 +115,7 @@ static bool check_output_displayable() {
             displayable = false;
         }
     }
+
     return displayable;
 }
 
@@ -303,6 +304,14 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     sizeof(transactionSummary->summarydata.changeAddress));
                 btchip_context_D.tmpCtx.output.changeInitialized = 1;
                 btchip_context_D.tmpCtx.output.changeAccepted = 0;
+
+                // if the bip44 change path provided is not canonical or its index are unsual, ask for user approval
+                if(bip44_derivation_guard(transactionSummary->summarydata.keyPath, true)) {
+                    btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
+                    btchip_context_D.outputParsingState = BTCHIP_BIP44_CHANGE_PATH_VALIDATION;
+                    btchip_bagl_request_change_path_approval(transactionSummary->summarydata.keyPath);
+                }
+
                 goto return_OK;
             }
 
@@ -310,9 +319,14 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             // given data
             // For SegWit, this has been reset to hold hashOutputs
             if (!btchip_context_D.segwitParsedOnce) {
-                cx_hash(&btchip_context_D.transactionHashFull.header, 0,
+                if (btchip_context_D.usingOverwinter) {
+                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, G_io_apdu_buffer + ISO_OFFSET_CDATA + hashOffset, apduLength - hashOffset, NULL);
+                }
+                else {
+                    cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
                         G_io_apdu_buffer + ISO_OFFSET_CDATA + hashOffset,
                         apduLength - hashOffset, NULL);
+                }
             }
 
             if (btchip_context_D.transactionContext.firstSigned) {
@@ -373,16 +387,21 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
 
             if (btchip_context_D.usingSegwit) {
                 if (!btchip_context_D.segwitParsedOnce) {
-                    cx_hash(&btchip_context_D.transactionHashFull.header,
+                    if (btchip_context_D.usingOverwinter) {
+                        cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, btchip_context_D.segwit.cache.hashedOutputs, 0, btchip_context_D.segwit.cache.hashedOutputs);
+                    }
+                    else {
+                        cx_hash(&btchip_context_D.transactionHashFull.sha256.header,
                             CX_LAST,
                             btchip_context_D.segwit.cache.hashedOutputs, 0,
                             btchip_context_D.segwit.cache.hashedOutputs);
-                    cx_sha256_init(&btchip_context_D.transactionHashFull);
-                    cx_hash(&btchip_context_D.transactionHashFull.header,
+                        cx_sha256_init(&btchip_context_D.transactionHashFull.sha256);
+                        cx_hash(&btchip_context_D.transactionHashFull.sha256.header,
                             CX_LAST,
                             btchip_context_D.segwit.cache.hashedOutputs,
                             sizeof(btchip_context_D.segwit.cache.hashedOutputs),
                             btchip_context_D.segwit.cache.hashedOutputs);
+                    }
                     L_DEBUG_BUF(("hashOutputs\n",
                                  btchip_context_D.segwit.cache.hashedOutputs,
                                  32));
@@ -479,14 +498,22 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
 }
 
 unsigned short btchip_apdu_hash_input_finalize_full() {
+    PRINTF("state=%d\n", btchip_context_D.outputParsingState);
     unsigned short sw = btchip_apdu_hash_input_finalize_full_internal(
         &btchip_context_D.transactionSummary);
     if (btchip_context_D.io_flags & IO_ASYNCH_REPLY) {
         // if the UI reject the processing of the request, then reply
         // immediately
         bool status;
-        if (btchip_context_D.outputParsingState == BTCHIP_OUTPUT_FINALIZE_TX) {
+        if(btchip_context_D.outputParsingState == BTCHIP_BIP44_CHANGE_PATH_VALIDATION) {
+            btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS;
+            return sw;
+        }
+        else if (btchip_context_D.outputParsingState == BTCHIP_OUTPUT_FINALIZE_TX) {
             status = btchip_bagl_finalize_tx();
+        } else if (btchip_context_D.outputParsingState ==
+                   BTCHIP_OUTPUT_HANDLE_LEGACY) {
+            status = btchip_bagl_confirm_full_output();
         } else if (btchip_context_D.outputParsingState ==
                    BTCHIP_OUTPUT_HANDLE_LEGACY) {
             status = btchip_bagl_confirm_full_output();
@@ -507,6 +534,7 @@ unsigned short btchip_apdu_hash_input_finalize_full() {
 unsigned char btchip_bagl_user_action(unsigned char confirming) {
     unsigned short sw = BTCHIP_SW_OK;
     // confirm and finish the apdu exchange //spaghetti
+
     if (confirming) {
         // Check if all inputs have been confirmed
 
