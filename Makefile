@@ -203,6 +203,7 @@ DEFINES   += UNUSED\(x\)=\(void\)x
 DEFINES   += APPVERSION=\"$(APPVERSION)\"
 
 DEFINES += CX_COMPLIANCE_141
+DEFINES += BLAKE_SDK
 
 ##############
 # Compiler #
