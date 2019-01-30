@@ -15,6 +15,9 @@
 *  limitations under the License.
 ********************************************************************************/
 
+#ifndef _BTCHIP_ROM_VARIABLES_
+#define _BTCHIP_ROM_VARIABLES_
+
 #include "btchip_internal.h"
 
 #define SIGNMAGIC_LENGTH 17
@@ -63,3 +66,5 @@ extern unsigned char const WIDE DISPATCHER_CLA[DISPATCHER_APDUS];
 extern unsigned char const WIDE DISPATCHER_INS[DISPATCHER_APDUS];
 extern unsigned char const WIDE DISPATCHER_DATA_IN[DISPATCHER_APDUS];
 extern apduProcessingFunction const DISPATCHER_FUNCTIONS[DISPATCHER_APDUS];
+
+#endif /* _BTCHIP_ROM_VARIABLES_ */

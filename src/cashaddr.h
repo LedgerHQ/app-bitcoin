@@ -21,7 +21,7 @@
  */
 
 #ifndef _CASHADDR_H_
-#define _CASHADDR_H_ 1
+#define _CASHADDR_H_
 
 #include <stdint.h>
 
@@ -45,4 +45,4 @@
 int cashaddr_encode(uint8_t *hash, const size_t hash_length, uint8_t *addr,
                     const size_t max_addr_len, const unsigned short version);
 
-#endif
+#endif /* _CASHADDR_H_ */

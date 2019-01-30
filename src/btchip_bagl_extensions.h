@@ -1,6 +1,5 @@
-#ifndef __BTCHIP_BAGL_H__
-
-#define __BTCHIP_BAGL_H__
+#ifndef _BTCHIP_BAGL_H_
+#define _BTCHIP_BAGL_H_
 
 // btchip asking the legacy grouped UI
 unsigned int btchip_bagl_confirm_full_output(void);
@@ -27,4 +26,4 @@ void btchip_bagl_user_action_message_signing(unsigned char confirming);
 void btchip_bagl_display_public_key(unsigned char *derivation_path);
 void btchip_bagl_user_action_display(unsigned char confirming);
 
-#endif
+#endif /* _BTCHIP_BAGL_H_ */

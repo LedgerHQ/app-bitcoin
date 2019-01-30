@@ -15,9 +15,8 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef BTCHIP_PUBLIC_RAM_VARIABLES_H
-
-#define BTCHIP_PUBLIC_RAM_VARIABLES_H
+#ifndef _BTCHIP_PUBLIC_RAM_VARIABLES_H_
+#define _BTCHIP_PUBLIC_RAM_VARIABLES_H_
 
 #include "btchip_config.h"
 
@@ -28,4 +27,4 @@ extern btchip_context_t btchip_context_D;
 
 extern btchip_altcoin_config_t *G_coin_config;
 
-#endif
+#endif /* _BTCHIP_PUBLIC_RAM_VARIABLES_H_ */

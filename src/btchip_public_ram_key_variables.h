@@ -15,9 +15,8 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef BTCHIP_PUBLIC_RAM_KEY_VARIABLES_H
-
-#define BTCHIP_PUBLIC_RAM_KEY_VARIABLES_H
+#ifndef _BTCHIP_PUBLIC_RAM_KEY_VARIABLES_H_
+#define _BTCHIP_PUBLIC_RAM_KEY_VARIABLES_H_
 
 #include "btchip_config.h"
 
@@ -27,4 +26,4 @@
 extern cx_ecfp_public_key_t btchip_public_key_D;
 extern cx_ecfp_private_key_t btchip_private_key_D;
 
-#endif
+#endif /* _BTCHIP_PUBLIC_RAM_KEY_VARIABLES_H_ */
