@@ -20,6 +20,6 @@
 #define BTCHIP_BCD_H
 
 unsigned char
-btchip_convert_hex_amount_to_displayable(unsigned char WIDE *amount);
+btchip_convert_hex_amount_to_displayable(unsigned char *amount);
 
 #endif

@@ -412,7 +412,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     cx_hash(
                         &btchip_context_D.transactionHashAuthorization.header,
                         CX_LAST,
-                        (unsigned char WIDE *)&btchip_context_D.segwit.cache,
+                        (unsigned char *)&btchip_context_D.segwit.cache,
                         sizeof(btchip_context_D.segwit.cache),
                         authorizationHash);
                 }

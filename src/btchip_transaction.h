@@ -32,12 +32,12 @@ void transaction_parse(unsigned char parseMode);
 
 // target = a + b
 unsigned char transaction_amount_add_be(unsigned char *target,
-                                        unsigned char WIDE *a,
-                                        unsigned char WIDE *b);
+                                        unsigned char *a,
+                                        unsigned char *b);
 
 // target = a - b
 unsigned char transaction_amount_sub_be(unsigned char *target,
-                                        unsigned char WIDE *a,
-                                        unsigned char WIDE *b);
+                                        unsigned char *a,
+                                        unsigned char *b);
 
 #endif /* _BTCHIP_TRANSACTION_H_ */

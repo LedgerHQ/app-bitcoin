@@ -36,8 +36,8 @@ void check_transaction_available(unsigned char x) {
 #define OP_CHECKMULTISIG 0xAE
 
 unsigned char transaction_amount_add_be(unsigned char *target,
-                                        unsigned char WIDE *a,
-                                        unsigned char WIDE *b) {
+                                        unsigned char *a,
+                                        unsigned char *b) {
     unsigned char carry = 0;
     unsigned char i;
     for (i = 0; i < 8; i++) {
@@ -49,8 +49,8 @@ unsigned char transaction_amount_add_be(unsigned char *target,
 }
 
 unsigned char transaction_amount_sub_be(unsigned char *target,
-                                        unsigned char WIDE *a,
-                                        unsigned char WIDE *b) {
+                                        unsigned char *a,
+                                        unsigned char *b) {
     unsigned char borrow = 0;
     unsigned char i;
     for (i = 0; i < 8; i++) {
@@ -237,7 +237,7 @@ void transaction_parse(unsigned char parseMode) {
                                 cx_hash(&btchip_context_D
                                          .transactionHashAuthorization.header,
                                     0,
-                                    (unsigned char WIDE *)&btchip_context_D
+                                    (unsigned char *)&btchip_context_D
                                         .segwit.cache,
                                     sizeof(btchip_context_D.segwit.cache),
                                     NULL);

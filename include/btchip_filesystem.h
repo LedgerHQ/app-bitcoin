@@ -73,9 +73,9 @@ typedef struct btchip_storage_s {
 } btchip_storage_t;
 
 // the global nvram memory variable
-extern WIDE btchip_storage_t N_btchip_real;
+extern btchip_storage_t N_btchip_real;
 
-#define N_btchip (*(WIDE btchip_storage_t *)PIC(&N_btchip_real))
+#define N_btchip (*(btchip_storage_t *)PIC(&N_btchip_real))
 
 void btchip_set_operation_mode(unsigned char operationMode);
 

@@ -78,7 +78,7 @@ unsigned short btchip_apdu_get_trusted_input() {
         }
 
         cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
-                (unsigned char WIDE *)NULL, 0, targetHash);
+                (unsigned char *)NULL, 0, targetHash);
 
         // Otherwise prepare
         cx_rng(G_io_apdu_buffer, 8);

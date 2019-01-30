@@ -20,7 +20,7 @@
 #define SCRATCH_SIZE 21
 
 unsigned char
-btchip_convert_hex_amount_to_displayable(unsigned char WIDE *amount) {
+btchip_convert_hex_amount_to_displayable(unsigned char *amount) {
     unsigned char LOOP1;
     unsigned char LOOP2;
     if (!(G_coin_config->flags & FLAG_PEERCOIN_UNITS)) {

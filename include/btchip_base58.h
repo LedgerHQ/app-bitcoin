@@ -21,10 +21,10 @@
 
 #include <stdlib.h>
 
-int btchip_decode_base58(const char WIDE *in, size_t length,
+int btchip_decode_base58(const char *in, size_t length,
                          unsigned char *out, size_t *outlen);
 
-int btchip_encode_base58(const unsigned char WIDE *in, size_t length,
+int btchip_encode_base58(const unsigned char *in, size_t length,
                          unsigned char *out, size_t *outlen);
 
 #endif
