@@ -325,7 +325,7 @@ void btchip_private_derive_keypair(unsigned char WIDE *bip32Path,
     os_memset(privateComponent, 0, sizeof(privateComponent));
 }
 
-/* 
+/*
 Checks if the values of a derivation path are within "normal" (arbitrary) ranges:
 Account < 100, change == 1 or 0, address index < 50000
 Returns 1 if the path is unusual, or not compliant with BIP44*/
@@ -334,17 +334,17 @@ unsigned char bip44_derivation_guard(unsigned char WIDE *bip32Path, bool is_chan
     unsigned char i, path_len;
     unsigned int bip32PathInt[MAX_BIP32_PATH];
     unsigned char privateComponent[32];
-    
+
     path_len = bip32Path[0];
     bip32Path++;
     if (path_len > MAX_BIP32_PATH) {
         THROW(INVALID_PARAMETER);
     }
-    
+
     for (i = 0; i < path_len; i++) {
         bip32PathInt[i] = btchip_read_u32(bip32Path, 1, 0);
         bip32Path += 4;
-    }    
+    }
 
     // If the path length is not compliant with BIP44 or if the purpose/coin type don't match regular usage
     if(path_len != BIP44_PATH_LEN ||
@@ -392,7 +392,7 @@ unsigned char bip32_print_path(unsigned char WIDE *bip32Path, char* out, unsigne
         snprintf(out+offset, max_out_len-offset, "%u", current_level);
         offset = strnlen(out, max_out_len);
         if(offset >= max_out_len - 2) THROW(EXCEPTION_OVERFLOW);
-        if(hardened) out[offset++] = '\''; 
+        if(hardened) out[offset++] = '\'';
 
         out[offset++] = '/';
         out[offset] = '\0';
@@ -401,7 +401,7 @@ unsigned char bip32_print_path(unsigned char WIDE *bip32Path, char* out, unsigne
     out[offset-1] = '\0';
 
 #if defined(TARGET_BLUE)
-    // if the path is longer than 30 char, split the string in multiple strings of length 30 
+    // if the path is longer than 30 char, split the string in multiple strings of length 30
     uint8_t len=strnlen(out, MAX_DERIV_PATH_ASCII_LENGTH);
     uint8_t num_split = len/30;
 

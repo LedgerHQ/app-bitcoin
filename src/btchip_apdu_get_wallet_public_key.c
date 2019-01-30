@@ -100,7 +100,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
     PRINTF("pin ok\n");
 
     btchip_private_derive_keypair(keyPath, 1, chainCode);
-    
+
 
     G_io_apdu_buffer[0] = 65;
 
@@ -177,7 +177,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         btchip_bagl_display_public_key(keyPath);
     }
     // If the token requested has already been approved in a previous call, the source is trusted so don't ask for approval again
-    else if(display_request_token && 
+    else if(display_request_token &&
            (!btchip_context_D.has_valid_token || os_memcmp(&request_token, btchip_context_D.last_token, 4)))
     {
         // disable the has_valid_token flag and store the new token
@@ -194,7 +194,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
         btchip_bagl_request_pubkey_approval();
     }
-    
+
     return BTCHIP_SW_OK;
 }
 

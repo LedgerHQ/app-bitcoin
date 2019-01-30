@@ -93,7 +93,7 @@ unsigned short btchip_apdu_hash_sign() {
             if (btchip_context_D.usingOverwinter && !btchip_context_D.overwinterSignReady) {
                 L_DEBUG_APP(("Overwinter not ready to sign\n"));
                 sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
-                goto discardTransaction;                
+                goto discardTransaction;
             }
 
             // Read parameters
@@ -162,7 +162,7 @@ unsigned short btchip_apdu_hash_sign() {
 
                 // Rehash
                 cx_sha256_init(&localHash);
-                cx_hash(&localHash.header, CX_LAST, hash1, sizeof(hash1), hash2);                
+                cx_hash(&localHash.header, CX_LAST, hash1, sizeof(hash1), hash2);
             }
             L_DEBUG_BUF(("Hash2\n", hash2, sizeof(hash2)));
 
