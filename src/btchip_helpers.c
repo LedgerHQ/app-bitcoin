@@ -333,7 +333,6 @@ unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_pa
 
     unsigned char i, path_len;
     unsigned int bip32PathInt[MAX_BIP32_PATH];
-    unsigned char privateComponent[32];
 
     path_len = bip32Path[0];
     bip32Path++;
@@ -372,7 +371,6 @@ unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned cha
     unsigned char i, offset;
     unsigned int current_level;
     bool hardened;
-    unsigned char privateComponent[32];
 
     bip32PathLength = bip32Path[0];
     if (bip32PathLength > MAX_BIP32_PATH) {
