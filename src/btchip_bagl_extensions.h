@@ -24,6 +24,9 @@ unsigned int btchip_bagl_confirm_full_output(void);
 // btchip asking the per-output UI
 unsigned int btchip_bagl_confirm_single_output(void);
 
+// btchip display token
+void btchip_bagl_display_token(void);
+
 // btchip finalizing the transaction
 unsigned int btchip_bagl_finalize_tx(void);
 
@@ -42,5 +45,8 @@ void btchip_bagl_user_action_message_signing(unsigned char confirming);
 // Public key display
 void btchip_bagl_display_public_key(unsigned char *derivation_path);
 void btchip_bagl_user_action_display(unsigned char confirming);
+
+void btchip_bagl_request_pubkey_approval(void);
+void btchip_bagl_request_change_path_approval(unsigned char* change_path);
 
 #endif /* _BTCHIP_BAGL_H_ */
