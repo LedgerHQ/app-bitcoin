@@ -201,7 +201,7 @@ void btchip_retrieve_keypair_discard(unsigned char WIDE *privateComponent,
             cx_ecdsa_init_private_key(BTCHIP_CURVE, privateComponent, 32,
                                       &btchip_private_key_D);
 
-            L_DEBUG_BUF(("Using private component\n", privateComponent, 32));
+            PRINTF("Using private component\n%.*H\n",32,privateComponent);
 
             if (derivePublic) {
                 cx_ecfp_generate_pair(BTCHIP_CURVE, &btchip_public_key_D,
@@ -239,9 +239,9 @@ unsigned short btchip_public_key_to_encoded_base58(
     size_t outputLen;
 
     if (!alreadyHashed) {
-        L_DEBUG_BUF(("To hash\n", in, inlen));
+        PRINTF("To hash\n%.*H\n",inlen,in);
         btchip_public_key_hash160(in, inlen, tmpBuffer + versionSize);
-        L_DEBUG_BUF(("Hash160\n", (tmpBuffer + versionSize), 20));
+        PRINTF("Hash160\n%.*H\n",20,(tmpBuffer + versionSize));
         if (version > 255) {
             tmpBuffer[0] = (version >> 8);
             tmpBuffer[1] = version;
@@ -257,7 +257,7 @@ unsigned short btchip_public_key_to_encoded_base58(
     cx_sha256_init(&hash);
     cx_hash(&hash.header, CX_LAST, checksumBuffer, 32, checksumBuffer);
 
-    L_DEBUG_BUF(("Checksum\n", checksumBuffer, 4));
+    PRINTF("Checksum\n%.*H\n",4,checksumBuffer);
     os_memmove(tmpBuffer + 20 + versionSize, checksumBuffer, 4);
 
     outputLen = outlen;
@@ -294,8 +294,7 @@ unsigned short btchip_decode_base58_address(unsigned char WIDE *in,
     cx_hash(&hash.header, CX_LAST, hashBuffer, 32, hashBuffer);
 
     if (os_memcmp(out + outlen - 4, hashBuffer, 4)) {
-        L_DEBUG_BUF(
-            ("Hash checksum mismatch\n", hashBuffer, sizeof(hashBuffer)));
+        PRINTF("Hash checksum mismatch\n%.*H\n",sizeof(hashBuffer),hashBuffer);
         THROW(INVALID_CHECKSUM);
     }
 

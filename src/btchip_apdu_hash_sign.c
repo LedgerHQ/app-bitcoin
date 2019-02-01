@@ -83,15 +83,13 @@ unsigned short btchip_apdu_hash_sign() {
 
             if (btchip_context_D.transactionContext.transactionState !=
                 BTCHIP_TRANSACTION_SIGN_READY) {
-                L_DEBUG_APP(
-                    ("Invalid transaction state %d\n",
-                     btchip_context_D.transactionContext.transactionState));
+                PRINTF("Invalid transaction state %d\n", btchip_context_D.transactionContext.transactionState);
                 sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
                 goto discardTransaction;
             }
 
             if (btchip_context_D.usingOverwinter && !btchip_context_D.overwinterSignReady) {
-                L_DEBUG_APP(("Overwinter not ready to sign\n"));
+                PRINTF("Overwinter not ready to sign\n");
                 sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
                 goto discardTransaction;                
             }
@@ -153,18 +151,17 @@ unsigned short btchip_apdu_hash_sign() {
             else {
                 btchip_write_u32_le(dataBuffer, lockTime);
                 btchip_write_u32_le(dataBuffer + 4, sighashType);
-                L_DEBUG_BUF(
-                    ("Finalize hash with\n", dataBuffer, sizeof(dataBuffer)));
+                PRINTF("Finalize hash with\n%.*H\n", sizeof(dataBuffer), dataBuffer);
 
                 cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
                     dataBuffer, sizeof(dataBuffer), hash1);
-                L_DEBUG_BUF(("Hash1\n", hash1, sizeof(hash1)));
+                PRINTF("Hash1\n%.*H\n", sizeof(hash1), hash1);
 
                 // Rehash
                 cx_sha256_init(&localHash);
                 cx_hash(&localHash.header, CX_LAST, hash1, sizeof(hash1), hash2);                
             }
-            L_DEBUG_BUF(("Hash2\n", hash2, sizeof(hash2)));
+            PRINTF("Hash2\n%.*H\n", sizeof(hash2), hash2);
 
             // Sign
             btchip_signverify_finalhash(

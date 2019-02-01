@@ -32,7 +32,7 @@ int btchip_decode_base58(const char WIDE *in, size_t length,
     return -1;
   }
   os_memmove(tmp, in, length);
-  L_DEBUG_BUF(("To decode\n", tmp, length));
+  PRINTF("To decode\n%.*H\n",length,tmp);
   for (i = 0; i < length; i++) {
     if (in[i] >= sizeof(BASE58TABLE)) {
       return -1;
@@ -66,12 +66,12 @@ int btchip_decode_base58(const char WIDE *in, size_t length,
   }
   length = length - (j - zeroCount);
   if (*outlen < length) {
-    L_DEBUG_APP(("Decode overflow %d %d\n", length, *outlen));
+    PRINTF("Decode overflow %d %d\n", length, *outlen);
     return -1;
   }
 
   os_memmove(out, buffer + j - zeroCount, length);
-  L_DEBUG_BUF(("Decoded\n", out, length));
+  PRINTF("Decoded\n%.*H\n",length,out);
   *outlen = length;
   return 0;
 }
@@ -88,8 +88,8 @@ int btchip_encode_base58(const unsigned char WIDE *in, size_t length,
     return -1;
   }
 
-  L_DEBUG_APP(("Length to encode %d\n", length));
-  L_DEBUG_BUF(("To encode\n", in, length));
+  PRINTF("Length to encode %d\n", length);
+  PRINTF("To encode\n%.*H\n",length,in);
 
   while ((zeroCount < length) && (in[zeroCount] == 0)) {
     ++zeroCount;
@@ -128,7 +128,7 @@ int btchip_encode_base58(const unsigned char WIDE *in, size_t length,
     out[i++] = BASE58ALPHABET[buffer[j++]];
   }
   *outlen = i;
-  L_DEBUG_APP(("Length encoded %d\n", i));
-  L_DEBUG_BUF(("Encoded\n", out, i));
+  PRINTF("Length encoded %d\n", i);
+  PRINTF("Encoded\n%.*H\n",i,out);
   return 0;
 }

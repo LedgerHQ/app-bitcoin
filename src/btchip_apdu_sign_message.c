@@ -89,7 +89,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                     os_memset(&btchip_context_D.transactionSummary, 0,
                               sizeof(btchip_transaction_summary_t));
                     if (G_io_apdu_buffer[offset] > MAX_BIP32_PATH) {
-                        L_DEBUG_APP(("Invalid path\n"));
+                        PRINTF("Invalid path\n");
                         sw = BTCHIP_SW_INCORRECT_DATA;
                         CLOSE_TRY;
                         goto discard;
@@ -114,7 +114,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                     }
                     if (btchip_context_D.transactionSummary.messageLength ==
                         0) {
-                        L_DEBUG_APP(("Null message length\n"));
+                        PRINTF("Null message length\n");
                         sw = BTCHIP_SW_INCORRECT_DATA;
                         CLOSE_TRY;
                         goto discard;
@@ -153,7 +153,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                     chunkLength = apduLength - (offset - ISO_OFFSET_CDATA);
                     if ((btchip_context_D.hashedMessageLength + chunkLength) >
                         btchip_context_D.transactionSummary.messageLength) {
-                        L_DEBUG_APP(("Invalid data length\n"));
+                        PRINTF("Invalid data length\n");
                         sw = BTCHIP_SW_INCORRECT_DATA;
                         CLOSE_TRY;
                         goto discard;
@@ -175,7 +175,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                 } else {
                     if ((btchip_context_D.hashedMessageLength + apduLength) >
                         btchip_context_D.transactionSummary.messageLength) {
-                        L_DEBUG_APP(("Invalid data length\n"));
+                        PRINTF("Invalid data length\n");
                         sw = BTCHIP_SW_INCORRECT_DATA;
                         CLOSE_TRY;
                         goto discard;
@@ -199,7 +199,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                 if ((btchip_context_D.transactionSummary.messageLength == 0) ||
                     (btchip_context_D.hashedMessageLength !=
                      btchip_context_D.transactionSummary.messageLength)) {
-                    L_DEBUG_APP(("Invalid length to sign\n"));
+                    PRINTF("Invalid length to sign\n");
                     sw = BTCHIP_SW_INCORRECT_DATA;
                     CLOSE_TRY;
                     goto discard;
