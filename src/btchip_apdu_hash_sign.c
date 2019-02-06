@@ -148,7 +148,7 @@ unsigned short btchip_apdu_hash_sign() {
             // Finalize the hash
 
             if (btchip_context_D.usingOverwinter) {
-                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hash2, 32, hash2);
+                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hash2, 0, hash2);
             }
             else {
                 btchip_write_u32_le(dataBuffer, lockTime);

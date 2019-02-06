@@ -388,7 +388,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             if (btchip_context_D.usingSegwit) {
                 if (!btchip_context_D.segwitParsedOnce) {
                     if (btchip_context_D.usingOverwinter) {
-                        cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, btchip_context_D.segwit.cache.hashedOutputs, 32, btchip_context_D.segwit.cache.hashedOutputs);
+                        cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, btchip_context_D.segwit.cache.hashedOutputs, 0, btchip_context_D.segwit.cache.hashedOutputs);
                     }
                     else {
                         cx_hash(&btchip_context_D.transactionHashFull.sha256.header,
