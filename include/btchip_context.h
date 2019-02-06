@@ -25,7 +25,7 @@
 
 #define MAX_OUTPUT_TO_CHECK 200
 #define MAX_COIN_ID 13
-#define MAX_SHORT_COIN_ID 5 
+#define MAX_SHORT_COIN_ID 5
 
 #define MAGIC_TRUSTED_INPUT 0x32
 #define MAGIC_DEV_KEY 0x01
@@ -170,9 +170,9 @@ struct btchip_context_s {
     /** Current short Coin ID */
     unsigned char shortCoinId[MAX_SHORT_COIN_ID];
     /** Current Coin ID length */
-    unsigned char coinIdLength;    
+    unsigned char coinIdLength;
     /** Current short Coin ID length */
-    unsigned char shortCoinIdLength;        
+    unsigned char shortCoinIdLength;
 
     /** Non protected transaction context */
 
@@ -241,7 +241,7 @@ struct btchip_context_s {
     unsigned int discardSize;
     unsigned char outputParsingState;
     unsigned char totalOutputAmount[8];
-    unsigned char changeOutputFound;    
+    unsigned char changeOutputFound;
 
     /* Overwinter */
     unsigned char usingOverwinter;
@@ -249,14 +249,14 @@ struct btchip_context_s {
     unsigned char nVersionGroupId[4];
     unsigned char nExpiryHeight[4];
     unsigned char nLockTime[4];
-    unsigned char sigHashType[4];    
+    unsigned char sigHashType[4];
 };
 typedef struct btchip_context_s btchip_context_t;
 
 
 /**
  * Structure to configure the bitcoin application for a given altcoin
- * 
+ *
  */
 typedef enum btchip_coin_flags_e {
     FLAG_PEERCOIN_UNITS=1,
@@ -289,8 +289,9 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_BITCOIN_PRIVATE,
     COIN_KIND_HORIZEN,
     COIN_KIND_GAMECREDITS,
-    COIN_KIND_ZCOIN, 
+    COIN_KIND_ZCOIN,
     COIN_KIND_ZCLASSIC,
+    COIN_KIND_XSN,
     COIN_KIND_NIX
 } btchip_coin_kind_t;
 
