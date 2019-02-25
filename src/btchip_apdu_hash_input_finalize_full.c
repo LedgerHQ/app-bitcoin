@@ -1,6 +1,6 @@
 /*******************************************************************************
-*   Ledger Blue - Bitcoin Wallet
-*   (c) 2016 Ledger
+*   Ledger App - Bitcoin Wallet
+*   (c) 2016-2019 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -224,13 +224,9 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
     unsigned char apduLength;
     unsigned short sw = BTCHIP_SW_OK;
     unsigned char *target = G_io_apdu_buffer;
-    unsigned char keycardActivated = 0;
-    unsigned char screenPaired = 0;
-    unsigned char deepControl = 0;
     unsigned char p1 = G_io_apdu_buffer[ISO_OFFSET_P1];
     unsigned char persistentCommit = 0;
     unsigned char hashOffset = 0;
-    unsigned char numOutputs = 0;
 
     apduLength = G_io_apdu_buffer[ISO_OFFSET_LC];
 
@@ -412,7 +408,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     cx_hash(
                         &btchip_context_D.transactionHashAuthorization.header,
                         CX_LAST,
-                        (unsigned char WIDE *)&btchip_context_D.segwit.cache,
+                        (unsigned char *)&btchip_context_D.segwit.cache,
                         sizeof(btchip_context_D.segwit.cache),
                         authorizationHash);
                 }

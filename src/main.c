@@ -1,6 +1,6 @@
 /*******************************************************************************
- *   Ledger Blue - Bitcoin Wallet
- *   (c) 2016 Ledger
+ *   Ledger App - Bitcoin Wallet
+ *   (c) 2016-2019 Ledger
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -93,7 +93,7 @@ union {
 
     struct {
         // A bip44 path contains 5 elements, which max length in ascii is 10 char + optional quote "'" + "/" + \0"
-        char derivation_path [MAX_DERIV_PATH_ASCII_LENGTH];  
+        char derivation_path [MAX_DERIV_PATH_ASCII_LENGTH];
     } tmp_warning;
 
     unsigned int dummy; // ensure the whole vars is aligned for the CM0 to
@@ -161,7 +161,7 @@ union {
     } tmp;
 
     struct {
-        char derivation_path [MAX_DERIV_PATH_ASCII_LENGTH];  
+        char derivation_path [MAX_DERIV_PATH_ASCII_LENGTH];
     } tmp_warning;
 
     /*
@@ -253,8 +253,8 @@ const bagl_element_t* ui_settings_out_over(const bagl_element_t* e) {
  const bagl_element_t ui_settings_blue[] = {
     UI_BLUE_BACKGROUND("SETTINGS"),
     UI_BLUE_BUTTON_GO_BACK(ui_settings_back_callback),
-    UI_BLUE_TEXT(0, 30, 105, 160, "Public key export", BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_BLACK, COLOR_BG_1),     
-    UI_BLUE_TEXT(0, 30, 126, 260, "Enable to approve export requests manually", BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_GRAY, COLOR_BG_1),     
+    UI_BLUE_TEXT(0, 30, 105, 160, "Public key export", BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 30, 126, 260, "Enable to approve export requests manually", BAGL_FONT_OPEN_SANS_REGULAR_8_11PX, BAGL_FONT_ALIGNMENT_LEFT, COLOR_GRAY, COLOR_BG_1),
     UI_BLUE_TOUCHZONE(0, 78, 320, 68, ui_settings_blue_toggle_pubKeyRequestRestriction, ui_settings_out_over, ui_settings_out_over),
     UI_BLUE_TOGGLE(258, 98, COLOR_BG_1)
 };
@@ -282,7 +282,7 @@ const bagl_element_t* ui_settings_out_over(const bagl_element_t* e) {
 }
 
 unsigned int ui_settings_blue_button(unsigned int button_mask, unsigned int button_mask_counter) {
-  return 0;  
+  return 0;
 }
 
 #endif // #if defined(TARGET_BLUE)
@@ -507,7 +507,7 @@ const bagl_element_t ui_transaction_blue[] = {
     UI_BLUE_TEXT(0x10, 130, 200, 160, NULL, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_RIGHT, COLOR_BLACK, COLOR_BG_1),
     UI_BLUE_TEXT(0x20, 284, 196, 6, BAGL_FONT_SYMBOLS_0_MINIRIGHT, BAGL_FONT_SYMBOLS_0, BAGL_FONT_ALIGNMENT_RIGHT, COLOR_GRAY, COLOR_BG_1),
     UI_BLUE_TOUCHZONE(0, 168, 320, 48, ui_transaction_blue_1_details, ui_menu_item_out_over, ui_menu_item_out_over),
-    {{BAGL_RECTANGLE, 0x20, 0, 168, 5, 48, 0, 0, BAGL_FILL, COLOR_BG_1, COLOR_BG_1, 0, 0}, 
+    {{BAGL_RECTANGLE, 0x20, 0, 168, 5, 48, 0, 0, BAGL_FILL, COLOR_BG_1, COLOR_BG_1, 0, 0},
     NULL, 0, 0x41CCB4, 0, NULL, NULL, NULL},
 
     // separator when second details is to be displayed
@@ -518,7 +518,7 @@ const bagl_element_t ui_transaction_blue[] = {
     UI_BLUE_TEXT(0x11, 130, 245, 160, NULL, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, BAGL_FONT_ALIGNMENT_RIGHT, COLOR_BLACK, COLOR_BG_1),
     UI_BLUE_TEXT(0x21, 284, 245, 6, BAGL_FONT_SYMBOLS_0_MINIRIGHT, BAGL_FONT_SYMBOLS_0, BAGL_FONT_ALIGNMENT_RIGHT, COLOR_GRAY, COLOR_BG_1),
     UI_BLUE_TOUCHZONE(0, 217, 320, 48, ui_transaction_blue_2_details, ui_menu_item_out_over, ui_menu_item_out_over),
-    {{BAGL_RECTANGLE, 0x21, 0, 217, 5, 48, 0, 0, BAGL_FILL, COLOR_BG_1, COLOR_BG_1, 0, 0}, 
+    {{BAGL_RECTANGLE, 0x21, 0, 217, 5, 48, 0, 0, BAGL_FILL, COLOR_BG_1, COLOR_BG_1, 0, 0},
     NULL, 0, 0x41CCB4, 0, NULL, NULL, NULL},
 
     // separator when second details is to be displayed
@@ -855,7 +855,7 @@ const bagl_element_t ui_display_address_nanos[] = {
 };
 
 const bagl_element_t ui_display_token_nanos[] = {
-    
+
     UI_NANOS_BACKGROUND(),
     UI_NANOS_ICON_LEFT(0, BAGL_GLYPH_ICON_CROSS),
     UI_NANOS_ICON_RIGHT(0, BAGL_GLYPH_ICON_CHECK),
@@ -886,7 +886,7 @@ const bagl_element_t ui_request_change_path_approval_nanos[] = {
     UI_NANOS_ICON_LEFT(4, BAGL_GLYPH_ICON_CROSS),
     UI_NANOS_ICON_RIGHT(4, BAGL_GLYPH_ICON_CHECK),
     UI_NANOS_TEXT(4, 0, 12, 128, "Reject if you're", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
-    UI_NANOS_TEXT(4, 0, 26, 128, "not sure", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px)     
+    UI_NANOS_TEXT(4, 0, 26, 128, "not sure", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px)
 };
 
 unsigned int ui_display_address_nanos_prepro(const bagl_element_t *element) {
@@ -895,7 +895,7 @@ unsigned int ui_display_address_nanos_prepro(const bagl_element_t *element) {
         unsigned int display = (ux_step == (0x7F & element->component.userid) - 1);
         if (display) {
             switch (element->component.userid) {
-            case 0x83: 
+            case 0x83:
                 ux_loop_over_curr_element = 1;
                 UX_CALLBACK_SET_INTERVAL(MAX(
                     3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
@@ -1128,7 +1128,7 @@ unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e) {
 unsigned int io_seproxyhal_touch_display_address_blue(const bagl_element_t *e) {
     load_qr_code(G_io_apdu_buffer + 200);
     UX_DISPLAY(ui_display_address_blue, ui_display_address_blue_prepro);
-    return 0; 
+    return 0;
 }
 #endif // TARGET_BLUE
 
@@ -1185,7 +1185,7 @@ unsigned int io_seproxyhal_touch_display_ok(const bagl_element_t *e) {
 }
 
 unsigned int io_seproxyhal_touch_display_token_cancel(const bagl_element_t *e) {
-    // revoke previous valid token if there was one 
+    // revoke previous valid token if there was one
     btchip_context_D.has_valid_token = false;
     // user denied the token, tell the USB side
     btchip_bagl_user_action_display(0);
@@ -1649,7 +1649,7 @@ uint8_t prepare_single_output() {
     // Prepare amount
 
     // Handle Omni simple send
-    if ((btchip_context_D.currentOutput[offset + 2] == 0x14) && 
+    if ((btchip_context_D.currentOutput[offset + 2] == 0x14) &&
         (os_memcmp(btchip_context_D.currentOutput + offset + 3, "omni", 4) == 0) &&
         (os_memcmp(btchip_context_D.currentOutput + offset + 3 + 4, "\0\0\0\0", 4) == 0)) {
             uint8_t headerLength;
@@ -1657,17 +1657,17 @@ uint8_t prepare_single_output() {
             switch(omniAssetId) {
                 case OMNI_ASSETID:
                     strcpy(vars.tmp.fullAmount, "OMNI ");
-                    break;                
+                    break;
                 case USDT_ASSETID:
                     strcpy(vars.tmp.fullAmount, "USDT ");
                     break;
-                case MAIDSAFE_ASSETID:                    
+                case MAIDSAFE_ASSETID:
                     strcpy(vars.tmp.fullAmount, "MAID ");
                     break;
                 default:
                     snprintf(vars.tmp.fullAmount, sizeof(vars.tmp.fullAmount), "OMNI asset %d ", omniAssetId);
                     break;
-            }                
+            }
             headerLength = strlen(vars.tmp.fullAmount);
             btchip_context_D.tmp = vars.tmp.fullAmount + headerLength;
             textSize = btchip_convert_hex_amount_to_displayable(btchip_context_D.currentOutput + offset + 3 + 4 + 4 + 4);
@@ -1746,7 +1746,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         isOpCreate = btchip_output_script_is_op_create(
             btchip_context_D.currentOutput + offset);
         isOpCall = btchip_output_script_is_op_call(
-            btchip_context_D.currentOutput + offset);        
+            btchip_context_D.currentOutput + offset);
         // Always notify OP_RETURN to the user
         if (nullAmount && isOpReturn) {
             if (!checkOnly) {
@@ -1754,10 +1754,10 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
             }
             goto error;
         }
-        if ((nullAmount && isOpReturn) || 
+        if ((nullAmount && isOpReturn) ||
              ((G_coin_config->kind == COIN_KIND_QTUM) && (isOpCall || isOpCreate))) {
             specialOpFound = 1;
-        }        
+        }
         if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                              offset) &&
             !isP2sh && !(nullAmount && isOpReturn) &&
@@ -1813,7 +1813,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
             PRINTF("Error : too many inputs");
         }
         goto error;
-    }    
+    }
     borrow = transaction_amount_sub_be(
             fees, btchip_context_D.transactionContext.transactionAmount,
             totalOutputAmount);
@@ -2048,7 +2048,7 @@ void btchip_bagl_display_public_key(unsigned char* derivation_path) {
         load_qr_code(G_io_apdu_buffer + 200);
         UX_DISPLAY(ui_display_address_blue, ui_display_address_blue_prepro);
     }
-    
+
 #elif defined(TARGET_NANOS)
     // prepend a white space to the address
     G_io_apdu_buffer[199] = ' ';

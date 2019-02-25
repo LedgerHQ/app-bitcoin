@@ -1,6 +1,6 @@
 /*******************************************************************************
-*   Ledger Blue - Bitcoin Wallet
-*   (c) 2016 Ledger
+*   Ledger App - Bitcoin Wallet
+*   (c) 2016-2019 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -36,8 +36,8 @@ void check_transaction_available(unsigned char x) {
 #define OP_CHECKMULTISIG 0xAE
 
 unsigned char transaction_amount_add_be(unsigned char *target,
-                                        unsigned char WIDE *a,
-                                        unsigned char WIDE *b) {
+                                        unsigned char *a,
+                                        unsigned char *b) {
     unsigned char carry = 0;
     unsigned char i;
     for (i = 0; i < 8; i++) {
@@ -49,8 +49,8 @@ unsigned char transaction_amount_add_be(unsigned char *target,
 }
 
 unsigned char transaction_amount_sub_be(unsigned char *target,
-                                        unsigned char WIDE *a,
-                                        unsigned char WIDE *b) {
+                                        unsigned char *a,
+                                        unsigned char *b) {
     unsigned char borrow = 0;
     unsigned char i;
     for (i = 0; i < 8; i++) {
@@ -157,10 +157,10 @@ void transaction_parse(unsigned char parseMode) {
                     if (btchip_context_D.usingOverwinter) {
                         if (btchip_context_D.segwitParsedOnce) {
                             uint8_t parameters[16];
-                            os_memmove(parameters, OVERWINTER_PARAM_SIGHASH, 16);                            
-                            btchip_write_u32_le(parameters + 12, 
-                                btchip_context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING ? 
-                                CONSENSUS_BRANCH_ID_SAPLING : CONSENSUS_BRANCH_ID_OVERWINTER);                        
+                            os_memmove(parameters, OVERWINTER_PARAM_SIGHASH, 16);
+                            btchip_write_u32_le(parameters + 12,
+                                btchip_context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING ?
+                                CONSENSUS_BRANCH_ID_SAPLING : CONSENSUS_BRANCH_ID_OVERWINTER);
                             cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, parameters, 16);
                         }
                     }
@@ -198,7 +198,7 @@ void transaction_parse(unsigned char parseMode) {
                                             .hashedSequence)));
                             if (btchip_context_D.usingOverwinter) {
                                 cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.transactionVersion, sizeof(btchip_context_D.transactionVersion), NULL);
-                                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.nVersionGroupId, sizeof(btchip_context_D.nVersionGroupId), NULL); 
+                                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.nVersionGroupId, sizeof(btchip_context_D.nVersionGroupId), NULL);
                                 cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.segwit.cache.hashedPrevouts, sizeof(btchip_context_D.segwit.cache.hashedPrevouts), NULL);
                                 cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.segwit.cache.hashedSequence, sizeof(btchip_context_D.segwit.cache.hashedSequence), NULL);
                                 cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.segwit.cache.hashedOutputs, sizeof(btchip_context_D.segwit.cache.hashedOutputs), NULL);
@@ -237,7 +237,7 @@ void transaction_parse(unsigned char parseMode) {
                                 cx_hash(&btchip_context_D
                                          .transactionHashAuthorization.header,
                                     0,
-                                    (unsigned char WIDE *)&btchip_context_D
+                                    (unsigned char *)&btchip_context_D
                                         .segwit.cache,
                                     sizeof(btchip_context_D.segwit.cache),
                                     NULL);
@@ -673,7 +673,7 @@ void transaction_parse(unsigned char parseMode) {
                                          .sha256.header,
                                     CX_LAST, hashedSequence,
                                     sizeof(hashedSequence), hashedSequence);
-              
+
                             }
                             os_memmove(
                                 btchip_context_D.segwit.cache.hashedPrevouts,
@@ -715,7 +715,7 @@ void transaction_parse(unsigned char parseMode) {
                             if (btchip_context_D.usingOverwinter) {
                                 cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, OVERWINTER_PARAM_OUTPUTS, 16);
                             }
-                            else 
+                            else
                             if (btchip_context_D.usingSegwit) {
                                 cx_sha256_init(&btchip_context_D.transactionHashFull.sha256);
                             }
