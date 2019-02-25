@@ -155,7 +155,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         }
     }
     G_io_apdu_buffer[66] = keyLength;
-    L_DEBUG_APP(("Length %d\n", keyLength));
+    PRINTF("Length %d\n", keyLength);
     if (!uncompressedPublicKeys) {
         // Restore for the full key component
         G_io_apdu_buffer[1] = 0x04;

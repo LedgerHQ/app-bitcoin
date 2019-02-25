@@ -328,7 +328,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             if (btchip_context_D.transactionContext.firstSigned) {
                 if ((btchip_context_D.currentOutputOffset + apduLength) >
                     sizeof(btchip_context_D.currentOutput)) {
-                    L_DEBUG_APP(("Output is too long to be checked\n"));
+                    PRINTF("Output is too long to be checked\n");
                     sw = BTCHIP_SW_INCORRECT_DATA;
                     goto discardTransaction;
                 }
@@ -398,9 +398,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                             sizeof(btchip_context_D.segwit.cache.hashedOutputs),
                             btchip_context_D.segwit.cache.hashedOutputs);
                     }
-                    L_DEBUG_BUF(("hashOutputs\n",
-                                 btchip_context_D.segwit.cache.hashedOutputs,
-                                 32));
+                    PRINTF("hashOutputs\n%.*H\n",32,btchip_context_D.segwit.cache.hashedOutputs);
                     cx_hash(
                         &btchip_context_D.transactionHashAuthorization.header,
                         CX_LAST, G_io_apdu_buffer, 0, authorizationHash);
@@ -452,8 +450,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                         authorizationHash,
                         transactionSummary->authorizationHash,
                         sizeof(transactionSummary->authorizationHash))) {
-                    L_DEBUG_APP(
-                        ("Authorization hash not matching, aborting\n"));
+                    PRINTF("Authorization hash not matching, aborting\n");
                     sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
                 discardTransaction:
                     CLOSE_TRY;
@@ -465,7 +462,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                 !btchip_context_D.segwitParsedOnce) {
                 // This input cannot be signed when using segwit - just restart.
                 btchip_context_D.segwitParsedOnce = 1;
-                L_DEBUG_APP(("Segwit parsed once\n"));
+                PRINTF("Segwit parsed once\n");
                 btchip_context_D.transactionContext.transactionState =
                     BTCHIP_TRANSACTION_NONE;
             } else {
@@ -593,7 +590,7 @@ unsigned char btchip_bagl_user_action(unsigned char confirming) {
                 !btchip_context_D.segwitParsedOnce) {
                 // This input cannot be signed when using segwit - just restart.
                 btchip_context_D.segwitParsedOnce = 1;
-                L_DEBUG_APP(("Segwit parsed once\n"));
+                PRINTF("Segwit parsed once\n");
                 btchip_context_D.transactionContext.transactionState =
                     BTCHIP_TRANSACTION_NONE;
             } else {

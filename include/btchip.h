@@ -25,9 +25,7 @@
 #include "stdlib.h"
 #include "stdbool.h"
 
-#define L_DEBUG_APP(x)
 #define L_DEBUG_NOPREFIX(x)
-#define L_DEBUG_BUF(x)
 
 #define SW_TECHNICAL_DETAILS(x) BTCHIP_SW_TECHNICAL_PROBLEM
 
