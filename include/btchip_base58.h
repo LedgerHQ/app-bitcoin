@@ -1,6 +1,6 @@
 /*******************************************************************************
-*   Ledger Blue - Bitcoin Wallet
-*   (c) 2016 Ledger
+*   Ledger App - Bitcoin Wallet
+*   (c) 2016-2019 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -19,9 +19,12 @@
 
 #define BTCHIP_BASE58_H
 
-unsigned char btchip_decode_base58(unsigned char WIDE *in, unsigned char length,
-                                   unsigned char *out, unsigned char maxoutlen);
-unsigned char btchip_encode_base58(unsigned char WIDE *in, unsigned char length,
-                                   unsigned char *out, unsigned char maxoutlen);
+#include <stdlib.h>
+
+int btchip_decode_base58(const char *in, size_t length,
+                         unsigned char *out, size_t *outlen);
+
+int btchip_encode_base58(const unsigned char *in, size_t length,
+                         unsigned char *out, size_t *outlen);
 
 #endif

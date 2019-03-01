@@ -1,6 +1,6 @@
 /*******************************************************************************
-*   Ledger Blue - Bitcoin Wallet
-*   (c) 2016 Ledger
+*   Ledger App - Bitcoin Wallet
+*   (c) 2016-2019 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -29,6 +29,9 @@
 
 #define MAGIC_TRUSTED_INPUT 0x32
 #define MAGIC_DEV_KEY 0x01
+
+#define ZCASH_USING_OVERWINTER 0x01
+#define ZCASH_USING_OVERWINTER_SAPLING 0x02
 
 enum btchip_modes_e {
     BTCHIP_MODE_ISSUER = 0x00,
@@ -85,13 +88,19 @@ enum btchip_output_parsing_state_e {
     BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS = 0x01,
     BTCHIP_OUTPUT_PARSING_OUTPUT = 0x02,
     BTCHIP_OUTPUT_FINALIZE_TX = 0x03,
+    BTCHIP_BIP44_CHANGE_PATH_VALIDATION = 0x04,
     BTCHIP_OUTPUT_HANDLE_LEGACY = 0xFF
 };
 typedef enum btchip_output_parsing_state_e btchip_output_parsing_state_t;
 
+
+typedef union multi_hash {
+    cx_sha256_t sha256;
+    cx_blake2b_t blake2b;
+} multi_hash;
+
 struct segwit_hash_s {
-    cx_sha256_t hashPrevouts;
-    cx_sha256_t hashSequence;
+    union multi_hash hashPrevouts;
 };
 struct segwit_cache_s {
     unsigned char hashedPrevouts[32];
@@ -167,8 +176,12 @@ struct btchip_context_s {
 
     /** Non protected transaction context */
 
+    /** Last U2F Token streamed by host to attempt pubkey request */
+    unsigned char last_token[4];
+    unsigned char has_valid_token;
+
     /** Full transaction hash context */
-    cx_sha256_t transactionHashFull;
+    union multi_hash transactionHashFull;
     /** Authorization transaction hash context */
     cx_sha256_t transactionHashAuthorization;
     /** Current hash to perform (TRANSACTION_HASH_) */
@@ -229,6 +242,14 @@ struct btchip_context_s {
     unsigned char outputParsingState;
     unsigned char totalOutputAmount[8];
     unsigned char changeOutputFound;    
+
+    /* Overwinter */
+    unsigned char usingOverwinter;
+    unsigned char overwinterSignReady;
+    unsigned char nVersionGroupId[4];
+    unsigned char nExpiryHeight[4];
+    unsigned char nLockTime[4];
+    unsigned char sigHashType[4];    
 };
 typedef struct btchip_context_s btchip_context_t;
 
@@ -268,8 +289,11 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_BITCOIN_PRIVATE,
     COIN_KIND_HORIZEN,
     COIN_KIND_GAMECREDITS,
-    COIN_KIND_ZCOIN,
-    COIN_KIND_RVN
+    COIN_KIND_ZCOIN, 
+    COIN_KIND_ZCLASSIC,
+    COIN_KIND_XSN,
+    COIN_KIND_RVN,
+    COIN_KIND_NIX
 } btchip_coin_kind_t;
 
 typedef struct btchip_altcoin_config_s {
