@@ -146,7 +146,7 @@ unsigned short btchip_apdu_hash_sign() {
             // Finalize the hash
 
             if (btchip_context_D.usingOverwinter) {
-                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hash2, 0, hash2);
+                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hash2, 0, hash2, 32);
             }
             else {
                 btchip_write_u32_le(dataBuffer, lockTime);
@@ -154,12 +154,12 @@ unsigned short btchip_apdu_hash_sign() {
                 PRINTF("Finalize hash with\n%.*H\n", sizeof(dataBuffer), dataBuffer);
 
                 cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
-                    dataBuffer, sizeof(dataBuffer), hash1);
+                    dataBuffer, sizeof(dataBuffer), hash1, 32);
                 PRINTF("Hash1\n%.*H\n", sizeof(hash1), hash1);
 
                 // Rehash
                 cx_sha256_init(&localHash);
-                cx_hash(&localHash.header, CX_LAST, hash1, sizeof(hash1), hash2);
+                cx_hash(&localHash.header, CX_LAST, hash1, sizeof(hash1), hash2, 32);
             }
             PRINTF("Hash2\n%.*H\n", sizeof(hash2), hash2);
 
