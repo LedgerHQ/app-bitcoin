@@ -1954,10 +1954,13 @@ error:
 
 #define HASH_LENGTH 4
 uint8_t prepare_message_signature() {
+    uint8_t buffer[32];
+
     cx_hash(&btchip_context_D.transactionHashAuthorization.header, CX_LAST,
-            vars.tmp.fullAmount, 0, vars.tmp.fullAmount);
+            vars.tmp.fullAmount, 0, buffer, 32);
+
     snprintf(vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress), "%.*H...%.*H",
-             8, vars.tmp.fullAmount, 8, vars.tmp.fullAmount + 32 - 8);
+             8, buffer, 8, buffer + 32 - 8);
     return 1;
 }
 
