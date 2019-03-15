@@ -223,9 +223,9 @@ void btchip_public_key_hash160(unsigned char *in, unsigned short inlen,
     unsigned char buffer[32];
 
     cx_sha256_init(&u.shasha);
-    cx_hash(&u.shasha.header, CX_LAST, in, inlen, buffer);
+    cx_hash(&u.shasha.header, CX_LAST, in, inlen, buffer, 32);
     cx_ripemd160_init(&u.riprip);
-    cx_hash(&u.riprip.header, CX_LAST, buffer, 32, out);
+    cx_hash(&u.riprip.header, CX_LAST, buffer, 32, out, 32);
 }
 
 unsigned short btchip_public_key_to_encoded_base58(
@@ -253,9 +253,9 @@ unsigned short btchip_public_key_to_encoded_base58(
     }
 
     cx_sha256_init(&hash);
-    cx_hash(&hash.header, CX_LAST, tmpBuffer, 20 + versionSize, checksumBuffer);
+    cx_hash(&hash.header, CX_LAST, tmpBuffer, 20 + versionSize, checksumBuffer, 32);
     cx_sha256_init(&hash);
-    cx_hash(&hash.header, CX_LAST, checksumBuffer, 32, checksumBuffer);
+    cx_hash(&hash.header, CX_LAST, checksumBuffer, 32, checksumBuffer, 32);
 
     PRINTF("Checksum\n%.*H\n",4,checksumBuffer);
     os_memmove(tmpBuffer + 20 + versionSize, checksumBuffer, 4);
@@ -289,9 +289,9 @@ unsigned short btchip_decode_base58_address(unsigned char *in,
 
     // Compute hash to verify address
     cx_sha256_init(&hash);
-    cx_hash(&hash.header, CX_LAST, out, outlen - 4, hashBuffer);
+    cx_hash(&hash.header, CX_LAST, out, outlen - 4, hashBuffer, 32);
     cx_sha256_init(&hash);
-    cx_hash(&hash.header, CX_LAST, hashBuffer, 32, hashBuffer);
+    cx_hash(&hash.header, CX_LAST, hashBuffer, 32, hashBuffer, 32);
 
     if (os_memcmp(out + outlen - 4, hashBuffer, 4)) {
         PRINTF("Hash checksum mismatch\n%.*H\n",sizeof(hashBuffer),hashBuffer);
@@ -442,7 +442,7 @@ void btchip_signverify_finalhash(void *keyContext, unsigned char sign,
         unsigned int info = 0;
         cx_ecdsa_sign((cx_ecfp_private_key_t *)keyContext,
                       CX_LAST | (rfc6979 ? CX_RND_RFC6979 : CX_RND_TRNG),
-                      CX_SHA256, in, inlen, out, &info);
+                      CX_SHA256, in, inlen, out, outlen, &info);
         if (info & CX_ECCINFO_PARITY_ODD) {
             out[0] |= 0x01;
         }

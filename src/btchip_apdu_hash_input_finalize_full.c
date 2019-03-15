@@ -320,12 +320,12 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             // For SegWit, this has been reset to hold hashOutputs
             if (!btchip_context_D.segwitParsedOnce) {
                 if (btchip_context_D.usingOverwinter) {
-                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, G_io_apdu_buffer + ISO_OFFSET_CDATA + hashOffset, apduLength - hashOffset, NULL);
+                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, G_io_apdu_buffer + ISO_OFFSET_CDATA + hashOffset, apduLength - hashOffset, NULL, 0);
                 }
                 else {
                     cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
                         G_io_apdu_buffer + ISO_OFFSET_CDATA + hashOffset,
-                        apduLength - hashOffset, NULL);
+                        apduLength - hashOffset, NULL, 0);
                 }
             }
 
@@ -371,7 +371,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     cx_hash(
                         &btchip_context_D.transactionHashAuthorization.header,
                         0, G_io_apdu_buffer + ISO_OFFSET_CDATA, apduLength,
-                        NULL);
+                        NULL, 0);
                 }
                 G_io_apdu_buffer[0] = 0x00;
                 btchip_context_D.outLength = 1;
@@ -382,37 +382,37 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             if (!btchip_context_D.usingSegwit) {
                 cx_hash(&btchip_context_D.transactionHashAuthorization.header,
                         CX_LAST, G_io_apdu_buffer + ISO_OFFSET_CDATA,
-                        apduLength, authorizationHash);
+                        apduLength, authorizationHash, 32);
             }
 
             if (btchip_context_D.usingSegwit) {
                 if (!btchip_context_D.segwitParsedOnce) {
                     if (btchip_context_D.usingOverwinter) {
-                        cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, btchip_context_D.segwit.cache.hashedOutputs, 0, btchip_context_D.segwit.cache.hashedOutputs);
+                        cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, btchip_context_D.segwit.cache.hashedOutputs, 0, btchip_context_D.segwit.cache.hashedOutputs, 32);
                     }
                     else {
                         cx_hash(&btchip_context_D.transactionHashFull.sha256.header,
                             CX_LAST,
                             btchip_context_D.segwit.cache.hashedOutputs, 0,
-                            btchip_context_D.segwit.cache.hashedOutputs);
+                            btchip_context_D.segwit.cache.hashedOutputs, 32);
                         cx_sha256_init(&btchip_context_D.transactionHashFull.sha256);
                         cx_hash(&btchip_context_D.transactionHashFull.sha256.header,
                             CX_LAST,
                             btchip_context_D.segwit.cache.hashedOutputs,
                             sizeof(btchip_context_D.segwit.cache.hashedOutputs),
-                            btchip_context_D.segwit.cache.hashedOutputs);
+                            btchip_context_D.segwit.cache.hashedOutputs, 32);
                     }
                     PRINTF("hashOutputs\n%.*H\n",32,btchip_context_D.segwit.cache.hashedOutputs);
                     cx_hash(
                         &btchip_context_D.transactionHashAuthorization.header,
-                        CX_LAST, G_io_apdu_buffer, 0, authorizationHash);
+                        CX_LAST, G_io_apdu_buffer, 0, authorizationHash, 32);
                 } else {
                     cx_hash(
                         &btchip_context_D.transactionHashAuthorization.header,
                         CX_LAST,
                         (unsigned char *)&btchip_context_D.segwit.cache,
                         sizeof(btchip_context_D.segwit.cache),
-                        authorizationHash);
+                        authorizationHash, 32);
                 }
             }
 
