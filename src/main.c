@@ -192,7 +192,13 @@ unsigned int io_seproxyhal_touch_settings(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e);
 void ui_idle(void);
 
+#ifdef TARGET_NANOX
+#include "ux.h"
+ux_state_t G_ux;
+bolos_ux_params_t G_ux_params;
+#else // TARGET_NANOX
 ux_state_t ux;
+#endif // TARGET_NANOX
 
 // display stepped screens
 unsigned int ux_step;
@@ -1101,16 +1107,6 @@ unsigned int ui_verify_message_prepro(const bagl_element_t *element) {
 
 #endif // #if defined(TARGET_NANOS)
 
-void ui_idle(void) {
-    ux_step_count = 0;
-    ux_loop_over_curr_element = 0;
-
-#if defined(TARGET_BLUE)
-    UX_DISPLAY(ui_idle_blue, ui_idle_blue_prepro);
-#elif defined(TARGET_NANOS)
-    UX_MENU_DISPLAY(0, menu_main, NULL);
-#endif // #if TARGET_ID
-}
 
 #ifdef TARGET_BLUE
 
@@ -1443,6 +1439,490 @@ void ui_transaction_p2sh_blue_init(void) {
     ui_transaction_blue_init();
 }
 #endif // #if defined(TARGET_BLUE)
+
+
+#if defined(TARGET_NANOX)
+
+const char* settings_submenu_getter(unsigned int idx);
+void settings_submenu_selector(unsigned int idx);
+
+
+void settings_pubkey_export_change(unsigned int enabled) {
+    nvm_write((void *)&N_btchip.pubKeyRequestRestriction, &enabled, 1);
+    ui_idle();
+}
+//////////////////////////////////////////////////////////////////////////////////////
+// Public keys export submenu:
+
+const char* const settings_pubkey_export_getter_values[] = {
+  "Auto Approval",
+  "Manual Approval",
+  "Back"
+};
+
+const char* settings_pubkey_export_getter(unsigned int idx) {
+  if (idx < ARRAYLEN(settings_pubkey_export_getter_values)) {
+    return settings_pubkey_export_getter_values[idx];
+  }
+  return NULL;
+}
+
+void settings_pubkey_export_selector(unsigned int idx) {
+  switch(idx) {
+    case 0:
+      settings_pubkey_export_change(0);
+      break;
+    case 1:
+      settings_pubkey_export_change(1);
+      break;
+    default:
+      ux_menulist_init(settings_submenu_getter, settings_submenu_selector);
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////
+// Settings menu:
+
+const char* const settings_submenu_getter_values[] = {
+  "Public keys export",
+  "Back",
+};
+
+const char* settings_submenu_getter(unsigned int idx) {
+  if (idx < ARRAYLEN(settings_submenu_getter_values)) {
+    return settings_submenu_getter_values[idx];
+  }
+  return NULL;
+}
+
+void settings_submenu_selector(unsigned int idx) {
+  switch(idx) {
+    case 0:
+      ux_menulist_init_select(settings_pubkey_export_getter, settings_pubkey_export_selector, N_btchip.pubKeyRequestRestriction);
+      break;
+    default:
+      ui_idle();
+  }
+}
+
+//////////////////////////////////////////////////////////////////////
+UX_FLOW_DEF_NOCB(
+    ux_idle_flow_1_step, 
+    nn, 
+    {
+      "Application",
+      "is ready",
+    });
+UX_FLOW_DEF_VALID(
+    ux_idle_flow_2_step,
+    pb,
+    ux_menulist_init(settings_submenu_getter, settings_submenu_selector),
+    {
+      &C_icon_coggle,
+      "Settings",
+    });
+UX_FLOW_DEF_NOCB(
+    ux_idle_flow_3_step, 
+    bn, 
+    {
+      "Version",
+      APPVERSION,
+    });
+UX_FLOW_DEF_VALID(
+    ux_idle_flow_4_step,
+    pb,
+    os_sched_exit(-1),
+    {
+      &C_icon_dashboard,
+      "Quit",
+    });
+UX_DEF(ux_idle_flow,
+  &ux_idle_flow_1_step,
+  &ux_idle_flow_2_step,
+  &ux_idle_flow_3_step,
+  &ux_idle_flow_4_step
+);
+
+//////////////////////////////////////////////////////////////////////
+UX_FLOW_DEF_NOCB(
+    ux_sign_flow_1_step, 
+    pnn, 
+    {
+      &C_icon_certificate,
+      "Sign",
+      "message",
+    });
+UX_FLOW_DEF_NOCB(
+    ux_sign_flow_2_step, 
+    bnnn_paging, 
+    {
+      .title = "Message hash",
+      .text = vars.tmp.fullAddress,
+    });
+UX_FLOW_DEF_VALID(
+    ux_sign_flow_3_step,
+    pbb,
+    io_seproxyhal_touch_message_signature_verify_ok(NULL),
+    {
+      &C_icon_validate_14,
+      "Sign",
+      "message",
+    });
+UX_FLOW_DEF_VALID(
+    ux_sign_flow_4_step,
+    pbb,
+    io_seproxyhal_touch_message_signature_verify_cancel(NULL),
+    {
+      &C_icon_crossmark,
+      "Cancel",
+      "signature",
+    });
+
+UX_DEF(ux_sign_flow,
+  &ux_sign_flow_1_step,
+  &ux_sign_flow_2_step,
+  &ux_sign_flow_3_step,
+  &ux_sign_flow_4_step
+);
+
+//////////////////////////////////////////////////////////////////////
+
+UX_FLOW_DEF_NOCB(ux_confirm_full_flow_1_step, 
+    pnn, 
+    {
+      &C_icon_eye,
+      "Review",
+      "transaction",
+    });
+UX_FLOW_DEF_NOCB(
+    ux_confirm_full_flow_2_step, 
+    bnnn_paging, 
+    {
+      .title = "Amount",
+      .text = vars.tmp.fullAmount
+    });
+UX_FLOW_DEF_NOCB(
+    ux_confirm_full_flow_3_step, 
+    bnnn_paging, 
+    {
+      .title = "Address",
+      .text = vars.tmp.fullAddress,
+    });
+UX_FLOW_DEF_NOCB(
+    ux_confirm_full_flow_4_step, 
+    bnnn_paging, 
+    {
+      .title = "Fees",
+      .text = vars.tmp.feesAmount,
+    });
+UX_FLOW_DEF_VALID(
+    ux_confirm_full_flow_5_step, 
+    pbb, 
+    io_seproxyhal_touch_verify_ok(NULL),
+    {
+      &C_icon_validate_14,
+      "Accept",
+      "and send",
+    });
+UX_FLOW_DEF_VALID(
+    ux_confirm_full_flow_6_step, 
+    pb, 
+    io_seproxyhal_touch_verify_cancel(NULL),
+    {
+      &C_icon_crossmark,
+      "Reject",
+    });
+// confirm_full: confirm transaction / Amount: fullAmount / Address: fullAddress / Fees: feesAmount
+UX_DEF(ux_confirm_full_flow,
+  &ux_confirm_full_flow_1_step,
+  &ux_confirm_full_flow_2_step,
+  &ux_confirm_full_flow_3_step,
+  &ux_confirm_full_flow_4_step,
+  &ux_confirm_full_flow_5_step,
+  &ux_confirm_full_flow_6_step
+);
+
+//////////////////////////////////////////////////////////////////////
+
+UX_FLOW_DEF_NOCB(
+    ux_confirm_single_flow_1_step, 
+    pnn, 
+    {
+      &C_icon_eye,
+      "Review",
+      "transaction"
+    });
+UX_FLOW_DEF_NOCB(
+    ux_confirm_single_flow_2_step, 
+    bnnn_paging, 
+    {
+      .title = "Amount",
+      .text = vars.tmp.fullAmount,
+    });
+UX_FLOW_DEF_NOCB(
+    ux_confirm_single_flow_3_step, 
+    bnnn_paging, 
+    {
+      .title = "Address",
+      .text = vars.tmp.fullAddress,
+    });
+UX_FLOW_DEF_NOCB(
+    ux_confirm_single_flow_4_step, 
+    bnnn_paging, 
+    {
+      .title = "Fees",
+      .text = vars.tmp.feesAmount,
+    });
+UX_FLOW_DEF_VALID(
+    ux_confirm_single_flow_5_step, 
+    pb,
+    io_seproxyhal_touch_verify_ok(NULL), 
+    {
+      &C_icon_validate_14,
+      "Accept",
+    });
+UX_FLOW_DEF_VALID(
+    ux_confirm_single_flow_6_step, 
+    pb, 
+    io_seproxyhal_touch_verify_cancel(NULL),
+    {
+      &C_icon_crossmark,
+      "Reject",
+    });
+// confirm_single: confirm output #x(feesAmount) / Amount: fullAmount / Address: fullAddress
+UX_DEF(ux_confirm_single_flow,
+  &ux_confirm_single_flow_1_step,
+  &ux_confirm_single_flow_2_step,
+  &ux_confirm_single_flow_3_step,
+  &ux_confirm_single_flow_4_step,
+  &ux_confirm_single_flow_5_step,
+  &ux_confirm_single_flow_6_step
+);
+
+//////////////////////////////////////////////////////////////////////
+
+UX_FLOW_DEF_NOCB(
+    ux_finalize_flow_1_step, 
+    pnn, 
+    {
+      &C_icon_eye,
+      "Review",
+      "transaction"
+    });
+UX_FLOW_DEF_NOCB(
+    ux_finalize_flow_4_step, 
+    bnnn_paging, 
+    {
+      .title = "Fees",
+      .text = vars.tmp.feesAmount,
+    });
+UX_FLOW_DEF_VALID(
+    ux_finalize_flow_5_step, 
+    pbb, 
+    io_seproxyhal_touch_verify_ok(NULL),
+    {
+      &C_icon_validate_14,
+      "Accept",
+      "and send"
+    });
+UX_FLOW_DEF_VALID(
+    ux_finalize_flow_6_step, 
+    pb, 
+    io_seproxyhal_touch_verify_cancel(NULL),
+    {
+      &C_icon_crossmark,
+      "Reject",
+    });
+// finalize: confirm transaction / Fees: feesAmount
+UX_DEF(ux_finalize_flow,
+  &ux_finalize_flow_1_step,
+  &ux_finalize_flow_4_step,
+  &ux_finalize_flow_5_step,
+  &ux_finalize_flow_6_step
+);
+
+//////////////////////////////////////////////////////////////////////
+UX_FLOW_DEF_NOCB(
+    ux_display_public_flow_1_step, 
+    pnn, 
+    {
+      &C_icon_warning,
+      "The derivation",
+      "path is unusual!",
+    });
+UX_FLOW_DEF_NOCB(
+    ux_display_public_flow_2_step, 
+    bnnn_paging, 
+    {
+      .title = "Derivation path",
+      .text = vars.tmp_warning.derivation_path,
+    });
+UX_FLOW_DEF_VALID(
+    ux_display_public_flow_3_step, 
+    pnn,
+    io_seproxyhal_touch_display_cancel(NULL),
+    {
+      &C_icon_crossmark,
+      "Reject if you're",
+      "not sure",
+    });
+UX_FLOW_DEF_NOCB(
+    ux_display_public_flow_4_step, 
+    pnn, 
+    {
+      &C_icon_validate_14,
+      "Approve derivation",
+      "path",
+    });
+UX_FLOW_DEF_NOCB(
+    ux_display_public_flow_5_step, 
+    bnnn_paging, 
+    {
+      .title = "Address",
+      .text = G_io_apdu_buffer+200,
+    });
+UX_FLOW_DEF_VALID(
+    ux_display_public_flow_6_step, 
+    pb, 
+    io_seproxyhal_touch_display_ok(NULL),
+    {
+      &C_icon_validate_14,
+      "Approve",
+    });
+UX_FLOW_DEF_VALID(
+    ux_display_public_flow_7_step, 
+    pb, 
+    io_seproxyhal_touch_display_cancel(NULL),
+    {
+      &C_icon_crossmark,
+      "Reject",
+    });
+
+UX_DEF(ux_display_public_with_warning_flow,
+  &ux_display_public_flow_1_step,
+  &ux_display_public_flow_2_step,
+  &ux_display_public_flow_3_step,
+  &ux_display_public_flow_4_step,
+  FLOW_BARRIER,
+  &ux_display_public_flow_5_step,
+  &ux_display_public_flow_6_step,
+  &ux_display_public_flow_7_step
+);
+
+UX_DEF(ux_display_public_flow,
+  &ux_display_public_flow_5_step,
+  &ux_display_public_flow_6_step,
+  &ux_display_public_flow_7_step
+);
+
+
+//////////////////////////////////////////////////////////////////////
+UX_FLOW_DEF_VALID(
+    ux_display_token_flow_1_step, 
+    pbb, 
+    io_seproxyhal_touch_display_ok(NULL),
+    {
+      &C_icon_validate_14,
+      "Confirm token",
+      G_io_apdu_buffer+200,
+    });
+UX_FLOW_DEF_VALID(
+    ux_display_token_flow_2_step, 
+    pb, 
+    io_seproxyhal_touch_display_cancel(NULL),
+    {
+      &C_icon_crossmark,
+      "Reject",
+    });
+
+UX_DEF(ux_display_token_flow,
+  &ux_display_token_flow_1_step,
+  &ux_display_token_flow_2_step
+);
+
+//////////////////////////////////////////////////////////////////////
+UX_FLOW_DEF_VALID(
+    ux_request_pubkey_approval_flow_1_step, 
+    pbb, 
+    io_seproxyhal_touch_display_ok(NULL),
+    {
+      &C_icon_validate_14,
+      "Export",
+      "public key?",
+    });
+UX_FLOW_DEF_VALID(
+    ux_request_pubkey_approval_flow_2_step, 
+    pb, 
+    io_seproxyhal_touch_display_cancel(NULL),
+    {
+      &C_icon_crossmark,
+      "Reject",
+    });
+
+UX_DEF(ux_request_pubkey_approval_flow,
+  &ux_request_pubkey_approval_flow_1_step,
+  &ux_request_pubkey_approval_flow_2_step
+);
+
+//////////////////////////////////////////////////////////////////////
+UX_FLOW_DEF_NOCB(
+    ux_request_change_path_approval_flow_1_step, 
+    pbb, 
+    {
+      &C_icon_eye,
+      "The change path",
+      "is unusual",
+    });
+UX_FLOW_DEF_NOCB(
+    ux_request_change_path_approval_flow_2_step, 
+    bnnn_paging, 
+    {
+      .title = "Change path",
+      .text = vars.tmp_warning.derivation_path,
+    });
+UX_FLOW_DEF_VALID(
+    ux_request_change_path_approval_flow_3_step, 
+    pbb, 
+    io_seproxyhal_touch_display_cancel(NULL),
+    {
+      &C_icon_crossmark,
+      "Reject if you're",
+      "not sure",
+    });
+UX_FLOW_DEF_VALID(
+    ux_request_change_path_approval_flow_4_step, 
+    pb, 
+    io_seproxyhal_touch_display_ok(NULL),
+    {
+      &C_icon_validate_14,
+      "Approve",
+    });
+
+UX_DEF(ux_request_change_path_approval_flow,
+  &ux_request_change_path_approval_flow_1_step,
+  &ux_request_change_path_approval_flow_2_step,
+  &ux_request_change_path_approval_flow_3_step,
+  &ux_request_change_path_approval_flow_4_step
+);
+
+#endif // #if defined(TARGET_NANOX)
+
+void ui_idle(void) {
+    ux_step_count = 0;
+    ux_loop_over_curr_element = 0;
+
+#if defined(TARGET_BLUE)
+    UX_DISPLAY(ui_idle_blue, ui_idle_blue_prepro);
+#elif defined(TARGET_NANOS)
+    UX_MENU_DISPLAY(0, menu_main, NULL);
+#elif defined(TARGET_NANOX)
+    // reserve a display stack slot if none yet
+    if(G_ux.stack_count == 0) {
+        ux_stack_push();
+    }
+    ux_flow_init(0, ux_idle_flow, NULL);
+#endif // #if TARGET_ID
+}
 
 // override point, but nothing more to do
 void io_seproxyhal_display(const bagl_element_t *element) {
@@ -1975,7 +2455,9 @@ unsigned int btchip_bagl_confirm_full_output() {
     ux_step = 0;
     ux_step_count = 4;
     UX_DISPLAY(ui_verify_nanos, ui_verify_prepro);
-#endif // #if TARGET_ID
+#elif defined(TARGET_NANOX)
+    ux_flow_init(0, ux_confirm_full_flow, NULL);
+#endif // TARGET_NANOX
     return 1;
 }
 
@@ -2002,7 +2484,9 @@ unsigned int btchip_bagl_confirm_single_output() {
     ux_step = 0;
     ux_step_count = 3;
     UX_DISPLAY(ui_verify_output_nanos, ui_verify_output_prepro);
-#endif // #if TARGET_ID
+#elif defined(TARGET_NANOX)
+    ux_flow_init(0, ux_confirm_single_flow, NULL);
+#endif // TARGET_NANOX 
     return 1;
 }
 
@@ -2017,7 +2501,9 @@ unsigned int btchip_bagl_finalize_tx() {
     ux_step = 0;
     ux_step_count = 2;
     UX_DISPLAY(ui_finalize_nanos, ui_finalize_prepro);
-#endif // #if TARGET_ID
+#elif defined(TARGET_NANOX)
+    ux_flow_init(0, ux_finalize_flow, NULL);
+#endif // TARGET_NANOX 
     return 1;
 }
 
@@ -2032,7 +2518,9 @@ void btchip_bagl_confirm_message_signature() {
     ux_step = 0;
     ux_step_count = 2;
     UX_DISPLAY(ui_verify_message_signature_nanos, ui_verify_message_prepro);
-#endif // #if TARGET_ID
+#elif defined(TARGET_NANOX)
+    ux_flow_init(0, ux_sign_flow, NULL);
+#endif // TARGET_NANOX 
 }
 
 void btchip_bagl_display_public_key(unsigned char* derivation_path) {
@@ -2058,7 +2546,10 @@ void btchip_bagl_display_public_key(unsigned char* derivation_path) {
     ux_step = is_derivation_path_unusual?0:4;
     ux_step_count = 6;
     UX_DISPLAY(ui_display_address_nanos, ui_display_address_nanos_prepro);
-#endif // #if TARGET_ID
+    
+#elif defined(TARGET_NANOX)
+    ux_flow_init(0, is_derivation_path_unusual?ux_display_public_with_warning_flow:ux_display_public_flow, NULL);
+#endif // TARGET_NANOX
 }
 
 void btchip_bagl_display_token()
@@ -2069,6 +2560,8 @@ void btchip_bagl_display_token()
     ux_step = 0;
     ux_step_count = 1;
     UX_DISPLAY(ui_display_token_nanos, NULL);
+#elif defined(TARGET_NANOX)
+    ux_flow_init(0, ux_display_token_flow, NULL);
 #endif // #if TARGET_ID
 }
 
@@ -2081,6 +2574,8 @@ void btchip_bagl_request_pubkey_approval()
     ux_step = 0;
     ux_step_count = 1;
     UX_DISPLAY(ui_request_pubkey_approval_nanos, NULL);
+#elif defined(TARGET_NANOX)
+    ux_flow_init(0, ux_request_pubkey_approval_flow, NULL);
 #endif // #if TARGET_ID
 }
 
@@ -2094,6 +2589,8 @@ void btchip_bagl_request_change_path_approval(unsigned char* change_path)
     ux_step = 0;
     ux_step_count = 4;
     UX_DISPLAY(ui_request_change_path_approval_nanos, ui_request_change_path_approval_nanos_prepro);
+#elif defined(TARGET_NANOX)
+    ux_flow_init(0, ux_request_change_path_approval_flow, NULL);
 #endif // #if TARGET_ID
 }
 
@@ -2206,14 +2703,21 @@ __attribute__((section(".boot"))) int main(int arg0) {
             TRY {
                 io_seproxyhal_init();
 
+#ifdef TARGET_NANOX
+                // grab the current plane mode setting
+                G_io_app.plane_mode = os_setting_get(OS_SETTING_PLANEMODE, NULL, 0);
+#endif // TARGET_NANOX
+
                 btchip_context_init();
 
                 USB_power(0);
                 USB_power(1);
 
+                ui_idle();
+
 #ifdef HAVE_BLE
                 BLE_power(0, NULL);
-                BLE_power(1, "Ledger Wallet");
+                BLE_power(1, "Nano X");
 #endif // HAVE_BLE
 
 #if defined(TARGET_BLUE)
@@ -2221,8 +2725,6 @@ __attribute__((section(".boot"))) int main(int arg0) {
                 // more if another app does not resetup after app switch)
                 UX_SET_STATUS_BAR_COLOR(COLOR_WHITE, G_coin_config->color_header);
 #endif // TARGET_ID
-
-                ui_idle();
 
                 app_main();
             }

@@ -224,9 +224,13 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
     unsigned char apduLength;
     unsigned short sw = BTCHIP_SW_OK;
     unsigned char *target = G_io_apdu_buffer;
+    unsigned char keycardActivated = 0;
+    unsigned char screenPaired = 0;
+    unsigned char deepControl = 0;
     unsigned char p1 = G_io_apdu_buffer[ISO_OFFSET_P1];
     unsigned char persistentCommit = 0;
     unsigned char hashOffset = 0;
+    unsigned char numOutputs = 0;
 
     apduLength = G_io_apdu_buffer[ISO_OFFSET_LC];
 

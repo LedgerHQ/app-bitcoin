@@ -21,6 +21,7 @@
 
 #include "btchip_config.h"
 #include "os.h"
+#include "os_io_seproxyhal.h"
 
 #include "stdlib.h"
 #include "stdbool.h"
