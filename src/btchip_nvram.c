@@ -19,8 +19,4 @@
 
 #include "btchip_public_ram_variables.h"
 
-#if 0
-WIDE btchip_storage_t N_btchip_real;
-#else
-WIDE btchip_storage_t const N_btchip_real;
-#endif
+btchip_storage_t const N_btchip_real;
