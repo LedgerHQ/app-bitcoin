@@ -1,6 +1,6 @@
 /*******************************************************************************
-*   Ledger Blue - Bitcoin Wallet
-*   (c) 2016 Ledger
+*   Ledger App - Bitcoin Wallet
+*   (c) 2016-2019 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -107,7 +107,6 @@ void app_main(void) {
     btchip_context_D.outLength = 0;
     btchip_context_D.io_flags = 0;
     for (;;) {
-        L_DEBUG_APP(("Main Loop\n"));
 
         // os_memset(G_io_apdu_buffer, 0, 255); // paranoia
 
@@ -122,7 +121,7 @@ void app_main(void) {
         // reply during reception of next apdu
     }
 
-    L_DEBUG_APP(("End of main loop\n"));
+    PRINTF("End of main loop\n");
 
     // in case reached
     reset();

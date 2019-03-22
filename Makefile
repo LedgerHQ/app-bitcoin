@@ -23,13 +23,13 @@ include $(BOLOS_SDK)/Makefile.defines
 APP_PATH = ""
 # All but bitcoin app use dependency onto the bitcoin app/lib
 DEFINES_LIB = USE_LIB_BITCOIN
-APP_LOAD_PARAMS= --curve secp256k1 $(COMMON_LOAD_PARAMS) 
+APP_LOAD_PARAMS= --curve secp256k1 $(COMMON_LOAD_PARAMS)
 
 APPVERSION_M=1
 APPVERSION_N=3
-APPVERSION_P=7
+APPVERSION_P=8
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
-APP_LOAD_FLAGS=--appFlags 0x50 --dep Bitcoin:$(APPVERSION)
+APP_LOAD_FLAGS=--appFlags 0x250 --dep Bitcoin:$(APPVERSION)
 
 # simplify for tests
 ifndef COIN
@@ -48,15 +48,15 @@ DEFINES   += COIN_P2PKH_VERSION=0 COIN_P2SH_VERSION=5 COIN_FAMILY=1 COIN_COINID=
 DEFINES_LIB=# we're not using the lib :)
 APPNAME ="Bitcoin"
 APP_LOAD_PARAMS += --path $(APP_PATH)
-#LIB and global pin and 
-APP_LOAD_FLAGS=--appFlags 0x850
+#LIB and global pin and
+APP_LOAD_FLAGS=--appFlags 0xa50
 else ifeq ($(COIN),bitcoin_cash)
 # Bitcoin cash
 DEFINES   += COIN_P2PKH_VERSION=0 COIN_P2SH_VERSION=5 COIN_FAMILY=1 COIN_COINID=\"Bitcoin\" COIN_COINID_HEADER=\"BITCOINCASH\" COIN_COLOR_HDR=0x85bb65 COIN_COLOR_DB=0xc2ddb2 COIN_COINID_NAME=\"BitcoinCash\" COIN_COINID_SHORT=\"BCH\" COIN_KIND=COIN_KIND_BITCOIN_CASH COIN_FORKID=0
 APPNAME ="Bitcoin Cash"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),bitcoin_gold)
-# Bitcoin Gold 
+# Bitcoin Gold
 DEFINES   += COIN_P2PKH_VERSION=38 COIN_P2SH_VERSION=23 COIN_FAMILY=1 COIN_COINID=\"Bitcoin\\x20Gold\" COIN_COINID_HEADER=\"BITCOINGOLD\" COIN_COLOR_HDR=0x85bb65 COIN_COLOR_DB=0xc2ddb2 COIN_COINID_NAME=\"BitcoinGold\" COIN_COINID_SHORT=\"BTG\" COIN_KIND=COIN_KIND_BITCOIN_GOLD COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT COIN_FORKID=79
 APPNAME ="Bitcoin Gold"
 APP_LOAD_PARAMS += --path $(APP_PATH)
@@ -96,7 +96,7 @@ DEFINES   += COIN_P2PKH_VERSION=85 COIN_P2SH_VERSION=122 COIN_FAMILY=1 COIN_COIN
 APPNAME ="LBRY"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),stratis)
-# Stratis 
+# Stratis
 DEFINES   += COIN_P2PKH_VERSION=63 COIN_P2SH_VERSION=125 COIN_FAMILY=2 COIN_COINID=\"Stratis\" COIN_COINID_HEADER=\"STRATIS\" COIN_COLOR_HDR=0x3790CA COIN_COLOR_DB=0x9BC8E5 COIN_COINID_NAME=\"Stratis\" COIN_COINID_SHORT=\"STRAT\" COIN_KIND=COIN_KIND_STRATIS COIN_FLAGS=FLAG_PEERCOIN_SUPPORT
 APPNAME ="Stratis"
 APP_LOAD_PARAMS += --path $(APP_PATH)
@@ -104,10 +104,6 @@ else ifeq ($(COIN),peercoin)
 # Peercoin
 DEFINES += COIN_P2PKH_VERSION=55 COIN_P2SH_VERSION=117 COIN_FAMILY=2 COIN_COINID=\"PPCoin\" COIN_COINID_HEADER=\"PEERCOIN\" COIN_COLOR_HDR=0x3790CA COIN_COLOR_DB=0x9BC8E5 COIN_COINID_NAME=\"Peercoin\" COIN_COINID_SHORT=\"PPC\" COIN_KIND=COIN_KIND_PEERCOIN COIN_FLAGS=FLAG_PEERCOIN_UNITS\|FLAG_PEERCOIN_SUPPORT
 APPNAME ="Peercoin"
-APP_LOAD_PARAMS += --path $(APP_PATH)
-else ifeq ($(COIN),posw)
-DEFINES += COIN_P2PKH_VERSION=55 COIN_P2SH_VERSION=85 COIN_FAMILY=2 COIN_COINID=\"PoSWallet\" COIN_COINID_HEADER=\"POSW\" COIN_COLOR_HDR=0x23273D COIN_COLOR_DB=0x91939E COIN_COINID_NAME=\"PoSW\" COIN_COINID_SHORT=\"POSW\" COIN_KIND=COIN_KIND_POSW COIN_FLAGS=FLAG_PEERCOIN_SUPPORT
-APPNAME ="PoSW"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),pivx)
 # PivX
@@ -138,11 +134,6 @@ else ifeq ($(COIN),qtum)
 DEFINES   += COIN_P2PKH_VERSION=58 COIN_P2SH_VERSION=50 COIN_FAMILY=3 COIN_COINID=\"Qtum\" COIN_COINID_HEADER=\"QTUM\" COIN_COLOR_HDR=0x2E9AD0 COIN_COLOR_DB=0x97CDE8 COIN_COINID_NAME=\"QTUM\" COIN_COINID_SHORT=\"QTUM\" COIN_KIND=COIN_KIND_QTUM
 APPNAME ="Qtum"
 APP_LOAD_PARAMS += --path "44'/88'" --path "0'/45342'" --path "20698'/3053'/12648430'"
-else ifeq ($(COIN),hcash)
-# HCash
-DEFINES   += COIN_P2PKH_VERSION=40 COIN_P2SH_VERSION=100 COIN_FAMILY=2 COIN_COINID=\"HShare\" COIN_COINID_HEADER=\"HCASH\" COIN_COLOR_HDR=0x57448D COIN_COLOR_DB=0xABA2C6 COIN_COINID_NAME=\"HCash\" COIN_COINID_SHORT=\"HCASH\" COIN_KIND=COIN_KIND_HCASH COIN_FLAGS=FLAG_PEERCOIN_SUPPORT
-APPNAME ="HCash"
-APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),zcoin)
 DEFINES   += COIN_P2PKH_VERSION=82 COIN_P2SH_VERSION=7 COIN_FAMILY=1 COIN_COINID=\"Zcoin\" COIN_COINID_HEADER=\"ZCOIN\" COIN_COLOR_HDR=0x3EAD54 COIN_COLOR_DB=0xA3DCAE COIN_COINID_NAME=\"Zcoin\" COIN_COINID_SHORT=\"ZCOIN\" COIN_KIND=COIN_KIND_ZCOIN
 APPNAME ="Zcoin"
@@ -169,12 +160,12 @@ APPNAME ="XSN"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),nix)
 # NIX
-DEFINES   += COIN_P2PKH_VERSION=38 COIN_P2SH_VERSION=53 COIN_FAMILY=1 COIN_COINID=\"NIX\" COIN_COINID_HEADER=\"NIX\" COIN_COLOR_HDR=0x1685e8 COIN_COLOR_DB=0xffffff COIN_COINID_NAME=\"NIX\" COIN_COINID_SHORT=\"NIX\" COIN_KIND=COIN_KIND_NIX
+DEFINES   += COIN_P2PKH_VERSION=38 COIN_P2SH_VERSION=53 COIN_FAMILY=1 COIN_COINID=\"NIX\" COIN_COINID_HEADER=\"NIX\" COIN_COLOR_HDR=0x1685e8 COIN_COLOR_DB=0xffffff COIN_COINID_NAME=\"NIX\" COIN_COINID_SHORT=\"NIX\" COIN_NATIVE_SEGWIT_PREFIX=\"nix\" COIN_KIND=COIN_KIND_NIX COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
 APPNAME ="NIX"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, posw, pivx, viacoin, vertcoin, stealth, digibyte, qtum, hcash, bitcoin_private, zcoin, gamecredits, zclassic, xsn, nix, lbry) 
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, pivx, viacoin, vertcoin, stealth, digibyte, qtum, bitcoin_private, zcoin, gamecredits, zclassic, xsn, nix, lbry)
 endif
 endif
 
@@ -184,7 +175,11 @@ DEFINES += $(DEFINES_LIB)
 ifeq ($(TARGET_NAME),TARGET_BLUE)
 ICONNAME=blue_app_$(COIN).gif
 else
+	ifeq ($(TARGET_NAME),TARGET_NANOX)
+ICONNAME=nanox_app_$(COIN).gif
+	else
 ICONNAME=nanos_app_$(COIN).gif
+	endif
 endif
 
 ################
@@ -206,14 +201,28 @@ DEFINES   += LEDGER_MAJOR_VERSION=$(APPVERSION_M) LEDGER_MINOR_VERSION=$(APPVERS
 # U2F
 DEFINES   += HAVE_U2F HAVE_IO_U2F
 DEFINES   += U2F_PROXY_MAGIC=\"BTC\"
-DEFINES   += USB_SEGMENT_SIZE=64 
+DEFINES   += USB_SEGMENT_SIZE=64
 DEFINES   += BLE_SEGMENT_SIZE=32 #max MTU, min 20
+
+WEBUSB_URL     = www.ledgerwallet.com
+DEFINES       += HAVE_WEBUSB WEBUSB_URL_SIZE_B=$(shell echo -n $(WEBUSB_URL) | wc -c) WEBUSB_URL=$(shell echo -n $(WEBUSB_URL) | sed -e "s/./\\\'\0\\\',/g")
 
 DEFINES   += UNUSED\(x\)=\(void\)x
 DEFINES   += APPVERSION=\"$(APPVERSION)\"
 
-DEFINES += CX_COMPLIANCE_141
 DEFINES += BLAKE_SDK
+
+ifeq ($(TARGET_NAME),TARGET_NANOX)
+DEFINES       += HAVE_BLE BLE_COMMAND_TIMEOUT_MS=2000
+DEFINES       += HAVE_BLE_APDU # basic ledger apdu transport over BLE
+
+DEFINES       += HAVE_GLO096 HAVE_UX_LEGACY
+DEFINES       += HAVE_BAGL BAGL_WIDTH=128 BAGL_HEIGHT=64
+DEFINES       += HAVE_BAGL_ELLIPSIS # long label truncation feature
+DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_REGULAR_11PX
+DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_EXTRABOLD_11PX
+DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_LIGHT_16PX
+endif
 
 ##############
 # Compiler #
@@ -232,7 +241,7 @@ ifeq ($(GCCPATH),)
 $(info GCCPATH is not set: arm-none-eabi-* will be used from PATH)
 endif
 
-CC       := $(CLANGPATH)clang 
+CC       := $(CLANGPATH)clang
 
 #CFLAGS   += -O0
 CFLAGS   += -O3 -Os
@@ -241,7 +250,7 @@ AS     := $(GCCPATH)arm-none-eabi-gcc
 
 LD       := $(GCCPATH)arm-none-eabi-gcc
 LDFLAGS  += -O3 -Os
-LDLIBS   += -lm -lgcc -lc 
+LDLIBS   += -lm -lgcc -lc
 
 # import rules to compile glyphs(/pone)
 include $(BOLOS_SDK)/Makefile.glyphs
@@ -249,6 +258,11 @@ include $(BOLOS_SDK)/Makefile.glyphs
 ### variables processed by the common makefile.rules of the SDK to grab source files and include dirs
 APP_SOURCE_PATH  += src
 SDK_SOURCE_PATH  += lib_stusb lib_stusb_impl lib_u2f qrcode
+
+ifeq ($(TARGET_NAME),TARGET_NANOX)
+SDK_SOURCE_PATH  += lib_blewbxx lib_blewbxx_impl
+SDK_SOURCE_PATH  += lib_ux
+endif
 
 load: all
 	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
@@ -263,4 +277,4 @@ include $(BOLOS_SDK)/Makefile.rules
 dep/%.d: %.c Makefile
 
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin posw pivx viacoin vertcoin stealth digibyte qtum hcash bitcoin_private zcoin gamecredits zclassic xsn nix
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix

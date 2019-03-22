@@ -1,6 +1,6 @@
 /*******************************************************************************
-*   Ledger Blue - Bitcoin Wallet
-*   (c) 2016 Ledger
+*   Ledger App - Bitcoin Wallet
+*   (c) 2016-2019 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -92,7 +92,7 @@ unsigned short btchip_apdu_hash_input_start() {
                 else
                 if (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_SAPLING) {
                     btchip_context_D.usingOverwinter = ZCASH_USING_OVERWINTER_SAPLING;
-                }                            
+                }
             }
             btchip_context_D.overwinterSignReady = 0;
             btchip_context_D.segwitParsedOnce = 0;

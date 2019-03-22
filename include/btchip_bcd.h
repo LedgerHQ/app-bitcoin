@@ -1,6 +1,6 @@
 /*******************************************************************************
-*   Ledger Blue - Bitcoin Wallet
-*   (c) 2016 Ledger
+*   Ledger App - Bitcoin Wallet
+*   (c) 2016-2019 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -20,6 +20,6 @@
 #define BTCHIP_BCD_H
 
 unsigned char
-btchip_convert_hex_amount_to_displayable(unsigned char WIDE *amount);
+btchip_convert_hex_amount_to_displayable(unsigned char *amount);
 
 #endif

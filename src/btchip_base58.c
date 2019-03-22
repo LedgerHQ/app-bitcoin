@@ -1,6 +1,6 @@
 /*******************************************************************************
-*   Ledger Blue - Bitcoin Wallet
-*   (c) 2016 Ledger
+*   Ledger App - Bitcoin Wallet
+*   (c) 2016-2019 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 #define MAX_DEC_INPUT_SIZE 164
 #define MAX_ENC_INPUT_SIZE 120
 
-int btchip_decode_base58(const char WIDE *in, size_t length,
+int btchip_decode_base58(const char *in, size_t length,
                          unsigned char *out, size_t *outlen) {
   unsigned char tmp[MAX_DEC_INPUT_SIZE];
   unsigned char buffer[MAX_DEC_INPUT_SIZE] = {0};
@@ -32,7 +32,7 @@ int btchip_decode_base58(const char WIDE *in, size_t length,
     return -1;
   }
   os_memmove(tmp, in, length);
-  L_DEBUG_BUF(("To decode\n", tmp, length));
+  PRINTF("To decode\n%.*H\n",length,tmp);
   for (i = 0; i < length; i++) {
     if (in[i] >= sizeof(BASE58TABLE)) {
       return -1;
@@ -66,17 +66,17 @@ int btchip_decode_base58(const char WIDE *in, size_t length,
   }
   length = length - (j - zeroCount);
   if (*outlen < length) {
-    L_DEBUG_APP(("Decode overflow %d %d\n", length, *outlen));
+    PRINTF("Decode overflow %d %d\n", length, *outlen);
     return -1;
   }
 
   os_memmove(out, buffer + j - zeroCount, length);
-  L_DEBUG_BUF(("Decoded\n", out, length));
+  PRINTF("Decoded\n%.*H\n",length,out);
   *outlen = length;
   return 0;
 }
 
-int btchip_encode_base58(const unsigned char WIDE *in, size_t length,
+int btchip_encode_base58(const unsigned char *in, size_t length,
                          unsigned char *out, size_t *outlen) {
   unsigned char buffer[MAX_ENC_INPUT_SIZE * 138 / 100 + 1] = {0};
   size_t i = 0, j;
@@ -88,8 +88,8 @@ int btchip_encode_base58(const unsigned char WIDE *in, size_t length,
     return -1;
   }
 
-  L_DEBUG_APP(("Length to encode %d\n", length));
-  L_DEBUG_BUF(("To encode\n", in, length));
+  PRINTF("Length to encode %d\n", length);
+  PRINTF("To encode\n%.*H\n",length,in);
 
   while ((zeroCount < length) && (in[zeroCount] == 0)) {
     ++zeroCount;
@@ -128,7 +128,7 @@ int btchip_encode_base58(const unsigned char WIDE *in, size_t length,
     out[i++] = BASE58ALPHABET[buffer[j++]];
   }
   *outlen = i;
-  L_DEBUG_APP(("Length encoded %d\n", i));
-  L_DEBUG_BUF(("Encoded\n", out, i));
+  PRINTF("Length encoded %d\n", i);
+  PRINTF("Encoded\n%.*H\n",i,out);
   return 0;
 }
