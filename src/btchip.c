@@ -116,6 +116,8 @@ void app_main(void) {
                         // use the previous outlength as the reply
                         btchip_context_D.outLength);
 
+        PRINTF("New APDU received:\n%.*H\n", btchip_context_D.inLength, G_io_apdu_buffer);
+
         app_dispatch();
 
         // reply during reception of next apdu
