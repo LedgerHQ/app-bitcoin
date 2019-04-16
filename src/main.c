@@ -1533,7 +1533,7 @@ UX_STEP_VALID(
     pb,
     os_sched_exit(-1),
     {
-      &C_icon_dashboard,
+      &C_icon_dashboard_x,
       "Quit",
     });
 UX_FLOW(ux_idle_flow,
