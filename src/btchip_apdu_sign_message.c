@@ -1,6 +1,6 @@
 /*******************************************************************************
-*   Ledger Blue - Bitcoin Wallet
-*   (c) 2016 Ledger
+*   Ledger App - Bitcoin Wallet
+*   (c) 2016-2019 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -89,7 +89,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                     os_memset(&btchip_context_D.transactionSummary, 0,
                               sizeof(btchip_transaction_summary_t));
                     if (G_io_apdu_buffer[offset] > MAX_BIP32_PATH) {
-                        L_DEBUG_APP(("Invalid path\n"));
+                        PRINTF("Invalid path\n");
                         sw = BTCHIP_SW_INCORRECT_DATA;
                         CLOSE_TRY;
                         goto discard;
@@ -114,24 +114,24 @@ unsigned short btchip_apdu_sign_message_internal() {
                     }
                     if (btchip_context_D.transactionSummary.messageLength ==
                         0) {
-                        L_DEBUG_APP(("Null message length\n"));
+                        PRINTF("Null message length\n");
                         sw = BTCHIP_SW_INCORRECT_DATA;
                         CLOSE_TRY;
                         goto discard;
                     }
                     btchip_context_D.hashedMessageLength = 0;
-                    cx_sha256_init(&btchip_context_D.transactionHashFull);
+                    cx_sha256_init(&btchip_context_D.transactionHashFull.sha256);
                     cx_sha256_init(
                         &btchip_context_D.transactionHashAuthorization);
                     chunkLength =
                         btchip_context_D.coinIdLength + SIGNMAGIC_LENGTH;
-                    cx_hash(&btchip_context_D.transactionHashFull.header, 0,
-                            &chunkLength, 1, NULL);
-                    cx_hash(&btchip_context_D.transactionHashFull.header, 0,
+                    cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
+                            &chunkLength, 1, NULL, 0);
+                    cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
                             btchip_context_D.coinId,
-                            btchip_context_D.coinIdLength, NULL);
-                    cx_hash(&btchip_context_D.transactionHashFull.header, 0,
-                            (unsigned char *)SIGNMAGIC, SIGNMAGIC_LENGTH, NULL);
+                            btchip_context_D.coinIdLength, NULL, 0);
+                    cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
+                            (unsigned char *)SIGNMAGIC, SIGNMAGIC_LENGTH, NULL, 0);
                     if (btchip_context_D.transactionSummary.messageLength <
                         0xfd) {
                         messageLength[0] =
@@ -148,21 +148,21 @@ unsigned short btchip_apdu_sign_message_internal() {
                                             0xff);
                         messageLengthSize = 3;
                     }
-                    cx_hash(&btchip_context_D.transactionHashFull.header, 0,
-                            messageLength, messageLengthSize, NULL);
+                    cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
+                            messageLength, messageLengthSize, NULL, 0);
                     chunkLength = apduLength - (offset - ISO_OFFSET_CDATA);
                     if ((btchip_context_D.hashedMessageLength + chunkLength) >
                         btchip_context_D.transactionSummary.messageLength) {
-                        L_DEBUG_APP(("Invalid data length\n"));
+                        PRINTF("Invalid data length\n");
                         sw = BTCHIP_SW_INCORRECT_DATA;
                         CLOSE_TRY;
                         goto discard;
                     }
-                    cx_hash(&btchip_context_D.transactionHashFull.header, 0,
-                            G_io_apdu_buffer + offset, chunkLength, NULL);
+                    cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
+                            G_io_apdu_buffer + offset, chunkLength, NULL, 0);
                     cx_hash(
                         &btchip_context_D.transactionHashAuthorization.header,
-                        0, G_io_apdu_buffer + offset, chunkLength, NULL);
+                        0, G_io_apdu_buffer + offset, chunkLength, NULL, 0);
                     btchip_context_D.hashedMessageLength += chunkLength;
                     G_io_apdu_buffer[0] = 0x00;
                     if (btchip_context_D.hashedMessageLength ==
@@ -175,16 +175,16 @@ unsigned short btchip_apdu_sign_message_internal() {
                 } else {
                     if ((btchip_context_D.hashedMessageLength + apduLength) >
                         btchip_context_D.transactionSummary.messageLength) {
-                        L_DEBUG_APP(("Invalid data length\n"));
+                        PRINTF("Invalid data length\n");
                         sw = BTCHIP_SW_INCORRECT_DATA;
                         CLOSE_TRY;
                         goto discard;
                     }
-                    cx_hash(&btchip_context_D.transactionHashFull.header, 0,
-                            G_io_apdu_buffer + offset, apduLength, NULL);
+                    cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
+                            G_io_apdu_buffer + offset, apduLength, NULL, 0);
                     cx_hash(
                         &btchip_context_D.transactionHashAuthorization.header,
-                        0, G_io_apdu_buffer + offset, apduLength, NULL);
+                        0, G_io_apdu_buffer + offset, apduLength, NULL, 0);
                     btchip_context_D.hashedMessageLength += apduLength;
                     G_io_apdu_buffer[0] = 0x00;
                     if (btchip_context_D.hashedMessageLength ==
@@ -199,7 +199,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                 if ((btchip_context_D.transactionSummary.messageLength == 0) ||
                     (btchip_context_D.hashedMessageLength !=
                      btchip_context_D.transactionSummary.messageLength)) {
-                    L_DEBUG_APP(("Invalid length to sign\n"));
+                    PRINTF("Invalid length to sign\n");
                     sw = BTCHIP_SW_INCORRECT_DATA;
                     CLOSE_TRY;
                     goto discard;
@@ -242,11 +242,11 @@ unsigned short btchip_compute_hash() {
     btchip_context_D.outLength = 0;
     BEGIN_TRY {
         TRY {
-            cx_hash(&btchip_context_D.transactionHashFull.header, CX_LAST, hash,
-                    0, hash);
-            cx_sha256_init(&btchip_context_D.transactionHashFull);
-            cx_hash(&btchip_context_D.transactionHashFull.header, CX_LAST, hash,
-                    32, hash);
+            cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST, hash,
+                    0, hash, 32);
+            cx_sha256_init(&btchip_context_D.transactionHashFull.sha256);
+            cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST, hash,
+                    32, hash, 32);
             btchip_private_derive_keypair(
                 btchip_context_D.transactionSummary.summarydata.keyPath, 0,
                 NULL);
