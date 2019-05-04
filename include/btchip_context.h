@@ -260,14 +260,15 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_PEERCOIN,
     COIN_KIND_POSW,
     COIN_KIND_PIVX,
-    COIN_KIND_STEALTHCOIN,
+    COIN_KIND_STEALTH,
     COIN_KIND_VIACOIN,
     COIN_KIND_VERTCOIN,
     COIN_KIND_DIGIBYTE,
     COIN_KIND_QTUM,
     COIN_KIND_HCASH,
     COIN_KIND_BITCOIN_PRIVATE,
-    COIN_KIND_ZENCASH
+    COIN_KIND_HORIZEN,
+    COIN_KIND_ZCOIN
 } btchip_coin_kind_t;
 
 typedef struct btchip_altcoin_config_s {
@@ -275,9 +276,11 @@ typedef struct btchip_altcoin_config_s {
     unsigned short p2sh_version;
     unsigned char family;
     //unsigned char* iconsuffix;// will use the icon provided on the stack (maybe)
-    const char* coindid_header;
+#ifdef TARGET_BLUE
+    const char* header_text;
     unsigned int color_header;
     unsigned int color_dashboard;
+#endif // TARGET_BLUE
     const char* coinid; // used coind id for message signature prefix
     const char* name; // for ux displays
     const char* name_short; // for unit in ux displays
