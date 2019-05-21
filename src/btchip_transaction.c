@@ -247,8 +247,10 @@ void transaction_parse(unsigned char parseMode) {
                     }
 
                     if (G_coin_config->flags & FLAG_PEERCOIN_SUPPORT) {
-                        if (btchip_context_D.coinFamily ==
-                            BTCHIP_FAMILY_PEERCOIN) {
+                        if ((btchip_context_D.coinFamily ==
+                            BTCHIP_FAMILY_PEERCOIN) || 
+                            ((btchip_context_D.coinFamily == BTCHIP_FAMILY_STEALTH) && 
+                            (btchip_context_D.transactionVersion[0] < 2))) {
                             // Timestamp
                             check_transaction_available(4);
                             transaction_offset_increase(4);
