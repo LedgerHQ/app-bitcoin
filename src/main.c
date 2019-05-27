@@ -1540,7 +1540,8 @@ UX_FLOW(ux_idle_flow,
   &ux_idle_flow_1_step,
   &ux_idle_flow_2_step,
   &ux_idle_flow_3_step,
-  &ux_idle_flow_4_step
+  &ux_idle_flow_4_step,
+  FLOW_LOOP
 );
 
 //////////////////////////////////////////////////////////////////////
@@ -1650,7 +1651,7 @@ UX_STEP_NOCB(
     {
       &C_icon_eye,
       "Review",
-      "transaction"
+      vars.tmp.feesAmount, // output #
     });
 UX_STEP_NOCB(
     ux_confirm_single_flow_2_step, 
@@ -1665,13 +1666,6 @@ UX_STEP_NOCB(
     {
       .title = "Address",
       .text = vars.tmp.fullAddress,
-    });
-UX_STEP_NOCB(
-    ux_confirm_single_flow_4_step, 
-    bnnn_paging, 
-    {
-      .title = "Fees",
-      .text = vars.tmp.feesAmount,
     });
 UX_STEP_VALID(
     ux_confirm_single_flow_5_step, 
@@ -1694,7 +1688,6 @@ UX_FLOW(ux_confirm_single_flow,
   &ux_confirm_single_flow_1_step,
   &ux_confirm_single_flow_2_step,
   &ux_confirm_single_flow_3_step,
-  &ux_confirm_single_flow_4_step,
   &ux_confirm_single_flow_5_step,
   &ux_confirm_single_flow_6_step
 );
@@ -1706,7 +1699,7 @@ UX_STEP_NOCB(
     pnn, 
     {
       &C_icon_eye,
-      "Review",
+      "Confirm",
       "transaction"
     });
 UX_STEP_NOCB(
