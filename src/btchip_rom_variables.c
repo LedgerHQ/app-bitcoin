@@ -63,6 +63,7 @@ unsigned char const DISPATCHER_CLA[] = {
     BTCHIP_CLA, // btchip_apdu_hash_sign,
     BTCHIP_CLA, // btchip_apdu_hash_input_finalize_full,
     BTCHIP_CLA, // btchip_apdu_sign_message,
+    BTCHIP_CLA, // btchip_apdu_sign_plain_message,
     BTCHIP_CLA, // btchip_apdu_get_random,
     BTCHIP_CLA, // btchip_apdu_get_firmware_version,
     BTCHIP_CLA, // btchip_apdu_set_alternate_coin_version
@@ -80,6 +81,7 @@ unsigned char const DISPATCHER_INS[] = {
     BTCHIP_INS_HASH_SIGN,                // btchip_apdu_hash_sign,
     BTCHIP_INS_HASH_INPUT_FINALIZE_FULL, // btchip_apdu_hash_input_finalize_full,
     BTCHIP_INS_SIGN_MESSAGE,             // btchip_apdu_sign_message,
+    BTCHIP_INS_SIGN_PLAIN_MESSAGE,       // btchip_apdu_sign_plain_message,
     BTCHIP_INS_GET_RANDOM,               // btchip_apdu_get_random,
     BTCHIP_INS_GET_FIRMWARE_VERSION,     // btchip_apdu_get_firmware_version,
     BTCHIP_INS_SET_ALTERNATE_COIN_VER, // btchip_apdu_set_alternate_coin_version
@@ -97,6 +99,7 @@ unsigned char const DISPATCHER_DATA_IN[] = {
     1, // btchip_apdu_hash_sign,
     1, // btchip_apdu_hash_input_finalize_full,
     1, // btchip_apdu_sign_message,
+    1, // btchip_apdu_sign_plain_message,
     0, // btchip_apdu_get_random,
     0, // btchip_apdu_get_firmware_version,
     1, // btchip_apdu_set_alternate_coin_version
@@ -114,6 +117,7 @@ apduProcessingFunction const DISPATCHER_FUNCTIONS[] = {
     btchip_apdu_hash_sign,
     btchip_apdu_hash_input_finalize_full,
     btchip_apdu_sign_message,
+    btchip_apdu_sign_plain_message,
     btchip_apdu_get_random,
     btchip_apdu_get_firmware_version,
     btchip_apdu_set_alternate_coin_version,

@@ -36,6 +36,7 @@
 #define BTCHIP_INS_HASH_INPUT_FINALIZE_FULL 0x4A
 #define BTCHIP_INS_GET_INTERNAL_CHAIN_INDEX 0x4C
 #define BTCHIP_INS_SIGN_MESSAGE 0x4E
+#define BTCHIP_INS_SIGN_PLAIN_MESSAGE 0x4F
 #define BTCHIP_INS_GET_TRANSACTION_LIMIT 0xA0
 #define BTCHIP_INS_SET_TRANSACTION_LIMIT 0xA2
 #define BTCHIP_INS_IMPORT_PRIVATE_KEY 0xB0
@@ -148,6 +149,7 @@ unsigned short btchip_apdu_get_public_key(void);
 unsigned short btchip_apdu_derive_bip32_key(void);
 unsigned short btchip_apdu_signverify_immediate(void);
 unsigned short btchip_apdu_sign_message(void);
+unsigned short btchip_apdu_sign_plain_message(void);
 
 unsigned short btchip_apdu_get_random(void);
 unsigned short btchip_apdu_get_firmware_version(void);
