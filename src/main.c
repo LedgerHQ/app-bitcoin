@@ -155,7 +155,7 @@ union {
         // char addressSummary[40]; // beginning of the output address ... end
         // of
 
-        char fullAddress[43]; // the address
+        char fullAddress[65]; // the address
         char fullAmount[20];  // full amount
         char feesAmount[20];  // fees
     } tmp;
@@ -2116,7 +2116,8 @@ uint8_t prepare_single_output() {
                 btchip_context_D.currentOutput[addressOffset - 1]);
         }
 
-        strcpy(vars.tmp.fullAddress, tmp);
+        strncpy(vars.tmp.fullAddress, tmp, sizeof(vars.tmp.fullAddress));
+        vars.tmp.fullAddress[sizeof(vars.tmp.fullAddress) - 1] = '\0';
     }
 
     // Prepare amount
@@ -2371,7 +2372,8 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                                  1]);
                     }
 
-                    strcpy(vars.tmp.fullAddress, tmp);
+                    strncpy(vars.tmp.fullAddress, tmp, sizeof(vars.tmp.fullAddress));
+                    vars.tmp.fullAddress[sizeof(vars.tmp.fullAddress) - 1] = '\0';
 
                     // Prepare amount
 
