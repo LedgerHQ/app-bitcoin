@@ -158,9 +158,14 @@ else ifeq ($(COIN),nix)
 DEFINES   += COIN_P2PKH_VERSION=38 COIN_P2SH_VERSION=53 COIN_FAMILY=1 COIN_COINID=\"NIX\" COIN_COINID_HEADER=\"NIX\" COIN_COLOR_HDR=0x1685e8 COIN_COLOR_DB=0xffffff COIN_COINID_NAME=\"NIX\" COIN_COINID_SHORT=\"NIX\" COIN_NATIVE_SEGWIT_PREFIX=\"nix\" COIN_KIND=COIN_KIND_NIX COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
 APPNAME ="NIX"
 APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),mtns)
+# OmotenashiCoin
+DEFINES   += COIN_P2PKH_VERSION=63 COIN_P2SH_VERSION=18 COIN_FAMILY=1 COIN_COINID=\"OmotenashiCoin\" COIN_COINID_HEADER=\"MTNS\" COIN_COLOR_HDR=0xFF9900 COIN_COLOR_DB=0xFFB241 COIN_COINID_NAME=\"Mtns\" COIN_COINID_SHORT=\"MTNS\" COIN_KIND=COIN_KIND_MTNS
+APPNAME ="OmotenashiCoin"
+APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, pivx, viacoin, vertcoin, stealth, digibyte, qtum, bitcoin_private, zcoin, gamecredits, zclassic, xsn, nix)
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, pivx, viacoin, vertcoin, stealth, digibyte, qtum, bitcoin_private, zcoin, gamecredits, zclassic, xsn, nix, omotenashicoin)
 endif
 endif
 
