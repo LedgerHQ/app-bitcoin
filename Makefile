@@ -60,11 +60,12 @@ else ifeq ($(COIN),bitcoin_gold)
 DEFINES   += COIN_P2PKH_VERSION=38 COIN_P2SH_VERSION=23 COIN_FAMILY=1 COIN_COINID=\"Bitcoin\\x20Gold\" COIN_COINID_HEADER=\"BITCOINGOLD\" COIN_COLOR_HDR=0x85bb65 COIN_COLOR_DB=0xc2ddb2 COIN_COINID_NAME=\"BitcoinGold\" COIN_COINID_SHORT=\"BTG\" COIN_KIND=COIN_KIND_BITCOIN_GOLD COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT COIN_FORKID=79
 APPNAME ="Bitcoin Gold"
 APP_LOAD_PARAMS += --path $(APP_PATH)
-else ifeq ($(COIN),litecoin)
+else ifeq ($(COIN),etp)
 # Metaverse ETP
-DEFINES   += COIN_P2PKH_VERSION=0 COIN_P2SH_VERSION=50 COIN_FAMILY=1 COIN_COINID=\"MetaverseETP\" COIN_COINID_HEADER=\"METAVERSEETP\" COIN_COLOR_HDR=0x85bb65 COIN_COLOR_DB=0xc2ddb2 COIN_COINID_NAME=\"MetaverseETP\" COIN_COINID_SHORT=\"ETP\" COIN_KIND=COIN_KIND_ETP COIN_FORKID=0
+DEFINES   += COIN_P2PKH_VERSION=50 COIN_P2SH_VERSION=5 COIN_FAMILY=1 COIN_COINID=\"MetaverseETP\" COIN_COINID_HEADER=\"METAVERSEETP\" COIN_COLOR_HDR=0x85bb65 COIN_COLOR_DB=0xc2ddb2 COIN_COINID_NAME=\"MetaverseETP\" COIN_COINID_SHORT=\"ETP\" COIN_KIND=COIN_KIND_ETP COIN_FORKID=0
 APPNAME ="ETP"
 APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),litecoin)
 # Litecoin
 DEFINES   += COIN_P2PKH_VERSION=48 COIN_P2SH_VERSION=50 COIN_FAMILY=1 COIN_COINID=\"Litecoin\" COIN_COINID_HEADER=\"LITECOIN\" COIN_COLOR_HDR=0xCCCCCC COIN_COLOR_DB=0xE6E6E6 COIN_COINID_NAME=\"Litecoin\" COIN_COINID_SHORT=\"LTC\" COIN_NATIVE_SEGWIT_PREFIX=\"ltc1\" COIN_KIND=COIN_KIND_LITECOIN COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
 APPNAME ="Litecoin"
@@ -164,7 +165,7 @@ APPNAME ="NIX"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, pivx, viacoin, vertcoin, stealth, digibyte, qtum, bitcoin_private, zcoin, gamecredits, zclassic, xsn, nix)
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, etp, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, pivx, viacoin, vertcoin, stealth, digibyte, qtum, bitcoin_private, zcoin, gamecredits, zclassic, xsn, nix)
 endif
 endif
 
