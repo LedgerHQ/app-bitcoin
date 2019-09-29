@@ -28,7 +28,7 @@ int btchip_decode_base58(const char *in, size_t length,
   unsigned char j;
   unsigned char startAt;
   unsigned char zeroCount = 0;
-  if (length > MAX_DEC_INPUT_SIZE) {
+  if ((length > MAX_DEC_INPUT_SIZE) || (length < 2)) {
     return -1;
   }
   os_memmove(tmp, in, length);

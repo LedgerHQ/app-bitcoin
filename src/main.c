@@ -2051,9 +2051,9 @@ uint8_t prepare_single_output() {
     char tmp[80];
     unsigned int offset = 0;
     unsigned char versionSize;
-    int addressOffset;
+    int addressOffset = 1; // for static analyzer only
     unsigned char address[22];
-    unsigned short version;
+    unsigned short version = 0; // for static analyzer only
     unsigned short textSize;
     unsigned char nativeSegwit;
 
@@ -2110,7 +2110,7 @@ uint8_t prepare_single_output() {
                 tmp[textSize] = '\0';
             }
         } else if (G_coin_config->native_segwit_prefix) {
-            textSize = segwit_addr_encode(
+            segwit_addr_encode(
                 tmp, PIC(G_coin_config->native_segwit_prefix), 0,
                 btchip_context_D.currentOutput + addressOffset,
                 btchip_context_D.currentOutput[addressOffset - 1]);
@@ -2362,7 +2362,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                             tmp[textSize] = '\0';
                         }
                     } else if (G_coin_config->native_segwit_prefix) {
-                        textSize = segwit_addr_encode(
+                        segwit_addr_encode(
                             tmp, PIC(G_coin_config->native_segwit_prefix), 0,
                             btchip_context_D.currentOutput + offset +
                                 OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET,
@@ -2421,7 +2421,8 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
             offset += 1 + btchip_context_D.currentOutput[offset];
             currentPos++;
         }
-    }
+    }    
+    btchip_context_D.tmp = NULL;
     return 1;
 error:
     return 0;
