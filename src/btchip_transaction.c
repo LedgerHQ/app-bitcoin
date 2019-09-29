@@ -226,7 +226,15 @@ void transaction_parse(unsigned char parseMode) {
                                     btchip_context_D.segwit.cache.hashedSequence,
                                     sizeof(btchip_context_D.segwit.cache
                                            .hashedSequence),
-                                    NULL, 0);
+                                    NULL, 0);                                
+                                if (btchip_context_D.usingLiquid) {
+                                    cx_hash(
+                                        &btchip_context_D.transactionHashFull.sha256.header, 0,
+                                        btchip_context_D.segwit.cache.hashedIssuance,
+                                        sizeof(btchip_context_D.segwit.cache
+                                               .hashedIssuance),
+                                        NULL, 0);                                                                    
+                                }
                                 cx_hash(&btchip_context_D
                                          .transactionHashAuthorization.header,
                                     0,
@@ -320,8 +328,14 @@ void transaction_parse(unsigned char parseMode) {
                             trustedInputFlag = 1;
                             break;
                         case 2:
-                            if (!btchip_context_D.usingSegwit) {
+                            if (!btchip_context_D.usingSegwit || btchip_context_D.usingLiquid) {
                                 PRINTF("Segwit input not used in segwit mode");
+                                goto fail;
+                            }
+                            break;
+                        case 3:
+                            if (!btchip_context_D.usingLiquid) {
+                                PRINTF("Liquid input not used in liquid mode");
                                 goto fail;
                             }
                             break;
@@ -354,34 +368,55 @@ void transaction_parse(unsigned char parseMode) {
                                         36, NULL, 0);
                                 }
                                 transaction_offset_increase(36);
-                                check_transaction_available(8); // update amount
-                                btchip_swap_bytes(
-                                    amount,
-                                    btchip_context_D.transactionBufferPointer,
-                                    8);
-                                if (transaction_amount_add_be(
-                                        btchip_context_D.transactionContext
-                                            .transactionAmount,
-                                        btchip_context_D.transactionContext
-                                            .transactionAmount,
-                                        amount)) {
-                                    PRINTF("Overflow\n");
-                                    goto fail;
+                                if (!btchip_context_D.usingLiquid) {
+                                    check_transaction_available(8); // update amount
+                                    btchip_swap_bytes(
+                                        amount,
+                                        btchip_context_D.transactionBufferPointer,
+                                        8);
+                                    if (transaction_amount_add_be(
+                                            btchip_context_D.transactionContext
+                                                .transactionAmount,
+                                            btchip_context_D.transactionContext
+                                                .transactionAmount,
+                                            amount)) {
+                                        PRINTF("Overflow\n");
+                                        goto fail;
+                                    }
+                                    PRINTF("Adding amount\n%.*H\n",8,btchip_context_D.transactionBufferPointer);
+                                    PRINTF("New amount\n%.*H\n",8,btchip_context_D.transactionContext.transactionAmount);
+                                    transaction_offset_increase(8);
                                 }
-                                PRINTF("Adding amount\n%.*H\n",8,btchip_context_D.transactionBufferPointer);
-                                PRINTF("New amount\n%.*H\n",8,btchip_context_D.transactionContext.transactionAmount);
-                                transaction_offset_increase(8);
+                                else {
+                                    unsigned char ctSize;
+                                    check_transaction_available(1);
+                                    ctSize = btchip_get_confidential_data_size(btchip_context_D.transactionBufferPointer[0], true, false);
+                                    check_transaction_available(ctSize);
+                                    transaction_offset_increase(ctSize);
+                                }
                             } else {
+                                unsigned char ctSize;
                                 btchip_context_D.transactionHashOption =
                                     TRANSACTION_HASH_FULL;
                                 transaction_offset_increase(36);
                                 btchip_context_D.transactionHashOption = 0;
-                                check_transaction_available(8); // save amount
+                                if (!btchip_context_D.usingLiquid) {
+                                    ctSize = 8;
+                                }
+                                else {                                    
+                                    check_transaction_available(1);
+                                    ctSize = btchip_get_confidential_data_size(btchip_context_D.transactionBufferPointer[0], true, false);
+                                    if (ctSize == 0) {
+                                        PRINTF("Invalid confidential value\n");
+                                        goto fail;
+                                    }
+                                }
+                                check_transaction_available(ctSize); // save amount
                                 os_memmove(
                                     btchip_context_D.inputValue,
                                     btchip_context_D.transactionBufferPointer,
-                                    8);
-                                transaction_offset_increase(8);
+                                    ctSize);
+                                transaction_offset_increase(ctSize);
                                 btchip_context_D.transactionHashOption =
                                     TRANSACTION_HASH_FULL;
                             }
@@ -553,15 +588,22 @@ void transaction_parse(unsigned char parseMode) {
                                     TRANSACTION_HASH_BOTH;
                             } else {
                                 if (btchip_context_D.segwitParsedOnce) {
-                                    // Append the saved value
-                                    PRINTF("SEGWIT Add value\n%.*H\n",8,btchip_context_D.inputValue);
+                                    // Append the saved value                                    
                                     if (btchip_context_D.usingOverwinter) {
                                         cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.inputValue, 8, NULL, 0);
                                     }
                                     else {
+                                        unsigned char ctSize;
+                                        if (!btchip_context_D.usingLiquid) {                                            
+                                            ctSize = 8;
+                                        }
+                                        else {
+                                            ctSize = btchip_get_confidential_data_size(btchip_context_D.inputValue[0], true, false);
+                                        }
+                                        PRINTF("SEGWIT Add value\n%.*H\n",ctSize,btchip_context_D.inputValue);
                                         cx_hash(&btchip_context_D
                                                  .transactionHashFull.sha256.header,
-                                            0, btchip_context_D.inputValue, 8,
+                                            0, btchip_context_D.inputValue, ctSize,
                                             NULL, 0);
                                     }
                                 }

@@ -138,6 +138,13 @@ unsigned char btchip_output_script_is_op_call(unsigned char *buffer) {
             (buffer[buffer[0]] == 0xC2));
 }
 
+unsigned char btchip_output_script_is_fee(unsigned char *buffer) {
+    if (btchip_context_D.usingLiquid) {
+        return(buffer[0] == 0);
+    }
+    return 0;
+}
+
 unsigned char btchip_rng_u8_modulo(unsigned char modulo) {
     unsigned int rng_max = 256 % modulo;
     unsigned int rng_limit = 256 - rng_max;
@@ -320,7 +327,7 @@ void btchip_private_derive_keypair(unsigned char *bip32Path,
     }
     io_seproxyhal_io_heartbeat();
     os_perso_derive_node_bip32(CX_CURVE_256K1, bip32PathInt, bip32PathLength,
-                               privateComponent, out_chainCode);    
+                               privateComponent, out_chainCode);
     btchip_retrieve_keypair_discard(privateComponent, derivePublic);
     io_seproxyhal_io_heartbeat();
     os_memset(privateComponent, 0, sizeof(privateComponent));
@@ -454,4 +461,62 @@ void btchip_signverify_finalhash(void *keyContext, unsigned char sign,
                         CX_SHA256, in, inlen, out, outlen);
     }
     io_seproxyhal_io_heartbeat();
+}
+
+#define CT_VALUE_NULL 0
+#define CT_VALUE_NON_BLIND 1
+#define CT_VALUE_PREFIX_A 8
+#define CT_VALUE_PREFIX_B 9
+#define CT_ASSET_PREFIX_A 10
+#define CT_ASSET_PREFIX_B 11
+#define CT_NONCE_PREFIX_A 2
+#define CT_NONCE_PREFIX_B 3
+
+#define CT_VALUE_UNBLIND_LEN 9
+#define CT_ASSET_LEN 33
+
+unsigned char btchip_get_confidential_data_size(char version, bool value, bool nullAccepted) {
+    switch(version) {
+        case CT_VALUE_NULL:
+            return (nullAccepted ? 1 : 0);
+        case CT_VALUE_NON_BLIND:
+            return (value ? CT_VALUE_UNBLIND_LEN : CT_ASSET_LEN);
+        case CT_VALUE_PREFIX_A:
+        case CT_VALUE_PREFIX_B:
+        case CT_ASSET_PREFIX_A:
+        case CT_ASSET_PREFIX_B:
+        case CT_NONCE_PREFIX_A:
+        case CT_NONCE_PREFIX_B:
+            return CT_ASSET_LEN;
+        default:
+            return 0;
+    }
+}
+
+void btchip_derive_master_blinding_key(unsigned char *target) {
+    uint8_t out[64];
+    // FIXME : replace by new syscall when available
+    os_perso_derive_node_bip32(CX_CURVE_256K1, NULL, 0, out, out + 32);
+    cx_hmac_sha512(SYMMETRIC_KEY_SEED, sizeof(SYMMETRIC_KEY_SEED), out, sizeof(out), out, sizeof(out));
+    cx_hmac_sha512(out, 32, SLIP77_LABEL, sizeof(SLIP77_LABEL), out, sizeof(out));
+    os_memmove(target, out + 32, 32);    
+}
+
+void btchip_derive_tx_blinding_key(unsigned char *target) {
+    uint8_t masterBlindingKey[32];
+    btchip_derive_master_blinding_key(masterBlindingKey);
+    cx_hmac_sha256(masterBlindingKey, sizeof(masterBlindingKey), 
+            btchip_context_D.segwit.cache.hashedPrevouts, sizeof(btchip_context_D.segwit.cache.hashedPrevouts), 
+            target, 32);    
+}
+
+void btchip_derive_abf_vbf(uint32_t outputIndex, bool abf, unsigned char *target) {
+    uint8_t txBlindingKey[32];
+    uint8_t deriveData[7];
+    btchip_derive_tx_blinding_key(txBlindingKey);
+    deriveData[0] = (abf ? 'A' : 'V');
+    deriveData[1] = 'B';
+    deriveData[2] = 'F';
+    btchip_write_u32_be(deriveData + 3, outputIndex);
+    cx_hmac_sha256(txBlindingKey, sizeof(txBlindingKey), deriveData, sizeof(deriveData), target, 32);
 }

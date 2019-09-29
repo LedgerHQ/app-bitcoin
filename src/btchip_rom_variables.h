@@ -34,6 +34,9 @@ extern unsigned char const OVERWINTER_PARAM_OUTPUTS[16];
 extern unsigned char const OVERWINTER_PARAM_SIGHASH[16];
 extern unsigned char const OVERWINTER_NO_JOINSPLITS[32];
 
+extern unsigned char const SYMMETRIC_KEY_SEED[18];
+extern unsigned char const SLIP77_LABEL[10];
+
 #define HDKEY_VERSION_LENGTH 4
 
 extern unsigned char const TWOPOWER[8];
@@ -58,7 +61,7 @@ extern unsigned char const TWOPOWER[8];
 
 #define APDU_BASE_LENGTH 13
 
-#define DISPATCHER_APDUS 14
+#define DISPATCHER_APDUS 19
 
 typedef unsigned short (*apduProcessingFunction)(void);
 

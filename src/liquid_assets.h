@@ -1,6 +1,6 @@
 /*******************************************************************************
 *   Ledger App - Bitcoin Wallet
-*   (c) 2016-2019 Ledger
+*   (c) 2019 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -15,20 +15,21 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef BTCHIP_INTERNAL_H
-#define BTCHIP_INTERNAL_H
+#ifndef _LIQUID_ASSETS_H__
+#define _LIQUID_ASSETS_H__
 
-#include "btchip.h"
-#include "btchip_public_ram_variables.h"
-#include "btchip_public_ram_key_variables.h"
-#include "btchip_rom_variables.h"
-#include "btchip_filesystem.h"
-#include "btchip_base58.h"
-#include "btchip_bcd.h"
-#include "btchip_ecc.h"
-#include "btchip_helpers.h"
-#include "btchip_transaction.h"
-#include "liquid_assets.h"
-#include "liquid_crypto.h"
+#include <stdint.h>
+
+typedef struct assetDefinition_t {
+    uint8_t tag[32];
+    uint8_t generator[65]; // to be removed once seeded generators are supported
+    uint8_t ticker[10];
+    uint8_t decimals;
+} assetDefinition_t;
+
+#define NUM_LIQUID_ASSETS 4
+
+extern assetDefinition_t const LIQUID_ASSETS[NUM_LIQUID_ASSETS];
 
 #endif
+

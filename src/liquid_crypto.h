@@ -1,6 +1,6 @@
 /*******************************************************************************
 *   Ledger App - Bitcoin Wallet
-*   (c) 2016-2019 Ledger
+*   (c) 2019 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -15,20 +15,15 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef BTCHIP_INTERNAL_H
-#define BTCHIP_INTERNAL_H
+#ifndef _LIQUID_CRYPTO_H__
+#define _LIQUID_CRYPTO_H__
 
-#include "btchip.h"
-#include "btchip_public_ram_variables.h"
-#include "btchip_public_ram_key_variables.h"
-#include "btchip_rom_variables.h"
-#include "btchip_filesystem.h"
-#include "btchip_base58.h"
-#include "btchip_bcd.h"
-#include "btchip_ecc.h"
-#include "btchip_helpers.h"
-#include "btchip_transaction.h"
-#include "liquid_assets.h"
-#include "liquid_crypto.h"
+#include <stdint.h>
+
+void liquid_crypto_pedersen_commit(unsigned char *blindingFactor, uint8_t *value64BE, unsigned char *generator, unsigned char *output);
+void liquid_crypto_generator_tweak_full(unsigned char *generator, unsigned char *blindingFactor, unsigned char *output);
+void liquid_crypto_generator_compress(unsigned char *generator);
+
+void liquid_crypto_test(void);
 
 #endif

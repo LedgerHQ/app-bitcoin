@@ -30,6 +30,7 @@ unsigned char btchip_output_script_is_regular(unsigned char *buffer);
 unsigned char btchip_output_script_is_p2sh(unsigned char *buffer);
 unsigned char btchip_output_script_is_op_return(unsigned char *buffer);
 unsigned char btchip_output_script_is_native_witness(unsigned char *buffer);
+unsigned char btchip_output_script_is_fee(unsigned char *buffer);
 
 unsigned char btchip_output_script_is_op_create(unsigned char *buffer);
 unsigned char btchip_output_script_is_op_call(unsigned char *buffer);
@@ -87,5 +88,11 @@ unsigned char btchip_secure_memcmp(const void *buf1, const void *buf2,
 unsigned char btchip_decrease_2fa(void);
 void btchip_reset_2fa(void);
 void btchip_reset_token(void);
+
+unsigned char btchip_get_confidential_data_size(char version, bool value, bool nullAccepted);
+
+void btchip_derive_master_blinding_key(unsigned char *target);
+void btchip_derive_tx_blinding_key(unsigned char *target);
+void btchip_derive_abf_vbf(uint32_t outputIndex, bool abf, unsigned char *target);
 
 #endif

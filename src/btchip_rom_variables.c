@@ -52,6 +52,9 @@ unsigned char const OVERWINTER_PARAM_OUTPUTS[16] = { 'Z', 'c', 'a', 's', 'h', 'O
 unsigned char const OVERWINTER_PARAM_SIGHASH[16] = { 'Z', 'c', 'a', 's', 'h', 'S', 'i', 'g', 'H', 'a', 's', 'h', 0, 0, 0, 0 };
 unsigned char const OVERWINTER_NO_JOINSPLITS[32] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
+unsigned char const SYMMETRIC_KEY_SEED[18] = { 'S', 'y', 'm', 'm', 'e', 't', 'r', 'i', 'c', ' ', 'k', 'e', 'y', ' ', 's', 'e', 'e', 'd' };
+unsigned char const SLIP77_LABEL[10] = { 0x00, 'S', 'L', 'I', 'P', '-', '0', '0', '7', '7' };
+
 unsigned char const DISPATCHER_CLA[] = {
     BTCHIP_CLA, // btchip_apdu_setup,
     BTCHIP_CLA, // btchip_apdu_verify_pin,
@@ -67,6 +70,11 @@ unsigned char const DISPATCHER_CLA[] = {
     BTCHIP_CLA, // btchip_apdu_get_firmware_version,
     BTCHIP_CLA, // btchip_apdu_set_alternate_coin_version
     BTCHIP_CLA, // btchip_apdu_get_coin_version
+    BTCHIP_CLA, // btchip_apdu_liquid_get_commitments
+    BTCHIP_CLA, // btchip_apdu_liquid_get_public_blinding_key
+    BTCHIP_CLA, // btchip_apdu_liquid_get_nonce
+    BTCHIP_CLA, // btchip_apdu_liquid_provide_issuance_information
+    BTCHIP_CLA  // btchip_apdu_liquid_get_blinding_factor
 };
 
 unsigned char const DISPATCHER_INS[] = {
@@ -84,6 +92,11 @@ unsigned char const DISPATCHER_INS[] = {
     BTCHIP_INS_GET_FIRMWARE_VERSION,     // btchip_apdu_get_firmware_version,
     BTCHIP_INS_SET_ALTERNATE_COIN_VER, // btchip_apdu_set_alternate_coin_version
     BTCHIP_INS_GET_COIN_VER,           // btchip_apdu_get_coin_version
+    BTCHIP_INS_LIQUID_GET_COMMITMENTS, // btchip_apdu_liquid_get_commitments
+    BTCHIP_INS_LIQUID_GET_PUBLIC_BLINDING_KEY, // btchip_apdu_liquid_get_public_blinding_key
+    BTCHIP_INS_LIQUID_GET_NONCE, // btchip_apdu_liquid_get_nonce
+    BTCHIP_INS_LIQUID_PROVIDE_ISSUANCE_INFORMATION, // btchip_apdu_liquid_provide_issuance_information
+    BTCHIP_INS_LIQUID_GET_BLINDING_FACTOR // btchip_apdu_liquid_get_blinding_factor
 };
 
 unsigned char const DISPATCHER_DATA_IN[] = {
@@ -100,7 +113,12 @@ unsigned char const DISPATCHER_DATA_IN[] = {
     0, // btchip_apdu_get_random,
     0, // btchip_apdu_get_firmware_version,
     1, // btchip_apdu_set_alternate_coin_version
-    0, // btchip_apdu_get_coin_version
+    0, // btchip_apdu_get_coin_version,
+    1, // btchip_apdu_liquid_get_commitments
+    1, // btchip_apdu_liquid_get_public_blinding_key
+    1, // btchip_apdu_liquid_get_nonce
+    1, // btchip_apdu_liquid_provide_issuance_information
+    1  // btchip_apdu_liquid_get_blinding_factor
 };
 
 apduProcessingFunction const DISPATCHER_FUNCTIONS[] = {
@@ -118,4 +136,9 @@ apduProcessingFunction const DISPATCHER_FUNCTIONS[] = {
     btchip_apdu_get_firmware_version,
     btchip_apdu_set_alternate_coin_version,
     btchip_apdu_get_coin_version,
+    btchip_apdu_liquid_get_commitments,
+    btchip_apdu_liquid_get_public_blinding_key,
+    btchip_apdu_liquid_get_nonce,
+    btchip_apdu_liquid_provide_issuance_information,
+    btchip_apdu_liquid_get_blinding_factor
 };

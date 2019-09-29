@@ -33,6 +33,9 @@
 #define ZCASH_USING_OVERWINTER 0x01
 #define ZCASH_USING_OVERWINTER_SAPLING 0x02
 
+#define LIQUID_TRUSTED_COMMITMENT_SIZE (1 + 4 + 33 + 33 + 32 + 8 + 32)
+#define LIQUID_TRUSTED_COMMITMENT_FLAG_HOST_PROVIDED_VBF 0x80
+
 enum btchip_modes_e {
     BTCHIP_MODE_ISSUER = 0x00,
     BTCHIP_MODE_SETUP_NEEDED = 0xff,
@@ -80,15 +83,21 @@ enum btchip_transaction_state_e {
     BTCHIP_TRANSACTION_PRESIGN_READY = 0x09,
     /** Transaction fully parsed, ready to be signed */
     BTCHIP_TRANSACTION_SIGN_READY = 0x0a,
+    /** Transaction is waiting for Liquid issuance information to be provided */
+    BTCHIP_TRANSACTION_WAIT_LIQUID_ISSUANCE = 0x0b,
 };
 typedef enum btchip_transaction_state_e btchip_transaction_state_t;
 
 enum btchip_output_parsing_state_e {
     BTCHIP_OUTPUT_PARSING_NONE = 0x00,
     BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS = 0x01,
-    BTCHIP_OUTPUT_PARSING_OUTPUT = 0x02,
-    BTCHIP_OUTPUT_FINALIZE_TX = 0x03,
-    BTCHIP_BIP44_CHANGE_PATH_VALIDATION = 0x04,
+    BTCHIP_OUTPUT_PARSING_AMOUNT = 0x02,
+    BTCHIP_OUTPUT_PARSING_OUTPUT = 0x03,
+    BTCHIP_OUTPUT_FINALIZE_TX = 0x04,
+    BTCHIP_BIP44_CHANGE_PATH_VALIDATION = 0x05,
+    BTCHIP_OUTPUT_LIQUID_PARSING_COMMITMENTS = 0x06,
+    BTCHIP_OUTPUT_LIQUID_PARSING_NONCE = 0x07,
+    BTCHIP_OUTPUT_LIQUID_PARSING_PUBLIC_BLINDING_KEY = 0x08,
     BTCHIP_OUTPUT_HANDLE_LEGACY = 0xFF
 };
 typedef enum btchip_output_parsing_state_e btchip_output_parsing_state_t;
@@ -106,6 +115,7 @@ struct segwit_cache_s {
     unsigned char hashedPrevouts[32];
     unsigned char hashedSequence[32];
     unsigned char hashedOutputs[32];
+    unsigned char hashedIssuance[32];
 };
 
 /**
@@ -194,10 +204,12 @@ struct btchip_context_s {
         struct segwit_cache_s cache;
     } segwit;
     unsigned char transactionVersion[4];
-    unsigned char inputValue[8];
+    unsigned char inputValue[33];
     unsigned char usingSegwit;
     unsigned char usingCashAddr;
     unsigned char segwitParsedOnce;
+    unsigned char usingLiquid;
+    unsigned char liquidHostProvidedVbf;
 
     /* /Segregated Witness changes */
 
@@ -250,6 +262,12 @@ struct btchip_context_s {
     unsigned char nExpiryHeight[4];
     unsigned char nLockTime[4];
     unsigned char sigHashType[4];    
+
+    /* Liquid */
+    unsigned char liquidAssetTag[32];
+    unsigned char liquidAssetReference;
+    unsigned char liquidValue[8];
+    unsigned char liquidBlindingKey[33];
 };
 typedef struct btchip_context_s btchip_context_t;
 

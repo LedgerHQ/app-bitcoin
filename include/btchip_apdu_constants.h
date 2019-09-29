@@ -82,6 +82,12 @@
 #define BTCHIP_INS_NFCPAYMENT_GET_LAST_STAT 0x58
 #define BTCHIP_INS_NFCPAYMENT_GET_DATA 0xC0
 
+#define BTCHIP_INS_LIQUID_GET_COMMITMENTS 0xE0
+#define BTCHIP_INS_LIQUID_GET_PUBLIC_BLINDING_KEY 0xE2
+#define BTCHIP_INS_LIQUID_GET_NONCE 0xE4
+#define BTCHIP_INS_LIQUID_PROVIDE_ISSUANCE_INFORMATION 0xE6
+#define BTCHIP_INS_LIQUID_GET_BLINDING_FACTOR 0xE8
+
 #define BTCHIP_SW_PIN_REMAINING_ATTEMPTS 0x63C0
 #define BTCHIP_SW_INCORRECT_LENGTH 0x6700
 #define BTCHIP_SW_COMMAND_INCOMPATIBLE_FILE_STRUCTURE 0x6981
@@ -154,5 +160,11 @@ unsigned short btchip_apdu_get_firmware_version(void);
 
 unsigned short btchip_apdu_set_alternate_coin_version(void);
 unsigned short btchip_apdu_get_coin_version(void);
+
+unsigned short btchip_apdu_liquid_get_commitments(void);
+unsigned short btchip_apdu_liquid_get_public_blinding_key(void);
+unsigned short btchip_apdu_liquid_get_nonce(void);
+unsigned short btchip_apdu_liquid_provide_issuance_information(void);
+unsigned short btchip_apdu_liquid_get_blinding_factor(void);
 
 #endif

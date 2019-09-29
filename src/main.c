@@ -70,6 +70,7 @@ unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 #define UI_BLUE_BUTTONS_REJECT_OR_CONFIRM(reject_text, confirm_text, reject_cb, confirm_cb) {{BAGL_RECTANGLE|BAGL_FLAG_TOUCHABLE,0x00,40,414,115,36,0,18,BAGL_FILL,0xCCCCCC,COLOR_BG_1,BAGL_FONT_OPEN_SANS_REGULAR_11_14PX|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE,0},reject_text,0,0xB7B7B7,COLOR_BG_1,reject_cb,NULL,NULL},{{BAGL_RECTANGLE|BAGL_FLAG_TOUCHABLE,0x00,165,414,115,36,0,18,BAGL_FILL,0x41ccb4,COLOR_BG_1,BAGL_FONT_OPEN_SANS_REGULAR_11_14PX|BAGL_FONT_ALIGNMENT_CENTER|BAGL_FONT_ALIGNMENT_MIDDLE,0},confirm_text,0,0x3ab7a2,COLOR_BG_1,confirm_cb,NULL,NULL}
 #define UI_BLUE_TEXT(userid, x, y, w, text, font, flags, text_color, bg_color) {{BAGL_LABELINE,userid,x,y,w,30,0,0,BAGL_FILL,text_color,bg_color,font|flags,0},(char *)text,0,0,0,NULL,NULL,NULL}
 
+void prepare_single_address(void);
 
 #if defined(TARGET_BLUE)
 #include "qrcodegen.h"
@@ -155,8 +156,8 @@ union {
         // char addressSummary[40]; // beginning of the output address ... end
         // of
 
-        char fullAddress[65]; // the address
-        char fullAmount[20];  // full amount
+        char fullAddress[83]; // the address
+        char fullAmount[30];  // full amount
         char feesAmount[20];  // fees
     } tmp;
 
@@ -979,8 +980,11 @@ const bagl_element_t ui_verify_output_nanos[] = {
     UI_NANOS_TEXT(2, 0, 12, 128, "Amount", BAGL_FONT_OPEN_SANS_REGULAR_11px),
     UI_NANOS_SCROLLING_TEXT(2, 23, 26, 82, vars.tmp.fullAmount, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
 
-    UI_NANOS_TEXT(3, 0, 12, 128, "Address", BAGL_FONT_OPEN_SANS_REGULAR_11px),
-    UI_NANOS_SCROLLING_TEXT(3, 23, 26, 82, vars.tmp.fullAddress, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px)
+    UI_NANOS_TEXT(3, 0, 12, 128, "Asset", BAGL_FONT_OPEN_SANS_REGULAR_11px),
+    UI_NANOS_SCROLLING_TEXT(3, 23, 26, 82, vars.tmp.fullAddress, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    UI_NANOS_TEXT(4, 0, 12, 128, "Address", BAGL_FONT_OPEN_SANS_REGULAR_11px),
+    UI_NANOS_SCROLLING_TEXT(4, 23, 26, 82, vars.tmp.fullAddress, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px)    
 };
 
 unsigned int ui_verify_output_nanos_button(unsigned int button_mask,
@@ -993,8 +997,11 @@ const bagl_element_t ui_finalize_nanos[] = {
     UI_NANOS_TEXT(1, 0, 12, 128, "Confirm", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
     UI_NANOS_TEXT(1, 0, 26, 128, "transaction", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
 
-    UI_NANOS_TEXT(2, 0, 12, 128, "Fees", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
-    UI_NANOS_SCROLLING_TEXT(2, 23, 26, 82, vars.tmp.feesAmount, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px)
+    UI_NANOS_TEXT(2, 0, 12, 128, "Fees", BAGL_FONT_OPEN_SANS_REGULAR_11px),
+    UI_NANOS_SCROLLING_TEXT(2, 23, 26, 82, vars.tmp.fullAmount, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    UI_NANOS_TEXT(3, 0, 12, 128, "Asset", BAGL_FONT_OPEN_SANS_REGULAR_11px),
+    UI_NANOS_SCROLLING_TEXT(3, 23, 26, 82, vars.tmp.fullAddress, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
 
 
     /* TODO
@@ -1034,6 +1041,14 @@ unsigned int ui_verify_prepro(const bagl_element_t *element) {
 }
 
 unsigned int ui_verify_output_prepro(const bagl_element_t *element) {
+
+    if ((ux_step == 2) && (!btchip_context_D.usingLiquid || 
+            (btchip_context_D.usingLiquid && btchip_context_D.liquidAssetReference))) {
+        ux_step++;
+        UX_REDISPLAY();
+        return 0;
+    }
+
     if (element->component.userid > 0) {
         unsigned int display = (ux_step == element->component.userid - 1);
         if (display) {
@@ -1041,8 +1056,17 @@ unsigned int ui_verify_output_prepro(const bagl_element_t *element) {
             case 1:
                 UX_CALLBACK_SET_INTERVAL(2000);
                 break;
-            case 2:
             case 3:
+            case 2:
+            case 4:
+                if (element->component.userid == 3) {
+                snprintf(vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress), "%.*H",
+                    32, btchip_context_D.liquidAssetTag);
+                }
+                else
+                if (element->component.userid == 4) {
+                    prepare_single_address();                    
+                }
                 UX_CALLBACK_SET_INTERVAL(MAX(
                     3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
                 break;
@@ -1054,6 +1078,14 @@ unsigned int ui_verify_output_prepro(const bagl_element_t *element) {
 }
 
 unsigned int ui_finalize_prepro(const bagl_element_t *element) {
+
+    if ((ux_step == 2) && (!btchip_context_D.usingLiquid || 
+            (btchip_context_D.usingLiquid && btchip_context_D.liquidAssetReference))) {
+        ux_step = 0;
+        UX_REDISPLAY();
+        return 0;
+    }
+
     if (element->component.userid > 0) {
         unsigned int display = (ux_step == element->component.userid - 1);
         if (display) {
@@ -1062,6 +1094,11 @@ unsigned int ui_finalize_prepro(const bagl_element_t *element) {
                 UX_CALLBACK_SET_INTERVAL(2000);
                 break;
             case 2:
+            case 3:
+                if (element->component.userid == 3) {
+                snprintf(vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress), "%.*H",
+                    32, btchip_context_D.liquidAssetTag);
+                }            
                 UX_CALLBACK_SET_INTERVAL(MAX(
                     3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
                 break;
@@ -1707,7 +1744,7 @@ UX_STEP_NOCB(
     bnnn_paging, 
     {
       .title = "Fees",
-      .text = vars.tmp.feesAmount,
+      .text = vars.tmp.fullAmount,
     });
 UX_STEP_VALID(
     ux_finalize_flow_5_step, 
@@ -1726,7 +1763,7 @@ UX_STEP_VALID(
       &C_icon_crossmark,
       "Reject",
     });
-// finalize: confirm transaction / Fees: feesAmount
+// finalize: confirm transaction / Fees: fullAmount
 UX_FLOW(ux_finalize_flow,
   &ux_finalize_flow_1_step,
   &ux_finalize_flow_4_step,
@@ -2006,59 +2043,69 @@ unsigned char io_event(unsigned char channel) {
 
 uint8_t prepare_fees() {
     if (btchip_context_D.transactionContext.relaxed) {
-        os_memmove(vars.tmp.feesAmount, "UNKNOWN", 7);
-        vars.tmp.feesAmount[7] = '\0';
+        os_memmove(vars.tmp.fullAmount, "UNKNOWN", 7);
+        vars.tmp.fullAmount[7] = '\0';
     } else {
         unsigned char fees[8];
         unsigned short textSize;
-        unsigned char borrow;
-
-        borrow = transaction_amount_sub_be(
+        unsigned char borrow = 0;
+        if (btchip_context_D.usingLiquid) {
+            os_memmove(fees, btchip_context_D.liquidValue, 8);
+        }
+        else {
+            borrow = transaction_amount_sub_be(
                 fees, btchip_context_D.transactionContext.transactionAmount,
                 btchip_context_D.totalOutputAmount);
+        }
         if (borrow && G_coin_config->kind == COIN_KIND_KOMODO) {
-            os_memmove(vars.tmp.feesAmount, "REWARD", 6);
-            vars.tmp.feesAmount[6] = '\0';
+            os_memmove(vars.tmp.fullAmount, "REWARD", 6);
+            vars.tmp.fullAmount[6] = '\0';
         }
         else {
             if (borrow) {
                 PRINTF("Error : Fees not consistent");
                 goto error;
             }
-            os_memmove(vars.tmp.feesAmount, btchip_context_D.shortCoinId,
-                       btchip_context_D.shortCoinIdLength);
-            vars.tmp.feesAmount[btchip_context_D.shortCoinIdLength] = ' ';
+            uint8_t coinNameOffset = btchip_context_D.shortCoinIdLength;
+            if (btchip_context_D.usingLiquid) {
+                if (btchip_context_D.liquidAssetReference) {
+                    strcpy(vars.tmp.fullAmount, LIQUID_ASSETS[btchip_context_D.liquidAssetReference - 1].ticker);
+                    coinNameOffset = strlen(vars.tmp.fullAmount);
+                }
+                else {
+                    strcpy(vars.tmp.fullAmount, "LIQUID");
+                    coinNameOffset = strlen("LIQUID");
+                }
+            }
+            else {
+                os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId, coinNameOffset);
+            }
+            vars.tmp.fullAmount[coinNameOffset] = ' ';
             btchip_context_D.tmp =
-                (unsigned char *)(vars.tmp.feesAmount +
-                              btchip_context_D.shortCoinIdLength + 1);
+                (unsigned char *)(vars.tmp.fullAmount + coinNameOffset + 1);
             textSize = btchip_convert_hex_amount_to_displayable(fees);
-            vars.tmp.feesAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
+            vars.tmp.fullAmount[textSize + coinNameOffset + 1] =
                 '\0';
         }
     }
+
     return 1;
 error:
     return 0;
 }
 
-#define OMNI_ASSETID 1
-#define MAIDSAFE_ASSETID 3
-#define USDT_ASSETID 31
-
-uint8_t prepare_single_output() {
+void prepare_single_address() {
     // TODO : special display for OP_RETURN
-    unsigned char amount[8];
-    char tmp[80];
+    char tmp[81];
     unsigned int offset = 0;
     unsigned char versionSize;
     int addressOffset = 1; // for static analyzer only
-    unsigned char address[22];
+    unsigned char address[59];
     unsigned short version = 0; // for static analyzer only
     unsigned short textSize;
     unsigned char nativeSegwit;
 
-    vars.tmp.fullAddress[0] = '\0';
-    btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset, 8);
+    vars.tmp.fullAddress[0] = '\0'; 
     offset += 8;
     nativeSegwit = btchip_output_script_is_native_witness(
         btchip_context_D.currentOutput + offset);
@@ -2084,6 +2131,19 @@ uint8_t prepare_single_output() {
         version = btchip_context_D.payToScriptHashVersion;
     }
     if (vars.tmp.fullAddress[0] == 0) {
+        if (btchip_context_D.usingLiquid) {
+            size_t outputLen = sizeof(tmp);
+            address[0] = 0x04; // FIXME
+            address[1] = 0x4b;
+            os_memmove(address + 2, btchip_context_D.liquidBlindingKey, 33);
+            os_memmove(address + 2 + 33, btchip_context_D.currentOutput + addressOffset, 20);
+            cx_hash_sha256(address, 2 + 33 + 20, tmp, sizeof(tmp));
+            cx_hash_sha256(tmp, 32, tmp, sizeof(tmp));
+            os_memmove(address + 2 + 33 + 20, tmp, 4);
+            btchip_encode_base58(address, 2 + 33 + 20 + 4, tmp, &outputLen);
+            tmp[outputLen] = '\0';
+        }
+        else
         if (!nativeSegwit) {
             if (version > 255) {
                 versionSize = 2;
@@ -2119,8 +2179,19 @@ uint8_t prepare_single_output() {
         strncpy(vars.tmp.fullAddress, tmp, sizeof(vars.tmp.fullAddress));
         vars.tmp.fullAddress[sizeof(vars.tmp.fullAddress) - 1] = '\0';
     }
+}
 
-    // Prepare amount
+#define OMNI_ASSETID 1
+#define MAIDSAFE_ASSETID 3
+#define USDT_ASSETID 31
+
+void prepare_single_amount() {    
+    unsigned char amount[8];
+    unsigned int offset = 0;
+    unsigned short textSize;
+
+    btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset, 8);
+    offset += 8;
 
     // Handle Omni simple send
     if ((btchip_context_D.currentOutput[offset + 2] == 0x14) &&
@@ -2148,17 +2219,31 @@ uint8_t prepare_single_output() {
             vars.tmp.fullAmount[textSize + headerLength] = '\0';
     }
     else {
-        os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId,
-               btchip_context_D.shortCoinIdLength);
-        vars.tmp.fullAmount[btchip_context_D.shortCoinIdLength] = ' ';
+        uint8_t coinNameOffset = btchip_context_D.shortCoinIdLength;
+        if (btchip_context_D.usingLiquid) {
+            if (btchip_context_D.liquidAssetReference) {
+                strcpy(vars.tmp.fullAmount, LIQUID_ASSETS[btchip_context_D.liquidAssetReference - 1].ticker);
+                coinNameOffset = strlen(vars.tmp.fullAmount);
+            }
+            else {
+                strcpy(vars.tmp.fullAmount, "LIQUID");
+                coinNameOffset = strlen("LIQUID");
+            }
+        }
+        else {
+            os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId, coinNameOffset);
+        }
+        vars.tmp.fullAmount[coinNameOffset] = ' ';
         btchip_context_D.tmp =
-            (unsigned char *)(vars.tmp.fullAmount +
-                          btchip_context_D.shortCoinIdLength + 1);
+            (unsigned char *)(vars.tmp.fullAmount + coinNameOffset + 1);
         textSize = btchip_convert_hex_amount_to_displayable(amount);
-        vars.tmp.fullAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
+        vars.tmp.fullAmount[textSize + coinNameOffset + 1] =
             '\0';
     }
+}
 
+uint8_t prepare_single_output() {
+    prepare_single_amount();
     return 1;
 }
 
@@ -2374,7 +2459,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
 
                     strncpy(vars.tmp.fullAddress, tmp, sizeof(vars.tmp.fullAddress));
                     vars.tmp.fullAddress[sizeof(vars.tmp.fullAddress) - 1] = '\0';
-
+ 
                     // Prepare amount
 
                     os_memmove(vars.tmp.fullAmount,
@@ -2421,9 +2506,9 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
             offset += 1 + btchip_context_D.currentOutput[offset];
             currentPos++;
         }
-    }    
+    }
     btchip_context_D.tmp = NULL;
-    return 1;
+    return 1;    
 error:
     return 0;
 }
@@ -2480,7 +2565,7 @@ unsigned int btchip_bagl_confirm_single_output() {
     ux_flow_init(0, ux_confirm_single_flow, NULL);
 #elif defined(TARGET_NANOS)
     ux_step = 0;
-    ux_step_count = 3;
+    ux_step_count = 4;
     UX_DISPLAY(ui_verify_output_nanos, ui_verify_output_prepro);
 #endif // TARGET_
     return 1;
@@ -2497,7 +2582,7 @@ unsigned int btchip_bagl_finalize_tx() {
     ux_flow_init(0, ux_finalize_flow, NULL);
 #elif defined(TARGET_NANOS)
     ux_step = 0;
-    ux_step_count = 2;
+    ux_step_count = 3;
     UX_DISPLAY(ui_finalize_nanos, ui_finalize_prepro);
 #endif // TARGET_
     return 1;
@@ -2714,8 +2799,8 @@ __attribute__((section(".boot"))) int main(int arg0) {
                 USB_power(0);
                 USB_power(1);
 
-                ui_idle();
-
+                ui_idle();                
+                
 #ifdef HAVE_BLE
                 BLE_power(0, NULL);
                 BLE_power(1, "Nano X");
