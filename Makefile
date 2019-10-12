@@ -218,10 +218,6 @@ DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_LIGHT_16PX
 DEFINES		    += HAVE_UX_FLOW
 endif
 
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-DEFINES		    += HAVE_UX_FLOW
-endif
-
 # Enabling debug PRINTF
 DEBUG = 0
 ifneq ($(DEBUG),0)
@@ -277,8 +273,15 @@ SDK_SOURCE_PATH  += lib_blewbxx lib_blewbxx_impl
 SDK_SOURCE_PATH  += lib_ux
 endif
 
+# If the SDK supports Flow for Nano S, build for it
+
 ifeq ($(TARGET_NAME),TARGET_NANOS)
-SDK_SOURCE_PATH  += lib_ux
+
+	ifneq "$(wildcard $(BOLOS_SDK)/lib_ux)" ""
+		SDK_SOURCE_PATH  += lib_ux
+		DEFINES		       += HAVE_UX_FLOW		
+	endif
+
 endif
 
 load: all
