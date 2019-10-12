@@ -215,7 +215,11 @@ DEFINES       += HAVE_BAGL_ELLIPSIS # long label truncation feature
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_REGULAR_11PX
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_EXTRABOLD_11PX
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_LIGHT_16PX
-DEFINES		  += HAVE_UX_FLOW
+DEFINES		    += HAVE_UX_FLOW
+endif
+
+ifeq ($(TARGET_NAME),TARGET_NANOS)
+DEFINES		    += HAVE_UX_FLOW
 endif
 
 # Enabling debug PRINTF
@@ -270,6 +274,10 @@ SDK_SOURCE_PATH  += lib_stusb lib_stusb_impl lib_u2f qrcode
 
 ifeq ($(TARGET_NAME),TARGET_NANOX)
 SDK_SOURCE_PATH  += lib_blewbxx lib_blewbxx_impl
+SDK_SOURCE_PATH  += lib_ux
+endif
+
+ifeq ($(TARGET_NAME),TARGET_NANOS)
 SDK_SOURCE_PATH  += lib_ux
 endif
 
