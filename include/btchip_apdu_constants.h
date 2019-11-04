@@ -167,4 +167,6 @@ unsigned short btchip_apdu_liquid_get_nonce(void);
 unsigned short btchip_apdu_liquid_provide_issuance_information(void);
 unsigned short btchip_apdu_liquid_get_blinding_factor(void);
 
+unsigned short btchip_apdu_not_implemented(void);
+
 #endif

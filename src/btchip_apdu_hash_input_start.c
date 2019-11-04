@@ -97,8 +97,10 @@ unsigned short btchip_apdu_hash_input_start() {
                     btchip_context_D.usingOverwinter = ZCASH_USING_OVERWINTER_SAPLING;
                 }
             }
+#ifdef HAVE_LIQUID            
             btchip_context_D.usingLiquid = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_LIQUID);
             btchip_context_D.liquidHostProvidedVbf = 0;
+#endif            
             btchip_context_D.overwinterSignReady = 0;
             btchip_context_D.segwitParsedOnce = 0;
             btchip_set_check_internal_structure_integrity(1);

@@ -22,6 +22,7 @@
 #include "string.h"
 
 #include "btchip_internal.h"
+#include "btchip_apdu_constants.h"
 
 #include "btchip_bagl_extensions.h"
 
@@ -156,8 +157,13 @@ union {
         // char addressSummary[40]; // beginning of the output address ... end
         // of
 
+#ifdef HAVE_LIQUID
         char fullAddress[83]; // the address
         char fullAmount[30];  // full amount
+#else
+        char fullAddress[65]; // the address
+        char fullAmount[20];  // full amount        
+#endif        
         char feesAmount[20];  // fees
     } tmp;
 
@@ -980,11 +986,22 @@ const bagl_element_t ui_verify_output_nanos[] = {
     UI_NANOS_TEXT(2, 0, 12, 128, "Amount", BAGL_FONT_OPEN_SANS_REGULAR_11px),
     UI_NANOS_SCROLLING_TEXT(2, 23, 26, 82, vars.tmp.fullAmount, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
 
+#ifdef HAVE_LIQUID
+
     UI_NANOS_TEXT(3, 0, 12, 128, "Asset", BAGL_FONT_OPEN_SANS_REGULAR_11px),
     UI_NANOS_SCROLLING_TEXT(3, 23, 26, 82, vars.tmp.fullAddress, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
 
     UI_NANOS_TEXT(4, 0, 12, 128, "Address", BAGL_FONT_OPEN_SANS_REGULAR_11px),
     UI_NANOS_SCROLLING_TEXT(4, 23, 26, 82, vars.tmp.fullAddress, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px)    
+
+#else
+
+    UI_NANOS_TEXT(3, 0, 12, 128, "Address", BAGL_FONT_OPEN_SANS_REGULAR_11px),
+    UI_NANOS_SCROLLING_TEXT(3, 23, 26, 82, vars.tmp.fullAddress, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px)    
+
+#endif    
+
+
 };
 
 unsigned int ui_verify_output_nanos_button(unsigned int button_mask,
@@ -1000,8 +1017,12 @@ const bagl_element_t ui_finalize_nanos[] = {
     UI_NANOS_TEXT(2, 0, 12, 128, "Fees", BAGL_FONT_OPEN_SANS_REGULAR_11px),
     UI_NANOS_SCROLLING_TEXT(2, 23, 26, 82, vars.tmp.fullAmount, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
 
+#ifdef HAVE_LIQUID
+
     UI_NANOS_TEXT(3, 0, 12, 128, "Asset", BAGL_FONT_OPEN_SANS_REGULAR_11px),
     UI_NANOS_SCROLLING_TEXT(3, 23, 26, 82, vars.tmp.fullAddress, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+#endif    
 
 
     /* TODO
@@ -1042,12 +1063,16 @@ unsigned int ui_verify_prepro(const bagl_element_t *element) {
 
 unsigned int ui_verify_output_prepro(const bagl_element_t *element) {
 
+#ifdef HAVE_LIQUID
+
     if ((ux_step == 2) && (!btchip_context_D.usingLiquid || 
             (btchip_context_D.usingLiquid && btchip_context_D.liquidAssetReference))) {
         ux_step++;
         UX_REDISPLAY();
         return 0;
     }
+
+#endif    
 
     if (element->component.userid > 0) {
         unsigned int display = (ux_step == element->component.userid - 1);
@@ -1059,12 +1084,18 @@ unsigned int ui_verify_output_prepro(const bagl_element_t *element) {
             case 3:
             case 2:
             case 4:
+#ifdef HAVE_LIQUID            
                 if (element->component.userid == 3) {
                 snprintf(vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress), "%.*H",
                     32, btchip_context_D.liquidAssetTag);
                 }
                 else
+#endif
+#ifdef HAVE_LIQUID                    
                 if (element->component.userid == 4) {
+#else                    
+                if (element->component.userid == 3) {
+#endif                    
                     prepare_single_address();                    
                 }
                 UX_CALLBACK_SET_INTERVAL(MAX(
@@ -1079,12 +1110,16 @@ unsigned int ui_verify_output_prepro(const bagl_element_t *element) {
 
 unsigned int ui_finalize_prepro(const bagl_element_t *element) {
 
+#ifdef HAVE_LIQUID
+
     if ((ux_step == 2) && (!btchip_context_D.usingLiquid || 
             (btchip_context_D.usingLiquid && btchip_context_D.liquidAssetReference))) {
         ux_step = 0;
         UX_REDISPLAY();
         return 0;
     }
+
+#endif    
 
     if (element->component.userid > 0) {
         unsigned int display = (ux_step == element->component.userid - 1);
@@ -1095,10 +1130,12 @@ unsigned int ui_finalize_prepro(const bagl_element_t *element) {
                 break;
             case 2:
             case 3:
+#ifdef HAVE_LIQUID            
                 if (element->component.userid == 3) {
                 snprintf(vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress), "%.*H",
                     32, btchip_context_D.liquidAssetTag);
-                }            
+                } 
+#endif
                 UX_CALLBACK_SET_INTERVAL(MAX(
                     3000, 1000 + bagl_label_roundtrip_duration_ms(element, 7)));
                 break;
@@ -2049,6 +2086,7 @@ uint8_t prepare_fees() {
         unsigned char fees[8];
         unsigned short textSize;
         unsigned char borrow = 0;
+#ifdef HAVE_LIQUID        
         if (btchip_context_D.usingLiquid) {
             os_memmove(fees, btchip_context_D.liquidValue, 8);
         }
@@ -2057,6 +2095,12 @@ uint8_t prepare_fees() {
                 fees, btchip_context_D.transactionContext.transactionAmount,
                 btchip_context_D.totalOutputAmount);
         }
+#else        
+            borrow = transaction_amount_sub_be(
+                fees, btchip_context_D.transactionContext.transactionAmount,
+                btchip_context_D.totalOutputAmount);
+#endif            
+
         if (borrow && G_coin_config->kind == COIN_KIND_KOMODO) {
             os_memmove(vars.tmp.fullAmount, "REWARD", 6);
             vars.tmp.fullAmount[6] = '\0';
@@ -2067,6 +2111,7 @@ uint8_t prepare_fees() {
                 goto error;
             }
             uint8_t coinNameOffset = btchip_context_D.shortCoinIdLength;
+#ifdef HAVE_LIQUID            
             if (btchip_context_D.usingLiquid) {
                 if (btchip_context_D.liquidAssetReference) {
                     strcpy(vars.tmp.fullAmount, LIQUID_ASSETS[btchip_context_D.liquidAssetReference - 1].ticker);
@@ -2080,6 +2125,9 @@ uint8_t prepare_fees() {
             else {
                 os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId, coinNameOffset);
             }
+#else        
+            os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId, coinNameOffset);    
+#endif            
             vars.tmp.fullAmount[coinNameOffset] = ' ';
             btchip_context_D.tmp =
                 (unsigned char *)(vars.tmp.fullAmount + coinNameOffset + 1);
@@ -2131,10 +2179,11 @@ void prepare_single_address() {
         version = btchip_context_D.payToScriptHashVersion;
     }
     if (vars.tmp.fullAddress[0] == 0) {
+#ifdef HAVE_LIQUID        
         if (btchip_context_D.usingLiquid) {
             size_t outputLen = sizeof(tmp);
-            address[0] = 0x04; // FIXME
-            address[1] = 0x4b;
+            address[0] = COIN_BLINDED_VERSION;
+            address[1] = COIN_P2PKH_VERSION;
             os_memmove(address + 2, btchip_context_D.liquidBlindingKey, 33);
             os_memmove(address + 2 + 33, btchip_context_D.currentOutput + addressOffset, 20);
             cx_hash_sha256(address, 2 + 33 + 20, tmp, sizeof(tmp));
@@ -2142,8 +2191,9 @@ void prepare_single_address() {
             os_memmove(address + 2 + 33 + 20, tmp, 4);
             btchip_encode_base58(address, 2 + 33 + 20 + 4, tmp, &outputLen);
             tmp[outputLen] = '\0';
-        }
+        }        
         else
+#endif            
         if (!nativeSegwit) {
             if (version > 255) {
                 versionSize = 2;
@@ -2220,6 +2270,7 @@ void prepare_single_amount() {
     }
     else {
         uint8_t coinNameOffset = btchip_context_D.shortCoinIdLength;
+#ifdef HAVE_LIQUID        
         if (btchip_context_D.usingLiquid) {
             if (btchip_context_D.liquidAssetReference) {
                 strcpy(vars.tmp.fullAmount, LIQUID_ASSETS[btchip_context_D.liquidAssetReference - 1].ticker);
@@ -2233,6 +2284,9 @@ void prepare_single_amount() {
         else {
             os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId, coinNameOffset);
         }
+#else    
+        os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId, coinNameOffset);    
+#endif        
         vars.tmp.fullAmount[coinNameOffset] = ' ';
         btchip_context_D.tmp =
             (unsigned char *)(vars.tmp.fullAmount + coinNameOffset + 1);
@@ -2554,6 +2608,10 @@ unsigned int btchip_bagl_confirm_single_output() {
     if (!prepare_single_output()) {
         return 0;
     }
+#if defined(HAVE_UX_FLOW)    
+    // TODO : recheck for unknown liquid asset
+    prepare_single_address();
+#endif    
 
     snprintf(vars.tmp.feesAmount, sizeof(vars.tmp.feesAmount), "output #%d",
              btchip_context_D.totalOutputs - btchip_context_D.remainingOutputs +
@@ -2565,7 +2623,11 @@ unsigned int btchip_bagl_confirm_single_output() {
     ux_flow_init(0, ux_confirm_single_flow, NULL);
 #elif defined(TARGET_NANOS)
     ux_step = 0;
+#ifdef HAVE_LIQUID    
     ux_step_count = 4;
+#else
+    ux_step_count = 3;
+#endif        
     UX_DISPLAY(ui_verify_output_nanos, ui_verify_output_prepro);
 #endif // TARGET_
     return 1;
@@ -2582,7 +2644,11 @@ unsigned int btchip_bagl_finalize_tx() {
     ux_flow_init(0, ux_finalize_flow, NULL);
 #elif defined(TARGET_NANOS)
     ux_step = 0;
+#ifdef HAVE_LIQUID    
     ux_step_count = 3;
+#else
+    ux_step_count = 2;
+#endif        
     UX_DISPLAY(ui_finalize_nanos, ui_finalize_prepro);
 #endif // TARGET_
     return 1;
@@ -2686,6 +2752,10 @@ void app_exit(void) {
         }
     }
     END_TRY_L(exit);
+}
+
+unsigned short btchip_apdu_not_implemented() {
+    return BTCHIP_SW_INS_NOT_SUPPORTED;
 }
 
 // used when application is compiled statically (no lib dependency)

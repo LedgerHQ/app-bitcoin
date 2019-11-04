@@ -226,7 +226,8 @@ void transaction_parse(unsigned char parseMode) {
                                     btchip_context_D.segwit.cache.hashedSequence,
                                     sizeof(btchip_context_D.segwit.cache
                                            .hashedSequence),
-                                    NULL, 0);                                
+                                    NULL, 0);        
+#ifdef HAVE_LIQUID                                                            
                                 if (btchip_context_D.usingLiquid) {
                                     cx_hash(
                                         &btchip_context_D.transactionHashFull.sha256.header, 0,
@@ -235,6 +236,7 @@ void transaction_parse(unsigned char parseMode) {
                                                .hashedIssuance),
                                         NULL, 0);                                                                    
                                 }
+#endif                                
                                 cx_hash(&btchip_context_D
                                          .transactionHashAuthorization.header,
                                     0,
@@ -328,17 +330,23 @@ void transaction_parse(unsigned char parseMode) {
                             trustedInputFlag = 1;
                             break;
                         case 2:
+#ifdef HAVE_LIQUID                        
                             if (!btchip_context_D.usingSegwit || btchip_context_D.usingLiquid) {
+#else
+                            if (!btchip_context_D.usingSegwit) {
+#endif
                                 PRINTF("Segwit input not used in segwit mode");
                                 goto fail;
                             }
                             break;
+#ifdef HAVE_LIQUID                            
                         case 3:
                             if (!btchip_context_D.usingLiquid) {
                                 PRINTF("Liquid input not used in liquid mode");
                                 goto fail;
                             }
                             break;
+#endif                            
                         default:
                             PRINTF("Invalid trusted input flag\n");
                             goto fail;
@@ -368,7 +376,9 @@ void transaction_parse(unsigned char parseMode) {
                                         36, NULL, 0);
                                 }
                                 transaction_offset_increase(36);
+#ifdef HAVE_LIQUID                                
                                 if (!btchip_context_D.usingLiquid) {
+#endif                                    
                                     check_transaction_available(8); // update amount
                                     btchip_swap_bytes(
                                         amount,
@@ -386,6 +396,7 @@ void transaction_parse(unsigned char parseMode) {
                                     PRINTF("Adding amount\n%.*H\n",8,btchip_context_D.transactionBufferPointer);
                                     PRINTF("New amount\n%.*H\n",8,btchip_context_D.transactionContext.transactionAmount);
                                     transaction_offset_increase(8);
+#ifdef HAVE_LIQUID                                    
                                 }
                                 else {
                                     unsigned char ctSize;
@@ -394,14 +405,18 @@ void transaction_parse(unsigned char parseMode) {
                                     check_transaction_available(ctSize);
                                     transaction_offset_increase(ctSize);
                                 }
+#endif                                
                             } else {
                                 unsigned char ctSize;
                                 btchip_context_D.transactionHashOption =
                                     TRANSACTION_HASH_FULL;
                                 transaction_offset_increase(36);
                                 btchip_context_D.transactionHashOption = 0;
+#ifdef HAVE_LIQUID                                
                                 if (!btchip_context_D.usingLiquid) {
+#endif                                    
                                     ctSize = 8;
+#ifdef HAVE_LIQUID                                    
                                 }
                                 else {                                    
                                     check_transaction_available(1);
@@ -411,6 +426,7 @@ void transaction_parse(unsigned char parseMode) {
                                         goto fail;
                                     }
                                 }
+#endif                                
                                 check_transaction_available(ctSize); // save amount
                                 os_memmove(
                                     btchip_context_D.inputValue,
@@ -594,12 +610,16 @@ void transaction_parse(unsigned char parseMode) {
                                     }
                                     else {
                                         unsigned char ctSize;
+#ifdef HAVE_LIQUID                                        
                                         if (!btchip_context_D.usingLiquid) {                                            
+#endif                                            
                                             ctSize = 8;
+#ifdef HAVE_LIQUID                                            
                                         }
                                         else {
                                             ctSize = btchip_get_confidential_data_size(btchip_context_D.inputValue[0], true, false);
                                         }
+#endif                                        
                                         PRINTF("SEGWIT Add value\n%.*H\n",ctSize,btchip_context_D.inputValue);
                                         cx_hash(&btchip_context_D
                                                  .transactionHashFull.sha256.header,

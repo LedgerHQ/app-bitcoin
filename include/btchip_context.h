@@ -115,7 +115,9 @@ struct segwit_cache_s {
     unsigned char hashedPrevouts[32];
     unsigned char hashedSequence[32];
     unsigned char hashedOutputs[32];
+#ifdef HAVE_LIQUID    
     unsigned char hashedIssuance[32];
+#endif    
 };
 
 /**
@@ -204,12 +206,18 @@ struct btchip_context_s {
         struct segwit_cache_s cache;
     } segwit;
     unsigned char transactionVersion[4];
+#ifdef HAVE_LIQUID    
     unsigned char inputValue[33];
+#else    
+    unsigned char inputValue[8];
+#endif    
     unsigned char usingSegwit;
     unsigned char usingCashAddr;
     unsigned char segwitParsedOnce;
+#ifdef HAVE_LIQUID    
     unsigned char usingLiquid;
     unsigned char liquidHostProvidedVbf;
+#endif    
 
     /* /Segregated Witness changes */
 
@@ -263,11 +271,13 @@ struct btchip_context_s {
     unsigned char nLockTime[4];
     unsigned char sigHashType[4];    
 
+#ifdef HAVE_LIQUID
     /* Liquid */
     unsigned char liquidAssetTag[32];
     unsigned char liquidAssetReference;
     unsigned char liquidValue[8];
     unsigned char liquidBlindingKey[33];
+#endif    
 };
 typedef struct btchip_context_s btchip_context_t;
 

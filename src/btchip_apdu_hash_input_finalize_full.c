@@ -68,7 +68,11 @@ static bool check_output_displayable() {
         btchip_output_script_is_op_create(btchip_context_D.currentOutput + 8);
     isOpCall =
         btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8);        
+#ifdef HAVE_LIQUID        
     isFee = btchip_output_script_is_fee(btchip_context_D.currentOutput + 8);
+#else    
+    isFee = 0;
+#endif    
     if (((G_coin_config->kind == COIN_KIND_QTUM) &&
          !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
          !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate && !isOpCall) ||
@@ -116,9 +120,11 @@ static bool check_output_displayable() {
             displayable = false;
         }
     }
+#ifdef HAVE_LIQUID    
     if (isFee) {
         displayable = false;
     }
+#endif    
     return displayable;
 }
 
@@ -140,8 +146,12 @@ static bool handle_output_state() {
             btchip_context_D.totalOutputs = btchip_context_D.remainingOutputs =
                 btchip_context_D.currentOutput[0];
             discardSize = 1;
+#ifdef HAVE_LIQUID            
             btchip_context_D.outputParsingState = 
                (btchip_context_D.usingLiquid ? BTCHIP_OUTPUT_LIQUID_PARSING_COMMITMENTS : BTCHIP_OUTPUT_PARSING_AMOUNT);
+#else
+            btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_AMOUNT;
+#endif                           
             processed = true;
             break;
         }
@@ -153,8 +163,12 @@ static bool handle_output_state() {
                 (btchip_context_D.currentOutput[2] << 8) |
                 btchip_context_D.currentOutput[1];
             discardSize = 3;
+#ifdef HAVE_LIQUID            
             btchip_context_D.outputParsingState = 
                (btchip_context_D.usingLiquid ? BTCHIP_OUTPUT_LIQUID_PARSING_COMMITMENTS : BTCHIP_OUTPUT_PARSING_AMOUNT);
+#else               
+            btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_AMOUNT;
+#endif               
             processed = true;
             break;
         } else if (btchip_context_D.currentOutput[0] == 0xFE) {
@@ -164,8 +178,12 @@ static bool handle_output_state() {
             btchip_context_D.totalOutputs = btchip_context_D.remainingOutputs =
                 btchip_read_u32(btchip_context_D.currentOutput + 1, 0, 0);
             discardSize = 5;
+#ifdef HAVE_LIQUID            
             btchip_context_D.outputParsingState = 
                (btchip_context_D.usingLiquid ? BTCHIP_OUTPUT_LIQUID_PARSING_COMMITMENTS : BTCHIP_OUTPUT_PARSING_AMOUNT);
+#else
+            btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_AMOUNT;
+#endif               
             processed = true;
             break;
         } else {
@@ -173,6 +191,7 @@ static bool handle_output_state() {
         }
     } break;
 
+#ifdef HAVE_LIQUID
     case BTCHIP_OUTPUT_LIQUID_PARSING_COMMITMENTS: {
         uint8_t i;
         // Check that the message is fully formatted - expect either clear asset + value tags or signed commitments
@@ -245,82 +264,6 @@ static bool handle_output_state() {
         }
     } break;
 
-#if 0
-    case BTCHIP_OUTPUT_LIQUID_PARSING_ASSET_COMMITMENT: {
-        uint8_t i;
-        if (btchip_context_D.currentOutputOffset < 1) {
-            break;
-        }
-        if (btchip_context_D.currentOutput[0] == 0x01) {
-            if (btchip_context_D.currentOutputOffset < 33) {
-                break;
-            }
-            btchip_swap_bytes(btchip_context_D.liquidAssetTag, btchip_context_D.currentOutput + 1, 32);
-            discardSize = 33;
-        }
-        else {
-            if (btchip_context_D.currentOutputOffset < LIQUID_TRUSTED_ASSET_COMMITMENT_SIZE) {
-                break;
-            }
-            cx_hmac_sha256(N_btchip.bkp.trustedinput_key, sizeof(N_btchip.bkp.trustedinput_key),
-                btchip_context_D.currentOutput, LIQUID_TRUSTED_ASSET_COMMITMENT_SIZE - 32, 
-                hmac, sizeof(hmac));
-            if (btchip_secure_memcmp(btchip_context_D.currentOutput + LIQUID_TRUSTED_ASSET_COMMITMENT_SIZE - 32, 
-               hmac, 32) != 0) {
-                PRINTF("Invalid asset commitment signature\n");
-                THROW(EXCEPTION);
-            }
-            os_memmove(btchip_context_D.liquidAssetTag, btchip_context_D.currentOutput + 33, 32);
-            discardSize = LIQUID_TRUSTED_ASSET_COMMITMENT_SIZE;
-        }
-        cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
-                        btchip_context_D.currentOutput, 33, NULL, 0);        
-        btchip_context_D.outputParsingState = BTCHIP_OUTPUT_LIQUID_PARSING_VALUE_COMMITMENT;
-        // Seek if the asset is well known
-        btchip_context_D.liquidAssetReference = 0;
-        for (i=0; i<NUM_LIQUID_ASSETS; i++) {
-            if (os_memcmp(btchip_context_D.liquidAssetTag, LIQUID_ASSETS[i].tag, sizeof(btchip_context_D.liquidAssetTag)) == 0) {
-                btchip_context_D.liquidAssetReference = i + 1;
-                PRINTF("Found asset %d\n", btchip_context_D.liquidAssetReference);
-                break;
-            }
-        }
-    } break;
-
-    case BTCHIP_OUTPUT_LIQUID_PARSING_VALUE_COMMITMENT: {
-        if (btchip_context_D.currentOutputOffset < 1) {
-            break;
-        }
-        if (btchip_context_D.currentOutput[0] == 0x01) {
-            if (btchip_context_D.currentOutputOffset < 9) {
-                break;
-            }
-            os_memmove(btchip_context_D.liquidValue, btchip_context_D.currentOutput + 1, 8);
-            cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
-                        btchip_context_D.currentOutput, 9, NULL, 0);
-            discardSize = 9;
-        }
-        else {
-            if (btchip_context_D.currentOutputOffset < LIQUID_TRUSTED_VALUE_COMMITMENT_SIZE) {
-                break;
-            }
-            cx_hmac_sha256(N_btchip.bkp.trustedinput_key, sizeof(N_btchip.bkp.trustedinput_key),
-                btchip_context_D.currentOutput, LIQUID_TRUSTED_VALUE_COMMITMENT_SIZE - 32, 
-                hmac, sizeof(hmac));
-            if (btchip_secure_memcmp(btchip_context_D.currentOutput + LIQUID_TRUSTED_VALUE_COMMITMENT_SIZE - 32, 
-                   hmac, 32) != 0) {
-                PRINTF("Invalid value commitment signature\n");
-                THROW(EXCEPTION);
-            }
-            os_memmove(btchip_context_D.liquidValue, btchip_context_D.currentOutput + 33, 8);
-            cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
-                        btchip_context_D.currentOutput, 33, NULL, 0);
-            discardSize = LIQUID_TRUSTED_VALUE_COMMITMENT_SIZE;
-        }
-        btchip_context_D.outputParsingState = BTCHIP_OUTPUT_LIQUID_PARSING_NONCE;
-    } break;
-#endif    
-
     case BTCHIP_OUTPUT_LIQUID_PARSING_NONCE: {
         if (btchip_context_D.currentOutputOffset < 1) {
             break;
@@ -363,6 +306,8 @@ static bool handle_output_state() {
         btchip_context_D.currentOutputOffset = 8;
         btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_OUTPUT;
     }
+
+#endif
 
     case BTCHIP_OUTPUT_PARSING_AMOUNT: {
         if (btchip_context_D.currentOutputOffset < 8) {
@@ -410,9 +355,11 @@ static bool handle_output_state() {
             discardSize = 0;
         } else {
             btchip_context_D.remainingOutputs--;
+#ifdef HAVE_LIQUID            
             if (btchip_context_D.usingLiquid && (btchip_context_D.remainingOutputs != 0)) {
                 btchip_context_D.outputParsingState = BTCHIP_OUTPUT_LIQUID_PARSING_COMMITMENTS;
-            }            
+            }     
+#endif            
         }
     } break;
 
@@ -690,13 +637,17 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                 // This input cannot be signed when using segwit - just restart.
                 btchip_context_D.segwitParsedOnce = 1;
                 PRINTF("Segwit parsed once\n");
+#ifdef HAVE_LIQUID                
                 if (btchip_context_D.usingLiquid) {
                     cx_sha256_init(&btchip_context_D.transactionHashFull.sha256);
                     btchip_context_D.transactionContext.transactionState = BTCHIP_TRANSACTION_WAIT_LIQUID_ISSUANCE;
                 }
                 else {
                     btchip_context_D.transactionContext.transactionState = BTCHIP_TRANSACTION_NONE;
-                }
+                }                
+#else            
+                btchip_context_D.transactionContext.transactionState = BTCHIP_TRANSACTION_NONE;    
+#endif                
             } else {
                 btchip_context_D.transactionContext.transactionState =
                     BTCHIP_TRANSACTION_SIGN_READY;
@@ -764,9 +715,11 @@ unsigned char btchip_bagl_user_action(unsigned char confirming) {
         if (btchip_context_D.outputParsingState ==
             BTCHIP_OUTPUT_PARSING_OUTPUT) {
             btchip_context_D.remainingOutputs--;
+#ifdef HAVE_LIQUID        
             if (btchip_context_D.usingLiquid && (btchip_context_D.remainingOutputs != 0)) {
                 btchip_context_D.outputParsingState = BTCHIP_OUTPUT_LIQUID_PARSING_COMMITMENTS;
             }
+#endif            
         }
 
         while (btchip_context_D.remainingOutputs != 0) {
@@ -824,6 +777,7 @@ unsigned char btchip_bagl_user_action(unsigned char confirming) {
                 // This input cannot be signed when using segwit - just restart.
                 btchip_context_D.segwitParsedOnce = 1;
                 PRINTF("Segwit parsed once\n");
+#ifdef HAVE_LIQUID                
                 if (btchip_context_D.usingLiquid) {
                     cx_sha256_init(&btchip_context_D.transactionHashFull.sha256);
                     btchip_context_D.transactionContext.transactionState = BTCHIP_TRANSACTION_WAIT_LIQUID_ISSUANCE;
@@ -831,6 +785,9 @@ unsigned char btchip_bagl_user_action(unsigned char confirming) {
                 else {
                     btchip_context_D.transactionContext.transactionState = BTCHIP_TRANSACTION_NONE;
                 }
+#else            
+                btchip_context_D.transactionContext.transactionState = BTCHIP_TRANSACTION_NONE;    
+#endif                
             } else {
                 btchip_context_D.transactionContext.transactionState =
                     BTCHIP_TRANSACTION_SIGN_READY;

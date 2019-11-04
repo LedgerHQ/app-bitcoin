@@ -52,8 +52,12 @@ unsigned char const OVERWINTER_PARAM_OUTPUTS[16] = { 'Z', 'c', 'a', 's', 'h', 'O
 unsigned char const OVERWINTER_PARAM_SIGHASH[16] = { 'Z', 'c', 'a', 's', 'h', 'S', 'i', 'g', 'H', 'a', 's', 'h', 0, 0, 0, 0 };
 unsigned char const OVERWINTER_NO_JOINSPLITS[32] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
+#ifdef HAVE_LIQUID
+
 unsigned char const SYMMETRIC_KEY_SEED[18] = { 'S', 'y', 'm', 'm', 'e', 't', 'r', 'i', 'c', ' ', 'k', 'e', 'y', ' ', 's', 'e', 'e', 'd' };
-unsigned char const SLIP77_LABEL[10] = { 0x00, 'S', 'L', 'I', 'P', '-', '0', '0', '7', '7' };
+unsigned char const SLIP77_LABEL[10] = { 0x00, 'S', 'L', 'I', 'P', '-', '0', '0', '7', '7', 0, 0 };
+
+#endif
 
 unsigned char const DISPATCHER_CLA[] = {
     BTCHIP_CLA, // btchip_apdu_setup,
@@ -136,9 +140,22 @@ apduProcessingFunction const DISPATCHER_FUNCTIONS[] = {
     btchip_apdu_get_firmware_version,
     btchip_apdu_set_alternate_coin_version,
     btchip_apdu_get_coin_version,
+    
+#ifdef HAVE_LIQUID
+
     btchip_apdu_liquid_get_commitments,
     btchip_apdu_liquid_get_public_blinding_key,
     btchip_apdu_liquid_get_nonce,
     btchip_apdu_liquid_provide_issuance_information,
     btchip_apdu_liquid_get_blinding_factor
+
+#else
+
+    btchip_apdu_not_implemented,
+    btchip_apdu_not_implemented,
+    btchip_apdu_not_implemented,
+    btchip_apdu_not_implemented,
+    btchip_apdu_not_implemented
+
+#endif    
 };

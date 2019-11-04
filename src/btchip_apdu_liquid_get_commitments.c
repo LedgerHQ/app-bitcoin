@@ -15,6 +15,8 @@
 *  limitations under the License.
 ********************************************************************************/
 
+#ifdef HAVE_LIQUID
+
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
 
@@ -94,3 +96,6 @@ unsigned short btchip_apdu_liquid_get_commitments() {
 
         return BTCHIP_SW_OK;
 }
+
+#endif
+

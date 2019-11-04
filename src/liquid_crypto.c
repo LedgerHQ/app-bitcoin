@@ -15,6 +15,8 @@
 *  limitations under the License.
 ********************************************************************************/
 
+#ifdef HAVE_LIQUID
+
 #include "btchip_internal.h"
 
 static uint8_t const SECP256K1_FIELD[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -241,3 +243,6 @@ void liquid_crypto_test() {
 }
 
 #endif
+
+#endif
+

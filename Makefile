@@ -38,6 +38,7 @@ endif
 
 ifeq ($(COIN),bitcoin_testnet)
 # Bitcoin testnet
+             pubkey_address         script_address 
 DEFINES   += COIN_P2PKH_VERSION=111 COIN_P2SH_VERSION=196 COIN_FAMILY=1 COIN_COINID=\"Bitcoin\" COIN_COINID_HEADER=\"BITCOIN\" COIN_COLOR_HDR=0xFCB653 COIN_COLOR_DB=0xFEDBA9 COIN_COINID_NAME=\"Bitcoin\" COIN_COINID_SHORT=\"TEST\" COIN_NATIVE_SEGWIT_PREFIX=\"tb\" COIN_KIND=COIN_KIND_BITCOIN_TESTNET COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
 
 APPNAME ="Bitcoin Test"
@@ -48,6 +49,22 @@ DEFINES   += COIN_P2PKH_VERSION=0 COIN_P2SH_VERSION=5 COIN_FAMILY=1 COIN_COINID=
 DEFINES_LIB=# we're not using the lib :)
 APPNAME ="Bitcoin"
 APP_LOAD_PARAMS += --path $(APP_PATH)
+#LIB and global pin and
+APP_LOAD_FLAGS=--appFlags 0xa50
+else ifeq ($(COIN),liquid_regtest)
+# Liquid regtest
+DEFINES   += HAVE_LIQUID COIN_BLINDED_VERSION=4 COIN_P2PKH_VERSION=235 COIN_P2SH_VERSION=75 COIN_FAMILY=1 COIN_COINID=\"Bitcoin\" COIN_COINID_HEADER=\"BITCOIN\" COIN_COLOR_HDR=0xFCB653 COIN_COLOR_DB=0xFEDBA9 COIN_COINID_NAME=\"Bitcoin\" COIN_COINID_SHORT=\"BTC\" COIN_NATIVE_SEGWIT_PREFIX=\"bc\" COIN_KIND=COIN_KIND_BITCOIN COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
+DEFINES_LIB=# we're not using the lib :)
+APPNAME ="Liquid Test"
+APP_LOAD_PARAMS += --path $(APP_PATH) --path_slip21 "SLIP-0077"
+#LIB and global pin and
+APP_LOAD_FLAGS=--appFlags 0xa50
+else ifeq ($(COIN),liquid)
+# Liquid
+DEFINES   += HAVE_LIQUID COIN_BLINDED_VERSION=12 COIN_P2PKH_VERSION=57 COIN_P2SH_VERSION=39 COIN_FAMILY=1 COIN_COINID=\"Bitcoin\" COIN_COINID_HEADER=\"BITCOIN\" COIN_COLOR_HDR=0xFCB653 COIN_COLOR_DB=0xFEDBA9 COIN_COINID_NAME=\"Bitcoin\" COIN_COINID_SHORT=\"BTC\" COIN_NATIVE_SEGWIT_PREFIX=\"bc\" COIN_KIND=COIN_KIND_BITCOIN COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
+DEFINES_LIB=# we're not using the lib :)
+APPNAME ="Liquid"
+APP_LOAD_PARAMS += --path $(APP_PATH) --path_slip21 "SLIP-0077"
 #LIB and global pin and
 APP_LOAD_FLAGS=--appFlags 0xa50
 else ifeq ($(COIN),bitcoin_cash)
@@ -323,3 +340,4 @@ listvariants:
 	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry resistance
 
 endif
+

@@ -138,12 +138,16 @@ unsigned char btchip_output_script_is_op_call(unsigned char *buffer) {
             (buffer[buffer[0]] == 0xC2));
 }
 
+#ifdef HAVE_LIQUID
+
 unsigned char btchip_output_script_is_fee(unsigned char *buffer) {
     if (btchip_context_D.usingLiquid) {
         return(buffer[0] == 0);
     }
     return 0;
 }
+
+#endif
 
 unsigned char btchip_rng_u8_modulo(unsigned char modulo) {
     unsigned int rng_max = 256 % modulo;
@@ -463,6 +467,8 @@ void btchip_signverify_finalhash(void *keyContext, unsigned char sign,
     io_seproxyhal_io_heartbeat();
 }
 
+#ifdef HAVE_LIQUID
+
 #define CT_VALUE_NULL 0
 #define CT_VALUE_NON_BLIND 1
 #define CT_VALUE_PREFIX_A 8
@@ -494,12 +500,19 @@ unsigned char btchip_get_confidential_data_size(char version, bool value, bool n
 }
 
 void btchip_derive_master_blinding_key(unsigned char *target) {
+#if 1    
+    uint32_t path[10];
+    os_memset((void*)path, 0, sizeof(path));
+    os_memmove((void*)path, SLIP77_LABEL, sizeof(SLIP77_LABEL));
+    os_perso_derive_node_with_seed_key(HDW_SLIP21, CX_CURVE_256K1, path, 10, target, NULL, NULL, 0);
+#else
     uint8_t out[64];
     // FIXME : replace by new syscall when available
     os_perso_derive_node_bip32(CX_CURVE_256K1, NULL, 0, out, out + 32);
     cx_hmac_sha512(SYMMETRIC_KEY_SEED, sizeof(SYMMETRIC_KEY_SEED), out, sizeof(out), out, sizeof(out));
     cx_hmac_sha512(out, 32, SLIP77_LABEL, sizeof(SLIP77_LABEL), out, sizeof(out));
     os_memmove(target, out + 32, 32);    
+#endif        
 }
 
 void btchip_derive_tx_blinding_key(unsigned char *target) {
@@ -520,3 +533,5 @@ void btchip_derive_abf_vbf(uint32_t outputIndex, bool abf, unsigned char *target
     btchip_write_u32_be(deriveData + 3, outputIndex);
     cx_hmac_sha256(txBlindingKey, sizeof(txBlindingKey), deriveData, sizeof(deriveData), target, 32);
 }
+
+#endif

@@ -34,8 +34,12 @@ extern unsigned char const OVERWINTER_PARAM_OUTPUTS[16];
 extern unsigned char const OVERWINTER_PARAM_SIGHASH[16];
 extern unsigned char const OVERWINTER_NO_JOINSPLITS[32];
 
+#ifdef HAVE_LIQUID
+
 extern unsigned char const SYMMETRIC_KEY_SEED[18];
 extern unsigned char const SLIP77_LABEL[10];
+
+#endif
 
 #define HDKEY_VERSION_LENGTH 4
 
@@ -69,5 +73,7 @@ extern unsigned char const DISPATCHER_CLA[DISPATCHER_APDUS];
 extern unsigned char const DISPATCHER_INS[DISPATCHER_APDUS];
 extern unsigned char const DISPATCHER_DATA_IN[DISPATCHER_APDUS];
 extern apduProcessingFunction const DISPATCHER_FUNCTIONS[DISPATCHER_APDUS];
+
+
 
 #endif /* _BTCHIP_ROM_VARIABLES_ */
