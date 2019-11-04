@@ -28,8 +28,11 @@
 #include "btchip_ecc.h"
 #include "btchip_helpers.h"
 #include "btchip_transaction.h"
+
+#ifdef HAVE_LIQUID
 #include "liquid_assets.h"
 #include "liquid_crypto.h"
+#endif
 
 #ifdef HAVE_LIQUID
 #include "liquid_assets.h"
