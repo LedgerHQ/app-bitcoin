@@ -279,7 +279,7 @@ endif
 
 ifeq ($(TARGET_NAME),TARGET_NANOS)
 
-	ifneq "$(wildcard $(BOLOS_SDK)/lib_ux)" ""
+	ifneq "$(wildcard $(BOLOS_SDK)/lib_ux/src/ux_flow_engine.c)" ""
 		SDK_SOURCE_PATH  += lib_ux
 		DEFINES		       += HAVE_UX_FLOW		
 	endif
