@@ -310,6 +310,7 @@ typedef struct btchip_altcoin_config_s {
     const char* name_short; // for unit in ux displays
     const char* native_segwit_prefix; // null if no segwit prefix
     unsigned int forkid;
+    unsigned int zcash_consensus_branch_id;
     btchip_coin_kind_t kind;
     unsigned int flags;
 } btchip_altcoin_config_t;

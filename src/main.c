@@ -2623,6 +2623,9 @@ btchip_altcoin_config_t const C_coin_config = {
 #ifdef COIN_FORKID
     .forkid = COIN_FORKID,
 #endif // COIN_FORKID
+#ifdef COIN_CONSENSUS_BRANCH_ID
+    .zcash_consensus_branch_id = COIN_CONSENSUS_BRANCH_ID,
+#endif // COIN_CONSENSUS_BRANCH_ID
 #ifdef COIN_FLAGS
     .flags = COIN_FLAGS,
 #endif // COIN_FLAGS
