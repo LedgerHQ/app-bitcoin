@@ -156,7 +156,7 @@ union {
         // of
 
         char fullAddress[65]; // the address
-        char fullAmount[40];  // full amount (Metaverse can have long token names, so increased from 20 to 40)
+        char fullAmount[20];  // full amount (Metaverse may have long token names, so maybe increase from 20 to 40?)
         char feesAmount[20];  // fees
         char decimals[3];
     } tmp;
@@ -2230,49 +2230,82 @@ uint8_t prepare_single_output() {
     }
 
     if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE) {
+        // btchip_context_D.nVersionGroupId = unsigned char etpBuff[4];
         vars.tmp.decimals[0] = '\0';
 
-        unsigned char decimals = DECIMALS;
-        unsigned char etpBuff[4];
-        unsigned char etpVarintLen;
         unsigned char *parsePointer = btchip_context_D.currentOutput + offset + 26;
-        uint8_t headerLength = btchip_context_D.shortCoinIdLength;
+        btchip_context_D.nExpiryHeight[0] = DECIMALS;
+        btchip_context_D.nExpiryHeight[1] = 0;
+        btchip_context_D.nExpiryHeight[2] = btchip_context_D.shortCoinIdLength;
 
-        os_memmove(etpBuff, parsePointer, 4);
+        // btchip_context_D.nExpiryHeight[0] = unsigned char decimals = DECIMALS;
+        // btchip_context_D.nExpiryHeight[1] = unsigned char etpVarintLen;
+        // btchip_context_D.nExpiryHeight[2] = unsigned char headerLength = btchip_context_D.shortCoinIdLength;
+
+
+        os_memmove(btchip_context_D.nVersionGroupId, parsePointer, 4);
         parsePointer += 4;
 
         // Version = 1 | 207 (ATTACHMENT.VERSION.DEFAULT |  ATTACHMENT.VERSION.DID)
-        if (etpBuff[0] != 1 || etpBuff[1] != 0 || etpBuff[2] != 0 || etpBuff[3] != 0) {
+        if (
+            btchip_context_D.nVersionGroupId[0] != 1 ||
+            btchip_context_D.nVersionGroupId[1] != 0 ||
+            btchip_context_D.nVersionGroupId[2] != 0 ||
+            btchip_context_D.nVersionGroupId[3] != 0
+        ) {
             return 0;
         }
 
-        os_memmove(etpBuff, parsePointer, 4);
+        os_memmove(btchip_context_D.nVersionGroupId, parsePointer, 4);
         parsePointer += 4;
 
         // Type = 0 | 2 (ATTACHMENT.TYPE.ETP_TRANSFER | ATTACHMENT.TYPE.MST)
-        if (etpBuff[0] == 0 && etpBuff[1] == 0 && etpBuff[2] == 0 && etpBuff[3] == 0) {
-        } else if (etpBuff[0] == 2 && etpBuff[1] == 0 && etpBuff[2] == 0 && etpBuff[3] == 0) {
+        if (
+            btchip_context_D.nVersionGroupId[0] == 0 &&
+            btchip_context_D.nVersionGroupId[1] == 0 &&
+            btchip_context_D.nVersionGroupId[2] == 0 &&
+            btchip_context_D.nVersionGroupId[3] == 0) {
+        } else if (
+            btchip_context_D.nVersionGroupId[0] == 2 &&
+            btchip_context_D.nVersionGroupId[1] == 0 &&
+            btchip_context_D.nVersionGroupId[2] == 0 &&
+            btchip_context_D.nVersionGroupId[3] == 0
+        ) {
             // Throw error is ETP amount is non zero
-            if (amount[0] != 0 || amount[1] != 0 || amount[2] != 0 || amount[3] != 0 || amount[4] != 0 || amount[5] != 0 || amount[6] != 0 || amount[7] != 0) {
+            if (
+                amount[0] != 0 ||
+                amount[1] != 0 ||
+                amount[2] != 0 ||
+                amount[3] != 0 ||
+                amount[4] != 0 ||
+                amount[5] != 0 ||
+                amount[6] != 0 ||
+                amount[7] != 0
+            ) {
                 return 0;
             }
 
-            os_memmove(etpBuff, parsePointer, 4);
+            os_memmove(btchip_context_D.nVersionGroupId, parsePointer, 4);
             parsePointer += 4;
 
             // Status = 1 | 2 (MST.STATUS.REGISTER | MST.STATUS.TRANSFER)
-            if (etpBuff[0] == 2 && etpBuff[1] == 0 && etpBuff[2] == 0 && etpBuff[3] == 0) {
+            if (
+                btchip_context_D.nVersionGroupId[0] == 2 &&
+                btchip_context_D.nVersionGroupId[1] == 0 &&
+                btchip_context_D.nVersionGroupId[2] == 0 &&
+                btchip_context_D.nVersionGroupId[3] == 0
+            ) {
                 // Ticker text length
-                etpVarintLen = *parsePointer;
+                btchip_context_D.nExpiryHeight[1] = *parsePointer;
                 parsePointer += 1;
 
                 // Prepare ticker text
-                headerLength = etpVarintLen > 10 ? 10 : etpVarintLen;
-                os_memmove(vars.tmp.fullAmount + 0, parsePointer, headerLength);
-                vars.tmp.fullAmount[headerLength] = '\0';
+                btchip_context_D.nExpiryHeight[2] = btchip_context_D.nExpiryHeight[1] > 10 ? 10 : btchip_context_D.nExpiryHeight[1];
+                os_memmove(vars.tmp.fullAmount, parsePointer, btchip_context_D.nExpiryHeight[2]);
+                vars.tmp.fullAmount[btchip_context_D.nExpiryHeight[2]] = '\0';
 
                 // Get token transfer amount
-                parsePointer += etpVarintLen;
+                parsePointer += btchip_context_D.nExpiryHeight[1];
                 btchip_swap_bytes(amount, parsePointer, 8);
                 parsePointer += 8;
 
@@ -2280,14 +2313,14 @@ uint8_t prepare_single_output() {
 
                 // Hardcode some tokens with predefined decimals (no need to display decimals confirmation to user)
                 if (strcmp(vars.tmp.fullAmount, "DNA") == 0) {
-                    decimals = 4;
+                    btchip_context_D.nExpiryHeight[0] = 4;
                 } else if (strcmp(vars.tmp.fullAmount, "MVS.ZGC") == 0) {
-                    decimals = 8;
+                    btchip_context_D.nExpiryHeight[0] = 8;
                 } else if (strcmp(vars.tmp.fullAmount, "MVS.ZDC") == 0) {
-                    decimals = 6;
+                    btchip_context_D.nExpiryHeight[0] = 6;
                 } else {
-                    decimals = btchip_context_D.decimals[btchip_context_D.totalOutputs - btchip_context_D.remainingOutputs];
-                    snprintf(vars.tmp.decimals, sizeof(vars.tmp.decimals), "%d", decimals);
+                    btchip_context_D.nExpiryHeight[0] = btchip_context_D.decimals[btchip_context_D.totalOutputs - btchip_context_D.remainingOutputs];
+                    snprintf(vars.tmp.decimals, sizeof(vars.tmp.decimals), "%d", btchip_context_D.nExpiryHeight[0]);
                 }
             } else {
                 return 0;
@@ -2296,10 +2329,11 @@ uint8_t prepare_single_output() {
             return 0;
         }
 
-        vars.tmp.fullAmount[headerLength] = ' ';
-        btchip_context_D.tmp = (unsigned char *)(vars.tmp.fullAmount + headerLength + 1);
-        textSize = btchip_convert_hex_amount_to_displayable(amount, decimals);
-        vars.tmp.fullAmount[textSize + headerLength + 1] = '\0';
+        vars.tmp.fullAmount[btchip_context_D.nExpiryHeight[2]] = ' ';
+        btchip_context_D.tmp = (unsigned char *)(vars.tmp.fullAmount + btchip_context_D.nExpiryHeight[2] + 1);
+        textSize = btchip_convert_hex_amount_to_displayable(amount, btchip_context_D.nExpiryHeight[0]);
+        vars.tmp.fullAmount[textSize + btchip_context_D.nExpiryHeight[2] + 1] = '\0';
+        vars.tmp.fullAmount[sizeof(vars.tmp.fullAmount) - 1] = '\0';
     }
 
     return 1;

@@ -175,24 +175,24 @@ static bool handle_output_state() {
             discardSize = 1;
 
             if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE) {
-                unsigned char etpBuff[4];
-                unsigned long int scriptRemaining = scriptSize + 9;
+                // btchip_context_D.nVersionGroupId = unsigned char etpBuff[4];
+                btchip_context_D.trustedInputIndex = scriptSize + 9; // unsigned long int scriptRemaining
 
-                scriptRemaining += 4; // Version
-                os_memmove(etpBuff, btchip_context_D.currentOutput + scriptRemaining, 4);
-                scriptRemaining += 4;  // Type
+                btchip_context_D.trustedInputIndex += 4; // Version
+                os_memmove(btchip_context_D.nVersionGroupId, btchip_context_D.currentOutput + btchip_context_D.trustedInputIndex, 4);
+                btchip_context_D.trustedInputIndex += 4;  // Type
 
-                if (etpBuff[0] == 2) {
-                    os_memmove(etpBuff, btchip_context_D.currentOutput + scriptRemaining, 4);
-                    scriptRemaining += 4; // Status
+                if (btchip_context_D.nVersionGroupId[0] == 2) {
+                    os_memmove(btchip_context_D.nVersionGroupId, btchip_context_D.currentOutput + btchip_context_D.trustedInputIndex, 4);
+                    btchip_context_D.trustedInputIndex += 4; // Status
 
-                    if (etpBuff[0] == 2) {
-                        scriptRemaining += *(btchip_context_D.currentOutput + scriptRemaining) + 1 + 8;
+                    if (btchip_context_D.nVersionGroupId[0] == 2) {
+                        btchip_context_D.trustedInputIndex += *(btchip_context_D.currentOutput + btchip_context_D.trustedInputIndex) + 1 + 8;
                         // Length varint + Ticker length + Amount length
                     }
                 }
 
-                scriptSize = scriptRemaining - 9;
+                scriptSize = btchip_context_D.trustedInputIndex - 9;
             }
         } else if (btchip_context_D.currentOutput[8] == 0xFD) {
             if (btchip_context_D.currentOutputOffset < 9 + 2) {
