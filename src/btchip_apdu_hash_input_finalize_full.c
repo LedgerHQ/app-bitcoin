@@ -171,6 +171,27 @@ static bool handle_output_state() {
         if (btchip_context_D.currentOutput[8] < 0xFD) {
             scriptSize = btchip_context_D.currentOutput[8];
             discardSize = 1;
+
+            if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE) {
+                unsigned char etpBuff[4];
+                unsigned long int scriptRemaining = scriptSize + 9;
+
+                scriptRemaining += 4; // Version
+                os_memmove(etpBuff, btchip_context_D.currentOutput + scriptRemaining, 4);
+                scriptRemaining += 4;  // Type
+
+                if (etpBuff[0] == 2) {
+                    os_memmove(etpBuff, btchip_context_D.currentOutput + scriptRemaining, 4);
+                    scriptRemaining += 4; // Status
+
+                    if (etpBuff[0] == 2) {
+                        scriptRemaining += *(btchip_context_D.currentOutput + scriptRemaining) + 1 + 8;
+                        // Length varint + Ticker length + Amount length
+                    }
+                }
+
+                scriptSize = scriptRemaining - 9;
+            }
         } else if (btchip_context_D.currentOutput[8] == 0xFD) {
             if (btchip_context_D.currentOutputOffset < 9 + 2) {
                 break;
@@ -263,6 +284,14 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             }
 
             if (p1 == FINALIZE_P1_CHANGEINFO) {
+                if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE && G_io_apdu_buffer[ISO_OFFSET_P2] == 0x0E) {
+                    if (apduLength > 4) { // For Metaverse can handle max 4 outputs with tokens
+                        goto discardTransaction;
+                    }
+                    os_memmove(btchip_context_D.decimals, G_io_apdu_buffer + ISO_OFFSET_CDATA, apduLength);
+                    goto return_OK;
+                }
+
                 unsigned char keyLength;
                 if (!btchip_context_D.transactionContext.firstSigned) {
                 // Already validated, should be prevented on the client side

@@ -35,7 +35,8 @@ enum btchip_family_e {
     BTCHIP_FAMILY_BITCOIN = 0x01,
     BTCHIP_FAMILY_PEERCOIN = 0x02,
     BTCHIP_FAMILY_QTUM = 0x03,
-    BTCHIP_FAMILY_STEALTH = 0x04
+    BTCHIP_FAMILY_STEALTH = 0x04,
+    BTCHIP_FAMILY_METAVERSE = 0x05
 };
 
 struct btchip_config_s {

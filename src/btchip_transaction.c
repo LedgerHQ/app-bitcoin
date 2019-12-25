@@ -728,6 +728,27 @@ void transaction_parse(unsigned char parseMode) {
                     btchip_context_D.transactionContext.scriptRemaining =
                         transaction_get_varint();
 
+                    if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE) {
+                        unsigned char etpBuff[4];
+                        unsigned long int scriptRemaining = btchip_context_D.transactionContext.scriptRemaining;
+
+                        scriptRemaining += 4; // Version
+                        os_memmove(etpBuff, btchip_context_D.transactionBufferPointer + scriptRemaining, 4);
+                        scriptRemaining += 4;  // Type
+
+                        if (etpBuff[0] == 2) {
+                            os_memmove(etpBuff, btchip_context_D.transactionBufferPointer + scriptRemaining, 4);
+                            scriptRemaining += 4; // Status
+
+                            if (etpBuff[0] == 2) {
+                                scriptRemaining += *(btchip_context_D.transactionBufferPointer + scriptRemaining) + 1 + 8;
+                                // Length varint + Ticker length + Amount length
+                            }
+                        }
+
+                        btchip_context_D.transactionContext.scriptRemaining = scriptRemaining;
+                    }
+
                     PRINTF("Script to read " DEBUG_LONG "\n",btchip_context_D.transactionContext.scriptRemaining);
                     // Move on
                     btchip_context_D.transactionContext.transactionState =

@@ -20,16 +20,10 @@
 #define SCRATCH_SIZE 21
 
 unsigned char
-btchip_convert_hex_amount_to_displayable(unsigned char *amount) {
-    unsigned char LOOP1;
-    unsigned char LOOP2;
-    if (!(G_coin_config->flags & FLAG_PEERCOIN_UNITS)) {
-        LOOP1 = 13;
-        LOOP2 = 8;
-    } else {
-        LOOP1 = 15;
-        LOOP2 = 6;
-    }
+btchip_convert_hex_amount_to_displayable(unsigned char *amount, unsigned char decimals) {
+    unsigned char LOOP1 = SCRATCH_SIZE - decimals;
+    unsigned char LOOP2 = decimals;
+
     unsigned short scratch[SCRATCH_SIZE];
     unsigned char offset = 0;
     unsigned char nonZero = 0;

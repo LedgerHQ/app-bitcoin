@@ -250,6 +250,8 @@ struct btchip_context_s {
     unsigned char nExpiryHeight[4];
     unsigned char nLockTime[4];
     unsigned char sigHashType[4];    
+
+    unsigned char decimals[4]; // For Metaverse tokens, need to provide precision for all outputs from external source (maximum can handle 4 outputs with tokens)
 };
 typedef struct btchip_context_s btchip_context_t;
 
@@ -292,7 +294,8 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_XSN,
     COIN_KIND_NIX,
     COIN_KIND_LBRY,
-    COIN_KIND_RESISTANCE
+    COIN_KIND_RESISTANCE,
+    COIN_KIND_METAVERSE
 } btchip_coin_kind_t;
 
 typedef struct btchip_altcoin_config_s {
@@ -315,5 +318,7 @@ typedef struct btchip_altcoin_config_s {
 } btchip_altcoin_config_t;
 
 void btchip_context_init(void);
+
+#define DECIMALS (!(G_coin_config->flags & FLAG_PEERCOIN_UNITS) ? 8 : 6)
 
 #endif

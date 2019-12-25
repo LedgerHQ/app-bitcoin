@@ -156,8 +156,9 @@ union {
         // of
 
         char fullAddress[65]; // the address
-        char fullAmount[20];  // full amount
+        char fullAmount[40];  // full amount (Metaverse can have long token names, so increased from 20 to 40)
         char feesAmount[20];  // fees
+        char decimals[3];
     } tmp;
 
     struct {
@@ -983,8 +984,29 @@ const bagl_element_t ui_verify_output_nanos[] = {
     UI_NANOS_SCROLLING_TEXT(3, 23, 26, 82, vars.tmp.fullAddress, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px)
 };
 
+const bagl_element_t ui_verify_output_decimals_nanos[] = {
+
+    UI_NANOS_BACKGROUND(),
+    UI_NANOS_ICON_LEFT(0, BAGL_GLYPH_ICON_CROSS),
+    UI_NANOS_ICON_RIGHT(0, BAGL_GLYPH_ICON_CHECK),
+    UI_NANOS_TEXT(1, 0, 12, 128, "Confirm", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+    UI_NANOS_TEXT(1, 0, 26, 128, vars.tmp.feesAmount, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    UI_NANOS_TEXT(2, 0, 12, 128, "Amount", BAGL_FONT_OPEN_SANS_REGULAR_11px),
+    UI_NANOS_SCROLLING_TEXT(2, 23, 26, 82, vars.tmp.fullAmount, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    UI_NANOS_TEXT(3, 0, 12, 128, "Decimals", BAGL_FONT_OPEN_SANS_REGULAR_11px),
+    UI_NANOS_TEXT(3, 0, 26, 128, vars.tmp.decimals, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    UI_NANOS_TEXT(4, 0, 12, 128, "Address", BAGL_FONT_OPEN_SANS_REGULAR_11px),
+    UI_NANOS_SCROLLING_TEXT(4, 23, 26, 82, vars.tmp.fullAddress, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px)
+};
+
 unsigned int ui_verify_output_nanos_button(unsigned int button_mask,
                                            unsigned int button_mask_counter);
+
+unsigned int ui_verify_output_decimals_nanos_button(unsigned int button_mask,
+                                          unsigned int button_mask_counter);
 
 const bagl_element_t ui_finalize_nanos[] = {
     UI_NANOS_BACKGROUND(),
@@ -1216,6 +1238,20 @@ unsigned int ui_verify_nanos_button(unsigned int button_mask,
 }
 
 unsigned int ui_verify_output_nanos_button(unsigned int button_mask,
+                                           unsigned int button_mask_counter) {
+    switch (button_mask) {
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT:
+        io_seproxyhal_touch_verify_cancel(NULL);
+        break;
+
+    case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
+        io_seproxyhal_touch_verify_ok(NULL);
+        break;
+    }
+    return 0;
+}
+
+unsigned int ui_verify_output_decimals_nanos_button(unsigned int button_mask,
                                            unsigned int button_mask_counter) {
     switch (button_mask) {
     case BUTTON_EVT_RELEASED | BUTTON_LEFT:
@@ -1667,6 +1703,13 @@ UX_STEP_NOCB(
       .title = "Address",
       .text = vars.tmp.fullAddress,
     });
+UX_STEP_NOCB(
+    ux_confirm_single_flow_4_step,
+    bnnn_paging,
+    {
+      .title = "Decimals",
+      .text = vars.tmp.decimals,
+    });
 UX_STEP_VALID(
     ux_confirm_single_flow_5_step, 
     pb,
@@ -1688,6 +1731,16 @@ UX_FLOW(ux_confirm_single_flow,
   &ux_confirm_single_flow_1_step,
   &ux_confirm_single_flow_2_step,
   &ux_confirm_single_flow_3_step,
+  &ux_confirm_single_flow_5_step,
+  &ux_confirm_single_flow_6_step
+);
+
+// confirm_single: confirm output #x(feesAmount) / Amount: fullAmount / Decimals: decimals / Address: fullAddress
+UX_FLOW(ux_confirm_single_decimals_flow,
+  &ux_confirm_single_flow_1_step,
+  &ux_confirm_single_flow_2_step,
+  &ux_confirm_single_flow_3_step,
+  &ux_confirm_single_flow_4_step,
   &ux_confirm_single_flow_5_step,
   &ux_confirm_single_flow_6_step
 );
@@ -2031,7 +2084,7 @@ uint8_t prepare_fees() {
             btchip_context_D.tmp =
                 (unsigned char *)(vars.tmp.feesAmount +
                               btchip_context_D.shortCoinIdLength + 1);
-            textSize = btchip_convert_hex_amount_to_displayable(fees);
+            textSize = btchip_convert_hex_amount_to_displayable(fees, DECIMALS);
             vars.tmp.feesAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
                 '\0';
         }
@@ -2057,6 +2110,7 @@ uint8_t prepare_single_output() {
     unsigned short textSize;
     unsigned char nativeSegwit;
 
+    vars.tmp.decimals[0] = '\0';
     vars.tmp.fullAddress[0] = '\0';
     btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset, 8);
     offset += 8;
@@ -2144,7 +2198,7 @@ uint8_t prepare_single_output() {
             }
             headerLength = strlen(vars.tmp.fullAmount);
             btchip_context_D.tmp = vars.tmp.fullAmount + headerLength;
-            textSize = btchip_convert_hex_amount_to_displayable(btchip_context_D.currentOutput + offset + 3 + 4 + 4 + 4);
+            textSize = btchip_convert_hex_amount_to_displayable(btchip_context_D.currentOutput + offset + 3 + 4 + 4 + 4, DECIMALS);
             vars.tmp.fullAmount[textSize + headerLength] = '\0';
     }
     else {
@@ -2154,9 +2208,75 @@ uint8_t prepare_single_output() {
         btchip_context_D.tmp =
             (unsigned char *)(vars.tmp.fullAmount +
                           btchip_context_D.shortCoinIdLength + 1);
-        textSize = btchip_convert_hex_amount_to_displayable(amount);
+        textSize = btchip_convert_hex_amount_to_displayable(amount, DECIMALS);
         vars.tmp.fullAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
             '\0';
+    }
+
+    if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE) {
+        vars.tmp.decimals[0] = '\0';
+
+        unsigned char decimals = DECIMALS;
+        unsigned char etpBuff[4];
+        unsigned char etpVarintLen;
+        unsigned char *parsePointer = btchip_context_D.currentOutput + offset + 26;
+        uint8_t headerLength = btchip_context_D.shortCoinIdLength;
+
+        os_memmove(etpBuff, parsePointer, 4);
+        parsePointer += 4;
+
+        // Version = 1 | 207 (ATTACHMENT.VERSION.DEFAULT |  ATTACHMENT.VERSION.DID)
+        if (etpBuff[0] != 1 || etpBuff[1] != 0 || etpBuff[2] != 0 || etpBuff[3] != 0) {
+            return 0;
+        }
+
+        os_memmove(etpBuff, parsePointer, 4);
+        parsePointer += 4;
+
+        // Type = 0 | 2 (ATTACHMENT.TYPE.ETP_TRANSFER | ATTACHMENT.TYPE.MST)
+        if (etpBuff[0] == 0 && etpBuff[1] == 0 && etpBuff[2] == 0 && etpBuff[3] == 0) {
+        } else if (etpBuff[0] == 2 && etpBuff[1] == 0 && etpBuff[2] == 0 && etpBuff[3] == 0) {
+            os_memmove(etpBuff, parsePointer, 4);
+            parsePointer += 4;
+
+            // Status = 1 | 2 (MST.STATUS.REGISTER | MST.STATUS.TRANSFER)
+            if (etpBuff[0] == 2 && etpBuff[1] == 0 && etpBuff[2] == 0 && etpBuff[3] == 0) {
+                // Ticker text length
+                etpVarintLen = *parsePointer;
+                parsePointer += 1;
+
+                // Prepare ticker text
+                headerLength = etpVarintLen > 10 ? 10 : etpVarintLen;
+                os_memmove(vars.tmp.fullAmount + 0, parsePointer, headerLength);
+                vars.tmp.fullAmount[headerLength] = '\0';
+
+                // Get token transfer amount
+                parsePointer += etpVarintLen;
+                btchip_swap_bytes(amount, parsePointer, 8);
+                parsePointer += 8;
+
+                // Hardcode some tokens with predefined decimals (no need to display decimals confirmation to user)
+                if (strcmp(vars.tmp.fullAmount, "DNA") == 0) {
+                    decimals = 4;
+                } else if (strcmp(vars.tmp.fullAmount, "MVS.ZGC") == 0) {
+                    decimals = 8;
+                } else if (strcmp(vars.tmp.fullAmount, "MVS.ZDC") == 0) {
+                    decimals = 6;
+                } else {
+                    decimals = btchip_context_D.decimals[btchip_context_D.totalOutputs - btchip_context_D.remainingOutputs];
+                    snprintf(vars.tmp.decimals, sizeof(vars.tmp.decimals), "%d", decimals);
+                }
+            } else {
+                return 0;
+            }
+        } else {
+            return 0;
+        }
+
+        vars.tmp.fullAmount[headerLength] = ' ';
+        btchip_context_D.tmp = (unsigned char *)(vars.tmp.fullAmount + headerLength + 1);
+        textSize = btchip_convert_hex_amount_to_displayable(amount, decimals);
+        vars.tmp.fullAmount[textSize + headerLength + 1] = '\0';
     }
 
     return 1;
@@ -2386,7 +2506,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                         (unsigned char *)(vars.tmp.fullAmount +
                                           btchip_context_D.shortCoinIdLength +
                                           1);
-                    textSize = btchip_convert_hex_amount_to_displayable(amount);
+                    textSize = btchip_convert_hex_amount_to_displayable(amount, DECIMALS);
                     vars.tmp
                         .fullAmount[textSize +
                                     btchip_context_D.shortCoinIdLength + 1] =
@@ -2407,7 +2527,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                             (unsigned char *)(vars.tmp.feesAmount +
                                           btchip_context_D.shortCoinIdLength +
                                           1);
-                        textSize = btchip_convert_hex_amount_to_displayable(fees);
+                        textSize = btchip_convert_hex_amount_to_displayable(fees, DECIMALS);
                         vars.tmp
                             .feesAmount[textSize +
                                     btchip_context_D.shortCoinIdLength + 1] =
@@ -2477,11 +2597,20 @@ unsigned int btchip_bagl_confirm_single_output() {
 #if defined(TARGET_BLUE)
     ui_transaction_output_blue_init();
 #elif defined(HAVE_UX_FLOW)
-    ux_flow_init(0, ux_confirm_single_flow, NULL);
+    if (vars.tmp.decimals[0] != '\0') {
+        ux_flow_init(0, ux_confirm_single_decimals_flow, NULL);
+    } else {
+        ux_flow_init(0, ux_confirm_single_flow, NULL);
+    }
 #elif defined(TARGET_NANOS)
     ux_step = 0;
-    ux_step_count = 3;
-    UX_DISPLAY(ui_verify_output_nanos, ui_verify_output_prepro);
+    if (vars.tmp.decimals[0] != '\0') {
+        ux_step_count = 4;
+        UX_DISPLAY(ui_verify_output_decimals_nanos, ui_verify_output_prepro);
+    } else {
+        ux_step_count = 3;
+        UX_DISPLAY(ui_verify_output_nanos, ui_verify_output_prepro);
+    }
 #endif // TARGET_
     return 1;
 }
