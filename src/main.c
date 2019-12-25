@@ -2066,6 +2066,22 @@ uint8_t prepare_fees() {
         unsigned short textSize;
         unsigned char borrow;
 
+        if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE) {
+            if (
+                btchip_context_D.totalTokenInputAmount[0] != 0 ||
+                btchip_context_D.totalTokenInputAmount[1] != 0 ||
+                btchip_context_D.totalTokenInputAmount[2] != 0 ||
+                btchip_context_D.totalTokenInputAmount[3] != 0 ||
+                btchip_context_D.totalTokenInputAmount[4] != 0 ||
+                btchip_context_D.totalTokenInputAmount[5] != 0 ||
+                btchip_context_D.totalTokenInputAmount[6] != 0 ||
+                btchip_context_D.totalTokenInputAmount[7] != 0
+            ) {
+                PRINTF("Error : Token amount not consistent");
+                goto error;
+            }
+        }
+
         borrow = transaction_amount_sub_be(
                 fees, btchip_context_D.transactionContext.transactionAmount,
                 btchip_context_D.totalOutputAmount);
@@ -2236,6 +2252,11 @@ uint8_t prepare_single_output() {
         // Type = 0 | 2 (ATTACHMENT.TYPE.ETP_TRANSFER | ATTACHMENT.TYPE.MST)
         if (etpBuff[0] == 0 && etpBuff[1] == 0 && etpBuff[2] == 0 && etpBuff[3] == 0) {
         } else if (etpBuff[0] == 2 && etpBuff[1] == 0 && etpBuff[2] == 0 && etpBuff[3] == 0) {
+            // Throw error is ETP amount is non zero
+            if (amount[0] != 0 || amount[1] != 0 || amount[2] != 0 || amount[3] != 0 || amount[4] != 0 || amount[5] != 0 || amount[6] != 0 || amount[7] != 0) {
+                return 0;
+            }
+
             os_memmove(etpBuff, parsePointer, 4);
             parsePointer += 4;
 
@@ -2254,6 +2275,8 @@ uint8_t prepare_single_output() {
                 parsePointer += etpVarintLen;
                 btchip_swap_bytes(amount, parsePointer, 8);
                 parsePointer += 8;
+
+                transaction_amount_sub_be(btchip_context_D.totalTokenInputAmount, btchip_context_D.totalTokenInputAmount, amount);
 
                 // Hardcode some tokens with predefined decimals (no need to display decimals confirmation to user)
                 if (strcmp(vars.tmp.fullAmount, "DNA") == 0) {

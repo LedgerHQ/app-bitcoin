@@ -743,6 +743,12 @@ void transaction_parse(unsigned char parseMode) {
                             if (etpBuff[0] == 2) {
                                 scriptRemaining += *(btchip_context_D.transactionBufferPointer + scriptRemaining) + 1 + 8;
                                 // Length varint + Ticker length + Amount length
+
+                                if ((parseMode == PARSE_MODE_TRUSTED_INPUT) && (btchip_context_D.transactionContext.transactionCurrentInputOutput == btchip_context_D.transactionTargetInput)) {
+                                    unsigned char tamount[8];
+                                    btchip_swap_bytes(tamount, btchip_context_D.transactionBufferPointer + scriptRemaining - 8, 8);
+                                    transaction_amount_add_be(btchip_context_D.totalTokenInputAmount, btchip_context_D.totalTokenInputAmount, tamount);
+                                }
                             }
                         }
 

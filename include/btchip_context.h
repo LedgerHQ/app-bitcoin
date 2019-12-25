@@ -241,6 +241,7 @@ struct btchip_context_s {
     unsigned int discardSize;
     unsigned char outputParsingState;
     unsigned char totalOutputAmount[8];
+    unsigned char totalTokenInputAmount[8];
     unsigned char changeOutputFound;    
 
     /* Overwinter */

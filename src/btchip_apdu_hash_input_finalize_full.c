@@ -38,6 +38,8 @@ static void btchip_apdu_hash_input_finalize_full_reset(void) {
     btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS;
     os_memset(btchip_context_D.totalOutputAmount, 0,
               sizeof(btchip_context_D.totalOutputAmount));
+    os_memset(btchip_context_D.totalTokenInputAmount, 0,
+              sizeof(btchip_context_D.totalTokenInputAmount));
     btchip_context_D.changeOutputFound = 0;
     btchip_set_check_internal_structure_integrity(1);
 }
