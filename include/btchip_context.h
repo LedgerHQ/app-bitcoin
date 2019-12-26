@@ -322,4 +322,12 @@ void btchip_context_init(void);
 
 #define DECIMALS (!(G_coin_config->flags & FLAG_PEERCOIN_UNITS) ? 8 : 6)
 
+// Metaverse reuse context variables to save memory
+#define ETP_COUNTER btchip_context_D.trustedInputIndex // unsigned long int
+#define ETP_BUFF btchip_context_D.nVersionGroupId // unsigned char[4]
+#define ETP_AMOUNT btchip_context_D.inputValue // unsigned char[8]
+#define ETP_DECIMALS btchip_context_D.nExpiryHeight[0] // unsigned char
+#define ETP_LENGTH btchip_context_D.nExpiryHeight[1] // unsigned char
+#define ETP_TMP btchip_context_D.nExpiryHeight[2] // unsigned char
+
 #endif

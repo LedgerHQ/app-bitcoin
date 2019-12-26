@@ -109,12 +109,22 @@ static bool check_output_displayable() {
             }
         }
         if (changeFound) {
-            if (btchip_context_D.changeOutputFound) {
-                PRINTF("Error : Multiple change output found");
-                THROW(EXCEPTION);
+            // Allow 2 change outputs for metaverse (ETP + token)
+            if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE) {
+                if (btchip_context_D.changeOutputFound >= 2) {
+                    PRINTF("Error : Multiple change output found");
+                    THROW(EXCEPTION);
+                }
+                btchip_context_D.changeOutputFound++;
+                displayable = false;
+            } else {
+                if (btchip_context_D.changeOutputFound) {
+                    PRINTF("Error : Multiple change output found");
+                    THROW(EXCEPTION);
+                }
+                btchip_context_D.changeOutputFound = true;
+                displayable = false;
             }
-            btchip_context_D.changeOutputFound = true;
-            displayable = false;
         }
     }
 
@@ -175,24 +185,26 @@ static bool handle_output_state() {
             discardSize = 1;
 
             if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE) {
-                // btchip_context_D.nVersionGroupId = unsigned char etpBuff[4];
-                btchip_context_D.trustedInputIndex = scriptSize + 9; // unsigned long int scriptRemaining
+                ETP_COUNTER = scriptSize + 9;
 
-                btchip_context_D.trustedInputIndex += 4; // Version
-                os_memmove(btchip_context_D.nVersionGroupId, btchip_context_D.currentOutput + btchip_context_D.trustedInputIndex, 4);
-                btchip_context_D.trustedInputIndex += 4;  // Type
+                ETP_COUNTER += 4; // Version
+                os_memmove(ETP_BUFF, btchip_context_D.currentOutput + ETP_COUNTER, 4);
+                ETP_COUNTER += 4;  // Type
 
-                if (btchip_context_D.nVersionGroupId[0] == 2) {
-                    os_memmove(btchip_context_D.nVersionGroupId, btchip_context_D.currentOutput + btchip_context_D.trustedInputIndex, 4);
-                    btchip_context_D.trustedInputIndex += 4; // Status
+                if (ETP_BUFF[0] == 2) {
+                    os_memmove(ETP_BUFF, btchip_context_D.currentOutput + ETP_COUNTER, 4);
+                    ETP_COUNTER += 4; // Status
 
-                    if (btchip_context_D.nVersionGroupId[0] == 2) {
-                        btchip_context_D.trustedInputIndex += *(btchip_context_D.currentOutput + btchip_context_D.trustedInputIndex) + 1 + 8;
+                    if (ETP_BUFF[0] == 2) {
+                        ETP_COUNTER += *(btchip_context_D.currentOutput + ETP_COUNTER) + 1 + 8;
                         // Length varint + Ticker length + Amount length
+
+                        btchip_swap_bytes(ETP_AMOUNT, btchip_context_D.currentOutput + ETP_COUNTER - 8, 8);
+                        transaction_amount_sub_be(btchip_context_D.totalTokenInputAmount, btchip_context_D.totalTokenInputAmount, ETP_AMOUNT);
                     }
                 }
 
-                scriptSize = btchip_context_D.trustedInputIndex - 9;
+                scriptSize = ETP_COUNTER - 9;
             }
         } else if (btchip_context_D.currentOutput[8] == 0xFD) {
             if (btchip_context_D.currentOutputOffset < 9 + 2) {

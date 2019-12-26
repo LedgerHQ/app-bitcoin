@@ -729,30 +729,35 @@ void transaction_parse(unsigned char parseMode) {
                         transaction_get_varint();
 
                     if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE) {
-                        // btchip_context_D.nVersionGroupId = unsigned char etpBuff[4];
-                        btchip_context_D.trustedInputIndex = btchip_context_D.transactionContext.scriptRemaining; // unsigned long int scriptRemaining
+                        ETP_COUNTER = btchip_context_D.transactionContext.scriptRemaining;
 
-                        btchip_context_D.trustedInputIndex += 4; // Version
-                        os_memmove(btchip_context_D.nVersionGroupId, btchip_context_D.transactionBufferPointer + btchip_context_D.trustedInputIndex, 4);
-                        btchip_context_D.trustedInputIndex += 4;  // Type
+                        ETP_COUNTER += 4; // Version
+                        os_memmove(ETP_BUFF, btchip_context_D.transactionBufferPointer + ETP_COUNTER, 4);
+                        ETP_COUNTER += 4;  // Type
 
-                        if (btchip_context_D.nVersionGroupId[0] == 2) {
-                            os_memmove(btchip_context_D.nVersionGroupId, btchip_context_D.transactionBufferPointer + btchip_context_D.trustedInputIndex, 4);
-                            btchip_context_D.trustedInputIndex += 4; // Status
+                        if (ETP_BUFF[0] == 2) {
+                            os_memmove(ETP_BUFF, btchip_context_D.transactionBufferPointer + ETP_COUNTER, 4);
+                            ETP_COUNTER += 4; // Status
 
-                            if (btchip_context_D.nVersionGroupId[0] == 2) {
-                                btchip_context_D.trustedInputIndex += *(btchip_context_D.transactionBufferPointer + btchip_context_D.trustedInputIndex) + 1 + 8;
+                            if (ETP_BUFF[0] == 2) {
+                                ETP_COUNTER += *(btchip_context_D.transactionBufferPointer + ETP_COUNTER) + 1 + 8;
                                 // Length varint + Ticker length + Amount length
 
-                                if ((parseMode == PARSE_MODE_TRUSTED_INPUT) && (btchip_context_D.transactionContext.transactionCurrentInputOutput == btchip_context_D.transactionTargetInput)) {
-                                    // btchip_context_D.inputValue = unsigned char tamount[8];
-                                    btchip_swap_bytes(btchip_context_D.inputValue, btchip_context_D.transactionBufferPointer + btchip_context_D.trustedInputIndex - 8, 8);
-                                    transaction_amount_add_be(btchip_context_D.totalTokenInputAmount, btchip_context_D.totalTokenInputAmount, btchip_context_D.inputValue);
+                                if (
+                                    parseMode == PARSE_MODE_TRUSTED_INPUT &&
+                                    btchip_context_D.transactionContext.transactionCurrentInputOutput == btchip_context_D.transactionTargetInput
+                                ) {
+                                    btchip_swap_bytes(ETP_AMOUNT, btchip_context_D.transactionBufferPointer + ETP_COUNTER - 8, 8);
+                                    transaction_amount_add_be(
+                                        btchip_context_D.totalTokenInputAmount,
+                                        btchip_context_D.totalTokenInputAmount,
+                                        ETP_AMOUNT
+                                    );
                                 }
                             }
                         }
 
-                        btchip_context_D.transactionContext.scriptRemaining = btchip_context_D.trustedInputIndex;
+                        btchip_context_D.transactionContext.scriptRemaining = ETP_COUNTER;
                     }
 
                     PRINTF("Script to read " DEBUG_LONG "\n",btchip_context_D.transactionContext.scriptRemaining);

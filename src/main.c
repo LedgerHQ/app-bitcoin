@@ -2230,46 +2230,40 @@ uint8_t prepare_single_output() {
     }
 
     if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE) {
-        // btchip_context_D.nVersionGroupId = unsigned char etpBuff[4];
         vars.tmp.decimals[0] = '\0';
 
         unsigned char *parsePointer = btchip_context_D.currentOutput + offset + 26;
-        btchip_context_D.nExpiryHeight[0] = DECIMALS;
-        btchip_context_D.nExpiryHeight[1] = 0;
-        btchip_context_D.nExpiryHeight[2] = btchip_context_D.shortCoinIdLength;
+        ETP_DECIMALS = DECIMALS;
+        ETP_TMP = 0;
+        ETP_LENGTH = btchip_context_D.shortCoinIdLength;
 
-        // btchip_context_D.nExpiryHeight[0] = unsigned char decimals = DECIMALS;
-        // btchip_context_D.nExpiryHeight[1] = unsigned char etpVarintLen;
-        // btchip_context_D.nExpiryHeight[2] = unsigned char headerLength = btchip_context_D.shortCoinIdLength;
-
-
-        os_memmove(btchip_context_D.nVersionGroupId, parsePointer, 4);
+        os_memmove(ETP_BUFF, parsePointer, 4);
         parsePointer += 4;
 
         // Version = 1 | 207 (ATTACHMENT.VERSION.DEFAULT |  ATTACHMENT.VERSION.DID)
         if (
-            btchip_context_D.nVersionGroupId[0] != 1 ||
-            btchip_context_D.nVersionGroupId[1] != 0 ||
-            btchip_context_D.nVersionGroupId[2] != 0 ||
-            btchip_context_D.nVersionGroupId[3] != 0
+            ETP_BUFF[0] != 1 ||
+            ETP_BUFF[1] != 0 ||
+            ETP_BUFF[2] != 0 ||
+            ETP_BUFF[3] != 0
         ) {
             return 0;
         }
 
-        os_memmove(btchip_context_D.nVersionGroupId, parsePointer, 4);
+        os_memmove(ETP_BUFF, parsePointer, 4);
         parsePointer += 4;
 
         // Type = 0 | 2 (ATTACHMENT.TYPE.ETP_TRANSFER | ATTACHMENT.TYPE.MST)
         if (
-            btchip_context_D.nVersionGroupId[0] == 0 &&
-            btchip_context_D.nVersionGroupId[1] == 0 &&
-            btchip_context_D.nVersionGroupId[2] == 0 &&
-            btchip_context_D.nVersionGroupId[3] == 0) {
+            ETP_BUFF[0] == 0 &&
+            ETP_BUFF[1] == 0 &&
+            ETP_BUFF[2] == 0 &&
+            ETP_BUFF[3] == 0) {
         } else if (
-            btchip_context_D.nVersionGroupId[0] == 2 &&
-            btchip_context_D.nVersionGroupId[1] == 0 &&
-            btchip_context_D.nVersionGroupId[2] == 0 &&
-            btchip_context_D.nVersionGroupId[3] == 0
+            ETP_BUFF[0] == 2 &&
+            ETP_BUFF[1] == 0 &&
+            ETP_BUFF[2] == 0 &&
+            ETP_BUFF[3] == 0
         ) {
             // Throw error is ETP amount is non zero
             if (
@@ -2285,42 +2279,42 @@ uint8_t prepare_single_output() {
                 return 0;
             }
 
-            os_memmove(btchip_context_D.nVersionGroupId, parsePointer, 4);
+            os_memmove(ETP_BUFF, parsePointer, 4);
             parsePointer += 4;
 
             // Status = 1 | 2 (MST.STATUS.REGISTER | MST.STATUS.TRANSFER)
             if (
-                btchip_context_D.nVersionGroupId[0] == 2 &&
-                btchip_context_D.nVersionGroupId[1] == 0 &&
-                btchip_context_D.nVersionGroupId[2] == 0 &&
-                btchip_context_D.nVersionGroupId[3] == 0
+                ETP_BUFF[0] == 2 &&
+                ETP_BUFF[1] == 0 &&
+                ETP_BUFF[2] == 0 &&
+                ETP_BUFF[3] == 0
             ) {
                 // Ticker text length
-                btchip_context_D.nExpiryHeight[1] = *parsePointer;
+                ETP_TMP = *parsePointer;
                 parsePointer += 1;
 
                 // Prepare ticker text
-                btchip_context_D.nExpiryHeight[2] = btchip_context_D.nExpiryHeight[1] > 10 ? 10 : btchip_context_D.nExpiryHeight[1];
-                os_memmove(vars.tmp.fullAmount, parsePointer, btchip_context_D.nExpiryHeight[2]);
-                vars.tmp.fullAmount[btchip_context_D.nExpiryHeight[2]] = '\0';
+                ETP_LENGTH = ETP_TMP > 10 ? 10 : ETP_TMP;
+                os_memmove(vars.tmp.fullAmount, parsePointer, ETP_LENGTH);
+                vars.tmp.fullAmount[ETP_LENGTH] = '\0';
 
                 // Get token transfer amount
-                parsePointer += btchip_context_D.nExpiryHeight[1];
+                parsePointer += ETP_TMP;
                 btchip_swap_bytes(amount, parsePointer, 8);
                 parsePointer += 8;
 
-                transaction_amount_sub_be(btchip_context_D.totalTokenInputAmount, btchip_context_D.totalTokenInputAmount, amount);
+                //transaction_amount_sub_be(btchip_context_D.totalTokenInputAmount, btchip_context_D.totalTokenInputAmount, amount);
 
                 // Hardcode some tokens with predefined decimals (no need to display decimals confirmation to user)
                 if (strcmp(vars.tmp.fullAmount, "DNA") == 0) {
-                    btchip_context_D.nExpiryHeight[0] = 4;
+                    ETP_DECIMALS = 4;
                 } else if (strcmp(vars.tmp.fullAmount, "MVS.ZGC") == 0) {
-                    btchip_context_D.nExpiryHeight[0] = 8;
+                    ETP_DECIMALS = 8;
                 } else if (strcmp(vars.tmp.fullAmount, "MVS.ZDC") == 0) {
-                    btchip_context_D.nExpiryHeight[0] = 6;
+                    ETP_DECIMALS = 6;
                 } else {
-                    btchip_context_D.nExpiryHeight[0] = btchip_context_D.decimals[btchip_context_D.totalOutputs - btchip_context_D.remainingOutputs];
-                    snprintf(vars.tmp.decimals, sizeof(vars.tmp.decimals), "%d", btchip_context_D.nExpiryHeight[0]);
+                    ETP_DECIMALS = btchip_context_D.decimals[btchip_context_D.totalOutputs - btchip_context_D.remainingOutputs];
+                    snprintf(vars.tmp.decimals, sizeof(vars.tmp.decimals), "%d", ETP_DECIMALS);
                 }
             } else {
                 return 0;
@@ -2329,10 +2323,10 @@ uint8_t prepare_single_output() {
             return 0;
         }
 
-        vars.tmp.fullAmount[btchip_context_D.nExpiryHeight[2]] = ' ';
-        btchip_context_D.tmp = (unsigned char *)(vars.tmp.fullAmount + btchip_context_D.nExpiryHeight[2] + 1);
-        textSize = btchip_convert_hex_amount_to_displayable(amount, btchip_context_D.nExpiryHeight[0]);
-        vars.tmp.fullAmount[textSize + btchip_context_D.nExpiryHeight[2] + 1] = '\0';
+        vars.tmp.fullAmount[ETP_LENGTH] = ' ';
+        btchip_context_D.tmp = (unsigned char *)(vars.tmp.fullAmount + ETP_LENGTH + 1);
+        textSize = btchip_convert_hex_amount_to_displayable(amount, ETP_DECIMALS);
+        vars.tmp.fullAmount[textSize + ETP_LENGTH + 1] = '\0';
         vars.tmp.fullAmount[sizeof(vars.tmp.fullAmount) - 1] = '\0';
     }
 
