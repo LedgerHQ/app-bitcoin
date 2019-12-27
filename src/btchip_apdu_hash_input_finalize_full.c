@@ -110,7 +110,7 @@ static bool check_output_displayable() {
         }
         if (changeFound) {
             // Allow 2 change outputs for metaverse (ETP + token)
-            if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE) {
+            if (G_coin_config->kind == COIN_KIND_METAVERSE) {
                 if (btchip_context_D.changeOutputFound >= 2) {
                     PRINTF("Error : Multiple change output found");
                     THROW(EXCEPTION);
@@ -184,7 +184,7 @@ static bool handle_output_state() {
             scriptSize = btchip_context_D.currentOutput[8];
             discardSize = 1;
 
-            if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE) {
+            if (G_coin_config->kind == COIN_KIND_METAVERSE) {
                 ETP_COUNTER = scriptSize + 9;
 
                 ETP_COUNTER += 4; // Version
@@ -298,7 +298,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             }
 
             if (p1 == FINALIZE_P1_CHANGEINFO) {
-                if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE && G_io_apdu_buffer[ISO_OFFSET_P2] == 0x0E) {
+                if (G_coin_config->kind == COIN_KIND_METAVERSE && G_io_apdu_buffer[ISO_OFFSET_P2] == 0x0E) {
                     if (apduLength > 4) { // For Metaverse can handle max 4 outputs with tokens
                         goto discardTransaction;
                     }

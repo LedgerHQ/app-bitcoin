@@ -728,7 +728,7 @@ void transaction_parse(unsigned char parseMode) {
                     btchip_context_D.transactionContext.scriptRemaining =
                         transaction_get_varint();
 
-                    if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE) {
+                    if (G_coin_config->kind == COIN_KIND_METAVERSE) {
                         ETP_COUNTER = btchip_context_D.transactionContext.scriptRemaining;
 
                         ETP_COUNTER += 4; // Version

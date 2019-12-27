@@ -2066,7 +2066,7 @@ uint8_t prepare_fees() {
         unsigned short textSize;
         unsigned char borrow;
 
-        if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE) {
+        if (G_coin_config->kind == COIN_KIND_METAVERSE) {
             if (
                 btchip_context_D.totalTokenInputAmount[0] != 0 ||
                 btchip_context_D.totalTokenInputAmount[1] != 0 ||
@@ -2229,7 +2229,7 @@ uint8_t prepare_single_output() {
             '\0';
     }
 
-    if (btchip_context_D.coinFamily == BTCHIP_FAMILY_METAVERSE) {
+    if (G_coin_config->kind == COIN_KIND_METAVERSE) {
         vars.tmp.decimals[0] = '\0';
 
         unsigned char *parsePointer = btchip_context_D.currentOutput + offset + 26;
