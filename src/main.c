@@ -2183,7 +2183,7 @@ void prepare_single_address() {
         if (btchip_context_D.usingLiquid) {
             size_t outputLen = sizeof(tmp);
             address[0] = COIN_BLINDED_VERSION;
-            address[1] = COIN_P2PKH_VERSION;
+            address[1] = version;
             os_memmove(address + 2, btchip_context_D.liquidBlindingKey, 33);
             os_memmove(address + 2 + 33, btchip_context_D.currentOutput + addressOffset, 20);
             cx_hash_sha256(address, 2 + 33 + 20, tmp, sizeof(tmp));
