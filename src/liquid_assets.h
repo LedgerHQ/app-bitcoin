@@ -27,7 +27,15 @@ typedef struct assetDefinition_t {
     uint8_t decimals;
 } assetDefinition_t;
 
-#define NUM_LIQUID_ASSETS 4
+#ifdef HAVE_LIQUID_TEST
+
+#define NUM_LIQUID_ASSETS 5
+
+#else
+
+#define NUM_LIQUID_ASSETS 3
+
+#endif
 
 extern assetDefinition_t const LIQUID_ASSETS[NUM_LIQUID_ASSETS];
 
