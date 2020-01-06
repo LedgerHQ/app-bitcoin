@@ -334,7 +334,9 @@ void btchip_context_init(void);
 #define ETP_TMP btchip_context_D.nExpiryHeight[2] // unsigned char
 #define ETP_OUT_TYPE btchip_context_D.nExpiryHeight[3] // unsigned char
 #define ETP_VERSION btchip_context_D.overwinterSignReady // unsigned char
+#define ETP_TLEN btchip_context_D.overwinterSignReady // unsigned char
 #define ETP_POINTER (parsePointer + ETP_COUNTER)
+#define ETP_MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
 #endif
