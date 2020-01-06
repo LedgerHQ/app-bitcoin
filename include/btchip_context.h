@@ -241,8 +241,7 @@ struct btchip_context_s {
     unsigned int discardSize;
     unsigned char outputParsingState;
     unsigned char totalOutputAmount[8];
-    unsigned char totalTokenInputAmount[8];
-    unsigned char changeOutputFound;    
+    unsigned char changeOutputFound;
 
     /* Overwinter */
     unsigned char usingOverwinter;
@@ -253,6 +252,7 @@ struct btchip_context_s {
     unsigned char sigHashType[4];    
 
     #ifdef APP_METAVERSE
+    unsigned char totalTokenInputAmount[8];
     unsigned char decimals[4]; // For Metaverse tokens, need to provide precision for all outputs from external source (maximum can handle 4 outputs with tokens)
     #endif
 };

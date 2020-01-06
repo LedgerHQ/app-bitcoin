@@ -156,10 +156,11 @@ union {
         // of
 
         char fullAddress[65]; // the address
-        char fullAmount[20];  // full amount (Metaverse may have long token names, so maybe increase from 20 to 40?)
+        char fullAmount[20];  // full amount
         char feesAmount[20];  // fees
 
         #ifdef APP_METAVERSE
+        // char fullAmount[20];  // full amount (Metaverse may have long token names, so maybe increase from 20 to 40?)
         char metaverse_decimals[3];
         //char metaverse_message[255];
         char metaverse_did[20];
@@ -2534,8 +2535,6 @@ uint8_t prepare_single_output() {
                 ETP_COUNTER += ETP_TMP;
                 btchip_swap_bytes(amount, ETP_POINTER, 8);
                 ETP_COUNTER += 8;
-
-                //transaction_amount_sub_be(btchip_context_D.totalTokenInputAmount, btchip_context_D.totalTokenInputAmount, amount);
 
                 // Hardcode some tokens with predefined decimals (no need to display decimals confirmation to user)
                 if (strcmp(vars.tmp.fullAmount, "DNA") == 0) {
