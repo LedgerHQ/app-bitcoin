@@ -252,7 +252,9 @@ struct btchip_context_s {
     unsigned char nLockTime[4];
     unsigned char sigHashType[4];    
 
+    #ifdef APP_METAVERSE
     unsigned char decimals[4]; // For Metaverse tokens, need to provide precision for all outputs from external source (maximum can handle 4 outputs with tokens)
+    #endif
 };
 typedef struct btchip_context_s btchip_context_t;
 
@@ -322,6 +324,7 @@ void btchip_context_init(void);
 
 #define DECIMALS (!(G_coin_config->flags & FLAG_PEERCOIN_UNITS) ? 8 : 6)
 
+#ifdef APP_METAVERSE
 // Metaverse reuse context variables to save memory
 #define ETP_COUNTER btchip_context_D.trustedInputIndex // unsigned long int
 #define ETP_BUFF btchip_context_D.nVersionGroupId // unsigned char[4]
@@ -329,5 +332,9 @@ void btchip_context_init(void);
 #define ETP_DECIMALS btchip_context_D.nExpiryHeight[0] // unsigned char
 #define ETP_LENGTH btchip_context_D.nExpiryHeight[1] // unsigned char
 #define ETP_TMP btchip_context_D.nExpiryHeight[2] // unsigned char
+#define ETP_OUT_TYPE btchip_context_D.nExpiryHeight[3] // unsigned char
+#define ETP_VERSION btchip_context_D.overwinterSignReady // unsigned char
+#define ETP_POINTER (parsePointer + ETP_COUNTER)
+#endif
 
 #endif

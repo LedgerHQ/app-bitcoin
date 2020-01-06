@@ -728,37 +728,224 @@ void transaction_parse(unsigned char parseMode) {
                     btchip_context_D.transactionContext.scriptRemaining =
                         transaction_get_varint();
 
-                    if (G_coin_config->kind == COIN_KIND_METAVERSE) {
+                    #ifdef APP_METAVERSE
+                    if (G_coin_config->kind == COIN_KIND_METAVERSE) { // Parsing input tx
+                        ETP_VERSION = 0;
                         ETP_COUNTER = btchip_context_D.transactionContext.scriptRemaining;
+                        unsigned char *parsePointer = btchip_context_D.transactionBufferPointer;
 
-                        ETP_COUNTER += 4; // Version
-                        os_memmove(ETP_BUFF, btchip_context_D.transactionBufferPointer + ETP_COUNTER, 4);
+                        os_memmove(ETP_BUFF, ETP_POINTER, 4); // Version
+                        ETP_COUNTER += 4;
+
+                        if (
+                            ETP_BUFF[0] == 1 &&
+                            ETP_BUFF[1] == 0 &&
+                            ETP_BUFF[2] == 0 &&
+                            ETP_BUFF[3] == 0
+                        ) {
+                            ETP_VERSION = 1;
+                        } else if (
+                            ETP_BUFF[0] == 207 &&
+                            ETP_BUFF[1] == 0 &&
+                            ETP_BUFF[2] == 0 &&
+                            ETP_BUFF[3] == 0
+                        ) {
+                            ETP_VERSION = 207;
+                        }
+
+                        if (ETP_VERSION != 1 && ETP_VERSION != 207) {
+                            PRINTF("PARSE ERROR ETP_VERSION %d\n", ETP_VERSION);
+                            goto fail;
+                        }
+
+                        os_memmove(ETP_BUFF, ETP_POINTER, 4);
                         ETP_COUNTER += 4;  // Type
 
-                        if (ETP_BUFF[0] == 2) {
-                            os_memmove(ETP_BUFF, btchip_context_D.transactionBufferPointer + ETP_COUNTER, 4);
+                        if (ETP_VERSION == 207) {
+                            // to_did
+                            ETP_TMP = *ETP_POINTER;
+                            ETP_COUNTER += 1 + ETP_TMP;
+
+                            // from_did
+                            ETP_TMP = *ETP_POINTER;
+                            ETP_COUNTER += 1 + ETP_TMP;
+                        }
+
+                        if (
+                            ETP_BUFF[1] != 0 ||
+                            ETP_BUFF[2] != 0 ||
+                            ETP_BUFF[3] != 0
+                        ) {
+                            PRINTF("PARSE ERROR Unknown ETP Type\n");
+                            goto fail;
+                        }
+
+                        if (ETP_BUFF[0] == 0) { // ATTACHMENT.TYPE.ETP_TRANSFER
+
+                        } else if (ETP_BUFF[0] == 2) { // ATTACHMENT.TYPE.MST
+                            os_memmove(ETP_BUFF, ETP_POINTER, 4);
                             ETP_COUNTER += 4; // Status
 
-                            if (ETP_BUFF[0] == 2) {
-                                ETP_COUNTER += *(btchip_context_D.transactionBufferPointer + ETP_COUNTER) + 1 + 8;
+                            if (
+                                ETP_BUFF[1] != 0 ||
+                                ETP_BUFF[2] != 0 ||
+                                ETP_BUFF[3] != 0
+                            ) {
+                                PRINTF("PARSE ERROR Unknown ETP Status\n");
+                                goto fail;
+                            }
+
+                            if (ETP_BUFF[0] == 1) { // MST.STATUS.REGISTER
+                                ETP_COUNTER += *ETP_POINTER + 1 + 8;
                                 // Length varint + Ticker length + Amount length
 
                                 if (
                                     parseMode == PARSE_MODE_TRUSTED_INPUT &&
                                     btchip_context_D.transactionContext.transactionCurrentInputOutput == btchip_context_D.transactionTargetInput
                                 ) {
-                                    btchip_swap_bytes(ETP_AMOUNT, btchip_context_D.transactionBufferPointer + ETP_COUNTER - 8, 8);
+                                    btchip_swap_bytes(ETP_AMOUNT, ETP_POINTER - 8, 8);
                                     transaction_amount_add_be(
                                         btchip_context_D.totalTokenInputAmount,
                                         btchip_context_D.totalTokenInputAmount,
                                         ETP_AMOUNT
                                     );
                                 }
+
+                                ETP_COUNTER += 1 + 1 + 2;
+                                // precision + secondary issue threshold + '0000'
+
+                                ETP_COUNTER += *ETP_POINTER + 1; // issuer
+                                ETP_COUNTER += *ETP_POINTER + 1; // recipient address
+                                ETP_COUNTER += *ETP_POINTER + 1; // description
+                            } else if (ETP_BUFF[0] == 2) { // MST.STATUS.TRANSFER
+                                ETP_COUNTER += *ETP_POINTER + 1 + 8;
+                                // Length varint + Ticker length + Amount length
+
+                                if (
+                                    parseMode == PARSE_MODE_TRUSTED_INPUT &&
+                                    btchip_context_D.transactionContext.transactionCurrentInputOutput == btchip_context_D.transactionTargetInput
+                                ) {
+                                    btchip_swap_bytes(ETP_AMOUNT, ETP_POINTER - 8, 8);
+                                    transaction_amount_add_be(
+                                        btchip_context_D.totalTokenInputAmount,
+                                        btchip_context_D.totalTokenInputAmount,
+                                        ETP_AMOUNT
+                                    );
+                                }
+                            } else {
+                                PRINTF("PARSE ERROR Unknown ETP Status\n");
+                                goto fail;
+                            }
+                        } else if (ETP_BUFF[0] == 3) { // ATTACHMENT.TYPE.MESSAGE
+                             // Message
+                             ETP_TMP = *ETP_POINTER;
+                             ETP_COUNTER += 1 + ETP_TMP;
+                         } else if (ETP_BUFF[0] == 4) { // ATTACHMENT.TYPE.AVATAR
+                            os_memmove(ETP_BUFF, ETP_POINTER, 4);
+                            ETP_COUNTER += 4; // Status
+
+                            if (
+                                ETP_BUFF[1] != 0 ||
+                                ETP_BUFF[2] != 0 ||
+                                ETP_BUFF[3] != 0
+                            ) {
+                                PRINTF("PARSE ERROR Unknown ETP Status\n");
+                                goto fail;
+                            }
+
+                            // Status = 1 | 2 (AVATAR.STATUS.REGISTER | AVATAR.STATUS.TRANSFER)
+                            if (ETP_BUFF[0] == 1 || ETP_BUFF[0] == 2) {
+                                // Symbol text length
+                                ETP_TMP = *ETP_POINTER;
+                                ETP_COUNTER += 1 + ETP_TMP;
+
+                                // Symbol address length
+                                ETP_TMP = *ETP_POINTER;
+                                ETP_COUNTER += 1 + ETP_TMP;
+
+                                if (
+                                    parseMode == PARSE_MODE_TRUSTED_INPUT &&
+                                    btchip_context_D.transactionContext.transactionCurrentInputOutput == btchip_context_D.transactionTargetInput
+                                ) {
+                                    PRINTF("PARSE ERROR Can not use AVATAR.STATUS.REGISTER | AVATAR.STATUS.TRANSFER as input\n");
+                                    goto fail;
+                                }
+                            } else {
+                                PRINTF("PARSE ERROR Unknown ETP Status\n");
+                                goto fail;
+                            }
+                        } else if (ETP_BUFF[0] == 5) { // ATTACHMENT.TYPE.CERT
+                             // Symbol
+                             ETP_TMP = *ETP_POINTER;
+                             ETP_COUNTER += 1 + ETP_TMP;
+
+                             // Owner
+                             ETP_TMP = *ETP_POINTER;
+                             ETP_COUNTER += 1 + ETP_TMP;
+
+                             // Address
+                             ETP_TMP = *ETP_POINTER;
+                             ETP_COUNTER += 1 + ETP_TMP;
+
+                             os_memmove(ETP_BUFF, ETP_POINTER, 4);
+                             ETP_COUNTER += 4; // Cert
+
+                             ETP_COUNTER += 1; // Status
+
+                             if (true) { // Check currentOutput has more data
+                                 // content
+                                 ETP_TMP = *ETP_POINTER;
+                                 ETP_COUNTER += 1 + ETP_TMP;
+                             }
+
+                             if (
+                                 parseMode == PARSE_MODE_TRUSTED_INPUT &&
+                                 btchip_context_D.transactionContext.transactionCurrentInputOutput == btchip_context_D.transactionTargetInput
+                             ) {
+                                 PRINTF("PARSE ERROR Can not use ATTACHMENT.TYPE.CERT as input\n");
+                                 goto fail;
+                             }
+                        } else if (ETP_BUFF[0] == 6) { // ATTACHMENT.TYPE.MIT
+                            ETP_BUFF[0] = *ETP_POINTER;
+                            ETP_COUNTER += 1; // Status
+
+                            if (ETP_BUFF[0] == 1 || ETP_BUFF[0] == 2) { // MIT.STATUS.REGISTER | MIT.STATUS.TRANSFER
+                                // Symbol
+                                ETP_TMP = *ETP_POINTER;
+                                ETP_COUNTER += 1 + ETP_TMP;
+
+                                // Address
+                                ETP_TMP = *ETP_POINTER;
+                                ETP_COUNTER += 1 + ETP_TMP;
+
+                                if (ETP_BUFF[0] == 1) { // MIT.STATUS.REGISTER
+                                    // Content
+                                    ETP_TMP = *ETP_POINTER;
+                                    ETP_COUNTER += 1 + ETP_TMP;
+                                }
+
+                                if (
+                                    parseMode == PARSE_MODE_TRUSTED_INPUT &&
+                                    btchip_context_D.transactionContext.transactionCurrentInputOutput == btchip_context_D.transactionTargetInput
+                                ) {
+                                    os_memset(ETP_AMOUNT, 0, sizeof(ETP_AMOUNT));
+                                    ETP_AMOUNT[0] = 1;
+
+                                    transaction_amount_add_be(
+                                        btchip_context_D.totalTokenInputAmount,
+                                        btchip_context_D.totalTokenInputAmount,
+                                        ETP_AMOUNT
+                                    );
+                                }
+                            } else {
+                                PRINTF("PARSE ERROR Unknown ETP Status\n");
+                                goto fail;
                             }
                         }
 
                         btchip_context_D.transactionContext.scriptRemaining = ETP_COUNTER;
                     }
+                    #endif
 
                     PRINTF("Script to read " DEBUG_LONG "\n",btchip_context_D.transactionContext.scriptRemaining);
                     // Move on
