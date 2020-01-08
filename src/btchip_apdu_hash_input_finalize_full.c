@@ -116,7 +116,7 @@ static bool check_output_displayable() {
         #ifdef APP_METAVERSE
         if (G_coin_config->kind == COIN_KIND_METAVERSE) {
             if (ETP_OUT_TYPE == 3 || ETP_OUT_TYPE == 21 || ETP_OUT_TYPE == 41 || ETP_OUT_TYPE == 42 || ETP_OUT_TYPE == 61 || ETP_OUT_TYPE == 62) {
-                changeFound = false;
+                changeFound = false; // Always display some transaction output types (even when it is for the same address as input)
             }
         }
         #endif
@@ -474,7 +474,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
 
     #ifdef APP_METAVERSE
     if (G_coin_config->kind == COIN_KIND_METAVERSE) {
-        btchip_context_D.tmpCtx.output.multipleOutput = 1;
+        btchip_context_D.tmpCtx.output.multipleOutput = 1; // Disable BTCHIP_OUTPUT_HANDLE_LEGACY;
     }
     #endif
 
@@ -492,6 +492,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                 #ifdef APP_METAVERSE
                 if (G_coin_config->kind == COIN_KIND_METAVERSE) {
                     if (G_io_apdu_buffer[ISO_OFFSET_P2] == 0x0E) {
+                        // This command is used to specify decimal precision for tokens outputs
                         if (apduLength > 4) { // For Metaverse can handle max 4 outputs with tokens
                             goto discardTransaction;
                         }

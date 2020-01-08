@@ -160,10 +160,10 @@ union {
         char feesAmount[20];  // fees
 
         #ifdef APP_METAVERSE
-        // char fullAmount[20];  // full amount (Metaverse may have long token names, so maybe increase from 20 to 40?)
-        char metaverse_decimals[3];
-        //char metaverse_message[255];
-        char metaverse_did[20];
+        // char fullAmount[40]; - Metaverse may have long token names, so maybe increase fullAmount from 20 to 40?
+        // char metaverse_message[255]; - app freezes when having this var
+        char metaverse_decimals[3]; // For displaying decimals (0-10)
+        char metaverse_did[20]; // For displaying destination avatar
         #endif
     } tmp;
 
@@ -995,7 +995,6 @@ unsigned int ui_verify_output_nanos_button(unsigned int button_mask,
 
 #ifdef APP_METAVERSE
 const bagl_element_t ui_verify_output_decimals_nanos[] = {
-
     UI_NANOS_BACKGROUND(),
     UI_NANOS_ICON_LEFT(0, BAGL_GLYPH_ICON_CROSS),
     UI_NANOS_ICON_RIGHT(0, BAGL_GLYPH_ICON_CHECK),
@@ -1741,7 +1740,6 @@ UX_FLOW(ux_confirm_single_flow,
 );
 
 #ifdef APP_METAVERSE
-// Metaverse MST
 // confirm_single: confirm output #x(feesAmount) / Amount: fullAmount / Decimals: decimals / Address: fullAddress
 UX_STEP_NOCB(
     ux_confirm_single_flow_4_step,
@@ -2192,6 +2190,7 @@ uint8_t prepare_fees() {
                 btchip_context_D.totalTokenInputAmount[6] != 0 ||
                 btchip_context_D.totalTokenInputAmount[7] != 0
             ) {
+                // Transaction input tokens amount must be equal to output tokens amount (MIT counts as 1)
                 PRINTF("Error : Token amount not consistent");
                 goto error;
             }
@@ -2350,7 +2349,6 @@ uint8_t prepare_single_output() {
     }
 
     #ifdef APP_METAVERSE
-
     // 0 - ETP, 21 - MST REG, 22 - MST TX, 3 - MESSAGE, 41 - AVA REG, 42 - AVA TX, 5 - CERT, 61 - MIT REG, 62 - MIT TX
     if (G_coin_config->kind == COIN_KIND_METAVERSE) { // Parsing displayable outputs
         ETP_OUT_TYPE = 255;
