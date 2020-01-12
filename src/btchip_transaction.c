@@ -163,7 +163,7 @@ void transaction_parse(unsigned char parseMode) {
                             else {
                                 btchip_write_u32_le(parameters + 12,
                                     btchip_context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING ?
-                                    CONSENSUS_BRANCH_ID_SAPLING : CONSENSUS_BRANCH_ID_OVERWINTER);
+                                    (G_coin_config->zcash_consensus_branch_id != 0 ? G_coin_config->zcash_consensus_branch_id : CONSENSUS_BRANCH_ID_SAPLING) : CONSENSUS_BRANCH_ID_OVERWINTER);
                             }
                             cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, parameters, 16);
                         }
