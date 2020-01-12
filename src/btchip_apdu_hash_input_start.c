@@ -25,6 +25,7 @@
 #define P2_NEW_SEGWIT_CASHADDR 0x03
 #define P2_NEW_SEGWIT_OVERWINTER 0x04
 #define P2_NEW_SEGWIT_SAPLING 0x05
+#define P2_CONTINUE_SEGWIT 0x10
 #define P2_CONTINUE 0x80
 
 unsigned short btchip_apdu_hash_input_start() {
@@ -102,6 +103,12 @@ unsigned short btchip_apdu_hash_input_start() {
                       sizeof(btchip_context_D.tmpCtx.output));
             btchip_context_D.tmpCtx.output.changeAccepted = 1;
         }
+    } else if (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_CONTINUE_SEGWIT) {
+        if (btchip_context_D.usingSegwit || btchip_context_D.transactionContext.firstSigned) {
+            return BTCHIP_SW_INCORRECT_P1_P2;
+        }
+        btchip_context_D.usingSegwit = 1;
+        btchip_context_D.segwitParsedOnce = 0;        
     } else if (G_io_apdu_buffer[ISO_OFFSET_P2] != P2_CONTINUE) {
         return BTCHIP_SW_INCORRECT_P1_P2;
     }

@@ -140,7 +140,7 @@ void transaction_parse(unsigned char parseMode) {
             for (;;) {
                 switch (btchip_context_D.transactionContext.transactionState) {
                 case BTCHIP_TRANSACTION_NONE: {
-                    PRINTF("Init transaction parser\n");
+                    PRINTF("Init transaction parser, segwit %d\n", btchip_context_D.usingSegwit);
                     // Reset transaction state
                     btchip_context_D.transactionContext
                         .transactionRemainingInputsOutputs = 0;
@@ -184,6 +184,7 @@ void transaction_parse(unsigned char parseMode) {
                                 cx_sha256_init(
                                     &btchip_context_D.segwit.hash.hashPrevouts.sha256);
                             }
+                            btchip_context_D.transactionHashOption = TRANSACTION_HASH_AUTHORIZATION;
                         } else {
                             PRINTF("Resume SegWit hash\n");
                             PRINTF("SEGWIT Version\n%.*H\n",sizeof(btchip_context_D.transactionVersion),btchip_context_D.transactionVersion);
@@ -226,14 +227,7 @@ void transaction_parse(unsigned char parseMode) {
                                     btchip_context_D.segwit.cache.hashedSequence,
                                     sizeof(btchip_context_D.segwit.cache
                                            .hashedSequence),
-                                    NULL, 0);
-                                cx_hash(&btchip_context_D
-                                         .transactionHashAuthorization.header,
-                                    0,
-                                    (unsigned char *)&btchip_context_D
-                                        .segwit.cache,
-                                    sizeof(btchip_context_D.segwit.cache),
-                                    NULL, 0);
+                                    NULL, 0);               
                             }
                         }
                     }
@@ -338,7 +332,9 @@ void transaction_parse(unsigned char parseMode) {
                         }
                         */
                         if (btchip_context_D.usingSegwit) {
-                            transaction_offset_increase(1);
+                            //transaction_offset_increase(1);
+                            btchip_context_D.transactionBufferPointer++;
+                            btchip_context_D.transactionDataRemaining--;                            
                             check_transaction_available(
                                 36); // prevout : 32 hash + 4 index
                             if (!btchip_context_D.segwitParsedOnce) {
@@ -370,7 +366,9 @@ void transaction_parse(unsigned char parseMode) {
                                 }
                                 PRINTF("Adding amount\n%.*H\n",8,btchip_context_D.transactionBufferPointer);
                                 PRINTF("New amount\n%.*H\n",8,btchip_context_D.transactionContext.transactionAmount);
+                                btchip_context_D.transactionHashOption &= ~TRANSACTION_HASH_AUTHORIZATION;                                                                
                                 transaction_offset_increase(8);
+                                btchip_context_D.transactionHashOption |= TRANSACTION_HASH_AUTHORIZATION;
                             } else {
                                 btchip_context_D.transactionHashOption =
                                     TRANSACTION_HASH_FULL;
@@ -484,12 +482,9 @@ void transaction_parse(unsigned char parseMode) {
                             PRINTF("New amount\n%.*H\n",8,btchip_context_D.transactionContext.transactionAmount);
                         }
 
-                        if (!btchip_context_D.usingSegwit) {
-                            // Do not include the input script length + value in
-                            // the authentication hash
-                            btchip_context_D.transactionHashOption =
-                                TRANSACTION_HASH_FULL;
-                        }
+                        // Do not include the input script length + value in
+                        // the authentication hash
+                        btchip_context_D.transactionHashOption &= ~TRANSACTION_HASH_AUTHORIZATION;
                     }
                     // Read the script length
                     btchip_context_D.transactionContext.scriptRemaining =
@@ -546,24 +541,23 @@ void transaction_parse(unsigned char parseMode) {
                     if (btchip_context_D.transactionContext.scriptRemaining ==
                         0) {
                         if (parseMode == PARSE_MODE_SIGNATURE) {
-                            if (!btchip_context_D.usingSegwit) {
-                                // Restore dual hash for signature +
-                                // authentication
-                                btchip_context_D.transactionHashOption =
-                                    TRANSACTION_HASH_BOTH;
-                            } else {
-                                if (btchip_context_D.segwitParsedOnce) {
-                                    // Append the saved value
-                                    PRINTF("SEGWIT Add value\n%.*H\n",8,btchip_context_D.inputValue);
-                                    if (btchip_context_D.usingOverwinter) {
-                                        cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.inputValue, 8, NULL, 0);
-                                    }
-                                    else {
-                                        cx_hash(&btchip_context_D
-                                                 .transactionHashFull.sha256.header,
-                                            0, btchip_context_D.inputValue, 8,
-                                            NULL, 0);
-                                    }
+
+                            // Restore dual hash for signature +
+                            // authentication
+                            btchip_context_D.transactionHashOption |=
+                                    TRANSACTION_HASH_AUTHORIZATION;                            
+
+                            if (btchip_context_D.segwitParsedOnce) {
+                                // Append the saved value
+                                PRINTF("SEGWIT Add value\n%.*H\n",8,btchip_context_D.inputValue);
+                                if (btchip_context_D.usingOverwinter) {
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.inputValue, 8, NULL, 0);
+                                }
+                                else {
+                                    cx_hash(&btchip_context_D
+                                                .transactionHashFull.sha256.header,
+                                        0, btchip_context_D.inputValue, 8,
+                                        NULL, 0);
                                 }
                             }
                         }

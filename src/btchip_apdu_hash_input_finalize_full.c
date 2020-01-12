@@ -367,23 +367,19 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             }
 
             if (G_io_apdu_buffer[ISO_OFFSET_P1] == FINALIZE_P1_MORE) {
-                if (!btchip_context_D.usingSegwit) {
                     cx_hash(
                         &btchip_context_D.transactionHashAuthorization.header,
                         0, G_io_apdu_buffer + ISO_OFFSET_CDATA, apduLength,
                         NULL, 0);
-                }
                 G_io_apdu_buffer[0] = 0x00;
                 btchip_context_D.outLength = 1;
                 btchip_context_D.tmpCtx.output.multipleOutput = 1;
                 goto return_OK;
             }
 
-            if (!btchip_context_D.usingSegwit) {
                 cx_hash(&btchip_context_D.transactionHashAuthorization.header,
                         CX_LAST, G_io_apdu_buffer + ISO_OFFSET_CDATA,
                         apduLength, authorizationHash, 32);
-            }
 
             if (btchip_context_D.usingSegwit) {
                 if (!btchip_context_D.segwitParsedOnce) {
@@ -403,17 +399,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                             btchip_context_D.segwit.cache.hashedOutputs, 32);
                     }
                     PRINTF("hashOutputs\n%.*H\n",32,btchip_context_D.segwit.cache.hashedOutputs);
-                    cx_hash(
-                        &btchip_context_D.transactionHashAuthorization.header,
-                        CX_LAST, G_io_apdu_buffer, 0, authorizationHash, 32);
-                } else {
-                    cx_hash(
-                        &btchip_context_D.transactionHashAuthorization.header,
-                        CX_LAST,
-                        (unsigned char *)&btchip_context_D.segwit.cache,
-                        sizeof(btchip_context_D.segwit.cache),
-                        authorizationHash, 32);
-                }
+                } 
             }
 
             if (btchip_context_D.transactionContext.firstSigned) {
@@ -445,16 +431,20 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             // (this is done to keep the transaction counter limit per session
             // synchronized)
             if (btchip_context_D.transactionContext.firstSigned) {
+                PRINTF("Setting authorization hash\n%.*H\n",32,authorizationHash);
                 os_memmove(transactionSummary->authorizationHash,
                            authorizationHash,
                            sizeof(transactionSummary->authorizationHash));
                 goto return_OK;
             } else {
+                PRINTF("Checking authorization hash\n");
                 if (btchip_secure_memcmp(
                         authorizationHash,
                         transactionSummary->authorizationHash,
                         sizeof(transactionSummary->authorizationHash))) {
                     PRINTF("Authorization hash not matching, aborting\n");
+                    PRINTF("Current\n%.*H\n",32,authorizationHash);
+                    PRINTF("Expected\n%.*H\n",32,transactionSummary->authorizationHash);
                     sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
                 discardTransaction:
                     CLOSE_TRY;
