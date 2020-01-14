@@ -291,7 +291,9 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_ZCOIN, 
     COIN_KIND_ZCLASSIC,
     COIN_KIND_XSN,
-    COIN_KIND_NIX
+    COIN_KIND_NIX,
+    COIN_KIND_LBRY,
+    COIN_KIND_RESISTANCE
 } btchip_coin_kind_t;
 
 typedef struct btchip_altcoin_config_s {
@@ -309,6 +311,7 @@ typedef struct btchip_altcoin_config_s {
     const char* name_short; // for unit in ux displays
     const char* native_segwit_prefix; // null if no segwit prefix
     unsigned int forkid;
+    unsigned int zcash_consensus_branch_id;
     btchip_coin_kind_t kind;
     unsigned int flags;
 } btchip_altcoin_config_t;
