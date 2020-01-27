@@ -29,6 +29,7 @@
 #include "cashaddr.h"
 
 #include "glyphs.h"
+#include "swap_lib_calls.h"
 
 #define __NAME3(a, b, c) a##b##c
 #define NAME3(a, b, c) __NAME3(a, b, c)
@@ -2765,72 +2766,8 @@ btchip_altcoin_config_t const C_coin_config = {
     .kind = COIN_KIND,
 };
 
-__attribute__((section(".boot"))) int main(int arg0) {
-#ifdef USE_LIB_BITCOIN
-    // in RAM allocation (on stack), to allow simple simple traversal into the
-    // bitcoin app (separate NVRAM zone)
-    unsigned int libcall_params[3];
-    unsigned char coinid[sizeof(COIN_COINID)];
-    strcpy(coinid, COIN_COINID);
-    unsigned char name[sizeof(COIN_COINID_NAME)];
-    strcpy(name, COIN_COINID_NAME);
-    unsigned char name_short[sizeof(COIN_COINID_SHORT)];
-    strcpy(name_short, COIN_COINID_SHORT);
-#ifdef TARGET_BLUE
-    unsigned char header[sizeof(COIN_COINID_HEADER)];
-    strcpy(header, COIN_COINID_HEADER);
-#endif // TARGET_BLUE
-#ifdef COIN_NATIVE_SEGWIT_PREFIX
-    unsigned char native_segwit_prefix[sizeof(COIN_NATIVE_SEGWIT_PREFIX)];
-    strcpy(native_segwit_prefix, COIN_NATIVE_SEGWIT_PREFIX);
-#endif
-    btchip_altcoin_config_t coin_config;
-    os_memmove(&coin_config, &C_coin_config, sizeof(coin_config));
-#ifdef TARGET_BLUE
-    coin_config.header_text = header;
-    coin_config.color_header = COIN_COLOR_HDR;
-    coin_config.color_dashboard = COIN_COLOR_DB;
-#endif // TARGET_BLUE
-    coin_config.coinid = coinid;
-    coin_config.name = name;
-    coin_config.name_short = name_short;
-#ifdef COIN_NATIVE_SEGWIT_PREFIX
-    coin_config.native_segwit_prefix = native_segwit_prefix;
-#endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
-    BEGIN_TRY {
-        TRY {
-            // ensure syscall will accept us
-            check_api_level(CX_COMPAT_APILEVEL);
-            // delegate to bitcoin app/lib
-            libcall_params[0] = "Bitcoin";
-            libcall_params[1] = 0x100; // use the Init call, as we won't exit
-            libcall_params[2] = &coin_config;
-            os_lib_call(&libcall_params);
-        }
-        FINALLY {
-            app_exit();
-        }
-    }
-    END_TRY;
-    // no return
-#else
-    // exit critical section
-    __asm volatile("cpsie i");
-
-    if (arg0) {
-        // is ID 1 ?
-        if (((unsigned int *)arg0)[0] != 0x100) {
-            os_lib_throw(INVALID_PARAMETER);
-        }
-        // grab the coin config structure from the first parameter
-        G_coin_config = (btchip_altcoin_config_t *)((unsigned int *)arg0)[1];
-    } else {
-        G_coin_config = (btchip_altcoin_config_t *)PIC(&C_coin_config);
-    }
-
-    // ensure exception will work as planned
-    os_boot();
-
+void coin_main(btchip_altcoin_config_t *config) {
+    G_coin_config = config;
     for (;;) {
         UX_INIT();
         BEGIN_TRY {
@@ -2877,6 +2814,116 @@ __attribute__((section(".boot"))) int main(int arg0) {
         END_TRY;
     }
     app_exit();
+}
+
+void library_main(btchip_altcoin_config_t *config, unsigned int call_id, unsigned int* call_parameters, unsigned int* return_value) {
+    G_coin_config = config;
+    *return_value = 0;
+    BEGIN_TRY {
+        TRY {
+            PRINTF("Insied library \n");
+            switch (call_id) {
+                case CHECK_ADDRESS_IN:
+                    handle_check_address((check_address_parameters_t*)call_parameters);
+                    *return_value = CHECK_ADDRESS_OUT;
+                break;
+                case SIGN_TRANSACTION_IN:
+                    *return_value = SIGN_TRANSACTION_OUT;
+                break;
+                case GET_PRINTABLE_AMOUNT_IN:
+                    handle_get_printable_amount((get_printable_amount_parameters_t*)call_parameters);
+                    *return_value = GET_PRINTABLE_AMOUNT_OUT;
+                break;
+            }
+        }
+        FINALLY {}
+    }
+    END_TRY;
+    os_lib_end();
+    app_exit();
+}
+
+__attribute__((section(".boot"))) int main(int arg0) {
+#ifdef USE_LIB_BITCOIN
+    // in RAM allocation (on stack), to allow simple simple traversal into the
+    // bitcoin app (separate NVRAM zone)
+    unsigned int libcall_params[4];
+    unsigned char coinid[sizeof(COIN_COINID)];
+    strcpy(coinid, COIN_COINID);
+    unsigned char name[sizeof(COIN_COINID_NAME)];
+    strcpy(name, COIN_COINID_NAME);
+    unsigned char name_short[sizeof(COIN_COINID_SHORT)];
+    strcpy(name_short, COIN_COINID_SHORT);
+#ifdef TARGET_BLUE
+    unsigned char header[sizeof(COIN_COINID_HEADER)];
+    strcpy(header, COIN_COINID_HEADER);
+#endif // TARGET_BLUE
+#ifdef COIN_NATIVE_SEGWIT_PREFIX
+    unsigned char native_segwit_prefix[sizeof(COIN_NATIVE_SEGWIT_PREFIX)];
+    strcpy(native_segwit_prefix, COIN_NATIVE_SEGWIT_PREFIX);
+#endif
+    btchip_altcoin_config_t coin_config;
+    os_memmove(&coin_config, &C_coin_config, sizeof(coin_config));
+#ifdef TARGET_BLUE
+    coin_config.header_text = header;
+    coin_config.color_header = COIN_COLOR_HDR;
+    coin_config.color_dashboard = COIN_COLOR_DB;
+#endif // TARGET_BLUE
+    coin_config.coinid = coinid;
+    coin_config.name = name;
+    coin_config.name_short = name_short;
+#ifdef COIN_NATIVE_SEGWIT_PREFIX
+    coin_config.native_segwit_prefix = native_segwit_prefix;
+#endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
+    BEGIN_TRY {
+        TRY {
+            check_api_level(CX_COMPAT_APILEVEL);
+            // delegate to bitcoin app/lib
+            libcall_params[0] = "Bitcoin";
+            libcall_params[2] = &coin_config;
+            if (arg0) {
+                // call as a library
+                libcall_params[1] = ((unsigned int *)arg0)[0] | 0x100;
+                libcall_params[3] = ((unsigned int *)arg0)[1]; // library arguments
+                os_lib_call(&libcall_params);
+                ((unsigned int *)arg0)[0] = libcall_params[1];
+                os_lib_end();
+            }
+            else {
+                // launch coin application
+                libcall_params[1] = 0x100; // use the Init call, as we won't exit
+                os_lib_call(&libcall_params);
+            }
+        }
+        FINALLY {
+            app_exit();
+        }
+    }
+    END_TRY;
+    // no return
+#else
+    // exit critical section
+    __asm volatile("cpsie i");
+    
+
+    // ensure exception will work as planned
+    os_boot();
+    if (!arg0) {
+        // Bitcoin application launched from dashboard
+        coin_main((btchip_altcoin_config_t *)PIC(&C_coin_config));
+        return 0;
+    }
+    unsigned int call_id = ((unsigned int *)arg0)[0];
+    if (call_id == 0x100) {
+        // *coin application launched from dashboard
+        coin_main((btchip_altcoin_config_t *)((unsigned int *)arg0)[1]);
+        return 0;
+    }
+    // Called as a library
+    if (call_id & 0x100)
+        library_main((btchip_altcoin_config_t *)((unsigned int *)arg0)[1], call_id & (~0x100), ((unsigned int *)arg0)[2], &((unsigned int *)arg0)[0]);
+    else
+        library_main((btchip_altcoin_config_t *)PIC(&C_coin_config), call_id, ((unsigned int *)arg0)[1], &((unsigned int *)arg0)[0]);
 #endif // USE_LIB_BITCOIN
     return 0;
 }
