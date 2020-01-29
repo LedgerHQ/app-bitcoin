@@ -318,9 +318,11 @@ void btchip_private_derive_keypair(unsigned char *bip32Path,
         bip32PathInt[i] = btchip_read_u32(bip32Path, 1, 0);
         bip32Path += 4;
     }
+    io_seproxyhal_io_heartbeat();
     os_perso_derive_node_bip32(CX_CURVE_256K1, bip32PathInt, bip32PathLength,
-                               privateComponent, out_chainCode);
+                               privateComponent, out_chainCode);    
     btchip_retrieve_keypair_discard(privateComponent, derivePublic);
+    io_seproxyhal_io_heartbeat();
     os_memset(privateComponent, 0, sizeof(privateComponent));
 }
 
@@ -438,6 +440,7 @@ void btchip_signverify_finalhash(void *keyContext, unsigned char sign,
                                  unsigned char *in, unsigned short inlen,
                                  unsigned char *out, unsigned short outlen,
                                  unsigned char rfc6979) {
+    io_seproxyhal_io_heartbeat();
     if (sign) {
         unsigned int info = 0;
         cx_ecdsa_sign((cx_ecfp_private_key_t *)keyContext,
@@ -450,4 +453,5 @@ void btchip_signverify_finalhash(void *keyContext, unsigned char sign,
         cx_ecdsa_verify((cx_ecfp_public_key_t *)keyContext, CX_LAST,
                         CX_SHA256, in, inlen, out, outlen);
     }
+    io_seproxyhal_io_heartbeat();
 }

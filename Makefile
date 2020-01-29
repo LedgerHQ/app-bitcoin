@@ -27,7 +27,7 @@ APP_LOAD_PARAMS= --curve secp256k1 $(COMMON_LOAD_PARAMS)
 
 APPVERSION_M=1
 APPVERSION_N=3
-APPVERSION_P=10
+APPVERSION_P=17
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 APP_LOAD_FLAGS=--appFlags 0x250 --dep Bitcoin:$(APPVERSION)
 
@@ -78,6 +78,8 @@ APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),zcash)
 # Zcash
 DEFINES   += COIN_P2PKH_VERSION=7352 COIN_P2SH_VERSION=7357 COIN_FAMILY=1 COIN_COINID=\"Zcash\" COIN_COINID_HEADER=\"ZCASH\" COIN_COLOR_HDR=0x3790CA COIN_COLOR_DB=0x9BC8E5 COIN_COINID_NAME=\"Zcash\" COIN_COINID_SHORT=\"ZEC\" COIN_KIND=COIN_KIND_ZCASH
+# Switch to Blossom over Sapling
+DEFINES   += COIN_CONSENSUS_BRANCH_ID=0x2BB40E60
 APPNAME ="Zcash"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),horizen)
@@ -126,9 +128,9 @@ APPNAME ="Digibyte"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),qtum)
 # Qtum
-DEFINES   += COIN_P2PKH_VERSION=58 COIN_P2SH_VERSION=50 COIN_FAMILY=3 COIN_COINID=\"Qtum\" COIN_COINID_HEADER=\"QTUM\" COIN_COLOR_HDR=0x2E9AD0 COIN_COLOR_DB=0x97CDE8 COIN_COINID_NAME=\"QTUM\" COIN_COINID_SHORT=\"QTUM\" COIN_KIND=COIN_KIND_QTUM
+DEFINES   += COIN_P2PKH_VERSION=58 COIN_P2SH_VERSION=50 COIN_FAMILY=3 COIN_COINID=\"Qtum\" COIN_COINID_HEADER=\"QTUM\" COIN_COLOR_HDR=0x2E9AD0 COIN_COLOR_DB=0x97CDE8 COIN_COINID_NAME=\"QTUM\" COIN_COINID_SHORT=\"QTUM\" COIN_NATIVE_SEGWIT_PREFIX=\"qc\" COIN_KIND=COIN_KIND_QTUM COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
 APPNAME ="Qtum"
-APP_LOAD_PARAMS += --path "44'/88'" --path "0'/45342'" --path "20698'/3053'/12648430'"
+APP_LOAD_PARAMS += --path "44'/88'" --path "49'/88'" --path "0'/45342'" --path "20698'/3053'/12648430'"
 else ifeq ($(COIN),zcoin)
 DEFINES   += COIN_P2PKH_VERSION=82 COIN_P2SH_VERSION=7 COIN_FAMILY=1 COIN_COINID=\"Zcoin\" COIN_COINID_HEADER=\"ZCOIN\" COIN_COLOR_HDR=0x3EAD54 COIN_COLOR_DB=0xA3DCAE COIN_COINID_NAME=\"Zcoin\" COIN_COINID_SHORT=\"ZCOIN\" COIN_KIND=COIN_KIND_ZCOIN
 APPNAME ="Zcoin"
@@ -158,6 +160,16 @@ else ifeq ($(COIN),nix)
 DEFINES   += COIN_P2PKH_VERSION=38 COIN_P2SH_VERSION=53 COIN_FAMILY=1 COIN_COINID=\"NIX\" COIN_COINID_HEADER=\"NIX\" COIN_COLOR_HDR=0x1685e8 COIN_COLOR_DB=0xffffff COIN_COINID_NAME=\"NIX\" COIN_COINID_SHORT=\"NIX\" COIN_NATIVE_SEGWIT_PREFIX=\"nix\" COIN_KIND=COIN_KIND_NIX COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
 APPNAME ="NIX"
 APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),lbry)
+# LBRY
+DEFINES   += COIN_P2PKH_VERSION=85 COIN_P2SH_VERSION=122 COIN_FAMILY=1 COIN_COINID=\"LBRY\" COIN_COINID_HEADER=\"LBRY\" COIN_COLOR_HDR=0x38D9A9 COIN_COLOR_DB=0xFEDBA9 COIN_COINID_NAME=\"LBRY\" COIN_COINID_SHORT=\"LBC\" COIN_KIND=COIN_KIND_LBRY
+APPNAME ="LBRY"
+APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),resistance)
+# Resistance
+DEFINES   += COIN_P2PKH_VERSION=7063 COIN_P2SH_VERSION=7068 COIN_FAMILY=1 COIN_COINID=\"Res\" COIN_COINID_HEADER=\"RES\" COIN_COLOR_HDR=0x3790CA COIN_COLOR_DB=0x9BC8E5 COIN_COINID_NAME=\"Res\" COIN_COINID_SHORT=\"RES\" COIN_KIND=COIN_KIND_RESISTANCE
+APPNAME ="Resistance"
+APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),terracoin)
 # Terracoin
 DEFINES   += COIN_P2PKH_VERSION=0 COIN_P2SH_VERSION=5 COIN_FAMILY=1 COIN_COINID=\"DarkCoin\" COIN_COINID_HEADER=\"TERRACOIN\" COIN_COLOR_HDR=0x0E8843 COIN_COLOR_DB=0xA5DDAD COIN_COINID_NAME=\"Terracoin\" COIN_COINID_SHORT=\"TRC\" COIN_KIND=COIN_KIND_TERRACOIN
@@ -165,7 +177,7 @@ APPNAME ="Terracoin"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, pivx, viacoin, vertcoin, stealth, digibyte, qtum, bitcoin_private, zcoin, gamecredits, zclassic, xsn, nix, terracoin)
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, pivx, viacoin, vertcoin, stealth, digibyte, qtum, bitcoin_private, zcoin, gamecredits, zclassic, xsn, nix, lbry, resistance)
 endif
 endif
 
@@ -192,8 +204,9 @@ all: default
 ############
 
 DEFINES   += OS_IO_SEPROXYHAL IO_SEPROXYHAL_BUFFER_SIZE_B=300
-DEFINES   += HAVE_BAGL HAVE_SPRINTF
+DEFINES   += HAVE_BAGL HAVE_SPRINTF HAVE_SNPRINTF_FORMAT_U
 DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=6 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
+DEFINES   += HAVE_LEGACY_PID
 DEFINES   += LEDGER_MAJOR_VERSION=$(APPVERSION_M) LEDGER_MINOR_VERSION=$(APPVERSION_N) LEDGER_PATCH_VERSION=$(APPVERSION_P) TCS_LOADER_PATCH_VERSION=0
 
 # U2F
@@ -202,8 +215,9 @@ DEFINES   += U2F_PROXY_MAGIC=\"BTC\"
 DEFINES   += USB_SEGMENT_SIZE=64
 DEFINES   += BLE_SEGMENT_SIZE=32 #max MTU, min 20
 
-WEBUSB_URL     = www.ledgerwallet.com
-DEFINES       += HAVE_WEBUSB WEBUSB_URL_SIZE_B=$(shell echo -n $(WEBUSB_URL) | wc -c) WEBUSB_URL=$(shell echo -n $(WEBUSB_URL) | sed -e "s/./\\\'\0\\\',/g")
+#WEBUSB_URL     = www.ledgerwallet.com
+#DEFINES       += HAVE_WEBUSB WEBUSB_URL_SIZE_B=$(shell echo -n $(WEBUSB_URL) | wc -c) WEBUSB_URL=$(shell echo -n $(WEBUSB_URL) | sed -e "s/./\\\'\0\\\',/g")
+DEFINES   += HAVE_WEBUSB WEBUSB_URL_SIZE_B=0 WEBUSB_URL=""
 
 DEFINES   += UNUSED\(x\)=\(void\)x
 DEFINES   += APPVERSION=\"$(APPVERSION)\"
@@ -220,7 +234,7 @@ DEFINES       += HAVE_BAGL_ELLIPSIS # long label truncation feature
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_REGULAR_11PX
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_EXTRABOLD_11PX
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_LIGHT_16PX
-DEFINES		  += HAVE_UX_FLOW
+DEFINES		    += HAVE_UX_FLOW
 endif
 
 # Enabling debug PRINTF
@@ -278,6 +292,17 @@ SDK_SOURCE_PATH  += lib_blewbxx lib_blewbxx_impl
 SDK_SOURCE_PATH  += lib_ux
 endif
 
+# If the SDK supports Flow for Nano S, build for it
+
+ifeq ($(TARGET_NAME),TARGET_NANOS)
+
+	ifneq "$(wildcard $(BOLOS_SDK)/lib_ux/src/ux_flow_engine.c)" ""
+		SDK_SOURCE_PATH  += lib_ux
+		DEFINES		       += HAVE_UX_FLOW		
+	endif
+
+endif
+
 load: all
 	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
 
@@ -290,5 +315,16 @@ include $(BOLOS_SDK)/Makefile.rules
 #add dependency on custom makefile filename
 dep/%.d: %.c Makefile
 
+
+# Temporary restriction until we a Resistance Nano X icon
+ifeq ($(TARGET_NAME),TARGET_NANOX)
+
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix terracoin
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry
+
+else
+
+listvariants:
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry resistance terracoin
+
+endif
