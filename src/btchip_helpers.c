@@ -401,8 +401,13 @@ unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned cha
 
 #if defined(TARGET_BLUE)
     // if the path is longer than 30 char, split the string in multiple strings of length 30
-    uint8_t len=strnlen(out, MAX_DERIV_PATH_ASCII_LENGTH);
+    uint8_t len=strnlen(out, max_out_len);
     uint8_t num_split = len/30;
+
+    // account for the '\0' line delimiters appended
+    if(len + num_split > max_out_len){
+        THROW(EXCEPTION);
+    }
 
     for(i = 1; i<= num_split; i++) {
         os_memmove(out+30*i, out+(30*i-1), len-29*i);
