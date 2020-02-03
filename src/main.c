@@ -158,6 +158,13 @@ union {
         char fullAddress[65]; // the address
         char fullAmount[20];  // full amount
         char feesAmount[20];  // fees
+
+        #ifdef APP_METAVERSE
+        // char fullAmount[40]; - Metaverse may have long token names, so maybe increase fullAmount from 20 to 40?
+        // char metaverse_message[255]; - app freezes when having this var
+        char metaverse_decimals[3]; // For displaying decimals (0-10)
+        char metaverse_did[20]; // For displaying destination avatar
+        #endif
     } tmp;
 
     struct {
@@ -986,6 +993,30 @@ const bagl_element_t ui_verify_output_nanos[] = {
 unsigned int ui_verify_output_nanos_button(unsigned int button_mask,
                                            unsigned int button_mask_counter);
 
+#ifdef APP_METAVERSE
+const bagl_element_t ui_verify_output_decimals_nanos[] = {
+    UI_NANOS_BACKGROUND(),
+    UI_NANOS_ICON_LEFT(0, BAGL_GLYPH_ICON_CROSS),
+    UI_NANOS_ICON_RIGHT(0, BAGL_GLYPH_ICON_CHECK),
+    UI_NANOS_TEXT(1, 0, 12, 128, "Confirm", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+    UI_NANOS_TEXT(1, 0, 26, 128, vars.tmp.feesAmount, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    UI_NANOS_TEXT(2, 0, 12, 128, "Amount", BAGL_FONT_OPEN_SANS_REGULAR_11px),
+    UI_NANOS_SCROLLING_TEXT(2, 23, 26, 82, vars.tmp.fullAmount, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    UI_NANOS_TEXT(3, 0, 12, 128, "Decimals", BAGL_FONT_OPEN_SANS_REGULAR_11px),
+    UI_NANOS_TEXT(3, 0, 26, 128, vars.tmp.metaverse_decimals, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    UI_NANOS_TEXT(4, 0, 12, 128, "Address", BAGL_FONT_OPEN_SANS_REGULAR_11px),
+    UI_NANOS_SCROLLING_TEXT(4, 23, 26, 82, vars.tmp.fullAddress, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px)
+};
+
+unsigned int ui_verify_output_decimals_nanos_button(unsigned int button_mask,
+                                          unsigned int button_mask_counter);
+#endif
+
+
+
 const bagl_element_t ui_finalize_nanos[] = {
     UI_NANOS_BACKGROUND(),
     UI_NANOS_ICON_LEFT(0, BAGL_GLYPH_ICON_CROSS),
@@ -1228,6 +1259,22 @@ unsigned int ui_verify_output_nanos_button(unsigned int button_mask,
     }
     return 0;
 }
+
+#ifdef APP_METAVERSE
+unsigned int ui_verify_output_decimals_nanos_button(unsigned int button_mask,
+                                           unsigned int button_mask_counter) {
+    switch (button_mask) {
+    case BUTTON_EVT_RELEASED | BUTTON_LEFT:
+        io_seproxyhal_touch_verify_cancel(NULL);
+        break;
+
+    case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
+        io_seproxyhal_touch_verify_ok(NULL);
+        break;
+    }
+    return 0;
+}
+#endif
 
 unsigned int ui_finalize_nanos_button(unsigned int button_mask,
                                       unsigned int button_mask_counter) {
@@ -1692,6 +1739,124 @@ UX_FLOW(ux_confirm_single_flow,
   &ux_confirm_single_flow_6_step
 );
 
+#ifdef APP_METAVERSE
+// confirm_single: confirm output #x(feesAmount) / Amount: fullAmount / Decimals: decimals / Address: fullAddress
+UX_STEP_NOCB(
+    ux_confirm_single_flow_4_step,
+    bnnn_paging,
+    {
+      .title = "Decimals",
+      .text = vars.tmp.metaverse_decimals,
+    });
+
+UX_FLOW(ux_confirm_metaverse_decimals_flow,
+  &ux_confirm_single_flow_1_step,
+  &ux_confirm_single_flow_2_step,
+  &ux_confirm_single_flow_3_step,
+  &ux_confirm_single_flow_4_step,
+  &ux_confirm_single_flow_5_step,
+  &ux_confirm_single_flow_6_step
+);
+
+UX_STEP_NOCB(
+    ux_confirm_metaverse_toavatar_step,
+    bnnn_paging,
+    {
+      .title = "To Avatar",
+      .text = vars.tmp.metaverse_did,
+    });
+UX_STEP_NOCB(
+    ux_confirm_metaverse_symbol_step,
+    bnnn_paging,
+    {
+      .title = "New MST",
+      .text = vars.tmp.fullAmount,
+    });
+UX_FLOW(ux_confirm_metaverse_mst_create_flow,
+  &ux_confirm_single_flow_1_step,
+  &ux_confirm_metaverse_symbol_step,
+  &ux_confirm_single_flow_3_step,
+  &ux_confirm_metaverse_toavatar_step,
+  &ux_confirm_single_flow_5_step,
+  &ux_confirm_single_flow_6_step
+);
+
+// Avatar
+UX_STEP_NOCB(
+    ux_confirm_metaverse_newavatar_step,
+    bnnn_paging,
+    {
+      .title = "New Avatar",
+      .text = vars.tmp.fullAmount,
+    });
+UX_FLOW(ux_confirm_metaverse_avatar_create_flow,
+  &ux_confirm_single_flow_1_step,
+  &ux_confirm_metaverse_newavatar_step,
+  &ux_confirm_single_flow_3_step,
+  &ux_confirm_single_flow_5_step,
+  &ux_confirm_single_flow_6_step
+);
+
+// MIT
+UX_FLOW(ux_confirm_metaverse_mit_transfer_flow,
+  &ux_confirm_single_flow_1_step,
+  &ux_confirm_single_flow_2_step,
+  &ux_confirm_metaverse_toavatar_step,
+  &ux_confirm_single_flow_3_step,
+  &ux_confirm_single_flow_5_step,
+  &ux_confirm_single_flow_6_step
+);
+UX_STEP_NOCB(
+    ux_confirm_metaverse_mit_create_step,
+    bnnn_paging,
+    {
+      .title = "New MIT",
+      .text = vars.tmp.fullAmount,
+    });
+UX_FLOW(ux_confirm_metaverse_mit_create_flow,
+  &ux_confirm_single_flow_1_step,
+  &ux_confirm_metaverse_mit_create_step,
+  &ux_confirm_metaverse_toavatar_step,
+  &ux_confirm_single_flow_3_step,
+  &ux_confirm_single_flow_5_step,
+  &ux_confirm_single_flow_6_step
+);
+
+// Message
+UX_STEP_NOCB(
+    ux_confirm_metaverse_message_step,
+    bnnn_paging,
+    {
+      .title = "Message",
+      .text = vars.tmp.fullAmount,
+    });
+UX_FLOW(ux_confirm_metaverse_message_flow,
+  &ux_confirm_single_flow_1_step,
+  &ux_confirm_metaverse_message_step,
+  &ux_confirm_single_flow_3_step,
+  &ux_confirm_single_flow_5_step,
+  &ux_confirm_single_flow_6_step
+);
+
+// Cert
+UX_STEP_NOCB(
+    ux_confirm_metaverse_cert_step,
+    bnnn_paging,
+    {
+      .title = "Certificate",
+      .text = vars.tmp.fullAmount,
+    });
+UX_FLOW(ux_confirm_metaverse_cert_flow,
+  &ux_confirm_single_flow_1_step,
+  &ux_confirm_metaverse_cert_step,
+  &ux_confirm_metaverse_toavatar_step,
+  &ux_confirm_single_flow_3_step,
+  &ux_confirm_single_flow_5_step,
+  &ux_confirm_single_flow_6_step
+);
+
+#endif
+
 //////////////////////////////////////////////////////////////////////
 
 UX_STEP_NOCB(
@@ -2013,6 +2178,25 @@ uint8_t prepare_fees() {
         unsigned short textSize;
         unsigned char borrow;
 
+        #ifdef APP_METAVERSE
+        if (G_coin_config->kind == COIN_KIND_METAVERSE) {
+            if (
+                btchip_context_D.totalTokenInputAmount[0] != 0 ||
+                btchip_context_D.totalTokenInputAmount[1] != 0 ||
+                btchip_context_D.totalTokenInputAmount[2] != 0 ||
+                btchip_context_D.totalTokenInputAmount[3] != 0 ||
+                btchip_context_D.totalTokenInputAmount[4] != 0 ||
+                btchip_context_D.totalTokenInputAmount[5] != 0 ||
+                btchip_context_D.totalTokenInputAmount[6] != 0 ||
+                btchip_context_D.totalTokenInputAmount[7] != 0
+            ) {
+                // Transaction input tokens amount must be equal to output tokens amount (MIT counts as 1)
+                PRINTF("Error : Token amount not consistent");
+                goto error;
+            }
+        }
+        #endif
+
         borrow = transaction_amount_sub_be(
                 fees, btchip_context_D.transactionContext.transactionAmount,
                 btchip_context_D.totalOutputAmount);
@@ -2031,7 +2215,7 @@ uint8_t prepare_fees() {
             btchip_context_D.tmp =
                 (unsigned char *)(vars.tmp.feesAmount +
                               btchip_context_D.shortCoinIdLength + 1);
-            textSize = btchip_convert_hex_amount_to_displayable(fees);
+            textSize = btchip_convert_hex_amount_to_displayable(fees, DECIMALS);
             vars.tmp.feesAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
                 '\0';
         }
@@ -2057,6 +2241,11 @@ uint8_t prepare_single_output() {
     unsigned short textSize;
     unsigned char nativeSegwit;
 
+    #ifdef APP_METAVERSE
+    if (G_coin_config->kind == COIN_KIND_METAVERSE) {
+        vars.tmp.metaverse_decimals[0] = '\0';
+    }
+    #endif
     vars.tmp.fullAddress[0] = '\0';
     btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset, 8);
     offset += 8;
@@ -2144,7 +2333,7 @@ uint8_t prepare_single_output() {
             }
             headerLength = strlen(vars.tmp.fullAmount);
             btchip_context_D.tmp = vars.tmp.fullAmount + headerLength;
-            textSize = btchip_convert_hex_amount_to_displayable(btchip_context_D.currentOutput + offset + 3 + 4 + 4 + 4);
+            textSize = btchip_convert_hex_amount_to_displayable(btchip_context_D.currentOutput + offset + 3 + 4 + 4 + 4, DECIMALS);
             vars.tmp.fullAmount[textSize + headerLength] = '\0';
     }
     else {
@@ -2154,10 +2343,457 @@ uint8_t prepare_single_output() {
         btchip_context_D.tmp =
             (unsigned char *)(vars.tmp.fullAmount +
                           btchip_context_D.shortCoinIdLength + 1);
-        textSize = btchip_convert_hex_amount_to_displayable(amount);
+        textSize = btchip_convert_hex_amount_to_displayable(amount, DECIMALS);
         vars.tmp.fullAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
             '\0';
     }
+
+    #ifdef APP_METAVERSE
+    // 0 - ETP, 21 - MST REG, 22 - MST TX, 3 - MESSAGE, 41 - AVA REG, 42 - AVA TX, 5 - CERT, 61 - MIT REG, 62 - MIT TX
+    if (G_coin_config->kind == COIN_KIND_METAVERSE) { // Parsing displayable outputs
+        ETP_OUT_TYPE = 255;
+        ETP_VERSION = 0;
+        ETP_TMP = 0;
+        ETP_DECIMALS = DECIMALS;
+        vars.tmp.metaverse_decimals[0] = '\0';
+
+        unsigned char *parsePointer = btchip_context_D.currentOutput;
+        ETP_COUNTER = offset + 26;
+
+        ETP_LENGTH = btchip_context_D.shortCoinIdLength;
+
+        os_memmove(ETP_BUFF, ETP_POINTER, 4);
+        ETP_COUNTER += 4;
+
+        // Version = 1 | 207 (ATTACHMENT.VERSION.DEFAULT |  ATTACHMENT.VERSION.DID)
+        if (
+            ETP_BUFF[0] == 1 &&
+            ETP_BUFF[1] == 0 &&
+            ETP_BUFF[2] == 0 &&
+            ETP_BUFF[3] == 0
+        ) {
+            ETP_VERSION = 1;
+        } else if (
+            ETP_BUFF[0] == 207 &&
+            ETP_BUFF[1] == 0 &&
+            ETP_BUFF[2] == 0 &&
+            ETP_BUFF[3] == 0
+        ) {
+            ETP_VERSION = 207;
+        }
+
+        PRINTF("ETP_VERSION %d\n", ETP_VERSION);
+
+        if (ETP_VERSION != 1 && ETP_VERSION != 207) {
+            PRINTF("PARSE ERROR ETP_VERSION %d\n", ETP_VERSION);
+            return 0;
+        }
+
+        os_memmove(ETP_BUFF, ETP_POINTER, 4);
+        ETP_COUNTER += 4;
+
+        if (ETP_VERSION == 207) {
+            // to_did length
+            ETP_TMP = *ETP_POINTER;
+            ETP_COUNTER += 1;
+
+            ETP_TLEN = ETP_MIN(ETP_TMP, sizeof(vars.tmp.metaverse_did) - 1);
+            os_memmove(vars.tmp.metaverse_did, ETP_POINTER, ETP_TLEN);
+            vars.tmp.metaverse_did[ETP_TLEN] = '\0';
+            ETP_COUNTER += ETP_TMP;
+
+            // from_did length
+            ETP_TMP = *ETP_POINTER;
+            ETP_COUNTER += 1 + ETP_TMP;
+
+            PRINTF("vars.tmp.metaverse_did = %.*H\n", sizeof(vars.tmp.metaverse_did), vars.tmp.metaverse_did);
+        }
+
+        PRINTF("ETP_BUFF Type = %.*H\n", sizeof(ETP_BUFF), ETP_BUFF);
+
+        if (
+            ETP_BUFF[1] != 0 ||
+            ETP_BUFF[2] != 0 ||
+            ETP_BUFF[3] != 0
+        ) {
+            PRINTF("PARSE ERROR Unknown ETP Type\n");
+            return 0;
+        }
+
+        if (ETP_BUFF[0] == 0) { // ATTACHMENT.TYPE.ETP_TRANSFER
+            PRINTF("ATTACHMENT.TYPE.ETP_TRANSFER\n");
+            ETP_OUT_TYPE = 0;
+        } else if (ETP_BUFF[0] == 2) { // ATTACHMENT.TYPE.MST
+            PRINTF("ATTACHMENT.TYPE.MST\n");
+
+            // Throw error is ETP amount is non zero
+            if (
+                amount[0] != 0 ||
+                amount[1] != 0 ||
+                amount[2] != 0 ||
+                amount[3] != 0 ||
+                amount[4] != 0 ||
+                amount[5] != 0 ||
+                amount[6] != 0 ||
+                amount[7] != 0
+            ) {
+                PRINTF("PARSE ERROR AMOUNT != 0\n");
+                return 0;
+            }
+
+            os_memmove(ETP_BUFF, ETP_POINTER, 4);
+            ETP_COUNTER += 4;
+
+            if (
+                ETP_BUFF[1] != 0 ||
+                ETP_BUFF[2] != 0 ||
+                ETP_BUFF[3] != 0
+            ) {
+                PRINTF("PARSE ERROR Unknown ETP Status\n");
+                return 0;
+            }
+
+            if (ETP_BUFF[0] == 1) { // MST.STATUS.REGISTER
+                // Symbol
+                ETP_TMP = *ETP_POINTER;
+                ETP_COUNTER += 1;
+                ETP_TLEN = ETP_MIN(ETP_TMP, sizeof(vars.tmp.fullAmount) - 1);
+                os_memmove(vars.tmp.fullAmount, ETP_POINTER, ETP_TLEN);
+                vars.tmp.fullAmount[ETP_TLEN] = '\0';
+                ETP_COUNTER += ETP_TMP;
+
+                // Maximum supply
+                btchip_swap_bytes(amount, ETP_POINTER, 8);
+                ETP_COUNTER += 8;
+
+                // Precision
+                ETP_DECIMALS = *ETP_POINTER;
+                ETP_COUNTER += 1;
+                if (ETP_DECIMALS < 0 || ETP_DECIMALS > 8) {
+                    PRINTF("PARSE ERROR Precision not in [0, 8]\n");
+                    return 0;
+                }
+
+                // Secondary issue threshold
+                ETP_COUNTER += 1;
+
+                // 0000 bytes
+                os_memmove(ETP_BUFF, ETP_POINTER, 2);
+                ETP_COUNTER += 2;
+                if (
+                    ETP_BUFF[0] != 0 ||
+                    ETP_BUFF[1] != 0
+                ) {
+                    PRINTF("PARSE ERROR Non zero bytes\n");
+                    return 0;
+                }
+
+                // Issuer
+                ETP_TMP = *ETP_POINTER;
+                ETP_COUNTER += 1;
+                if (
+                    strlen(vars.tmp.metaverse_did) != ETP_TMP ||
+                    os_memcmp(vars.tmp.metaverse_did, ETP_POINTER, ETP_TMP) != 0
+                ) {
+                    PRINTF("PARSE ERROR OUTPUT AVATAR != ATTACHMENT AVATAR\n");
+                    return 0;
+                }
+                ETP_COUNTER += ETP_TMP;
+
+                // Recipient address
+                ETP_TMP = *ETP_POINTER;
+                ETP_COUNTER += 1;
+                if (
+                    strlen(vars.tmp.fullAddress) != ETP_TMP ||
+                    os_memcmp(vars.tmp.fullAddress, ETP_POINTER, ETP_TMP) != 0
+                ) {
+                    PRINTF("PARSE ERROR OUTPUT ADDRESS != ATTACHMENT ADDRESS\n");
+                    return 0;
+                }
+                ETP_COUNTER += ETP_TMP;
+
+                // Description
+                ETP_TMP = *ETP_POINTER;
+                ETP_COUNTER += 1;
+                //ETP_TLEN = ETP_MIN(ETP_TMP, sizeof(vars.tmp.metaverse_message) - 1);
+                //os_memmove(vars.tmp.metaverse_message, ETP_POINTER, ETP_TLEN);
+                //vars.tmp.metaverse_message[ETP_TLEN] = '\0';
+                ETP_COUNTER += ETP_TMP;
+
+                ETP_OUT_TYPE = 21;
+            } else if (ETP_BUFF[0] == 2) { // MST.STATUS.TRANSFER
+                // Symbol
+                ETP_TMP = *ETP_POINTER;
+                ETP_COUNTER += 1;
+                ETP_LENGTH = ETP_TMP > 10 ? 10 : ETP_TMP;
+                os_memmove(vars.tmp.fullAmount, ETP_POINTER, ETP_LENGTH);
+                vars.tmp.fullAmount[ETP_LENGTH] = '\0';
+
+                // Get token transfer amount
+                ETP_COUNTER += ETP_TMP;
+                btchip_swap_bytes(amount, ETP_POINTER, 8);
+                ETP_COUNTER += 8;
+
+                // Hardcode some tokens with predefined decimals (no need to display decimals confirmation to user)
+                if (strcmp(vars.tmp.fullAmount, "DNA") == 0) {
+                    ETP_DECIMALS = 4;
+                } else if (strcmp(vars.tmp.fullAmount, "MVS.ZGC") == 0) {
+                    ETP_DECIMALS = 8;
+                } else if (strcmp(vars.tmp.fullAmount, "MVS.ZDC") == 0) {
+                    ETP_DECIMALS = 6;
+                } else if (strcmp(vars.tmp.fullAmount, "SDG") == 0) {
+                    ETP_DECIMALS = 8;
+                } else {
+                    ETP_DECIMALS = btchip_context_D.decimals[btchip_context_D.totalOutputs - btchip_context_D.remainingOutputs];
+                    snprintf(vars.tmp.metaverse_decimals, sizeof(vars.tmp.metaverse_decimals), "%d", ETP_DECIMALS);
+                }
+
+                ETP_OUT_TYPE = 22;
+            } else {
+                PRINTF("PARSE ERROR Unknown ETP Status\n");
+                return 0;
+            }
+        } else if (ETP_BUFF[0] == 3) { // ATTACHMENT.TYPE.MESSAGE
+            // Throw error is ETP amount is non zero
+            if (
+                amount[0] != 0 ||
+                amount[1] != 0 ||
+                amount[2] != 0 ||
+                amount[3] != 0 ||
+                amount[4] != 0 ||
+                amount[5] != 0 ||
+                amount[6] != 0 ||
+                amount[7] != 0
+            ) {
+                PRINTF("PARSE ERROR AMOUNT != 0\n");
+                return 0;
+            }
+
+            // Message
+            ETP_TMP = *ETP_POINTER;
+            ETP_COUNTER += 1;
+
+            ETP_TLEN = ETP_MIN(ETP_TMP, sizeof(vars.tmp.fullAmount) - 1);
+            os_memmove(vars.tmp.fullAmount, ETP_POINTER, ETP_TLEN);
+            vars.tmp.fullAmount[sizeof(vars.tmp.fullAmount) - 2] = '.';
+            vars.tmp.fullAmount[sizeof(vars.tmp.fullAmount) - 3] = '.';
+            vars.tmp.fullAmount[sizeof(vars.tmp.fullAmount) - 4] = '.';
+            vars.tmp.fullAmount[ETP_TLEN] = '\0';
+            ETP_COUNTER += ETP_TMP;
+
+            ETP_OUT_TYPE = 3;
+        } else if (ETP_BUFF[0] == 4) { // ATTACHMENT.TYPE.AVATAR
+            PRINTF("ATTACHMENT.TYPE.AVATAR\n");
+            // Throw error is ETP amount is non zero
+            if (
+                amount[0] != 0 ||
+                amount[1] != 0 ||
+                amount[2] != 0 ||
+                amount[3] != 0 ||
+                amount[4] != 0 ||
+                amount[5] != 0 ||
+                amount[6] != 0 ||
+                amount[7] != 0
+            ) {
+                PRINTF("PARSE ERROR AMOUNT != 0\n");
+                return 0;
+            }
+
+            os_memmove(ETP_BUFF, ETP_POINTER, 4); // Status
+            ETP_COUNTER += 4;
+
+            if (
+                ETP_BUFF[1] != 0 ||
+                ETP_BUFF[2] != 0 ||
+                ETP_BUFF[3] != 0
+            ) {
+                PRINTF("PARSE ERROR Unknown ETP Status\n");
+                return 0;
+            }
+
+            if (ETP_BUFF[0] == 1) { // AVATAR.STATUS.REGISTER
+                // Symbol text length
+                ETP_TMP = *ETP_POINTER;
+                ETP_COUNTER += 1;
+                ETP_TLEN = ETP_MIN(ETP_TMP, sizeof(vars.tmp.fullAmount) - 1);
+                os_memmove(vars.tmp.fullAmount, ETP_POINTER, ETP_TLEN);
+                vars.tmp.fullAmount[ETP_TLEN] = '\0';
+                ETP_COUNTER += ETP_TMP;
+
+                // Symbol address length
+                ETP_TMP = *ETP_POINTER;
+                ETP_COUNTER += 1;
+
+                if (
+                    strlen(vars.tmp.fullAddress) != ETP_TMP ||
+                    os_memcmp(vars.tmp.fullAddress, ETP_POINTER, ETP_TMP) != 0
+                ) {
+                    PRINTF("PARSE ERROR OUTPUT ADDRESS != ATTACHMENT ADDRESS\n");
+                    PRINTF("ADDRESS LENGTHS %d %d\n", strlen(vars.tmp.fullAddress), ETP_TMP);
+                    PRINTF("OUTPUT ADDRESS %.*H\n", sizeof(vars.tmp.fullAddress), vars.tmp.fullAddress);
+                    PRINTF("ATTACHMENT ADDRESS %.*H\n", ETP_TMP, ETP_POINTER);
+                    return 0;
+                }
+                ETP_COUNTER += ETP_TMP;
+
+                ETP_OUT_TYPE = 41;
+            } else if (ETP_BUFF[0] == 2) { // AVATAR.STATUS.TRANSFER
+                PRINTF("PARSE ERROR Unsupported ETP Status\n");
+                return 0;
+
+                //ETP_OUT_TYPE = 42;
+            } else {
+                PRINTF("PARSE ERROR Unknown ETP Status\n");
+                return 0;
+            }
+        } else if (ETP_BUFF[0] == 5) { // ATTACHMENT.TYPE.CERT
+            // Throw error is ETP amount is non zero
+            if (
+                amount[0] != 0 ||
+                amount[1] != 0 ||
+                amount[2] != 0 ||
+                amount[3] != 0 ||
+                amount[4] != 0 ||
+                amount[5] != 0 ||
+                amount[6] != 0 ||
+                amount[7] != 0
+            ) {
+                PRINTF("PARSE ERROR AMOUNT != 0\n");
+                return 0;
+            }
+
+            // Symbol
+            ETP_TMP = *ETP_POINTER;
+            ETP_COUNTER += 1;
+            ETP_TLEN = ETP_MIN(ETP_TMP, sizeof(vars.tmp.fullAmount) - 1);
+            os_memmove(vars.tmp.fullAmount, ETP_POINTER, ETP_TLEN);
+            vars.tmp.fullAmount[sizeof(vars.tmp.fullAmount) - 2] = '.';
+            vars.tmp.fullAmount[sizeof(vars.tmp.fullAmount) - 3] = '.';
+            vars.tmp.fullAmount[sizeof(vars.tmp.fullAmount) - 4] = '.';
+            vars.tmp.fullAmount[ETP_TLEN] = '\0';
+            ETP_COUNTER += ETP_TMP;
+
+            // Owner
+            ETP_TMP = *ETP_POINTER;
+            ETP_COUNTER += 1;
+            if (
+                strlen(vars.tmp.metaverse_did) != ETP_TMP ||
+                os_memcmp(vars.tmp.metaverse_did, ETP_POINTER, ETP_TMP) != 0
+            ) {
+                PRINTF("PARSE ERROR OUTPUT AVATAR != ATTACHMENT CERT OWNER\n");
+                return 0;
+            }
+            ETP_COUNTER += ETP_TMP;
+
+            // Address
+            ETP_TMP = *ETP_POINTER;
+            ETP_COUNTER += 1;
+            if (
+                strlen(vars.tmp.fullAddress) != ETP_TMP ||
+                os_memcmp(vars.tmp.fullAddress, ETP_POINTER, ETP_TMP) != 0
+            ) {
+                PRINTF("PARSE ERROR OUTPUT ADDRESS != ATTACHMENT CERT ADDRESS\n");
+                return 0;
+            }
+            ETP_COUNTER += ETP_TMP;
+
+            os_memmove(ETP_BUFF, ETP_POINTER, 4);
+            ETP_COUNTER += 4; // Cert
+
+            ETP_COUNTER += 1; // Status
+
+            if (true) { // Check currentOutput has more data
+                // content
+                ETP_TMP = *ETP_POINTER;
+                ETP_COUNTER += 1 + ETP_TMP;
+            }
+
+            ETP_OUT_TYPE = 5;
+        } else if (ETP_BUFF[0] == 6) { // ATTACHMENT.TYPE.MIT
+            PRINTF("ATTACHMENT.TYPE.MIT\n");
+            // Throw error is ETP amount is non zero
+            if (
+                amount[0] != 0 ||
+                amount[1] != 0 ||
+                amount[2] != 0 ||
+                amount[3] != 0 ||
+                amount[4] != 0 ||
+                amount[5] != 0 ||
+                amount[6] != 0 ||
+                amount[7] != 0
+            ) {
+                PRINTF("PARSE ERROR AMOUNT != 0\n");
+                return 0;
+            }
+
+            ETP_BUFF[0] = *ETP_POINTER;
+            ETP_COUNTER += 1;
+
+            if (ETP_BUFF[0] == 1) { // MIT.STATUS.REGISTER
+                // Symbol
+                ETP_TMP = *ETP_POINTER;
+                ETP_COUNTER += 1;
+                ETP_TLEN = ETP_MIN(ETP_TMP, sizeof(vars.tmp.fullAmount) - 1);
+                os_memmove(vars.tmp.fullAmount, ETP_POINTER, ETP_TLEN);
+                vars.tmp.fullAmount[ETP_TLEN] = '\0';
+                ETP_COUNTER += ETP_TMP;
+
+                // Address
+                ETP_TMP = *ETP_POINTER;
+                ETP_COUNTER += 1;
+                if (
+                    strlen(vars.tmp.fullAddress) != ETP_TMP ||
+                    os_memcmp(vars.tmp.fullAddress, ETP_POINTER, ETP_TMP) != 0
+                ) {
+                    PRINTF("PARSE ERROR OUTPUT ADDRESS != ATTACHMENT ADDRESS\n");
+                    return 0;
+                }
+                ETP_COUNTER += ETP_TMP;
+
+                // Content
+                ETP_TMP = *ETP_POINTER;
+                ETP_COUNTER += 1 + ETP_TMP;
+
+                ETP_OUT_TYPE = 61;
+            } else if (ETP_BUFF[0] == 2) { // MIT.STATUS.TRANSFER
+                // Symbol
+                ETP_TMP = *ETP_POINTER;
+                ETP_COUNTER += 1;
+                ETP_TLEN = ETP_MIN(ETP_TMP, sizeof(vars.tmp.fullAmount) - 1);
+                os_memmove(vars.tmp.fullAmount, ETP_POINTER, ETP_TLEN);
+                vars.tmp.fullAmount[ETP_TLEN] = '\0';
+                ETP_COUNTER += ETP_TMP;
+
+                // Address
+                ETP_TMP = *ETP_POINTER;
+                ETP_COUNTER += 1;
+                if (os_memcmp(vars.tmp.fullAddress, ETP_POINTER, ETP_TMP) != 0) {
+                    PRINTF("PARSE ERROR OUTPUT ADDRESS != ATTACHMENT ADDRESS\n");
+                    return 0;
+                }
+                ETP_COUNTER += ETP_TMP;
+
+                ETP_OUT_TYPE = 62;
+            } else {
+                PRINTF("PARSE ERROR UNKNOWN STATUS\n");
+                return 0;
+            }
+        } else {
+            PRINTF("PARSE ERROR UNKNOWN TYPE\n");
+            return 0;
+        }
+
+        PRINTF("ETP_OUT_TYPE %d\n", ETP_OUT_TYPE);
+
+        if (ETP_OUT_TYPE == 0 || ETP_OUT_TYPE == 22) {
+            vars.tmp.fullAmount[ETP_LENGTH] = ' ';
+            btchip_context_D.tmp = (unsigned char *)(vars.tmp.fullAmount + ETP_LENGTH + 1);
+            textSize = btchip_convert_hex_amount_to_displayable(amount, ETP_DECIMALS);
+            vars.tmp.fullAmount[textSize + ETP_LENGTH + 1] = '\0';
+            vars.tmp.fullAmount[sizeof(vars.tmp.fullAmount) - 1] = '\0';
+        }
+    }
+    #endif
 
     return 1;
 }
@@ -2386,7 +3022,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                         (unsigned char *)(vars.tmp.fullAmount +
                                           btchip_context_D.shortCoinIdLength +
                                           1);
-                    textSize = btchip_convert_hex_amount_to_displayable(amount);
+                    textSize = btchip_convert_hex_amount_to_displayable(amount, DECIMALS);
                     vars.tmp
                         .fullAmount[textSize +
                                     btchip_context_D.shortCoinIdLength + 1] =
@@ -2407,7 +3043,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                             (unsigned char *)(vars.tmp.feesAmount +
                                           btchip_context_D.shortCoinIdLength +
                                           1);
-                        textSize = btchip_convert_hex_amount_to_displayable(fees);
+                        textSize = btchip_convert_hex_amount_to_displayable(fees, DECIMALS);
                         vars.tmp
                             .feesAmount[textSize +
                                     btchip_context_D.shortCoinIdLength + 1] =
@@ -2477,6 +3113,30 @@ unsigned int btchip_bagl_confirm_single_output() {
 #if defined(TARGET_BLUE)
     ui_transaction_output_blue_init();
 #elif defined(HAVE_UX_FLOW)
+    #ifdef APP_METAVERSE
+    if (G_coin_config->kind == COIN_KIND_METAVERSE) {
+        // 0 - ETP, 21 - MST REG, 22 - MST TX, 3 - MESSAGE, 41 - AVA REG, 42 - AVA TX, 5 - CERT, 61 - MIT REG, 62 - MIT TX
+        if (ETP_OUT_TYPE == 21) {
+            ux_flow_init(0, ux_confirm_metaverse_mst_create_flow, NULL);
+        } else if (ETP_OUT_TYPE == 3) {
+            ux_flow_init(0, ux_confirm_metaverse_message_flow, NULL);
+        } else if (ETP_OUT_TYPE == 41 || ETP_OUT_TYPE == 42) {
+            ux_flow_init(0, ux_confirm_metaverse_avatar_create_flow, NULL);
+        } else if (ETP_OUT_TYPE == 5) {
+            ux_flow_init(0, ux_confirm_metaverse_cert_flow, NULL);
+        } else if (ETP_OUT_TYPE == 61) {
+            ux_flow_init(0, ux_confirm_metaverse_mit_create_flow, NULL);
+        } else if (ETP_OUT_TYPE == 62) {
+            ux_flow_init(0, ux_confirm_metaverse_mit_transfer_flow, NULL);
+        } else if (vars.tmp.metaverse_decimals[0] != '\0') {
+            ux_flow_init(0, ux_confirm_metaverse_decimals_flow, NULL);
+        } else { // 0, 22
+            ux_flow_init(0, ux_confirm_single_flow, NULL);
+        }
+
+        return 1;
+    }
+    #endif
     ux_flow_init(0, ux_confirm_single_flow, NULL);
 #elif defined(TARGET_NANOS)
     ux_step = 0;

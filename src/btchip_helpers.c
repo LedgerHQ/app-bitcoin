@@ -354,6 +354,20 @@ unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_pa
         return 1;
     }
 
+    #ifdef APP_METAVERSE
+    // Allow change path to be 0 or 1 (no security threats here)
+    if (G_coin_config->kind == COIN_KIND_METAVERSE) {
+        // If the account or address index is very high or if the change isn't 0 or 1, return a warning
+        if((bip32PathInt[BIP44_ACCOUNT_OFFSET]^0x80000000) > MAX_BIP44_ACCOUNT_RECOMMENDED ||
+           (bip32PathInt[BIP44_CHANGE_OFFSET] != 0 && bip32PathInt[BIP44_CHANGE_OFFSET] != 1) ||
+           bip32PathInt[BIP44_ADDRESS_INDEX_OFFSET] > MAX_BIP44_ADDRESS_INDEX_RECOMMENDED) {
+            return 1;
+        }
+
+        return 0;
+    }
+    #endif
+
     // If the account or address index is very high or if the change isn't 1, return a warning
     if((bip32PathInt[BIP44_ACCOUNT_OFFSET]^0x80000000) > MAX_BIP44_ACCOUNT_RECOMMENDED ||
        bip32PathInt[BIP44_CHANGE_OFFSET] != is_change_path?1:0 ||

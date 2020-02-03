@@ -38,6 +38,12 @@ static void btchip_apdu_hash_input_finalize_full_reset(void) {
     btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS;
     os_memset(btchip_context_D.totalOutputAmount, 0,
               sizeof(btchip_context_D.totalOutputAmount));
+    #ifdef APP_METAVERSE
+    if (G_coin_config->kind == COIN_KIND_METAVERSE) {
+        os_memset(btchip_context_D.totalTokenInputAmount, 0,
+            sizeof(btchip_context_D.totalTokenInputAmount));
+    }
+    #endif
     btchip_context_D.changeOutputFound = 0;
     btchip_set_check_internal_structure_integrity(1);
 }
@@ -106,7 +112,30 @@ static bool check_output_displayable() {
                 }
             }
         }
+
+        #ifdef APP_METAVERSE
+        if (G_coin_config->kind == COIN_KIND_METAVERSE) {
+            if (ETP_OUT_TYPE == 3 || ETP_OUT_TYPE == 21 || ETP_OUT_TYPE == 41 || ETP_OUT_TYPE == 42 || ETP_OUT_TYPE == 61 || ETP_OUT_TYPE == 62) {
+                changeFound = false; // Always display some transaction output types (even when it is for the same address as input)
+            }
+        }
+        #endif
+
         if (changeFound) {
+            #ifdef APP_METAVERSE
+            // Allow 2 change outputs for metaverse (ETP + token)
+            if (G_coin_config->kind == COIN_KIND_METAVERSE) {
+                if (btchip_context_D.changeOutputFound >= 2) {
+                    PRINTF("Error : Multiple change output found");
+                    THROW(EXCEPTION);
+                }
+                btchip_context_D.changeOutputFound++;
+                displayable = false;
+
+                return displayable;
+            }
+            #endif
+
             if (btchip_context_D.changeOutputFound) {
                 PRINTF("Error : Multiple change output found");
                 THROW(EXCEPTION);
@@ -171,6 +200,197 @@ static bool handle_output_state() {
         if (btchip_context_D.currentOutput[8] < 0xFD) {
             scriptSize = btchip_context_D.currentOutput[8];
             discardSize = 1;
+
+            #ifdef APP_METAVERSE
+            if (G_coin_config->kind == COIN_KIND_METAVERSE) { // Parsing output tx
+                ETP_OUT_TYPE = 255;
+                ETP_VERSION = 0;
+
+                unsigned char *parsePointer = btchip_context_D.currentOutput;
+                ETP_COUNTER = scriptSize + 9;
+
+                os_memmove(ETP_BUFF, ETP_POINTER, 4); // Version
+                ETP_COUNTER += 4;
+
+                if (
+                    ETP_BUFF[0] == 1 &&
+                    ETP_BUFF[1] == 0 &&
+                    ETP_BUFF[2] == 0 &&
+                    ETP_BUFF[3] == 0
+                ) {
+                    ETP_VERSION = 1;
+                } else if (
+                    ETP_BUFF[0] == 207 &&
+                    ETP_BUFF[1] == 0 &&
+                    ETP_BUFF[2] == 0 &&
+                    ETP_BUFF[3] == 0
+                ) {
+                    ETP_VERSION = 207;
+                }
+
+                if (ETP_VERSION != 1 && ETP_VERSION != 207) {
+                    PRINTF("PARSE ERROR ETP_VERSION %d\n", ETP_VERSION);
+                    THROW(EXCEPTION);
+                }
+
+                os_memmove(ETP_BUFF, ETP_POINTER, 4); // Type
+                ETP_COUNTER += 4;
+
+                if (ETP_VERSION == 207) {
+                    // to_did
+                    ETP_TMP = *ETP_POINTER;
+                    ETP_COUNTER += 1 + ETP_TMP;
+
+                    // from_did
+                    ETP_TMP = *ETP_POINTER;
+                    ETP_COUNTER += 1 + ETP_TMP;
+                }
+
+                if (
+                    ETP_BUFF[1] != 0 ||
+                    ETP_BUFF[2] != 0 ||
+                    ETP_BUFF[3] != 0
+                ) {
+                    PRINTF("PARSE ERROR Unknown ETP Type\n");
+                    THROW(EXCEPTION);
+                }
+
+                if (ETP_BUFF[0] == 0) { // ATTACHMENT.TYPE.ETP_TRANSFER
+                    ETP_OUT_TYPE = 0;
+                } else if (ETP_BUFF[0] == 2) { // ATTACHMENT.TYPE.MST
+                    os_memmove(ETP_BUFF, ETP_POINTER, 4); // Status
+                    ETP_COUNTER += 4;
+
+                    if (
+                        ETP_BUFF[1] != 0 ||
+                        ETP_BUFF[2] != 0 ||
+                        ETP_BUFF[3] != 0
+                    ) {
+                        PRINTF("PARSE ERROR Unknown ETP Status\n");
+                        THROW(EXCEPTION);
+                    }
+
+                    if (ETP_BUFF[0] == 1) { // MST.STATUS.REGISTER
+                        ETP_COUNTER += *ETP_POINTER + 1 + 16 + 1 + 1 + 2;
+                        // Length varint + Ticker length + maximum supply + precision + secondary issue threshold + '0000'
+
+                        ETP_COUNTER += *ETP_POINTER + 1; // issuer
+                        ETP_COUNTER += *ETP_POINTER + 1; // recipient address
+                        ETP_COUNTER += *ETP_POINTER + 1; // description
+
+                        ETP_OUT_TYPE = 21;
+                    } else if (ETP_BUFF[0] == 2) { // MST.STATUS.TRANSFER
+                        ETP_COUNTER += *ETP_POINTER + 1 + 8;
+                        // Length varint + Ticker length + Amount length
+
+                        btchip_swap_bytes(ETP_AMOUNT, ETP_POINTER - 8, 8);
+                        transaction_amount_sub_be(btchip_context_D.totalTokenInputAmount, btchip_context_D.totalTokenInputAmount, ETP_AMOUNT);
+
+                        ETP_OUT_TYPE = 22;
+                    } else {
+                        PRINTF("PARSE ERROR Unknown ETP Status\n");
+                        THROW(EXCEPTION);
+                    }
+                } else if (ETP_BUFF[0] == 3) { // ATTACHMENT.TYPE.MESSAGE
+                    // Message
+                    ETP_TMP = *ETP_POINTER;
+                    ETP_COUNTER += 1 + ETP_TMP;
+                    ETP_OUT_TYPE = 3;
+                } else if (ETP_BUFF[0] == 4) { // ATTACHMENT.TYPE.AVATAR
+                    os_memmove(ETP_BUFF, ETP_POINTER, 4); // Status
+                    ETP_COUNTER += 4;
+
+                    if (
+                        ETP_BUFF[1] != 0 ||
+                        ETP_BUFF[2] != 0 ||
+                        ETP_BUFF[3] != 0
+                    ) {
+                        PRINTF("PARSE ERROR Unknown ETP Status\n");
+                        THROW(EXCEPTION);
+                    }
+
+                    // Status = 1 | 2 (AVATAR.STATUS.REGISTER | AVATAR.STATUS.TRANSFER)
+                    if (ETP_BUFF[0] == 1 || ETP_BUFF[0] == 2) {
+                        // Symbol text length
+                        ETP_TMP = *ETP_POINTER;
+                        ETP_COUNTER += 1 + ETP_TMP;
+
+                        // Symbol address length
+                        ETP_TMP = *ETP_POINTER;
+                        ETP_COUNTER += 1 + ETP_TMP;
+
+                        ETP_OUT_TYPE = 41;
+                    } else {
+                        PRINTF("PARSE ERROR Unknown ETP Status\n");
+                        THROW(EXCEPTION);
+
+                        //ETP_OUT_TYPE = 42;
+                    }
+                } else if (ETP_BUFF[0] == 5) { // ATTACHMENT.TYPE.CERT
+                    // Symbol
+                    ETP_TMP = *ETP_POINTER;
+                    ETP_COUNTER += 1 + ETP_TMP;
+
+                    // Owner
+                    ETP_TMP = *ETP_POINTER;
+                    ETP_COUNTER += 1 + ETP_TMP;
+
+                    // Address
+                    ETP_TMP = *ETP_POINTER;
+                    ETP_COUNTER += 1 + ETP_TMP;
+
+                    os_memmove(ETP_BUFF, ETP_POINTER, 4);
+                    ETP_COUNTER += 4; // Cert
+
+                    ETP_COUNTER += 1; // Status
+
+                    if (true) { // Check currentOutput has more data
+                        // content
+                        ETP_TMP = *ETP_POINTER;
+                        ETP_COUNTER += 1 + ETP_TMP;
+                    }
+
+                    ETP_OUT_TYPE = 5;
+                } else if (ETP_BUFF[0] == 6) { // ATTACHMENT.TYPE.MIT
+                    ETP_BUFF[0] = *ETP_POINTER;
+                    ETP_COUNTER += 1; // Status
+
+                    if (ETP_BUFF[0] == 1) { // Constants.MIT.STATUS.REGISTER
+                        // Symbol
+                        ETP_TMP = *ETP_POINTER;
+                        ETP_COUNTER += 1 + ETP_TMP;
+
+                        // Address
+                        ETP_TMP = *ETP_POINTER;
+                        ETP_COUNTER += 1 + ETP_TMP;
+
+                        // content
+                        ETP_TMP = *ETP_POINTER;
+                        ETP_COUNTER += 1 + ETP_TMP;
+
+                        ETP_OUT_TYPE = 61;
+                    } else if (ETP_BUFF[0] == 2) { // Constants.MIT.STATUS.TRANSFER
+                        // Symbol
+                        ETP_TMP = *ETP_POINTER;
+                        ETP_COUNTER += 1 + ETP_TMP;
+
+                        // address
+                        ETP_TMP = *ETP_POINTER;
+                        ETP_COUNTER += 1 + ETP_TMP;
+
+                        os_memset(ETP_AMOUNT, 0, sizeof(ETP_AMOUNT));
+                        ETP_AMOUNT[0] = 1;
+                        transaction_amount_sub_be(btchip_context_D.totalTokenInputAmount, btchip_context_D.totalTokenInputAmount, ETP_AMOUNT);
+
+                        ETP_OUT_TYPE = 62;
+                    } else {
+                        PRINTF("PARSE ERROR Unknown ETP Status\n");
+                        THROW(EXCEPTION);
+                    }
+                }
+                scriptSize = ETP_COUNTER - 9;
+            }
+            #endif
         } else if (btchip_context_D.currentOutput[8] == 0xFD) {
             if (btchip_context_D.currentOutputOffset < 9 + 2) {
                 break;
@@ -252,6 +472,12 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
         }
     }
 
+    #ifdef APP_METAVERSE
+    if (G_coin_config->kind == COIN_KIND_METAVERSE) {
+        btchip_context_D.tmpCtx.output.multipleOutput = 1; // Disable BTCHIP_OUTPUT_HANDLE_LEGACY;
+    }
+    #endif
+
     // Check state
     BEGIN_TRY {
         TRY {
@@ -263,6 +489,19 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             }
 
             if (p1 == FINALIZE_P1_CHANGEINFO) {
+                #ifdef APP_METAVERSE
+                if (G_coin_config->kind == COIN_KIND_METAVERSE) {
+                    if (G_io_apdu_buffer[ISO_OFFSET_P2] == 0x0E) {
+                        // This command is used to specify decimal precision for tokens outputs
+                        if (apduLength > 4) { // For Metaverse can handle max 4 outputs with tokens
+                            goto discardTransaction;
+                        }
+                        os_memmove(btchip_context_D.decimals, G_io_apdu_buffer + ISO_OFFSET_CDATA, apduLength);
+                        goto return_OK;
+                    }
+                }
+                #endif
+
                 unsigned char keyLength;
                 if (!btchip_context_D.transactionContext.firstSigned) {
                 // Already validated, should be prevented on the client side

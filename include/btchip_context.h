@@ -241,7 +241,7 @@ struct btchip_context_s {
     unsigned int discardSize;
     unsigned char outputParsingState;
     unsigned char totalOutputAmount[8];
-    unsigned char changeOutputFound;    
+    unsigned char changeOutputFound;
 
     /* Overwinter */
     unsigned char usingOverwinter;
@@ -250,6 +250,11 @@ struct btchip_context_s {
     unsigned char nExpiryHeight[4];
     unsigned char nLockTime[4];
     unsigned char sigHashType[4];    
+
+    #ifdef APP_METAVERSE
+    unsigned char totalTokenInputAmount[8]; // same as totalOutputAmount, but for Tokens
+    unsigned char decimals[4]; // For Metaverse tokens, need to provide precision for all outputs from external source (maximum can handle 4 outputs with tokens)
+    #endif
 };
 typedef struct btchip_context_s btchip_context_t;
 
@@ -292,7 +297,8 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_XSN,
     COIN_KIND_NIX,
     COIN_KIND_LBRY,
-    COIN_KIND_RESISTANCE
+    COIN_KIND_RESISTANCE,
+    COIN_KIND_METAVERSE
 } btchip_coin_kind_t;
 
 typedef struct btchip_altcoin_config_s {
@@ -316,5 +322,22 @@ typedef struct btchip_altcoin_config_s {
 } btchip_altcoin_config_t;
 
 void btchip_context_init(void);
+
+#define DECIMALS (!(G_coin_config->flags & FLAG_PEERCOIN_UNITS) ? 8 : 6)
+
+#ifdef APP_METAVERSE
+// Metaverse reuse context variables to save memory
+#define ETP_COUNTER btchip_context_D.trustedInputIndex // unsigned long int
+#define ETP_BUFF btchip_context_D.nVersionGroupId // unsigned char[4]
+#define ETP_AMOUNT btchip_context_D.inputValue // unsigned char[8]
+#define ETP_DECIMALS btchip_context_D.nExpiryHeight[0] // unsigned char
+#define ETP_LENGTH btchip_context_D.nExpiryHeight[1] // unsigned char
+#define ETP_TMP btchip_context_D.nExpiryHeight[2] // unsigned char
+#define ETP_OUT_TYPE btchip_context_D.nExpiryHeight[3] // unsigned char
+#define ETP_VERSION btchip_context_D.overwinterSignReady // unsigned char
+#define ETP_TLEN btchip_context_D.overwinterSignReady // unsigned char
+#define ETP_POINTER (parsePointer + ETP_COUNTER)
+#define ETP_MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
 
 #endif
