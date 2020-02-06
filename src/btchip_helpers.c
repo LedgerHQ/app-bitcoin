@@ -234,13 +234,21 @@ void btchip_public_key_hash160(unsigned char *in, unsigned short inlen,
     cx_hash(&u.riprip.header, CX_LAST, buffer, 32, out, 20);
 }
 
+void btchip_compute_checksum(unsigned char* in, unsigned short inlen, unsigned char * output) {
+    unsigned char checksumBuffer[32];
+    cx_hash_sha256(in, inlen, checksumBuffer, 32);
+    cx_hash_sha256(checksumBuffer, 32, checksumBuffer, 32);
+
+    PRINTF("Checksum\n%.*H\n",4,checksumBuffer);
+    os_memmove(output, checksumBuffer, 4);
+}
+
 unsigned short btchip_public_key_to_encoded_base58(
     unsigned char *in, unsigned short inlen, unsigned char *out,
     unsigned short outlen, unsigned short version,
     unsigned char alreadyHashed) {
     unsigned char tmpBuffer[26];
-    unsigned char checksumBuffer[32];
-    cx_sha256_t hash;
+    
     unsigned char versionSize = (version > 255 ? 2 : 1);
     size_t outputLen;
 
@@ -258,13 +266,7 @@ unsigned short btchip_public_key_to_encoded_base58(
         os_memmove(tmpBuffer, in, 20 + versionSize);
     }
 
-    cx_sha256_init(&hash);
-    cx_hash(&hash.header, CX_LAST, tmpBuffer, 20 + versionSize, checksumBuffer, 32);
-    cx_sha256_init(&hash);
-    cx_hash(&hash.header, CX_LAST, checksumBuffer, 32, checksumBuffer, 32);
-
-    PRINTF("Checksum\n%.*H\n",4,checksumBuffer);
-    os_memmove(tmpBuffer + 20 + versionSize, checksumBuffer, 4);
+    btchip_compute_checksum(tmpBuffer, 20 + versionSize, tmpBuffer + 20 + versionSize);
 
     outputLen = outlen;
     if (btchip_encode_base58(tmpBuffer, 24 + versionSize, out, &outputLen) < 0) {
