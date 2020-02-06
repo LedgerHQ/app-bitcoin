@@ -33,7 +33,7 @@ typedef struct get_printable_amount_parameters_s {
     unsigned char* amount; 
     unsigned char amount_length;
     // OUT
-    char printable_amont[30];
+    char printable_amount[30];
 } get_printable_amount_parameters_t;
 
 typedef struct create_transaction_parameters_s {

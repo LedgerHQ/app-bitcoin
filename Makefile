@@ -238,7 +238,7 @@ DEFINES       += HAVE_UX_FLOW
 endif
 
 # Enabling debug PRINTF
-DEBUG = 0
+DEBUG = 1
 ifneq ($(DEBUG),0)
         ifeq ($(TARGET_NAME),TARGET_NANOX)
                 DEFINES   += HAVE_PRINTF PRINTF=mcu_usb_printf

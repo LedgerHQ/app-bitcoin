@@ -31,6 +31,8 @@
 #include "glyphs.h"
 #include "swap_lib_calls.h"
 
+#include "usbd_core.h"
+
 #define __NAME3(a, b, c) a##b##c
 #define NAME3(a, b, c) __NAME3(a, b, c)
 
@@ -2817,21 +2819,20 @@ void coin_main(btchip_altcoin_config_t *config) {
 }
 
 void library_main(btchip_altcoin_config_t *config, unsigned int call_id, unsigned int* call_parameters, unsigned int* return_value) {
-    G_coin_config = config;
     *return_value = 0;
     BEGIN_TRY {
         TRY {
             PRINTF("Insied library \n");
             switch (call_id) {
                 case CHECK_ADDRESS_IN:
-                    handle_check_address((check_address_parameters_t*)call_parameters);
+                    handle_check_address((check_address_parameters_t*)call_parameters, config);
                     *return_value = CHECK_ADDRESS_OUT;
                 break;
                 case SIGN_TRANSACTION_IN:
                     *return_value = SIGN_TRANSACTION_OUT;
                 break;
                 case GET_PRINTABLE_AMOUNT_IN:
-                    handle_get_printable_amount((get_printable_amount_parameters_t*)call_parameters);
+                    handle_get_printable_amount((get_printable_amount_parameters_t*)call_parameters, config);
                     *return_value = GET_PRINTABLE_AMOUNT_OUT;
                 break;
             }
@@ -2877,6 +2878,8 @@ __attribute__((section(".boot"))) int main(int arg0) {
 #endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
     BEGIN_TRY {
         TRY {
+            USBD_Device.dev_state = USBD_STATE_CONFIGURED;
+            PRINTF("Hello from litecoin\n");
             check_api_level(CX_COMPAT_APILEVEL);
             // delegate to bitcoin app/lib
             libcall_params[0] = "Bitcoin";
@@ -2905,6 +2908,10 @@ __attribute__((section(".boot"))) int main(int arg0) {
     // exit critical section
     __asm volatile("cpsie i");
     
+    // TODO: delete me
+        USBD_Device.dev_state = USBD_STATE_CONFIGURED;
+        PRINTF("Hello from bitcoin\n");
+    //////////////////
 
     // ensure exception will work as planned
     os_boot();
