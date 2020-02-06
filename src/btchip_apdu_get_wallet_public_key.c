@@ -22,15 +22,7 @@
 
 #include "segwit_addr.h"
 #include "cashaddr.h"
-
-#define P1_NO_DISPLAY 0x00
-#define P1_DISPLAY 0x01
-#define P1_REQUEST_TOKEN 0x02
-
-#define P2_LEGACY 0x00
-#define P2_SEGWIT 0x01
-#define P2_NATIVE_SEGWIT 0x02
-#define P2_CASHADDR 0x03
+#include "btchip_apdu_get_wallet_public_key.h"
 
 unsigned short btchip_apdu_get_wallet_public_key() {
     unsigned char keyLength;
