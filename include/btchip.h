@@ -1,6 +1,6 @@
 /*******************************************************************************
-*   Ledger Blue - Bitcoin Wallet
-*   (c) 2016 Ledger
+*   Ledger App - Bitcoin Wallet
+*   (c) 2016-2019 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -21,13 +21,12 @@
 
 #include "btchip_config.h"
 #include "os.h"
+#include "os_io_seproxyhal.h"
 
 #include "stdlib.h"
 #include "stdbool.h"
 
-#define L_DEBUG_APP(x)
 #define L_DEBUG_NOPREFIX(x)
-#define L_DEBUG_BUF(x)
 
 #define SW_TECHNICAL_DETAILS(x) BTCHIP_SW_TECHNICAL_PROBLEM
 

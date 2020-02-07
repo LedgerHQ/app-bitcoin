@@ -1,6 +1,6 @@
 /*******************************************************************************
-*   Ledger Blue - Bitcoin Wallet
-*   (c) 2016 Ledger
+*   Ledger App - Bitcoin Wallet
+*   (c) 2016-2019 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@ void btchip_autosetup(void);
  * Initialize the application context on boot
  */
 void btchip_context_init() {
-    L_DEBUG_APP(("Context init\n"));
-    L_DEBUG_APP(("Backup size %d\n", sizeof(N_btchip.bkp)));
+    PRINTF("Context init\n");
+    PRINTF("Backup size %d\n", sizeof(N_btchip.bkp));
     os_memset(&btchip_context_D, 0, sizeof(btchip_context_D));
     SB_SET(btchip_context_D.halted, 0);
     btchip_context_D.currentOutputOffset = 0;
@@ -39,7 +39,7 @@ void btchip_context_init() {
 
     if (!N_btchip.config_valid) {
         unsigned char defaultMode;
-        L_DEBUG_APP(("No configuration found\n"));
+        PRINTF("No configuration found\n");
         defaultMode = BTCHIP_MODE_SETUP_NEEDED;
 
         btchip_set_operation_mode(defaultMode);
