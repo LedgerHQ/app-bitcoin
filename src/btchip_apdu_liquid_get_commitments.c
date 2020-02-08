@@ -68,7 +68,7 @@ unsigned short btchip_apdu_liquid_get_commitments() {
         }
         btchip_derive_abf_vbf(outputIndex, true, abf);
             
-        liquid_crypto_generator_tweak_full(LIQUID_ASSETS[assetIndex].generator, abf, generator);
+        liquid_crypto_generator_tweak_full(LIQUID_ASSETS[assetIndex].generator, abf, generator, G_io_apdu_buffer);
         liquid_crypto_pedersen_commit(vbf, value, generator, commitment);
 
         os_memmove(G_io_apdu_buffer + offset, abf, 32);

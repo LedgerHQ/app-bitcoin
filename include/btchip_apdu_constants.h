@@ -87,6 +87,7 @@
 #define BTCHIP_INS_LIQUID_GET_NONCE 0xE4
 #define BTCHIP_INS_LIQUID_PROVIDE_ISSUANCE_INFORMATION 0xE6
 #define BTCHIP_INS_LIQUID_GET_BLINDING_FACTOR 0xE8
+#define BTCHIP_INS_LIQUID_GET_GREEN_WALLET_ADDRESS 0xEA
 
 #define BTCHIP_SW_PIN_REMAINING_ATTEMPTS 0x63C0
 #define BTCHIP_SW_INCORRECT_LENGTH 0x6700
@@ -166,6 +167,7 @@ unsigned short btchip_apdu_liquid_get_public_blinding_key(void);
 unsigned short btchip_apdu_liquid_get_nonce(void);
 unsigned short btchip_apdu_liquid_provide_issuance_information(void);
 unsigned short btchip_apdu_liquid_get_blinding_factor(void);
+unsigned short btchip_apdu_liquid_get_green_wallet_address(void);
 
 unsigned short btchip_apdu_not_implemented(void);
 

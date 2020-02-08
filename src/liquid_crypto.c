@@ -187,8 +187,8 @@ void liquid_crypto_pedersen_commit(unsigned char *blindingFactor, uint8_t *value
 	os_memmove(output + 1, point1 + 1, 32);
 }
 
-void liquid_crypto_generator_tweak_full(unsigned char *generator, unsigned char *blindingFactor, unsigned char *output) {
-	uint8_t *point1 = G_io_apdu_buffer;
+void liquid_crypto_generator_tweak_full(unsigned char *generator, unsigned char *blindingFactor, unsigned char *output, unsigned char *tmp65) {
+	uint8_t *point1 = tmp65;
 	os_memmove(point1, PEDERSEN_GENERATOR, 65);
 	cx_ecfp_scalar_mult(CX_CURVE_SECP256K1, point1, 65, blindingFactor, 32);
 	cx_ecfp_add_point(CX_CURVE_SECP256K1, output, generator, point1, 65);

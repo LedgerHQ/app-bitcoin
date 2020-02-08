@@ -65,7 +65,7 @@ extern unsigned char const TWOPOWER[8];
 
 #define APDU_BASE_LENGTH 13
 
-#define DISPATCHER_APDUS 19
+#define DISPATCHER_APDUS 20
 
 typedef unsigned short (*apduProcessingFunction)(void);
 
@@ -73,7 +73,6 @@ extern unsigned char const DISPATCHER_CLA[DISPATCHER_APDUS];
 extern unsigned char const DISPATCHER_INS[DISPATCHER_APDUS];
 extern unsigned char const DISPATCHER_DATA_IN[DISPATCHER_APDUS];
 extern apduProcessingFunction const DISPATCHER_FUNCTIONS[DISPATCHER_APDUS];
-
 
 
 #endif /* _BTCHIP_ROM_VARIABLES_ */

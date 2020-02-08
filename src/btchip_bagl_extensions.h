@@ -49,4 +49,7 @@ void btchip_bagl_user_action_display(unsigned char confirming);
 void btchip_bagl_request_pubkey_approval(void);
 void btchip_bagl_request_change_path_approval(unsigned char* change_path);
 
+// Liquid extensions
+void btchip_bagl_liquid_display_green_address(void);
+
 #endif /* _BTCHIP_BAGL_H_ */

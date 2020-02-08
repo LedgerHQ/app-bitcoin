@@ -1972,6 +1972,40 @@ UX_FLOW(ux_request_change_path_approval_flow,
   &ux_request_change_path_approval_flow_4_step
 );
 
+#ifdef HAVE_LIQUID
+
+UX_STEP_NOCB(
+    ux_display_liquid_green_address_flow_1_step, 
+    bnnn_paging, 
+    {
+      .title = "Address",
+      .text = G_io_apdu_buffer,
+    });
+UX_STEP_VALID(
+    ux_display_liquid_green_address_flow_2_step, 
+    pb, 
+    io_seproxyhal_touch_display_ok(NULL),
+    {
+      &C_icon_validate_14,
+      "Approve",
+    });
+UX_STEP_VALID(
+    ux_display_liquid_green_address_flow_3_step, 
+    pb, 
+    io_seproxyhal_touch_display_cancel(NULL),
+    {
+      &C_icon_crossmark,
+      "Reject",
+    });
+
+UX_FLOW(ux_display_liquid_green_address_flow,
+  &ux_display_liquid_green_address_flow_1_step,
+  &ux_display_liquid_green_address_flow_2_step,
+  &ux_display_liquid_green_address_flow_3_step
+);
+
+#endif // HAVE_LIQUID
+
 #endif // #if defined(HAVE_UX_FLOW)
 
 void ui_idle(void) {
@@ -2742,6 +2776,16 @@ void btchip_bagl_request_change_path_approval(unsigned char* change_path)
     UX_DISPLAY(ui_request_change_path_approval_nanos, ui_request_change_path_approval_nanos_prepro);
 #endif // #if TARGET_ID
 }
+
+#ifdef HAVE_LIQUID
+
+void btchip_bagl_liquid_display_green_address() {
+
+    ux_flow_init(0, ux_display_liquid_green_address_flow, NULL);
+    
+}
+
+#endif // HAVE_LIQUID
 
 void app_exit(void) {
     BEGIN_TRY_L(exit) {
