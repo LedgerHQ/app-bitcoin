@@ -225,7 +225,7 @@ void btchip_public_key_hash160(unsigned char *in, unsigned short inlen,
     cx_sha256_init(&u.shasha);
     cx_hash(&u.shasha.header, CX_LAST, in, inlen, buffer, 32);
     cx_ripemd160_init(&u.riprip);
-    cx_hash(&u.riprip.header, CX_LAST, buffer, 32, out, 32);
+    cx_hash(&u.riprip.header, CX_LAST, buffer, 32, out, 20);
 }
 
 unsigned short btchip_public_key_to_encoded_base58(
