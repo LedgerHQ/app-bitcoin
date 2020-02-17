@@ -149,7 +149,7 @@ unsigned short btchip_apdu_hash_sign() {
             else {
                 btchip_write_u32_le(dataBuffer, lockTime);
                 btchip_write_u32_le(dataBuffer + 4, sighashType);
-                PRINTF("Finalize hash with\n%.*H\n", sizeof(dataBuffer), dataBuffer);
+                PRINTF("--- ADD TO HASH FULL:\n%.*H\n", sizeof(dataBuffer), dataBuffer);
 
                 cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
                     dataBuffer, sizeof(dataBuffer), hash1, 32);
