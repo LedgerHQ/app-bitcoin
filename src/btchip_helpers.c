@@ -124,22 +124,24 @@ unsigned char btchip_output_script_is_op_return(unsigned char *buffer) {
     return (buffer[1] == 0x6A);
 }
 
-unsigned char btchip_output_script_is_op_create(unsigned char *buffer,
-                                                size_t size) {
+static unsigned char output_script_is_op_create_or_call(unsigned char *buffer,
+                                                        size_t size,
+                                                        unsigned char value) {
     return (!btchip_output_script_is_regular(buffer) &&
             !btchip_output_script_is_p2sh(buffer) &&
             !btchip_output_script_is_op_return(buffer) && (buffer[0] <= 0xEA) &&
             (buffer[0] < size) &&
-            (buffer[buffer[0]] == 0xC1));
+            (buffer[buffer[0]] == value));
+}
+
+unsigned char btchip_output_script_is_op_create(unsigned char *buffer,
+                                                size_t size) {
+    return output_script_is_op_create_or_call(buffer, size, 0xC1);
 }
 
 unsigned char btchip_output_script_is_op_call(unsigned char *buffer,
                                               size_t size) {
-    return (!btchip_output_script_is_regular(buffer) &&
-            !btchip_output_script_is_p2sh(buffer) &&
-            !btchip_output_script_is_op_return(buffer) && (buffer[0] <= 0xEA) &&
-            (buffer[0] < size) &&
-            (buffer[buffer[0]] == 0xC2));
+    return output_script_is_op_create_or_call(buffer, size, 0xC2);
 }
 
 unsigned char btchip_rng_u8_modulo(unsigned char modulo) {
