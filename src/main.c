@@ -2067,11 +2067,13 @@ uint8_t prepare_single_output() {
             strcpy(vars.tmp.fullAddress, "OP_RETURN");
     } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
                btchip_output_script_is_op_create(
-                   btchip_context_D.currentOutput + offset)) {
+                   btchip_context_D.currentOutput + offset,
+                   sizeof(btchip_context_D.currentOutput) - offset)) {
         strcpy(vars.tmp.fullAddress, "OP_CREATE");
     } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
-               btchip_output_script_is_op_call(btchip_context_D.currentOutput +
-                                               offset)) {
+               btchip_output_script_is_op_call(
+                 btchip_context_D.currentOutput + offset,
+                 sizeof(btchip_context_D.currentOutput) - offset)) {
         strcpy(vars.tmp.fullAddress, "OP_CALL");
     } else if (nativeSegwit) {
         addressOffset = offset + OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET;
@@ -2218,9 +2220,11 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         isNativeSegwit = btchip_output_script_is_native_witness(
             btchip_context_D.currentOutput + offset);
         isOpCreate = btchip_output_script_is_op_create(
-            btchip_context_D.currentOutput + offset);
+            btchip_context_D.currentOutput + offset,
+            sizeof(btchip_context_D.currentOutput) - offset);
         isOpCall = btchip_output_script_is_op_call(
-            btchip_context_D.currentOutput + offset);
+            btchip_context_D.currentOutput + offset,
+            sizeof(btchip_context_D.currentOutput) - offset);
         // Always notify OP_RETURN to the user
         if (nullAmount && isOpReturn) {
             if (!checkOnly) {
@@ -2307,9 +2311,11 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                  !btchip_output_script_is_op_return(
                      btchip_context_D.currentOutput + offset + 8) &&
                  !btchip_output_script_is_op_create(
-                     btchip_context_D.currentOutput + offset + 8) &&
+                     btchip_context_D.currentOutput + offset + 8,
+                     sizeof(btchip_context_D.currentOutput) - offset - 8) &&
                  !btchip_output_script_is_op_call(
-                     btchip_context_D.currentOutput + offset + 8)) ||
+                     btchip_context_D.currentOutput + offset + 8,
+                     sizeof(btchip_context_D) - offset - 8)) ||
                 (!(G_coin_config->kind == COIN_KIND_QTUM) &&
                  !btchip_output_script_is_op_return(
                      btchip_context_D.currentOutput + offset + 8))) {

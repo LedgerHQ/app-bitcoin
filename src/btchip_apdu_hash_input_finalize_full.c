@@ -65,9 +65,11 @@ static bool check_output_displayable() {
     isNativeSegwit = btchip_output_script_is_native_witness(
         btchip_context_D.currentOutput + 8);
     isOpCreate =
-        btchip_output_script_is_op_create(btchip_context_D.currentOutput + 8);
+        btchip_output_script_is_op_create(btchip_context_D.currentOutput + 8,
+          sizeof(btchip_context_D.currentOutput) - 8);
     isOpCall =
-        btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8);
+        btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8,
+          sizeof(btchip_context_D.currentOutput) - 8);
     if (((G_coin_config->kind == COIN_KIND_QTUM) &&
          !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
          !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate && !isOpCall) ||
