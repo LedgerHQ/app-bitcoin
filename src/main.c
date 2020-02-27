@@ -2692,6 +2692,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
     // in RAM allocation (on stack), to allow simple simple traversal into the
     // bitcoin app (separate NVRAM zone)
     btchip_altcoin_config_t coin_config;
+    os_memset(&coin_config, 0, sizeof(btchip_altcoin_config_t));
     coin_config.p2pkh_version = COIN_P2PKH_VERSION;
     coin_config.p2sh_version = COIN_P2SH_VERSION;
     coin_config.family = COIN_FAMILY;
