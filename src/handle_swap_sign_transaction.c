@@ -2,13 +2,18 @@
 #include "btchip_public_ram_variables.h"
 #include "btchip_context.h"
 #include "usbd_core.h"
+#include "ux.h"
+
 
 void handle_swap_sign_transaction(create_transaction_parameters_t* get_printable_amount_params, btchip_altcoin_config_t *config) {
     G_coin_config = config;
     btchip_context_init();
+    io_seproxyhal_init();
+    UX_INIT();
     PRINTF("I am back from btchip_context_init\n");
     USB_power(0);
     USB_power(1);
+    ui_idle();
     PRINTF("USB power ON/OFF\n");
 #ifdef TARGET_NANOX
     // grab the current plane mode setting
