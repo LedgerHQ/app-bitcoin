@@ -2728,10 +2728,6 @@ __attribute__((section(".boot"))) int main(int arg0) {
 #endif // COIN_FLAGS
     coin_config.kind = COIN_KIND;
 
-// TODO: delete me
-        USBD_Device.dev_state = USBD_STATE_CONFIGURED;
-//////////////////
-
 #ifdef USE_LIB_BITCOIN
     unsigned int libcall_params[4];
     BEGIN_TRY {
