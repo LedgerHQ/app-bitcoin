@@ -28,11 +28,8 @@ unsigned short btchip_apdu_hash_sign() {
     unsigned char hash2[32];
     unsigned char authorizationLength;
     unsigned char *parameters = G_io_apdu_buffer + ISO_OFFSET_CDATA;
-    btchip_transaction_summary_t
-        transactionSummary; // could be removed with a refactor
     unsigned short sw;
     unsigned char keyPath[MAX_BIP32_PATH_LENGTH];
-    cx_sha256_t localHash;
 
     SB_CHECK(N_btchip.bkp.config.operationMode);
     switch (SB_GET(N_btchip.bkp.config.operationMode)) {
@@ -128,12 +125,6 @@ unsigned short btchip_apdu_hash_sign() {
                 }
             }
 
-            // Read transaction parameters
-            // TODO : remove copy
-            os_memmove(&transactionSummary,
-                       &btchip_context_D.transactionSummary,
-                       sizeof(transactionSummary));
-
             // Fetch the private key
 
             btchip_private_derive_keypair(keyPath, 0, NULL);
@@ -156,8 +147,7 @@ unsigned short btchip_apdu_hash_sign() {
                 PRINTF("Hash1\n%.*H\n", sizeof(hash1), hash1);
 
                 // Rehash
-                cx_sha256_init(&localHash);
-                cx_hash(&localHash.header, CX_LAST, hash1, sizeof(hash1), hash2, 32);
+                cx_hash_sha256(hash1, sizeof(hash1), hash2, 32);
             }
             PRINTF("Hash2\n%.*H\n", sizeof(hash2), hash2);
 
