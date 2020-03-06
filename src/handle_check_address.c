@@ -68,7 +68,7 @@ bool get_address_from_compressed_public_key(
             address_length = btchip_public_key_to_encoded_base58(
                 tmp,                   // IN
                 22,                    // INLEN
-                G_io_apdu_buffer + 67, // OUT
+                address,               // OUT
                 150,                   // MAXOUTLEN
                 payToScriptHashVersion, 0);
             address[address_length] = 0;
