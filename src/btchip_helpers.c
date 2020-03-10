@@ -222,16 +222,12 @@ void btchip_retrieve_keypair_discard(unsigned char *privateComponent,
 
 void btchip_public_key_hash160(unsigned char *in, unsigned short inlen,
                                unsigned char *out) {
-    union {
-        cx_sha256_t shasha;
-        cx_ripemd160_t riprip;
-    } u;
+    cx_ripemd160_t riprip;
     unsigned char buffer[32];
 
-    cx_sha256_init(&u.shasha);
-    cx_hash(&u.shasha.header, CX_LAST, in, inlen, buffer, 32);
-    cx_ripemd160_init(&u.riprip);
-    cx_hash(&u.riprip.header, CX_LAST, buffer, 32, out, 20);
+    cx_hash_sha256(in, inlen, buffer, 32);
+    cx_ripemd160_init(&riprip);
+    cx_hash(&riprip.header, CX_LAST, buffer, 32, out, 32);
 }
 
 void btchip_compute_checksum(unsigned char* in, unsigned short inlen, unsigned char * output) {

@@ -238,7 +238,7 @@ DEFINES       += HAVE_UX_FLOW
 endif
 
 # Enabling debug PRINTF
-DEBUG = 1
+DEBUG = 0
 ifneq ($(DEBUG),0)
         ifeq ($(TARGET_NAME),TARGET_NANOX)
                 DEFINES   += HAVE_PRINTF PRINTF=mcu_usb_printf
@@ -272,7 +272,7 @@ CC       := $(CLANGPATH)clang
 
 #CFLAGS   += -O0
 CFLAGS   += -O3 -Os
-
+CFLAGS   += -I/usr/include/
 AS     := $(GCCPATH)arm-none-eabi-gcc
 
 LD       := $(GCCPATH)arm-none-eabi-gcc
