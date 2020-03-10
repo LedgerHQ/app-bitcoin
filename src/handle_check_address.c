@@ -85,6 +85,23 @@ bool get_address_from_compressed_public_key(
     return true;
 }
 
+bool derive_compressed_public_key_from_serialized_path(
+    unsigned char* serialized_path,
+    unsigned char serialized_path_length,
+    unsigned char* compressed_public_key,
+    unsigned char compressed_public_key_length) {
+    bip32_path_t path;
+    if (!parse_serialized_path(&path, serialized_path, serialized_path_length)) {
+        PRINTF("Can't parse path\n");
+        return false;
+    }
+    if (!derive_compressed_public_key(&path, compressed_public_key, compressed_public_key_length)) {
+        PRINTF("Can't derive public key on given address\n");
+        return false;
+    }
+    return true;
+}
+
 void handle_check_address(check_address_parameters_t* params, btchip_altcoin_config_t* coin_config) {
     unsigned char compressed_public_key[33];
     PRINTF("Params on the address %d\n",(unsigned int)params);
@@ -95,15 +112,14 @@ void handle_check_address(check_address_parameters_t* params, btchip_altcoin_con
         PRINTF("Address to check == 0\n");
         return;
     }
-    bip32_path_t path;
-    if (!parse_serialized_path(&path, params->address_parameters + 1,params->address_parameters_length - 1)) {
-        PRINTF("Can't parse \n");
+    if (!derive_compressed_public_key_from_serialized_path(
+        params->address_parameters + 1,
+        params->address_parameters_length - 1,
+        compressed_public_key,
+        sizeof(compressed_public_key))) {
         return;
     }
-    if (!derive_compressed_public_key(&path, compressed_public_key, sizeof(compressed_public_key))) {
-        PRINTF("Can't derive public key on given address\n");
-        return;
-    }
+    
     char address[51];
     if (!get_address_from_compressed_public_key(
         params->address_parameters[0],
