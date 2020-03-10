@@ -234,11 +234,12 @@ DEFINES       += HAVE_BAGL_ELLIPSIS # long label truncation feature
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_REGULAR_11PX
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_EXTRABOLD_11PX
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_LIGHT_16PX
-DEFINES		    += HAVE_UX_FLOW
+DEFINES	      += HAVE_UX_FLOW
 endif
 
+DEFINES	      += HAVE_STACK_OVERFLOW_CHECK
 # Enabling debug PRINTF
-DEBUG = 1
+DEBUG = 0
 ifneq ($(DEBUG),0)
 
         ifeq ($(TARGET_NAME),TARGET_NANOX)
@@ -273,7 +274,7 @@ CC       := $(CLANGPATH)clang
 
 #CFLAGS   += -O0
 CFLAGS   += -O3 -Os
-
+CFLAGS   += -I/usr/include/
 AS     := $(GCCPATH)arm-none-eabi-gcc
 
 LD       := $(GCCPATH)arm-none-eabi-gcc
