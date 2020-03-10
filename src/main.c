@@ -2611,7 +2611,7 @@ void app_exit(void) {
     END_TRY_L(exit);
 }
 
-void coin_main(btchip_altcoin_config_t *config) {
+void coin_main_with_config(btchip_altcoin_config_t *config) {
     G_coin_config = config;
     for (;;) {
         UX_INIT();
@@ -2661,7 +2661,44 @@ void coin_main(btchip_altcoin_config_t *config) {
     app_exit();
 }
 
-void library_main(btchip_altcoin_config_t *config, unsigned int call_id, unsigned int* call_parameters, unsigned int* return_value) {
+void init_coin_config(btchip_altcoin_config_t *coin_config) {
+    os_memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
+    coin_config->p2pkh_version = COIN_P2PKH_VERSION;
+    coin_config->p2sh_version = COIN_P2SH_VERSION;
+    coin_config->family = COIN_FAMILY;
+#ifdef TARGET_BLUE
+    strcpy(coin_config->header, COIN_COINID_HEADER);
+    coin_config.color_header = COIN_COLOR_HDR;
+    coin_config.color_dashboard = COIN_COLOR_DB;
+#endif // TARGET_BLUE
+    strcpy(coin_config->coinid, COIN_COINID);
+    strcpy(coin_config->name, COIN_COINID_NAME);
+    strcpy(coin_config->name_short, COIN_COINID_SHORT);
+#ifdef COIN_NATIVE_SEGWIT_PREFIX
+    strcpy(coin_config->native_segwit_prefix_val, COIN_NATIVE_SEGWIT_PREFIX);
+    coin_config->native_segwit_prefix = coin_config->native_segwit_prefix_val;
+#else
+    coin_config->native_segwit_prefix = 0;
+#endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
+#ifdef COIN_FORKID
+    coin_config->forkid = COIN_FORKID;
+#endif // COIN_FORKID
+#ifdef COIN_CONSENSUS_BRANCH_ID
+    coin_config->zcash_consensus_branch_id = COIN_CONSENSUS_BRANCH_ID;
+#endif // COIN_CONSENSUS_BRANCH_ID
+#ifdef COIN_FLAGS
+    coin_config->flags = COIN_FLAGS;
+#endif // COIN_FLAGS
+    coin_config->kind = COIN_KIND;
+}
+
+void coin_main() {
+    btchip_altcoin_config_t coin_config;
+    init_coin_config(&coin_config);
+    coin_main_with_config(&coin_config);
+}
+
+void library_main_with_config(btchip_altcoin_config_t *config, unsigned int call_id, unsigned int* call_parameters, unsigned int* return_value) {
     *return_value = 0;
     BEGIN_TRY {
         TRY {
@@ -2688,50 +2725,19 @@ void library_main(btchip_altcoin_config_t *config, unsigned int call_id, unsigne
     app_exit();
 }
 
-__attribute__((section(".boot"))) int main(int arg0) {
-    // in RAM allocation (on stack), to allow simple simple traversal into the
-    // bitcoin app (separate NVRAM zone)
+void library_main(unsigned int call_id, unsigned int* call_parameters, unsigned int* return_value) {
     btchip_altcoin_config_t coin_config;
-    os_memset(&coin_config, 0, sizeof(btchip_altcoin_config_t));
-    coin_config.p2pkh_version = COIN_P2PKH_VERSION;
-    coin_config.p2sh_version = COIN_P2SH_VERSION;
-    coin_config.family = COIN_FAMILY;
-#ifdef TARGET_BLUE
-    unsigned char header[sizeof(COIN_COINID_HEADER)];
-    strcpy(header, COIN_COINID_HEADER);
-    coin_config.header_text = header;
-    coin_config.color_header = COIN_COLOR_HDR;
-    coin_config.color_dashboard = COIN_COLOR_DB;
-#endif // TARGET_BLUE
-    unsigned char coinid[sizeof(COIN_COINID)];
-    strcpy(coinid, COIN_COINID);
-    unsigned char name[sizeof(COIN_COINID_NAME)];
-    strcpy(name, COIN_COINID_NAME);
-    unsigned char name_short[sizeof(COIN_COINID_SHORT)];
-    strcpy(name_short, COIN_COINID_SHORT);
-    coin_config.coinid = coinid;
-    coin_config.name = name;
-    coin_config.name_short = name_short;
-#ifdef COIN_NATIVE_SEGWIT_PREFIX
-    unsigned char native_segwit_prefix[sizeof(COIN_NATIVE_SEGWIT_PREFIX)];
-    strcpy(native_segwit_prefix, COIN_NATIVE_SEGWIT_PREFIX);
-    coin_config.native_segwit_prefix = native_segwit_prefix;
-#endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
-#ifdef COIN_FORKID
-    coin_config.forkid = COIN_FORKID;
-#endif // COIN_FORKID
-#ifdef COIN_CONSENSUS_BRANCH_ID
-    coin_config.zcash_consensus_branch_id = COIN_CONSENSUS_BRANCH_ID;
-#endif // COIN_CONSENSUS_BRANCH_ID
-#ifdef COIN_FLAGS
-    coin_config.flags = COIN_FLAGS;
-#endif // COIN_FLAGS
-    coin_config.kind = COIN_KIND;
+    init_coin_config(&coin_config);
+    library_main_with_config(&coin_config, call_id, call_parameters, return_value);
+}
 
+__attribute__((section(".boot"))) int main(int arg0) {
 #ifdef USE_LIB_BITCOIN
     unsigned int libcall_params[4];
     BEGIN_TRY {
         TRY {
+            btchip_altcoin_config_t coin_config;
+            init_coin_config(&coin_config);
             PRINTF("Hello from litecoin\n");
             check_api_level(CX_COMPAT_APILEVEL);
             // delegate to bitcoin app/lib
@@ -2766,20 +2772,20 @@ __attribute__((section(".boot"))) int main(int arg0) {
     os_boot();
     if (!arg0) {
         // Bitcoin application launched from dashboard
-        coin_main(&coin_config);
+        coin_main();
         return 0;
     }
     unsigned int call_id = ((unsigned int *)arg0)[0];
     if (call_id == 0x100) {
         // *coin application launched from dashboard
-        coin_main((btchip_altcoin_config_t *)((unsigned int *)arg0)[1]);
+        coin_main_with_config((btchip_altcoin_config_t *)((unsigned int *)arg0)[1]);
         return 0;
     }
     // Called as a library
     if (call_id & 0x100)
-        library_main((btchip_altcoin_config_t *)((unsigned int *)arg0)[1], call_id & (~0x100), ((unsigned int *)arg0)[2], &((unsigned int *)arg0)[0]);
+        library_main_with_config((btchip_altcoin_config_t *)((unsigned int *)arg0)[1], call_id & (~0x100), ((unsigned int *)arg0)[2], &((unsigned int *)arg0)[0]);
     else
-        library_main(&coin_config, call_id, ((unsigned int *)arg0)[1], &((unsigned int *)arg0)[0]);
+        library_main(call_id, ((unsigned int *)arg0)[1], &((unsigned int *)arg0)[0]);
 #endif // USE_LIB_BITCOIN
     return 0;
 }

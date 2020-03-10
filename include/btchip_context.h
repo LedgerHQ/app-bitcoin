@@ -301,13 +301,14 @@ typedef struct btchip_altcoin_config_s {
     unsigned char family;
     //unsigned char* iconsuffix;// will use the icon provided on the stack (maybe)
 #ifdef TARGET_BLUE
-    const char* header_text;
+    char header_text[16];
     unsigned int color_header;
     unsigned int color_dashboard;
 #endif // TARGET_BLUE
-    const char* coinid; // used coind id for message signature prefix
-    const char* name; // for ux displays
-    const char* name_short; // for unit in ux displays
+    char coinid[16]; // used coind id for message signature prefix
+    char name[16]; // for ux displays
+    char name_short[10]; // for unit in ux displays
+    char native_segwit_prefix_val[5];
     const char* native_segwit_prefix; // null if no segwit prefix
     unsigned int forkid;
     unsigned int zcash_consensus_branch_id;
