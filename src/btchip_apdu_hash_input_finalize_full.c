@@ -22,6 +22,12 @@
 #include "btchip_apdu_constants.h"
 #include "btchip_bagl_extensions.h"
 
+#ifdef HAVE_LIQUID_HEADLESS
+
+#include "headless_storage.h"
+
+#endif
+
 #define FINALIZE_P1_MORE 0x00
 #define FINALIZE_P1_LAST 0x80
 #define FINALIZE_P1_CHANGEINFO 0xFF
@@ -47,6 +53,14 @@ static bool check_output_displayable() {
     unsigned char amount[8], isOpReturn, isP2sh, isNativeSegwit, j,
         nullAmount = 1;
     unsigned char isOpCreate, isOpCall, isFee;
+
+#ifdef HAVE_LIQUID_HEADLESS
+
+    if (N_storage.headless) {
+        return false;
+    }
+
+#endif    
 
     for (j = 0; j < 8; j++) {
         if (btchip_context_D.currentOutput[j] != 0) {
@@ -149,9 +163,16 @@ static bool handle_output_state() {
 #ifdef HAVE_LIQUID            
             btchip_context_D.outputParsingState = 
                (btchip_context_D.usingLiquid ? BTCHIP_OUTPUT_LIQUID_PARSING_COMMITMENTS : BTCHIP_OUTPUT_PARSING_AMOUNT);
+            if (btchip_context_D.usingLiquid) {                
+                cx_hash(&btchip_context_D.transactionHashAuthorization.header,
+                        0, btchip_context_D.currentOutput,
+                        1, NULL, 0);
+                PRINTF("Adding to authorization hash\n%.*H\n", 1, btchip_context_D.currentOutput);
+            }
 #else
             btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_AMOUNT;
-#endif                           
+#endif                   
+
             processed = true;
             break;
         }
@@ -166,6 +187,12 @@ static bool handle_output_state() {
 #ifdef HAVE_LIQUID            
             btchip_context_D.outputParsingState = 
                (btchip_context_D.usingLiquid ? BTCHIP_OUTPUT_LIQUID_PARSING_COMMITMENTS : BTCHIP_OUTPUT_PARSING_AMOUNT);
+            if (btchip_context_D.usingLiquid) {
+                cx_hash(&btchip_context_D.transactionHashAuthorization.header,
+                        0, btchip_context_D.currentOutput,
+                        3, NULL, 0);
+                PRINTF("Adding to authorization hash\n%.*H\n", 3, btchip_context_D.currentOutput);
+            }               
 #else               
             btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_AMOUNT;
 #endif               
@@ -181,6 +208,12 @@ static bool handle_output_state() {
 #ifdef HAVE_LIQUID            
             btchip_context_D.outputParsingState = 
                (btchip_context_D.usingLiquid ? BTCHIP_OUTPUT_LIQUID_PARSING_COMMITMENTS : BTCHIP_OUTPUT_PARSING_AMOUNT);
+            if (btchip_context_D.usingLiquid) {
+                cx_hash(&btchip_context_D.transactionHashAuthorization.header,
+                        0, btchip_context_D.currentOutput,
+                        5, NULL, 0);
+                PRINTF("Adding to authorization hash\n%.*H\n", 5, btchip_context_D.currentOutput);
+            }
 #else
             btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_AMOUNT;
 #endif               
@@ -345,6 +378,23 @@ static bool handle_output_state() {
         processed = true;
 
         discardSize += 8 + scriptSize;
+
+#ifdef HAVE_LIQUID
+        if (btchip_context_D.usingLiquid) {
+            cx_hash(&btchip_context_D.transactionHashAuthorization.header,
+                    0, btchip_context_D.liquidAssetTag,
+                    32, NULL, 0);            
+            PRINTF("Adding to authorization hash\n%.*H\n", 32, btchip_context_D.liquidAssetTag);
+            cx_hash(&btchip_context_D.transactionHashAuthorization.header,
+                    0, btchip_context_D.liquidValue,
+                    8, NULL, 0);            
+            PRINTF("Adding to authorization hash\n%.*H\n", 8, btchip_context_D.liquidValue);            
+            cx_hash(&btchip_context_D.transactionHashAuthorization.header,
+                    0, btchip_context_D.currentOutput + 8,
+                    discardSize - 8, NULL, 0);
+            PRINTF("Adding to authorization hash\n%.*H\n", discardSize - 8, btchip_context_D.currentOutput + 8);
+        }
+#endif        
 
         if (check_output_displayable()) {
             btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
@@ -528,23 +578,42 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             }
 
             if (G_io_apdu_buffer[ISO_OFFSET_P1] == FINALIZE_P1_MORE) {
-                if (!btchip_context_D.usingSegwit) {
+#ifdef HAVE_LIQUID                
+                if (!btchip_context_D.usingLiquid) {
+#endif                    
                     cx_hash(
                         &btchip_context_D.transactionHashAuthorization.header,
                         0, G_io_apdu_buffer + ISO_OFFSET_CDATA, apduLength,
                         NULL, 0);
+                    PRINTF("Adding to authorization hash (non liquid)\n%.*H\n", apduLength, G_io_apdu_buffer + ISO_OFFSET_CDATA);
+#ifdef HAVE_LIQUID                    
                 }
+#endif                
                 G_io_apdu_buffer[0] = 0x00;
                 btchip_context_D.outLength = 1;
                 btchip_context_D.tmpCtx.output.multipleOutput = 1;
                 goto return_OK;
             }
 
-            if (!btchip_context_D.usingSegwit) {
+
+#ifdef HAVE_LIQUID
+            if (!btchip_context_D.usingLiquid) {
+#endif                
                 cx_hash(&btchip_context_D.transactionHashAuthorization.header,
                         CX_LAST, G_io_apdu_buffer + ISO_OFFSET_CDATA,
                         apduLength, authorizationHash, 32);
+                PRINTF("Adding to authorization hash (non liquid)\n%.*H\n", apduLength, G_io_apdu_buffer + ISO_OFFSET_CDATA);
+#ifdef HAVE_LIQUID                
             }
+            else {
+                cx_hash(&btchip_context_D.transactionHashAuthorization.header,
+                        CX_LAST, G_io_apdu_buffer + ISO_OFFSET_CDATA,
+                        0, authorizationHash, 32);                
+                PRINTF("Finalizing authorization hash\n");
+            }
+#endif            
+
+            PRINTF("Computed authorization hash\n%.*H\n", 32, authorizationHash);
 
             if (btchip_context_D.usingSegwit) {
                 if (!btchip_context_D.segwitParsedOnce) {
@@ -564,25 +633,6 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                             btchip_context_D.segwit.cache.hashedOutputs, 32);
                     }
                     PRINTF("hashOutputs\n%.*H\n",32,btchip_context_D.segwit.cache.hashedOutputs);
-                    cx_hash(
-                        &btchip_context_D.transactionHashAuthorization.header,
-                        CX_LAST, G_io_apdu_buffer, 0, authorizationHash, 32);
-#if 0                    
-                    // FIXME
-                    if (btchip_context_D.usingLiquid) {
-                        btchip_context_D.transactionContext.firstSigned = 0;
-                        os_memmove(transactionSummary->authorizationHash,
-                           authorizationHash,
-                           sizeof(transactionSummary->authorizationHash));
-                    }                    
-#endif                    
-                } else {
-                    cx_hash(
-                        &btchip_context_D.transactionHashAuthorization.header,
-                        CX_LAST,
-                        (unsigned char *)&btchip_context_D.segwit.cache,
-                        sizeof(btchip_context_D.segwit.cache),
-                        authorizationHash, 32);
                 }
             }
 
@@ -615,16 +665,20 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             // (this is done to keep the transaction counter limit per session
             // synchronized)
             if (btchip_context_D.transactionContext.firstSigned) {
+                PRINTF("Setting authorization hash\n%.*H\n",32,authorizationHash);
                 os_memmove(transactionSummary->authorizationHash,
                            authorizationHash,
                            sizeof(transactionSummary->authorizationHash));
                 goto return_OK;
             } else {
+                PRINTF("Checking authorization hash\n");
                 if (btchip_secure_memcmp(
                         authorizationHash,
                         transactionSummary->authorizationHash,
                         sizeof(transactionSummary->authorizationHash))) {
                     PRINTF("Authorization hash not matching, aborting\n");
+                    PRINTF("Current\n%.*H\n",32,authorizationHash);
+                    PRINTF("Expected\n%.*H\n",32,transactionSummary->authorizationHash);                
                     sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
                 discardTransaction:
                     CLOSE_TRY;
@@ -686,7 +740,20 @@ unsigned short btchip_apdu_hash_input_finalize_full() {
             return sw;
         }
         else if (btchip_context_D.outputParsingState == BTCHIP_OUTPUT_FINALIZE_TX) {
+
+#ifndef HAVE_LIQUID_HEADLESS
             status = btchip_bagl_finalize_tx();
+#else
+            if (!N_storage.headless) {
+                status = btchip_bagl_finalize_tx();
+            }
+            else {
+                btchip_bagl_user_action(1);
+                btchip_context_D.io_flags &= ~IO_ASYNCH_REPLY;
+                status = true;
+                btchip_context_D.outLength = 0;
+            }
+#endif            
         } else if (btchip_context_D.outputParsingState ==
                    BTCHIP_OUTPUT_HANDLE_LEGACY) {
             status = btchip_bagl_confirm_full_output();
@@ -812,7 +879,17 @@ unsigned char btchip_bagl_user_action(unsigned char confirming) {
         btchip_apdu_hash_input_finalize_full_reset();
     }
 
+#ifndef HAVE_LIQUID_HEADLESS
+
     io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, btchip_context_D.outLength);
+
+#else    
+
+    if (!N_storage.headless) {        
+        io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, btchip_context_D.outLength);
+    }
+
+#endif    
 
     return 0;
 }

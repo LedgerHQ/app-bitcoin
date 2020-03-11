@@ -31,6 +31,14 @@
 
 #include "glyphs.h"
 
+#ifdef HAVE_LIQUID_HEADLESS
+
+#include "headless_storage.h"
+
+const internalStorage_t N_storage_real;
+
+#endif 
+
 #define __NAME3(a, b, c) a##b##c
 #define NAME3(a, b, c) __NAME3(a, b, c)
 
@@ -197,6 +205,9 @@ unsigned int io_seproxyhal_touch_display_token_cancel(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_display_token_ok(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_settings(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_exit(const bagl_element_t *e);
+#ifdef HAVE_LIQUID_HEADLESS
+unsigned int io_seproxyhal_touch_liquid_headless_setup_ok(const bagl_element_t *e);
+#endif
 void ui_idle(void);
 
 #ifdef HAVE_UX_FLOW
@@ -1274,6 +1285,27 @@ unsigned int io_seproxyhal_touch_display_token_ok(const bagl_element_t *e) {
     return 0; // DO NOT REDRAW THE BUTTON
 }
 
+#ifdef HAVE_LIQUID_HEADLESS
+
+unsigned int io_seproxyhal_touch_liquid_headless_setup_ok(const bagl_element_t *e) {
+    unsigned short sw = BTCHIP_SW_OK;
+    cx_ecfp_public_key_t publicKey;
+
+    uint8_t headless = 1;
+    cx_ecfp_init_public_key(CX_CURVE_256K1, G_io_apdu_buffer + 150, 65, &publicKey);
+    nvm_write((void*)&N_storage.headlessValidationKey, (void*)&publicKey, sizeof(cx_ecfp_public_key_t));
+    nvm_write(&N_storage.headless, &headless, 1);
+
+    btchip_context_D.outLength = 0;
+    G_io_apdu_buffer[btchip_context_D.outLength++] = sw >> 8;
+    G_io_apdu_buffer[btchip_context_D.outLength++] = sw;    
+    io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, btchip_context_D.outLength);
+    ui_idle();
+    return 0; // DO NOT REDRAW THE BUTTON
+}
+
+#endif
+
 #if defined(TARGET_NANOS) && !defined(HAVE_UX_FLOW)
 unsigned int ui_verify_nanos_button(unsigned int button_mask,
                                     unsigned int button_mask_counter) {
@@ -2003,6 +2035,40 @@ UX_FLOW(ux_display_liquid_green_address_flow,
   &ux_display_liquid_green_address_flow_2_step,
   &ux_display_liquid_green_address_flow_3_step
 );
+
+#ifdef HAVE_LIQUID_HEADLESS
+
+UX_STEP_NOCB(
+    ux_display_liquid_headless_setup_flow_1_step, 
+    bnnn_paging, 
+    {
+      .title = "Authorize",
+      .text = G_io_apdu_buffer,
+    });
+UX_STEP_VALID(
+    ux_display_liquid_headless_setup_flow_2_step, 
+    pb, 
+    io_seproxyhal_touch_liquid_headless_setup_ok(NULL),
+    {
+      &C_icon_validate_14,
+      "Approve",
+    });
+UX_STEP_VALID(
+    ux_display_liquid_headless_setup_flow_3_step, 
+    pb, 
+    io_seproxyhal_touch_display_cancel(NULL),
+    {
+      &C_icon_crossmark,
+      "Reject",
+    });
+
+UX_FLOW(ux_display_liquid_headless_setup_flow,
+  &ux_display_liquid_headless_setup_flow_1_step,
+  &ux_display_liquid_headless_setup_flow_2_step,
+  &ux_display_liquid_headless_setup_flow_3_step
+);
+
+#endif
 
 #endif // HAVE_LIQUID
 
@@ -2785,6 +2851,15 @@ void btchip_bagl_liquid_display_green_address() {
     
 }
 
+#ifdef HAVE_LIQUID_HEADLESS
+
+void btchip_bagl_liquid_display_headless_authorization_key() {
+
+    ux_flow_init(0, ux_display_liquid_headless_setup_flow, NULL);
+}
+
+#endif
+
 #endif // HAVE_LIQUID
 
 void app_exit(void) {
@@ -2902,6 +2977,18 @@ __attribute__((section(".boot"))) int main(int arg0) {
         BEGIN_TRY {
             TRY {
                 io_seproxyhal_init();
+
+#ifdef HAVE_LIQUID_HEADLESS
+
+                if (N_storage.initialized != 0x01) {
+                    uint8_t x;
+                    x = 0;
+                    nvm_write(&N_storage.headless, (void*)&x, sizeof(uint8_t));
+                    x = 0x01;
+                    nvm_write(&N_storage.initialized, (void*)&x, sizeof(uint8_t));
+                }
+
+#endif                
 
 #ifdef TARGET_NANOX
                 // grab the current plane mode setting

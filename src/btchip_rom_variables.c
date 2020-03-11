@@ -79,7 +79,8 @@ unsigned char const DISPATCHER_CLA[] = {
     BTCHIP_CLA, // btchip_apdu_liquid_get_nonce
     BTCHIP_CLA, // btchip_apdu_liquid_provide_issuance_information
     BTCHIP_CLA, // btchip_apdu_liquid_get_blinding_factor
-    BTCHIP_CLA  // btchip_apdu_liquid_get_green_wallet_address
+    BTCHIP_CLA, // btchip_apdu_liquid_get_green_wallet_address
+    BTCHIP_ADM_CLA // btchip_apdu_liquid_headless_setup
 };
 
 unsigned char const DISPATCHER_INS[] = {
@@ -102,7 +103,8 @@ unsigned char const DISPATCHER_INS[] = {
     BTCHIP_INS_LIQUID_GET_NONCE, // btchip_apdu_liquid_get_nonce
     BTCHIP_INS_LIQUID_PROVIDE_ISSUANCE_INFORMATION, // btchip_apdu_liquid_provide_issuance_information
     BTCHIP_INS_LIQUID_GET_BLINDING_FACTOR, // btchip_apdu_liquid_get_blinding_factor
-    BTCHIP_INS_LIQUID_GET_GREEN_WALLET_ADDRESS // btchip_apdu_liquid_get_green_wallet_address
+    BTCHIP_INS_LIQUID_GET_GREEN_WALLET_ADDRESS, // btchip_apdu_liquid_get_green_wallet_address
+    BTCHIP_INS_LIQUID_HEADLESS_SETUP // btchip_apdu_liquid_headless_setup
 };
 
 unsigned char const DISPATCHER_DATA_IN[] = {
@@ -125,7 +127,8 @@ unsigned char const DISPATCHER_DATA_IN[] = {
     1, // btchip_apdu_liquid_get_nonce
     1, // btchip_apdu_liquid_provide_issuance_information
     1, // btchip_apdu_liquid_get_blinding_factor
-    1  // btchip_apdu_liquid_get_green_wallet_address
+    1, // btchip_apdu_liquid_get_green_wallet_address
+    1  // btchip_apdu_liquid_headless_setup
 };
 
 apduProcessingFunction const DISPATCHER_FUNCTIONS[] = {
@@ -151,10 +154,17 @@ apduProcessingFunction const DISPATCHER_FUNCTIONS[] = {
     btchip_apdu_liquid_get_nonce,
     btchip_apdu_liquid_provide_issuance_information,
     btchip_apdu_liquid_get_blinding_factor,
-    btchip_apdu_liquid_get_green_wallet_address
+    btchip_apdu_liquid_get_green_wallet_address,
+
+#ifdef HAVE_LIQUID_HEADLESS
+    btchip_apdu_liquid_headless_setup
+#else
+    btchip_apdu_not_implemented    
+#endif    
 
 #else
 
+    btchip_apdu_not_implemented,
     btchip_apdu_not_implemented,
     btchip_apdu_not_implemented,
     btchip_apdu_not_implemented,

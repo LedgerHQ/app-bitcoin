@@ -65,7 +65,7 @@ extern unsigned char const TWOPOWER[8];
 
 #define APDU_BASE_LENGTH 13
 
-#define DISPATCHER_APDUS 20
+#define DISPATCHER_APDUS 21
 
 typedef unsigned short (*apduProcessingFunction)(void);
 

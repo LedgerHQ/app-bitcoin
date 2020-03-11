@@ -86,9 +86,10 @@ void transaction_offset(unsigned char value) {
         }
     }
     if ((btchip_context_D.transactionHashOption &
-         TRANSACTION_HASH_AUTHORIZATION) != 0) {
+         TRANSACTION_HASH_AUTHORIZATION) != 0) {        
         cx_hash(&btchip_context_D.transactionHashAuthorization.header, 0,
                 btchip_context_D.transactionBufferPointer, value, NULL, 0);
+        PRINTF("Adding to authorization hash TX \n%.*H\n", value, btchip_context_D.transactionBufferPointer);
     }
 }
 
@@ -140,7 +141,7 @@ void transaction_parse(unsigned char parseMode) {
             for (;;) {
                 switch (btchip_context_D.transactionContext.transactionState) {
                 case BTCHIP_TRANSACTION_NONE: {
-                    PRINTF("Init transaction parser\n");
+                    PRINTF("Init transaction parser, segwit %d\n", btchip_context_D.usingSegwit);
                     // Reset transaction state
                     btchip_context_D.transactionContext
                         .transactionRemainingInputsOutputs = 0;
@@ -184,6 +185,7 @@ void transaction_parse(unsigned char parseMode) {
                                 cx_sha256_init(
                                     &btchip_context_D.segwit.hash.hashPrevouts.sha256);
                             }
+                            btchip_context_D.transactionHashOption = TRANSACTION_HASH_AUTHORIZATION;
                         } else {
                             PRINTF("Resume SegWit hash\n");
                             PRINTF("SEGWIT Version\n%.*H\n",sizeof(btchip_context_D.transactionVersion),btchip_context_D.transactionVersion);
@@ -237,13 +239,6 @@ void transaction_parse(unsigned char parseMode) {
                                         NULL, 0);                                                                    
                                 }
 #endif                                
-                                cx_hash(&btchip_context_D
-                                         .transactionHashAuthorization.header,
-                                    0,
-                                    (unsigned char *)&btchip_context_D
-                                        .segwit.cache,
-                                    sizeof(btchip_context_D.segwit.cache),
-                                    NULL, 0);
                             }
                         }
                     }
@@ -360,7 +355,9 @@ void transaction_parse(unsigned char parseMode) {
                         }
                         */
                         if (btchip_context_D.usingSegwit) {
-                            transaction_offset_increase(1);
+                            //transaction_offset_increase(1);
+                            btchip_context_D.transactionBufferPointer++;
+                            btchip_context_D.transactionDataRemaining--;  
                             check_transaction_available(
                                 36); // prevout : 32 hash + 4 index
                             if (!btchip_context_D.segwitParsedOnce) {
@@ -395,15 +392,19 @@ void transaction_parse(unsigned char parseMode) {
                                     }
                                     PRINTF("Adding amount\n%.*H\n",8,btchip_context_D.transactionBufferPointer);
                                     PRINTF("New amount\n%.*H\n",8,btchip_context_D.transactionContext.transactionAmount);
+                                    btchip_context_D.transactionHashOption &= ~TRANSACTION_HASH_AUTHORIZATION; 
                                     transaction_offset_increase(8);
+                                    btchip_context_D.transactionHashOption |= TRANSACTION_HASH_AUTHORIZATION;
 #ifdef HAVE_LIQUID                                    
                                 }
                                 else {
                                     unsigned char ctSize;
                                     check_transaction_available(1);
                                     ctSize = btchip_get_confidential_data_size(btchip_context_D.transactionBufferPointer[0], true, false);
-                                    check_transaction_available(ctSize);
+                                    check_transaction_available(ctSize);                                    
+                                    btchip_context_D.transactionHashOption &= ~TRANSACTION_HASH_AUTHORIZATION; 
                                     transaction_offset_increase(ctSize);
+                                    btchip_context_D.transactionHashOption |= TRANSACTION_HASH_AUTHORIZATION;
                                 }
 #endif                                
                             } else {
@@ -431,7 +432,8 @@ void transaction_parse(unsigned char parseMode) {
                                 os_memmove(
                                     btchip_context_D.inputValue,
                                     btchip_context_D.transactionBufferPointer,
-                                    ctSize);
+                                    ctSize);                                
+                                btchip_context_D.transactionHashOption &= ~TRANSACTION_HASH_AUTHORIZATION; 
                                 transaction_offset_increase(ctSize);
                                 btchip_context_D.transactionHashOption =
                                     TRANSACTION_HASH_FULL;
@@ -535,12 +537,9 @@ void transaction_parse(unsigned char parseMode) {
                             PRINTF("New amount\n%.*H\n",8,btchip_context_D.transactionContext.transactionAmount);
                         }
 
-                        if (!btchip_context_D.usingSegwit) {
-                            // Do not include the input script length + value in
-                            // the authentication hash
-                            btchip_context_D.transactionHashOption =
-                                TRANSACTION_HASH_FULL;
-                        }
+                        // Do not include the input script length + value in
+                        // the authentication hash
+                        btchip_context_D.transactionHashOption &= ~TRANSACTION_HASH_AUTHORIZATION;
                     }
                     // Read the script length
                     btchip_context_D.transactionContext.scriptRemaining =
@@ -597,35 +596,32 @@ void transaction_parse(unsigned char parseMode) {
                     if (btchip_context_D.transactionContext.scriptRemaining ==
                         0) {
                         if (parseMode == PARSE_MODE_SIGNATURE) {
-                            if (!btchip_context_D.usingSegwit) {
-                                // Restore dual hash for signature +
-                                // authentication
-                                btchip_context_D.transactionHashOption =
-                                    TRANSACTION_HASH_BOTH;
-                            } else {
-                                if (btchip_context_D.segwitParsedOnce) {
-                                    // Append the saved value                                    
-                                    if (btchip_context_D.usingOverwinter) {
-                                        cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.inputValue, 8, NULL, 0);
+                            // Restore dual hash for signature +
+                            // authentication
+                            btchip_context_D.transactionHashOption |=
+                                    TRANSACTION_HASH_AUTHORIZATION;
+                            if (btchip_context_D.segwitParsedOnce) {
+                                // Append the saved value                                    
+                                if (btchip_context_D.usingOverwinter) {
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.inputValue, 8, NULL, 0);
+                                }
+                                else {
+                                    unsigned char ctSize;
+#ifdef HAVE_LIQUID                                        
+                                    if (!btchip_context_D.usingLiquid) {                                            
+#endif                                            
+                                        ctSize = 8;
+#ifdef HAVE_LIQUID                                            
                                     }
                                     else {
-                                        unsigned char ctSize;
-#ifdef HAVE_LIQUID                                        
-                                        if (!btchip_context_D.usingLiquid) {                                            
-#endif                                            
-                                            ctSize = 8;
-#ifdef HAVE_LIQUID                                            
-                                        }
-                                        else {
-                                            ctSize = btchip_get_confidential_data_size(btchip_context_D.inputValue[0], true, false);
-                                        }
-#endif                                        
-                                        PRINTF("SEGWIT Add value\n%.*H\n",ctSize,btchip_context_D.inputValue);
-                                        cx_hash(&btchip_context_D
-                                                 .transactionHashFull.sha256.header,
-                                            0, btchip_context_D.inputValue, ctSize,
-                                            NULL, 0);
+                                        ctSize = btchip_get_confidential_data_size(btchip_context_D.inputValue[0], true, false);
                                     }
+#endif                                        
+                                    PRINTF("SEGWIT Add value\n%.*H\n",ctSize,btchip_context_D.inputValue);
+                                    cx_hash(&btchip_context_D
+                                                .transactionHashFull.sha256.header,
+                                        0, btchip_context_D.inputValue, ctSize,
+                                        NULL, 0);
                                 }
                             }
                         }

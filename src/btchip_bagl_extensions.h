@@ -51,5 +51,6 @@ void btchip_bagl_request_change_path_approval(unsigned char* change_path);
 
 // Liquid extensions
 void btchip_bagl_liquid_display_green_address(void);
+void btchip_bagl_liquid_display_headless_authorization_key(void);
 
 #endif /* _BTCHIP_BAGL_H_ */

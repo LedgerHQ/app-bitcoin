@@ -1,4 +1,4 @@
-/*******************************************************************************
+ /*******************************************************************************
 *   Ledger App - Bitcoin Wallet
 *   (c) 2016-2019 Ledger
 *
@@ -17,6 +17,12 @@
 
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
+
+#ifdef HAVE_LIQUID_HEADLESS
+
+#include "headless_storage.h"
+
+#endif
 
 #define SIGHASH_ALL 0x01
 
@@ -104,6 +110,23 @@ unsigned short btchip_apdu_hash_sign() {
                        MAX_BIP32_PATH_LENGTH);
             parameters += (4 * G_io_apdu_buffer[ISO_OFFSET_CDATA]) + 1;
             authorizationLength = *(parameters++);
+
+#ifdef HAVE_LIQUID_HEADLESS
+
+            if (N_storage.headless) {
+                if (!cx_ecdsa_verify(PIC(&N_storage.headlessValidationKey), CX_LAST, CX_SHA256,
+                    btchip_context_D.transactionSummary.authorizationHash, 32,
+                    parameters, authorizationLength)) {
+                    PRINTF("Headless permission not verified\n");
+                    PRINTF("Authorization hash %.*H\n", 32, btchip_context_D.transactionSummary.authorizationHash);
+                    PRINTF("Key %.*H\n", 65, PIC(N_storage.headlessValidationKey.W));
+                    sw = BTCHIP_SW_INCORRECT_DATA;
+                    goto discardTransaction;
+                }
+            }
+
+#endif
+
             parameters += authorizationLength;
             lockTime = btchip_read_u32(parameters, 1, 0);
             parameters += 4;
