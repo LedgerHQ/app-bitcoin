@@ -357,5 +357,5 @@ listvariants:
 #	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry resistance
 
 endif
-	@echo VARIANTS COIN liquid_regtest liquid
+	@echo VARIANTS COIN liquid_regtest liquid_regtest_headless liquid liquid_headless
 
