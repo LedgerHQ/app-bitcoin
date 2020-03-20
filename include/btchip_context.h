@@ -88,8 +88,7 @@ enum btchip_output_parsing_state_e {
     BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS = 0x01,
     BTCHIP_OUTPUT_PARSING_OUTPUT = 0x02,
     BTCHIP_OUTPUT_FINALIZE_TX = 0x03,
-    BTCHIP_BIP44_CHANGE_PATH_VALIDATION = 0x04,
-    BTCHIP_OUTPUT_HANDLE_LEGACY = 0xFF
+    BTCHIP_BIP44_CHANGE_PATH_VALIDATION = 0x04
 };
 typedef enum btchip_output_parsing_state_e btchip_output_parsing_state_t;
 
