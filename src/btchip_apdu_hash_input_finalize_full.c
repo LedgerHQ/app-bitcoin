@@ -506,9 +506,6 @@ unsigned short btchip_apdu_hash_input_finalize_full() {
         }
         else if (btchip_context_D.outputParsingState == BTCHIP_OUTPUT_FINALIZE_TX) {
             status = btchip_bagl_finalize_tx();
-        } else if (btchip_context_D.outputParsingState ==
-                   BTCHIP_OUTPUT_HANDLE_LEGACY) {
-            status = btchip_bagl_confirm_full_output();
         }
         else {
             status = btchip_bagl_confirm_single_output();
@@ -580,10 +577,8 @@ unsigned char btchip_bagl_user_action(unsigned char confirming) {
             }
         }
 
-        if ((btchip_context_D.outputParsingState ==
-             BTCHIP_OUTPUT_FINALIZE_TX) ||
-            (btchip_context_D.outputParsingState ==
-             BTCHIP_OUTPUT_HANDLE_LEGACY)) {
+        if (btchip_context_D.outputParsingState ==
+             BTCHIP_OUTPUT_FINALIZE_TX) {
             btchip_context_D.transactionContext.firstSigned = 0;
 
             if (btchip_context_D.usingSegwit &&
@@ -611,7 +606,6 @@ unsigned char btchip_bagl_user_action(unsigned char confirming) {
     G_io_apdu_buffer[btchip_context_D.outLength++] = sw;
 
     if ((btchip_context_D.outputParsingState == BTCHIP_OUTPUT_FINALIZE_TX) ||
-        (btchip_context_D.outputParsingState == BTCHIP_OUTPUT_HANDLE_LEGACY) ||
         (sw != BTCHIP_SW_OK)) {
         // we've finished the processing of the input
         btchip_apdu_hash_input_finalize_full_reset();
