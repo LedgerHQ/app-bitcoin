@@ -2028,14 +2028,14 @@ uint8_t prepare_fees() {
                 PRINTF("Error : Fees not consistent");
                 goto error;
             }
-            os_memmove(vars.tmp.feesAmount, btchip_context_D.shortCoinId,
-                       btchip_context_D.shortCoinIdLength);
-            vars.tmp.feesAmount[btchip_context_D.shortCoinIdLength] = ' ';
+            os_memmove(vars.tmp.feesAmount, G_coin_config->name_short,
+                       strlen(G_coin_config->name_short));
+            vars.tmp.feesAmount[strlen(G_coin_config->name_short)] = ' ';
             btchip_context_D.tmp =
                 (unsigned char *)(vars.tmp.feesAmount +
-                              btchip_context_D.shortCoinIdLength + 1);
+                              strlen(G_coin_config->name_short) + 1);
             textSize = btchip_convert_hex_amount_to_displayable(fees);
-            vars.tmp.feesAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
+            vars.tmp.feesAmount[textSize + strlen(G_coin_config->name_short) + 1] =
                 '\0';
         }
     }
@@ -2083,10 +2083,10 @@ uint8_t prepare_single_output() {
     } else if (btchip_output_script_is_regular(btchip_context_D.currentOutput +
                                                offset)) {
         addressOffset = offset + 4;
-        version = btchip_context_D.payToAddressVersion;
+        version = G_coin_config->p2pkh_version;
     } else {
         addressOffset = offset + 3;
-        version = btchip_context_D.payToScriptHashVersion;
+        version = G_coin_config->p2sh_version;
     }
     if (vars.tmp.fullAddress[0] == 0) {
         if (!nativeSegwit) {
@@ -2105,7 +2105,7 @@ uint8_t prepare_single_output() {
             if (btchip_context_D.usingCashAddr) {
                 cashaddr_encode(
                     address + versionSize, 20, tmp, sizeof(tmp),
-                    (version == btchip_context_D.payToScriptHashVersion
+                    (version == G_coin_config->p2sh_version
                          ? CASHADDR_P2SH
                          : CASHADDR_P2PKH));
             } else {
@@ -2153,14 +2153,14 @@ uint8_t prepare_single_output() {
             vars.tmp.fullAmount[textSize + headerLength] = '\0';
     }
     else {
-        os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId,
-               btchip_context_D.shortCoinIdLength);
-        vars.tmp.fullAmount[btchip_context_D.shortCoinIdLength] = ' ';
+        os_memmove(vars.tmp.fullAmount, G_coin_config->name_short,
+               strlen(G_coin_config->name_short));
+        vars.tmp.fullAmount[strlen(G_coin_config->name_short)] = ' ';
         btchip_context_D.tmp =
             (unsigned char *)(vars.tmp.fullAmount +
-                          btchip_context_D.shortCoinIdLength + 1);
+                          strlen(G_coin_config->name_short) + 1);
         textSize = btchip_convert_hex_amount_to_displayable(amount);
-        vars.tmp.fullAmount[textSize + btchip_context_D.shortCoinIdLength + 1] =
+        vars.tmp.fullAmount[textSize + strlen(G_coin_config->name_short) + 1] =
             '\0';
     }
 
@@ -2336,10 +2336,10 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                     if (btchip_output_script_is_regular(
                             btchip_context_D.currentOutput + offset)) {
                         addressOffset = offset + 4;
-                        version = btchip_context_D.payToAddressVersion;
+                        version = G_coin_config->p2pkh_version;
                     } else {
                         addressOffset = offset + 3;
-                        version = btchip_context_D.payToScriptHashVersion;
+                        version = G_coin_config->p2sh_version;
                     }
                     if (version > 255) {
                         versionSize = 2;
@@ -2361,7 +2361,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                             cashaddr_encode(
                                 address + versionSize, 20, tmp, sizeof(tmp),
                                 (version ==
-                                         btchip_context_D.payToScriptHashVersion
+                                         G_coin_config->p2sh_version
                                      ? CASHADDR_P2SH
                                      : CASHADDR_P2PKH));
                         } else {
@@ -2387,18 +2387,18 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                     // Prepare amount
 
                     os_memmove(vars.tmp.fullAmount,
-                               btchip_context_D.shortCoinId,
-                               btchip_context_D.shortCoinIdLength);
-                    vars.tmp.fullAmount[btchip_context_D.shortCoinIdLength] =
+                               G_coin_config->name_short,
+                               strlen(G_coin_config->name_short));
+                    vars.tmp.fullAmount[strlen(G_coin_config->name_short)] =
                         ' ';
                     btchip_context_D.tmp =
                         (unsigned char *)(vars.tmp.fullAmount +
-                                          btchip_context_D.shortCoinIdLength +
+                                          strlen(G_coin_config->name_short) +
                                           1);
                     textSize = btchip_convert_hex_amount_to_displayable(amount);
                     vars.tmp
                         .fullAmount[textSize +
-                                    btchip_context_D.shortCoinIdLength + 1] =
+                                    strlen(G_coin_config->name_short) + 1] =
                         '\0';
 
                     // prepare fee display
@@ -2408,18 +2408,18 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                     }
                     else {
                         os_memmove(vars.tmp.feesAmount,
-                               btchip_context_D.shortCoinId,
-                               btchip_context_D.shortCoinIdLength);
-                        vars.tmp.feesAmount[btchip_context_D.shortCoinIdLength] =
+                               G_coin_config->name_short,
+                               strlen(G_coin_config->name_short));
+                        vars.tmp.feesAmount[strlen(G_coin_config->name_short)] =
                             ' ';
                         btchip_context_D.tmp =
                             (unsigned char *)(vars.tmp.feesAmount +
-                                          btchip_context_D.shortCoinIdLength +
+                                          strlen(G_coin_config->name_short) +
                                           1);
                         textSize = btchip_convert_hex_amount_to_displayable(fees);
                         vars.tmp
                             .feesAmount[textSize +
-                                    btchip_context_D.shortCoinIdLength + 1] =
+                                    strlen(G_coin_config->name_short) + 1] =
                             '\0';
                     }
                     break;

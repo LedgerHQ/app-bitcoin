@@ -158,21 +158,6 @@ struct btchip_context_s {
     /** (Integrity protected) transaction context */
     btchip_transaction_context_t transactionContext;
 
-    /** Current Pay To Address version */
-    unsigned short payToAddressVersion;
-    /** Current Pay To Script Hash version */
-    unsigned short payToScriptHashVersion;
-    /** Current coin family */
-    unsigned char coinFamily;
-    /** Current Coin ID */
-    unsigned char coinId[MAX_COIN_ID];
-    /** Current short Coin ID */
-    unsigned char shortCoinId[MAX_SHORT_COIN_ID];
-    /** Current Coin ID length */
-    unsigned char coinIdLength;
-    /** Current short Coin ID length */
-    unsigned char shortCoinIdLength;
-
     /** Non protected transaction context */
 
     /** Last U2F Token streamed by host to attempt pubkey request */
@@ -305,9 +290,9 @@ typedef struct btchip_altcoin_config_s {
     unsigned int color_header;
     unsigned int color_dashboard;
 #endif // TARGET_BLUE
-    char coinid[16]; // used coind id for message signature prefix
+    char coinid[14]; // used coind id for message signature prefix
     char name[16]; // for ux displays
-    char name_short[10]; // for unit in ux displays
+    char name_short[6]; // for unit in ux displays
     char native_segwit_prefix_val[5];
     const char* native_segwit_prefix; // null if no segwit prefix
     unsigned int forkid;

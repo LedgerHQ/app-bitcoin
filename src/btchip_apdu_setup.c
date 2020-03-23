@@ -33,15 +33,7 @@ void btchip_autosetup() {
                                                    // supporting multi output
     SB_SET(config.supportedModes, BTCHIP_MODE_WALLET);
     SB_SET(config.operationMode, BTCHIP_MODE_WALLET);
-    // config.payToAddressVersion = G_coin_config->p2pkh_version;
-    // config.payToScriptHashVersion = G_coin_config->p2sh_version;
-    // config.coinFamily = G_coin_config->family;
-    // config.coinIdLength = strlen(PIC(G_coin_config->coinid));
-    // os_memmove(config.coinId, PIC(G_coin_config->coinid),
-    // config.coinIdLength);
-    // config.shortCoinIdLength = strlen(PIC(G_coin_config->name_short));
-    // os_memmove(config.shortCoinId, PIC(G_coin_config->name_short),
-    // config.shortCoinIdLength);
+
     nvm_write((void *)&N_btchip.bkp.config, &config, sizeof(config));
     cx_rng(tmp, sizeof(tmp));
     nvm_write((void *)&N_btchip.bkp.trustedinput_key, tmp, sizeof(tmp));

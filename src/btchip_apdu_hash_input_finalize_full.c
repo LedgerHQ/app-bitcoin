@@ -423,9 +423,9 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                 }
 
                 transactionSummary->payToAddressVersion =
-                    btchip_context_D.payToAddressVersion;
+                    G_coin_config->p2pkh_version;
                 transactionSummary->payToScriptHashVersion =
-                    btchip_context_D.payToScriptHashVersion;
+                    G_coin_config->p2sh_version;
 
                 // Generate new nonce
 
