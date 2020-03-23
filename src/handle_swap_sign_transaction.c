@@ -10,7 +10,6 @@ void handle_swap_sign_transaction(create_transaction_parameters_t* get_printable
     btchip_context_init();
     io_seproxyhal_init();
     UX_INIT();
-    PRINTF("I am back from btchip_context_init\n");
     USB_power(0);
     USB_power(1);
     ui_idle();
