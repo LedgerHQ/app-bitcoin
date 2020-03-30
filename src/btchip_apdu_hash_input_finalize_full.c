@@ -269,10 +269,12 @@ static bool handle_output_state() {
                 THROW(EXCEPTION);
             }
             if ((btchip_context_D.currentOutput[0] & LIQUID_TRUSTED_COMMITMENT_FLAG_HOST_PROVIDED_VBF) != 0) {
+#ifndef HAVE_LIQUID_HEADLESS
                 if (btchip_context_D.liquidHostProvidedVbf) {
                     PRINTF("More than one output with host provided VBF\n");
                     THROW(EXCEPTION);
                 }
+#endif
                 btchip_context_D.liquidHostProvidedVbf = 1;
             }
 
