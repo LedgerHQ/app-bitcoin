@@ -226,7 +226,30 @@ static bool handle_output_state() {
 
 #ifdef HAVE_LIQUID
     case BTCHIP_OUTPUT_LIQUID_PARSING_COMMITMENTS: {
-        uint8_t i;
+        uint8_t i;        
+
+#ifdef HAVE_LIQUID_HEADLESS
+        btchip_context_D.liquidBlindOutput = 0;
+
+        if (N_storage.headless &&
+            (btchip_context_D.currentOutputOffset >= 33 + 33) &&
+            ((btchip_context_D.currentOutput[0] == 0x0A) || (btchip_context_D.currentOutput[0] == 0x0B)) &&
+            ((btchip_context_D.currentOutput[33] == 0x08) || (btchip_context_D.currentOutput[33] == 0x09))) {
+            PRINTF("Processing blind output\n");
+            btchip_context_D.liquidBlindOutput = 1;
+            cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
+                        btchip_context_D.currentOutput, 33 + 33, NULL, 0);        
+            cx_hash(&btchip_context_D.transactionHashAuthorization.header,
+                        0, btchip_context_D.currentOutput,
+                        33 + 33, NULL, 0);            
+            PRINTF("Adding to authorization hash\n%.*H\n", 33 + 33, btchip_context_D.currentOutput);
+            discardSize = 33 + 33;
+            btchip_context_D.outputParsingState = BTCHIP_OUTPUT_LIQUID_PARSING_NONCE;                    
+            break;
+        }
+
+#endif        
+
         // Check that the message is fully formatted - expect either clear asset + value tags or signed commitments
         if (btchip_context_D.currentOutputOffset < 33 + 1) {
             break;
@@ -269,12 +292,16 @@ static bool handle_output_state() {
                 THROW(EXCEPTION);
             }
             if ((btchip_context_D.currentOutput[0] & LIQUID_TRUSTED_COMMITMENT_FLAG_HOST_PROVIDED_VBF) != 0) {
-#ifndef HAVE_LIQUID_HEADLESS
-                if (btchip_context_D.liquidHostProvidedVbf) {
-                    PRINTF("More than one output with host provided VBF\n");
-                    THROW(EXCEPTION);
+#ifdef HAVE_LIQUID_HEADLESS
+                if (!N_storage.headless) {
+#endif                    
+                    if (btchip_context_D.liquidHostProvidedVbf) {
+                        PRINTF("More than one output with host provided VBF\n");
+                        THROW(EXCEPTION);
+                    }
+#ifdef HAVE_LIQUID_HEADLESS
                 }
-#endif
+#endif                    
                 btchip_context_D.liquidHostProvidedVbf = 1;
             }
 
@@ -306,13 +333,24 @@ static bool handle_output_state() {
         if ((btchip_context_D.currentOutput[0] != 0) && (btchip_context_D.currentOutputOffset < 33)) {
             break;
         }
-        btchip_context_D.outputParsingState = BTCHIP_OUTPUT_LIQUID_PARSING_PUBLIC_BLINDING_KEY;
-        if (btchip_context_D.currentOutput[0] == 0) {
-            discardSize = 1;
+#ifdef HAVE_LIQUID_HEADLESS        
+        if (btchip_context_D.liquidBlindOutput) {
+            btchip_context_D.currentOutputOffset = 8;
+            btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_OUTPUT;
+            processed = true;            
         }
         else {
-            discardSize = 33;
+#endif            
+            btchip_context_D.outputParsingState = BTCHIP_OUTPUT_LIQUID_PARSING_PUBLIC_BLINDING_KEY;
+            if (btchip_context_D.currentOutput[0] == 0) {
+                discardSize = 1;
+            }
+            else {
+                discardSize = 33;
+            }
+#ifdef HAVE_LIQUID_HEADLESS                    
         }
+#endif        
     } break;
 
     case BTCHIP_OUTPUT_LIQUID_PARSING_PUBLIC_BLINDING_KEY: {
@@ -383,18 +421,24 @@ static bool handle_output_state() {
 
 #ifdef HAVE_LIQUID
         if (btchip_context_D.usingLiquid) {
-            cx_hash(&btchip_context_D.transactionHashAuthorization.header,
-                    0, btchip_context_D.liquidAssetTag,
-                    32, NULL, 0);            
-            PRINTF("Adding to authorization hash\n%.*H\n", 32, btchip_context_D.liquidAssetTag);
-            cx_hash(&btchip_context_D.transactionHashAuthorization.header,
-                    0, btchip_context_D.liquidValue,
-                    8, NULL, 0);            
-            PRINTF("Adding to authorization hash\n%.*H\n", 8, btchip_context_D.liquidValue);            
+#ifdef HAVE_LIQUID_HEADLESS            
+            if (!btchip_context_D.liquidBlindOutput) {
+#endif                
+              cx_hash(&btchip_context_D.transactionHashAuthorization.header,
+                        0, btchip_context_D.liquidAssetTag,
+                        32, NULL, 0);            
+                PRINTF("Adding to authorization hash\n%.*H\n", 32, btchip_context_D.liquidAssetTag);
+                cx_hash(&btchip_context_D.transactionHashAuthorization.header,
+                        0, btchip_context_D.liquidValue,
+                        8, NULL, 0);            
+                PRINTF("Adding to authorization hash\n%.*H\n", 8, btchip_context_D.liquidValue);            
+#ifdef HAVE_LIQUID_HEADLESS                
+            }              
+#endif              
             cx_hash(&btchip_context_D.transactionHashAuthorization.header,
                     0, btchip_context_D.currentOutput + 8,
                     discardSize - 8, NULL, 0);
-            PRINTF("Adding to authorization hash\n%.*H\n", discardSize - 8, btchip_context_D.currentOutput + 8);
+            PRINTF("Adding to authorization hash\n%.*H\n", discardSize - 8, btchip_context_D.currentOutput + 8);   
         }
 #endif        
 

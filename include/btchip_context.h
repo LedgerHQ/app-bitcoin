@@ -217,6 +217,10 @@ struct btchip_context_s {
 #ifdef HAVE_LIQUID    
     unsigned char usingLiquid;
     unsigned char liquidHostProvidedVbf;
+#ifdef HAVE_LIQUID_HEADLESS
+    unsigned char liquidBlindOutput;
+#endif
+
 #endif    
 
     /* /Segregated Witness changes */

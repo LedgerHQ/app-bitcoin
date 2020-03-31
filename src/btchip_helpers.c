@@ -500,7 +500,7 @@ unsigned char btchip_get_confidential_data_size(char version, bool value, bool n
 }
 
 void btchip_derive_master_blinding_key(unsigned char *target) {
-#if 1    
+#if 0    
     uint32_t path[10];
     os_memset((void*)path, 0, sizeof(path));
     os_memmove((void*)path, SLIP77_LABEL, sizeof(SLIP77_LABEL));
