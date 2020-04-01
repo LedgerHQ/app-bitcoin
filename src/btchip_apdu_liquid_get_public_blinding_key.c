@@ -21,20 +21,21 @@
 #include "btchip_apdu_constants.h"
 
 unsigned short btchip_apdu_liquid_get_public_blinding_key() {
-		uint8_t masterBlindingKey[32];
 		cx_ecfp_private_key_t privateKey;
 		cx_ecfp_public_key_t publicKey;
 
-		btchip_derive_master_blinding_key(masterBlindingKey);
-		cx_hmac_sha256(masterBlindingKey, sizeof(masterBlindingKey), 
-			G_io_apdu_buffer + ISO_OFFSET_CDATA, G_io_apdu_buffer[ISO_OFFSET_LC], 
-			masterBlindingKey, sizeof(masterBlindingKey));
-		cx_ecdsa_init_private_key(BTCHIP_CURVE, masterBlindingKey, 32, &privateKey);
-		cx_ecfp_generate_pair(BTCHIP_CURVE, &publicKey, &privateKey, 1);
-		os_memset(&privateKey, 0, sizeof(privateKey));
-
-		os_memmove(G_io_apdu_buffer, publicKey.W, sizeof(publicKey.W));
-		btchip_context_D.outLength = sizeof(publicKey.W);
+		BEGIN_TRY {
+			TRY {
+				btchip_derive_private_blinding_key(G_io_apdu_buffer + ISO_OFFSET_CDATA, G_io_apdu_buffer[ISO_OFFSET_LC], &privateKey);
+				cx_ecfp_generate_pair(BTCHIP_CURVE, &publicKey, &privateKey, 1);
+				memmove(G_io_apdu_buffer, publicKey.W, sizeof(publicKey.W));
+				btchip_context_D.outLength = sizeof(publicKey.W);
+			}
+			FINALLY {
+				memset(&privateKey, 0, sizeof(privateKey));
+			}
+		}
+		END_TRY;
 
     return BTCHIP_SW_OK;
 }

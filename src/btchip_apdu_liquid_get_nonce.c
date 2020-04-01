@@ -21,25 +21,29 @@
 #include "btchip_apdu_constants.h"
 
 unsigned short btchip_apdu_liquid_get_nonce() {
-		uint8_t masterBlindingKey[65];
 		cx_ecfp_private_key_t privateKey;
+		uint8_t tmp[65];
 
 	  if (G_io_apdu_buffer[ISO_OFFSET_LC] < 65) {
 	  	return BTCHIP_SW_INCORRECT_LENGTH;
 	  }
-		btchip_derive_master_blinding_key(masterBlindingKey);
-		cx_hmac_sha256(masterBlindingKey, 32, 
-			G_io_apdu_buffer + ISO_OFFSET_CDATA + 65, G_io_apdu_buffer[ISO_OFFSET_LC] - 65, 
-			masterBlindingKey, sizeof(masterBlindingKey));
-		cx_ecdsa_init_private_key(BTCHIP_CURVE, masterBlindingKey, 32, &privateKey);
-		cx_ecdh(&privateKey, CX_ECDH_POINT, G_io_apdu_buffer + ISO_OFFSET_CDATA, 65, masterBlindingKey, sizeof(masterBlindingKey));
-		btchip_compress_public_key_value(masterBlindingKey);
-		cx_hash_sha256(masterBlindingKey, 33, masterBlindingKey, 32);
-		cx_hash_sha256(masterBlindingKey, 32, G_io_apdu_buffer, 32);
+	  BEGIN_TRY {
+	  	TRY {
+		  btchip_derive_private_blinding_key(G_io_apdu_buffer + ISO_OFFSET_CDATA + 65, G_io_apdu_buffer[ISO_OFFSET_LC] - 65, &privateKey);
+			cx_ecdh(&privateKey, CX_ECDH_POINT, G_io_apdu_buffer + ISO_OFFSET_CDATA, 65, tmp, sizeof(tmp));
+			btchip_compress_public_key_value(tmp);
+			cx_hash_sha256(tmp, 33, tmp, 32);
+			cx_hash_sha256(tmp, 32, G_io_apdu_buffer, 32);
+	  	}
+			FINALLY {
+				memset(&privateKey, 0, sizeof(privateKey));
+				memset(tmp, 0, sizeof(tmp));
+			}	  	
+	  }
+	  END_TRY;
 
 		btchip_context_D.outLength = 32;
 		return BTCHIP_SW_OK;
 }
 
 #endif
-

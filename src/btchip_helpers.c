@@ -60,25 +60,25 @@ const unsigned char ZEN_OUTPUT_SCRIPT_POST[] = {
 
 unsigned char btchip_output_script_is_regular(unsigned char *buffer) {
     if (G_coin_config->native_segwit_prefix) {
-        if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
+        if ((memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE)) == 0) ||
-            (os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
+            (memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE)) == 0)) {
             return 1;
         }
     }
     if (G_coin_config->kind == COIN_KIND_HORIZEN) {
-        if ((os_memcmp(buffer, ZEN_OUTPUT_SCRIPT_PRE,
+        if ((memcmp(buffer, ZEN_OUTPUT_SCRIPT_PRE,
                        sizeof(ZEN_OUTPUT_SCRIPT_PRE)) == 0) &&
-            (os_memcmp(buffer + sizeof(ZEN_OUTPUT_SCRIPT_PRE) + 20,
+            (memcmp(buffer + sizeof(ZEN_OUTPUT_SCRIPT_PRE) + 20,
                        ZEN_OUTPUT_SCRIPT_POST,
                        sizeof(ZEN_OUTPUT_SCRIPT_POST)) == 0)) {
             return 1;
         }
     } else {
-        if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_PRE,
+        if ((memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE)) == 0) &&
-            (os_memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE) + 20,
+            (memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE) + 20,
                        TRANSACTION_OUTPUT_SCRIPT_POST,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_POST)) == 0)) {
             return 1;
@@ -89,17 +89,17 @@ unsigned char btchip_output_script_is_regular(unsigned char *buffer) {
 
 unsigned char btchip_output_script_is_p2sh(unsigned char *buffer) {
     if (G_coin_config->kind == COIN_KIND_HORIZEN) {
-        if ((os_memcmp(buffer, ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE,
+        if ((memcmp(buffer, ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE,
                        sizeof(ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE)) == 0) &&
-            (os_memcmp(buffer + sizeof(ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE) + 20,
+            (memcmp(buffer + sizeof(ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE) + 20,
                        ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_POST,
                        sizeof(ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_POST)) == 0)) {
             return 1;
         }
     } else {
-        if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE,
+        if ((memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE)) == 0) &&
-            (os_memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE) + 20,
+            (memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE) + 20,
                        TRANSACTION_OUTPUT_SCRIPT_P2SH_POST,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_POST)) == 0)) {
             return 1;
@@ -110,9 +110,9 @@ unsigned char btchip_output_script_is_p2sh(unsigned char *buffer) {
 
 unsigned char btchip_output_script_is_native_witness(unsigned char *buffer) {
     if (G_coin_config->native_segwit_prefix) {
-        if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
+        if ((memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE)) == 0) ||
-            (os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
+            (memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE)) == 0)) {
             return 1;
         }
@@ -260,7 +260,7 @@ unsigned short btchip_public_key_to_encoded_base58(
             tmpBuffer[0] = version;
         }
     } else {
-        os_memmove(tmpBuffer, in, 20 + versionSize);
+        memmove(tmpBuffer, in, 20 + versionSize);
     }
 
     cx_sha256_init(&hash);
@@ -269,7 +269,7 @@ unsigned short btchip_public_key_to_encoded_base58(
     cx_hash(&hash.header, CX_LAST, checksumBuffer, 32, checksumBuffer, 32);
 
     PRINTF("Checksum\n%.*H\n",4,checksumBuffer);
-    os_memmove(tmpBuffer + 20 + versionSize, checksumBuffer, 4);
+    memmove(tmpBuffer + 20 + versionSize, checksumBuffer, 4);
 
     outputLen = outlen;
     if (btchip_encode_base58(tmpBuffer, 24 + versionSize, out, &outputLen) < 0) {
@@ -304,7 +304,7 @@ unsigned short btchip_decode_base58_address(unsigned char *in,
     cx_sha256_init(&hash);
     cx_hash(&hash.header, CX_LAST, hashBuffer, 32, hashBuffer, 32);
 
-    if (os_memcmp(out + outlen - 4, hashBuffer, 4)) {
+    if (memcmp(out + outlen - 4, hashBuffer, 4)) {
         PRINTF("Hash checksum mismatch\n%.*H\n",sizeof(hashBuffer),hashBuffer);
         THROW(INVALID_CHECKSUM);
     }
@@ -334,7 +334,7 @@ void btchip_private_derive_keypair(unsigned char *bip32Path,
                                privateComponent, out_chainCode);
     btchip_retrieve_keypair_discard(privateComponent, derivePublic);
     io_seproxyhal_io_heartbeat();
-    os_memset(privateComponent, 0, sizeof(privateComponent));
+    memset(privateComponent, 0, sizeof(privateComponent));
 }
 
 /*
@@ -416,7 +416,7 @@ unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned cha
     uint8_t num_split = len/30;
 
     for(i = 1; i<= num_split; i++) {
-        os_memmove(out+30*i, out+(30*i-1), len-29*i);
+        memmove(out+30*i, out+(30*i-1), len-29*i);
         out[30*i-1] = '\0';
     }
 #endif
@@ -438,11 +438,11 @@ void btchip_transaction_add_output(unsigned char *hash160Address,
         btchip_swap_bytes(btchip_context_D.tmp, amount, 8);
         btchip_context_D.tmp += 8;
     }
-    os_memmove(btchip_context_D.tmp, (void *)pre, sizePre);
+    memmove(btchip_context_D.tmp, (void *)pre, sizePre);
     btchip_context_D.tmp += sizePre;
-    os_memmove(btchip_context_D.tmp, hash160Address, 20);
+    memmove(btchip_context_D.tmp, hash160Address, 20);
     btchip_context_D.tmp += 20;
-    os_memmove(btchip_context_D.tmp, (void *)post, sizePost);
+    memmove(btchip_context_D.tmp, (void *)post, sizePost);
     btchip_context_D.tmp += sizePost;
 }
 
@@ -500,18 +500,20 @@ unsigned char btchip_get_confidential_data_size(char version, bool value, bool n
 }
 
 void btchip_derive_master_blinding_key(unsigned char *target) {
-#if 0    
+#if 1    
     uint32_t path[10];
-    os_memset((void*)path, 0, sizeof(path));
-    os_memmove((void*)path, SLIP77_LABEL, sizeof(SLIP77_LABEL));
+    memset((void*)path, 0, sizeof(path));
+    memmove((void*)path, SLIP77_LABEL, sizeof(SLIP77_LABEL));
     os_perso_derive_node_with_seed_key(HDW_SLIP21, CX_CURVE_256K1, path, 10, target, NULL, NULL, 0);
 #else
     uint8_t out[64];
     // FIXME : replace by new syscall when available
     os_perso_derive_node_bip32(CX_CURVE_256K1, NULL, 0, out, out + 32);
     cx_hmac_sha512(SYMMETRIC_KEY_SEED, sizeof(SYMMETRIC_KEY_SEED), out, sizeof(out), out, sizeof(out));
-    cx_hmac_sha512(out, 32, SLIP77_LABEL, sizeof(SLIP77_LABEL), out, sizeof(out));
-    os_memmove(target, out + 32, 32);    
+    //cx_hmac_sha512(out, 32, SLIP77_LABEL, sizeof(SLIP77_LABEL), out, sizeof(out));
+    // for compatibility with the old (broken) test cases
+    cx_hmac_sha512(out, 32, SLIP77_LABEL, sizeof(SLIP77_LABEL) - 2, out, sizeof(out));
+    memmove(target, out + 32, 32);    
 #endif        
 }
 
@@ -532,6 +534,15 @@ void btchip_derive_abf_vbf(uint32_t outputIndex, bool abf, unsigned char *target
     deriveData[2] = 'F';
     btchip_write_u32_be(deriveData + 3, outputIndex);
     cx_hmac_sha256(txBlindingKey, sizeof(txBlindingKey), deriveData, sizeof(deriveData), target, 32);
+}
+
+void btchip_derive_private_blinding_key(uint8_t *script, uint32_t scriptSize, cx_ecfp_private_key_t *privateKey) {
+    uint8_t masterBlindingKey[32];
+    btchip_derive_master_blinding_key(masterBlindingKey);
+    cx_hmac_sha256(masterBlindingKey, sizeof(masterBlindingKey), script, scriptSize, 
+                    masterBlindingKey, sizeof(masterBlindingKey));
+    cx_ecdsa_init_private_key(BTCHIP_CURVE, masterBlindingKey, 32, privateKey);
+    os_memset(masterBlindingKey, 0, sizeof(masterBlindingKey));
 }
 
 #endif

@@ -94,5 +94,6 @@ unsigned char btchip_get_confidential_data_size(char version, bool value, bool n
 void btchip_derive_master_blinding_key(unsigned char *target);
 void btchip_derive_tx_blinding_key(unsigned char *target);
 void btchip_derive_abf_vbf(uint32_t outputIndex, bool abf, unsigned char *target);
+void btchip_derive_private_blinding_key(uint8_t *script, uint32_t scriptSize, cx_ecfp_private_key_t *privateKey);
 
 #endif
