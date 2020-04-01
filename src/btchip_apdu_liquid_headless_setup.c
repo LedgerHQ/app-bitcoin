@@ -54,7 +54,7 @@ unsigned short btchip_apdu_liquid_headless_setup() {
 		return BTCHIP_SW_INCORRECT_DATA;
 	}
 
-	os_memmove(G_io_apdu_buffer + 150, G_io_apdu_buffer + ISO_OFFSET_CDATA, 65);
+	memmove(G_io_apdu_buffer + 150, G_io_apdu_buffer + ISO_OFFSET_CDATA, 65);
 	snprintf(G_io_apdu_buffer, 150, "%.*H", 65, G_io_apdu_buffer + 150);		
 	btchip_context_D.outLength = 130;
 

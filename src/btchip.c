@@ -99,7 +99,7 @@ void app_dispatch(void) {
 }
 
 void app_main(void) {
-    os_memset(G_io_apdu_buffer, 0, 255); // paranoia
+    memset(G_io_apdu_buffer, 0, 255); // paranoia
 
     // Process the incoming APDUs
 
@@ -108,7 +108,7 @@ void app_main(void) {
     btchip_context_D.io_flags = 0;
     for (;;) {
 
-        // os_memset(G_io_apdu_buffer, 0, 255); // paranoia
+        // memset(G_io_apdu_buffer, 0, 255); // paranoia
 
         // receive the whole apdu using the 7 bytes headers (ledger transport)
         btchip_context_D.inLength =

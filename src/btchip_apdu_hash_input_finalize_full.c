@@ -42,7 +42,7 @@ extern uint8_t prepare_full_output(uint8_t checkOnly);
 static void btchip_apdu_hash_input_finalize_full_reset(void) {
     btchip_context_D.currentOutputOffset = 0;
     btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS;
-    os_memset(btchip_context_D.totalOutputAmount, 0,
+    memset(btchip_context_D.totalOutputAmount, 0,
               sizeof(btchip_context_D.totalOutputAmount));
     btchip_context_D.changeOutputFound = 0;
     btchip_set_check_internal_structure_integrity(1);
@@ -103,7 +103,7 @@ static bool check_output_displayable() {
                             : isP2sh ? OUTPUT_SCRIPT_P2SH_PRE_LENGTH
                                      : OUTPUT_SCRIPT_REGULAR_PRE_LENGTH);
         if (!isP2sh &&
-            os_memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
+            memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
                       btchip_context_D.tmpCtx.output.changeAddress + 1,
                       20) == 0) {
             changeFound = true;
@@ -111,10 +111,10 @@ static bool check_output_displayable() {
             unsigned char changeSegwit[22];
             changeSegwit[0] = 0x00;
             changeSegwit[1] = 0x14;
-            os_memmove(changeSegwit + 2,
+            memmove(changeSegwit + 2,
                        btchip_context_D.tmpCtx.output.changeAddress + 1, 20);
             btchip_public_key_hash160(changeSegwit, 22, changeSegwit);
-            if (os_memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
+            if (memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
                           changeSegwit, 20) == 0) {
                 if (G_coin_config->flags & FLAG_SEGWIT_CHANGE_SUPPORT) {
                     changeFound = true;
@@ -260,7 +260,7 @@ static bool handle_output_state() {
             }
             // Parse cleartext values
             btchip_swap_bytes(btchip_context_D.liquidAssetTag, btchip_context_D.currentOutput + 1, 32);
-            os_memmove(btchip_context_D.liquidValue, btchip_context_D.currentOutput + 34, 8);
+            memmove(btchip_context_D.liquidValue, btchip_context_D.currentOutput + 34, 8);
             cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
                         btchip_context_D.currentOutput, 33 + 9, NULL, 0);        
             discardSize = 33 + 9;
@@ -305,8 +305,8 @@ static bool handle_output_state() {
                 btchip_context_D.liquidHostProvidedVbf = 1;
             }
 
-            os_memmove(btchip_context_D.liquidAssetTag, btchip_context_D.currentOutput + 1 + 4 + 33 + 33, 32);
-            os_memmove(btchip_context_D.liquidValue, btchip_context_D.currentOutput + 1 + 4 + 33 + 33 + 32, 8);
+            memmove(btchip_context_D.liquidAssetTag, btchip_context_D.currentOutput + 1 + 4 + 33 + 33, 32);
+            memmove(btchip_context_D.liquidValue, btchip_context_D.currentOutput + 1 + 4 + 33 + 33 + 32, 8);
 
             cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
                         btchip_context_D.currentOutput + 1 + 4, 33 + 33, NULL, 0);        
@@ -318,7 +318,7 @@ static bool handle_output_state() {
         // Seek if the asset is well known
         btchip_context_D.liquidAssetReference = 0;
         for (i=0; i<NUM_LIQUID_ASSETS; i++) {
-            if (os_memcmp(btchip_context_D.liquidAssetTag, LIQUID_ASSETS[i].tag, sizeof(btchip_context_D.liquidAssetTag)) == 0) {
+            if (memcmp(btchip_context_D.liquidAssetTag, LIQUID_ASSETS[i].tag, sizeof(btchip_context_D.liquidAssetTag)) == 0) {
                 btchip_context_D.liquidAssetReference = i + 1;
                 PRINTF("Found asset %d\n", btchip_context_D.liquidAssetReference);
                 break;
@@ -366,7 +366,7 @@ static bool handle_output_state() {
             //discardSize = 1;
         }
         else {
-            os_memmove(btchip_context_D.liquidBlindingKey, btchip_context_D.currentOutput, 33);
+            memmove(btchip_context_D.liquidBlindingKey, btchip_context_D.currentOutput, 33);
             //discardSize = 33;
         }
         // FIXME : fake amount, replace by value from value commitment 
@@ -464,7 +464,7 @@ static bool handle_output_state() {
     }
 
     if (discardSize != 0) {
-        os_memmove(btchip_context_D.currentOutput,
+        memmove(btchip_context_D.currentOutput,
                    btchip_context_D.currentOutput + discardSize,
                    btchip_context_D.currentOutputOffset - discardSize);
         btchip_context_D.currentOutputOffset -= discardSize;
@@ -524,14 +524,14 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
                     goto discardTransaction;
                 }
-                os_memset(transactionSummary, 0,
+                memset(transactionSummary, 0,
                           sizeof(btchip_transaction_summary_t));
                 if (G_io_apdu_buffer[ISO_OFFSET_CDATA] == 0x00) {
                     // Called with no change path, abort, should be prevented on
                     // the client side
                     goto return_OK;
                 }
-                os_memmove(transactionSummary->summarydata.keyPath,
+                memmove(transactionSummary->summarydata.keyPath,
                            G_io_apdu_buffer + ISO_OFFSET_CDATA,
                            MAX_BIP32_PATH_LENGTH);
                 btchip_private_derive_keypair(
@@ -548,7 +548,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     keyLength,                                        // INLEN
                     transactionSummary->summarydata.changeAddress + 1 // OUT
                     );
-                os_memmove(
+                memmove(
                     btchip_context_D.tmpCtx.output.changeAddress,
                     transactionSummary->summarydata.changeAddress,
                     sizeof(transactionSummary->summarydata.changeAddress));
@@ -593,7 +593,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     sw = BTCHIP_SW_INCORRECT_DATA;
                     goto discardTransaction;
                 }
-                os_memmove(btchip_context_D.currentOutput +
+                memmove(btchip_context_D.currentOutput +
                                btchip_context_D.currentOutputOffset,
                            G_io_apdu_buffer + ISO_OFFSET_CDATA, apduLength);
                 btchip_context_D.currentOutputOffset += apduLength;
@@ -684,7 +684,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
 
             if (btchip_context_D.transactionContext.firstSigned) {
                 if (!btchip_context_D.tmpCtx.output.changeInitialized) {
-                    os_memset(transactionSummary, 0,
+                    memset(transactionSummary, 0,
                               sizeof(btchip_transaction_summary_t));
                 }
 
@@ -712,7 +712,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             // synchronized)
             if (btchip_context_D.transactionContext.firstSigned) {
                 PRINTF("Setting authorization hash\n%.*H\n",32,authorizationHash);
-                os_memmove(transactionSummary->authorizationHash,
+                memmove(transactionSummary->authorizationHash,
                            authorizationHash,
                            sizeof(transactionSummary->authorizationHash));
                 goto return_OK;
@@ -761,7 +761,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                 BTCHIP_TRANSACTION_NONE;
             btchip_context_D.outLength = 0;
 
-            os_memmove(G_io_apdu_buffer, btchip_context_D.currentOutput,
+            memmove(G_io_apdu_buffer, btchip_context_D.currentOutput,
                        btchip_context_D.currentOutputOffset);
             btchip_context_D.outLength = btchip_context_D.currentOutputOffset;
         }
@@ -836,7 +836,7 @@ unsigned char btchip_bagl_user_action(unsigned char confirming) {
         }
 
         while (btchip_context_D.remainingOutputs != 0) {
-            os_memmove(btchip_context_D.currentOutput,
+            memmove(btchip_context_D.currentOutput,
                        btchip_context_D.currentOutput +
                            btchip_context_D.discardSize,
                        btchip_context_D.currentOutputOffset -

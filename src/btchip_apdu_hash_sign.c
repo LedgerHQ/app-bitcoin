@@ -106,7 +106,7 @@ unsigned short btchip_apdu_hash_sign() {
                 CLOSE_TRY;
                 goto catch_discardTransaction;
             }
-            os_memmove(keyPath, G_io_apdu_buffer + ISO_OFFSET_CDATA,
+            memmove(keyPath, G_io_apdu_buffer + ISO_OFFSET_CDATA,
                        MAX_BIP32_PATH_LENGTH);
             parameters += (4 * G_io_apdu_buffer[ISO_OFFSET_CDATA]) + 1;
             authorizationLength = *(parameters++);
@@ -153,7 +153,7 @@ unsigned short btchip_apdu_hash_sign() {
 
             // Read transaction parameters
             // TODO : remove copy
-            os_memmove(&transactionSummary,
+            memmove(&transactionSummary,
                        &btchip_context_D.transactionSummary,
                        sizeof(transactionSummary));
 

@@ -37,11 +37,11 @@ unsigned short btchip_apdu_get_coin_version() {
     G_io_apdu_buffer[offset++] = btchip_context_D.payToScriptHashVersion;
     G_io_apdu_buffer[offset++] = btchip_context_D.coinFamily;
     G_io_apdu_buffer[offset++] = btchip_context_D.coinIdLength;
-    os_memmove(G_io_apdu_buffer + offset, btchip_context_D.coinId,
+    memmove(G_io_apdu_buffer + offset, btchip_context_D.coinId,
                btchip_context_D.coinIdLength);
     offset += btchip_context_D.coinIdLength;
     G_io_apdu_buffer[offset++] = btchip_context_D.shortCoinIdLength;
-    os_memmove(G_io_apdu_buffer + offset, btchip_context_D.shortCoinId,
+    memmove(G_io_apdu_buffer + offset, btchip_context_D.shortCoinId,
                btchip_context_D.shortCoinIdLength);
     offset += btchip_context_D.shortCoinIdLength;
     btchip_context_D.outLength = offset;

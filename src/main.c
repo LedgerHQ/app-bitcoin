@@ -116,7 +116,7 @@ void load_qr_code(unsigned char *data){
     // qrcodegen_BUFFER_LEN_FOR_VERSION(guessed_qrcode_version)
 
     // encode the address as a QRcode
-    os_memset(&vars.tmpqr, 0, sizeof(vars.tmpqr));
+    memset(&vars.tmpqr, 0, sizeof(vars.tmpqr));
     // use G_io_seproxyhal_spi_buffer as
     if (qrcodegen_encodeBinary(
             data, strlen(data),
@@ -135,7 +135,7 @@ void load_qr_code(unsigned char *data){
 
         vars.tmpqr.icon_details.colors = &vars.tmpqr.colors[0];
         vars.tmpqr.icon_details.bitmap = &vars.tmpqr.qrcode[1];
-        // os_memmove(&vars.tmpqr.icon, &C_qrcode_icon_initializer,
+        // memmove(&vars.tmpqr.icon, &C_qrcode_icon_initializer,
         // sizeof(C_qrcode_icon_initializer));
     }
 }
@@ -151,7 +151,7 @@ unsigned int map_color(unsigned int color) {
     return color;
 }
 void copy_element_and_map_coin_colors(const bagl_element_t *element) {
-    os_memmove(&tmp_element, element, sizeof(bagl_element_t));
+    memmove(&tmp_element, element, sizeof(bagl_element_t));
     tmp_element.component.fgcolor = map_color(tmp_element.component.fgcolor);
     tmp_element.component.bgcolor = map_color(tmp_element.component.bgcolor);
     tmp_element.overfgcolor = map_color(tmp_element.overfgcolor);
@@ -388,8 +388,8 @@ const bagl_element_t *ui_details_blue_prepro(const bagl_element_t *element) {
     } else if (element->component.userid > 0) {
         unsigned int length = strlen(ui_details_content);
         if (length >= (element->component.userid & 0xF) * MAX_CHAR_PER_LINE) {
-            os_memset(vars.tmp.addressSummary, 0, MAX_CHAR_PER_LINE + 1);
-            os_memmove(vars.tmp.addressSummary,
+            memset(vars.tmp.addressSummary, 0, MAX_CHAR_PER_LINE + 1);
+            memmove(vars.tmp.addressSummary,
                        ui_details_content + (element->component.userid & 0xF) *
                                                 MAX_CHAR_PER_LINE,
                        MIN(length - (element->component.userid & 0xF) *
@@ -733,7 +733,7 @@ unsigned int ui_display_address_blue_prepro(const bagl_element_t *element) {
         case 0x02: {
             unsigned int x, y, x_off, y_off, bit;
 #define PIXEL_SIZE 5
-            os_memmove(&tmp_element, element, sizeof(bagl_element_t));
+            memmove(&tmp_element, element, sizeof(bagl_element_t));
             tmp_element.component.width = PIXEL_SIZE;
             tmp_element.component.height = PIXEL_SIZE;
             x_off = 320 / 2 - vars.tmpqr.qrcode[0] * PIXEL_SIZE / 2;
@@ -783,8 +783,8 @@ unsigned int ui_display_address_blue_prepro(const bagl_element_t *element) {
         default:
             if (length >=
                 (element->component.userid & 0xF) * MAX_CHAR_PER_LINE) {
-                os_memset(vars.tmpqr.addressSummary, 0, MAX_CHAR_PER_LINE + 1);
-                os_memmove(vars.tmpqr.addressSummary,
+                memset(vars.tmpqr.addressSummary, 0, MAX_CHAR_PER_LINE + 1);
+                memmove(vars.tmpqr.addressSummary,
                            G_io_apdu_buffer + 200 +
                                (element->component.userid & 0xF) *
                                    MAX_CHAR_PER_LINE,
@@ -2180,7 +2180,7 @@ unsigned char io_event(unsigned char channel) {
 
 uint8_t prepare_fees() {
     if (btchip_context_D.transactionContext.relaxed) {
-        os_memmove(vars.tmp.fullAmount, "UNKNOWN", 7);
+        memmove(vars.tmp.fullAmount, "UNKNOWN", 7);
         vars.tmp.fullAmount[7] = '\0';
     } else {
         unsigned char fees[8];
@@ -2188,7 +2188,7 @@ uint8_t prepare_fees() {
         unsigned char borrow = 0;
 #ifdef HAVE_LIQUID        
         if (btchip_context_D.usingLiquid) {
-            os_memmove(fees, btchip_context_D.liquidValue, 8);
+            memmove(fees, btchip_context_D.liquidValue, 8);
         }
         else {
             borrow = transaction_amount_sub_be(
@@ -2202,7 +2202,7 @@ uint8_t prepare_fees() {
 #endif            
 
         if (borrow && G_coin_config->kind == COIN_KIND_KOMODO) {
-            os_memmove(vars.tmp.fullAmount, "REWARD", 6);
+            memmove(vars.tmp.fullAmount, "REWARD", 6);
             vars.tmp.fullAmount[6] = '\0';
         }
         else {
@@ -2223,10 +2223,10 @@ uint8_t prepare_fees() {
                 }
             }
             else {
-                os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId, coinNameOffset);
+                memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId, coinNameOffset);
             }
 #else        
-            os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId, coinNameOffset);    
+            memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId, coinNameOffset);    
 #endif            
             vars.tmp.fullAmount[coinNameOffset] = ' ';
             btchip_context_D.tmp =
@@ -2284,11 +2284,11 @@ void prepare_single_address() {
             size_t outputLen = sizeof(tmp);
             address[0] = COIN_BLINDED_VERSION;
             address[1] = version;
-            os_memmove(address + 2, btchip_context_D.liquidBlindingKey, 33);
-            os_memmove(address + 2 + 33, btchip_context_D.currentOutput + addressOffset, 20);
+            memmove(address + 2, btchip_context_D.liquidBlindingKey, 33);
+            memmove(address + 2 + 33, btchip_context_D.currentOutput + addressOffset, 20);
             cx_hash_sha256(address, 2 + 33 + 20, tmp, sizeof(tmp));
             cx_hash_sha256(tmp, 32, tmp, sizeof(tmp));
-            os_memmove(address + 2 + 33 + 20, tmp, 4);
+            memmove(address + 2 + 33 + 20, tmp, 4);
             btchip_encode_base58(address, 2 + 33 + 20 + 4, tmp, &outputLen);
             tmp[outputLen] = '\0';
         }        
@@ -2303,7 +2303,7 @@ void prepare_single_address() {
                 versionSize = 1;
                 address[0] = version;
             }
-            os_memmove(address + versionSize,
+            memmove(address + versionSize,
                        btchip_context_D.currentOutput + addressOffset, 20);
 
             // Prepare address
@@ -2345,8 +2345,8 @@ void prepare_single_amount() {
 
     // Handle Omni simple send
     if ((btchip_context_D.currentOutput[offset + 2] == 0x14) &&
-        (os_memcmp(btchip_context_D.currentOutput + offset + 3, "omni", 4) == 0) &&
-        (os_memcmp(btchip_context_D.currentOutput + offset + 3 + 4, "\0\0\0\0", 4) == 0)) {
+        (memcmp(btchip_context_D.currentOutput + offset + 3, "omni", 4) == 0) &&
+        (memcmp(btchip_context_D.currentOutput + offset + 3 + 4, "\0\0\0\0", 4) == 0)) {
             uint8_t headerLength;
             uint32_t omniAssetId = btchip_read_u32(btchip_context_D.currentOutput + offset + 3 + 4 + 4, 1, 0);
             switch(omniAssetId) {
@@ -2382,10 +2382,10 @@ void prepare_single_amount() {
             }
         }
         else {
-            os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId, coinNameOffset);
+            memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId, coinNameOffset);
         }
 #else    
-        os_memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId, coinNameOffset);    
+        memmove(vars.tmp.fullAmount, btchip_context_D.shortCoinId, coinNameOffset);    
 #endif        
         vars.tmp.fullAmount[coinNameOffset] = ' ';
         btchip_context_D.tmp =
@@ -2427,7 +2427,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         return 1;
     }
     // Parse output, locate the change output location
-    os_memset(totalOutputAmount, 0, sizeof(totalOutputAmount));
+    memset(totalOutputAmount, 0, sizeof(totalOutputAmount));
     numberOutputs = btchip_context_D.currentOutput[offset++];
     if (numberOutputs > 3) {
         if (!checkOnly) {
@@ -2497,7 +2497,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                 (isNativeSegwit ? OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET
                                 : isP2sh ? OUTPUT_SCRIPT_P2SH_PRE_LENGTH
                                          : OUTPUT_SCRIPT_REGULAR_PRE_LENGTH);
-            if (os_memcmp(btchip_context_D.currentOutput + offset +
+            if (memcmp(btchip_context_D.currentOutput + offset +
                               addressOffset,
                           btchip_context_D.tmpCtx.output.changeAddress + 1,
                           20) == 0) {
@@ -2579,7 +2579,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                         versionSize = 1;
                         address[0] = version;
                     }
-                    os_memmove(address + versionSize,
+                    memmove(address + versionSize,
                                btchip_context_D.currentOutput + addressOffset,
                                20);
                 }
@@ -2616,7 +2616,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
  
                     // Prepare amount
 
-                    os_memmove(vars.tmp.fullAmount,
+                    memmove(vars.tmp.fullAmount,
                                btchip_context_D.shortCoinId,
                                btchip_context_D.shortCoinIdLength);
                     vars.tmp.fullAmount[btchip_context_D.shortCoinIdLength] =
@@ -2633,11 +2633,11 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
 
                     // prepare fee display
                     if (borrow) {
-                        os_memmove(vars.tmp.feesAmount, "REWARD", 6);
+                        memmove(vars.tmp.feesAmount, "REWARD", 6);
                         vars.tmp.feesAmount[6] = '\0';
                     }
                     else {
-                        os_memmove(vars.tmp.feesAmount,
+                        memmove(vars.tmp.feesAmount,
                                btchip_context_D.shortCoinId,
                                btchip_context_D.shortCoinIdLength);
                         vars.tmp.feesAmount[btchip_context_D.shortCoinIdLength] =
@@ -2926,7 +2926,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
     strcpy(native_segwit_prefix, COIN_NATIVE_SEGWIT_PREFIX);
 #endif
     btchip_altcoin_config_t coin_config;
-    os_memmove(&coin_config, &C_coin_config, sizeof(coin_config));
+    memmove(&coin_config, &C_coin_config, sizeof(coin_config));
 #ifdef TARGET_BLUE
     coin_config.header_text = header;
     coin_config.color_header = COIN_COLOR_HDR;

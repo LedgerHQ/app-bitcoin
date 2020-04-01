@@ -75,7 +75,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
     if (G_io_apdu_buffer[ISO_OFFSET_LC] < 0x01) {
         return BTCHIP_SW_INCORRECT_LENGTH;
     }
-    os_memmove(keyPath, G_io_apdu_buffer + ISO_OFFSET_CDATA,
+    memmove(keyPath, G_io_apdu_buffer + ISO_OFFSET_CDATA,
                MAX_BIP32_PATH_LENGTH);
 
     if(display_request_token){
@@ -112,7 +112,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         keyLength = 33;
     }
 
-    os_memmove(G_io_apdu_buffer + 1, btchip_public_key_D.W,
+    memmove(G_io_apdu_buffer + 1, btchip_public_key_D.W,
                sizeof(btchip_public_key_D.W));
     if (cashAddr) {
         uint8_t tmp[20];
@@ -162,7 +162,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
     }
 
     // output chain code
-    os_memmove(G_io_apdu_buffer + 1 + 65 + 1 + keyLength, chainCode,
+    memmove(G_io_apdu_buffer + 1 + 65 + 1 + keyLength, chainCode,
                sizeof(chainCode));
     btchip_context_D.outLength = 1 + 65 + 1 + keyLength + sizeof(chainCode);
 
@@ -171,14 +171,14 @@ unsigned short btchip_apdu_get_wallet_public_key() {
             return BTCHIP_SW_INCORRECT_DATA;
         }
         // Hax, avoid wasting space
-        os_memmove(G_io_apdu_buffer + 200, G_io_apdu_buffer + 67, keyLength);
+        memmove(G_io_apdu_buffer + 200, G_io_apdu_buffer + 67, keyLength);
         G_io_apdu_buffer[200 + keyLength] = '\0';
         btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
         btchip_bagl_display_public_key(keyPath);
     }
     // If the token requested has already been approved in a previous call, the source is trusted so don't ask for approval again
     else if(display_request_token &&
-           (!btchip_context_D.has_valid_token || os_memcmp(&request_token, btchip_context_D.last_token, 4)))
+           (!btchip_context_D.has_valid_token || memcmp(&request_token, btchip_context_D.last_token, 4)))
     {
         // disable the has_valid_token flag and store the new token
         btchip_context_D.has_valid_token = false;

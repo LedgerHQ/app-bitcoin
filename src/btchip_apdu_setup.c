@@ -27,7 +27,7 @@ void btchip_autosetup() {
     btchip_config_t config;
     unsigned char i;
     unsigned char tmp[32];
-    os_memset(&config, 0, sizeof(btchip_config_t));
+    memset(&config, 0, sizeof(btchip_config_t));
     config.options |= BTCHIP_OPTION_DETERMINISTIC_SIGNATURE;
     config.options |= BTCHIP_OPTION_SKIP_2FA_P2SH; // TODO : remove when
                                                    // supporting multi output
@@ -37,10 +37,10 @@ void btchip_autosetup() {
     // config.payToScriptHashVersion = G_coin_config->p2sh_version;
     // config.coinFamily = G_coin_config->family;
     // config.coinIdLength = strlen(PIC(G_coin_config->coinid));
-    // os_memmove(config.coinId, PIC(G_coin_config->coinid),
+    // memmove(config.coinId, PIC(G_coin_config->coinid),
     // config.coinIdLength);
     // config.shortCoinIdLength = strlen(PIC(G_coin_config->name_short));
-    // os_memmove(config.shortCoinId, PIC(G_coin_config->name_short),
+    // memmove(config.shortCoinId, PIC(G_coin_config->name_short),
     // config.shortCoinIdLength);
     nvm_write((void *)&N_btchip.bkp.config, &config, sizeof(config));
     cx_rng(tmp, sizeof(tmp));

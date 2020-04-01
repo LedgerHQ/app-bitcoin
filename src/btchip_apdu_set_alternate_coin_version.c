@@ -82,11 +82,11 @@ unsigned short btchip_apdu_set_alternate_coin_version() {
             (shortCoinIdLength > MAX_SHORT_COIN_ID)) {
             return BTCHIP_SW_INCORRECT_DATA;
         }
-        os_memmove(btchip_context_D.coinId, G_io_apdu_buffer + offset + 1,
+        memmove(btchip_context_D.coinId, G_io_apdu_buffer + offset + 1,
                    coinIdLength);
         btchip_context_D.coinIdLength = coinIdLength;
         offset += 1 + coinIdLength;
-        os_memmove(btchip_context_D.shortCoinId, G_io_apdu_buffer + offset + 1,
+        memmove(btchip_context_D.shortCoinId, G_io_apdu_buffer + offset + 1,
                    shortCoinIdLength);
         btchip_context_D.shortCoinIdLength = shortCoinIdLength;
     }

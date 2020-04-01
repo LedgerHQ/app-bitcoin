@@ -25,11 +25,11 @@ void btchip_autosetup(void);
 void btchip_context_init() {
     PRINTF("Context init\n");
     PRINTF("Backup size %d\n", sizeof(N_btchip.bkp));
-    os_memset(&btchip_context_D, 0, sizeof(btchip_context_D));
+    memset(&btchip_context_D, 0, sizeof(btchip_context_D));
     SB_SET(btchip_context_D.halted, 0);
     btchip_context_D.currentOutputOffset = 0;
     btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS;
-    os_memset(btchip_context_D.totalOutputAmount, 0,
+    memset(btchip_context_D.totalOutputAmount, 0,
               sizeof(btchip_context_D.totalOutputAmount));
     btchip_context_D.changeOutputFound = 0;
 
@@ -51,22 +51,22 @@ void btchip_context_init() {
         N_btchip.bkp.config.payToScriptHashVersion;
             btchip_context_D.coinFamily = N_btchip.bkp.config.coinFamily;
         btchip_context_D.coinIdLength = N_btchip.bkp.config.coinIdLength;
-        os_memmove(btchip_context_D.coinId, N_btchip.bkp.config.coinId,
+        memmove(btchip_context_D.coinId, N_btchip.bkp.config.coinId,
         N_btchip.bkp.config.coinIdLength);
         btchip_context_D.shortCoinIdLength =
         N_btchip.bkp.config.shortCoinIdLength;
-        os_memmove(btchip_context_D.shortCoinId,
+        memmove(btchip_context_D.shortCoinId,
         N_btchip.bkp.config.shortCoinId, N_btchip.bkp.config.shortCoinIdLength);
         */
         btchip_context_D.payToAddressVersion = G_coin_config->p2pkh_version;
         btchip_context_D.payToScriptHashVersion = G_coin_config->p2sh_version;
         btchip_context_D.coinFamily = G_coin_config->family;
         btchip_context_D.coinIdLength = strlen(PIC(G_coin_config->coinid));
-        os_memmove(btchip_context_D.coinId, PIC(G_coin_config->coinid),
+        memmove(btchip_context_D.coinId, PIC(G_coin_config->coinid),
                    btchip_context_D.coinIdLength);
         btchip_context_D.shortCoinIdLength =
             strlen(PIC(G_coin_config->name_short));
-        os_memmove(btchip_context_D.shortCoinId, PIC(G_coin_config->name_short),
+        memmove(btchip_context_D.shortCoinId, PIC(G_coin_config->name_short),
                    btchip_context_D.shortCoinIdLength);
 
         SB_CHECK(N_btchip.bkp.config.operationMode);
