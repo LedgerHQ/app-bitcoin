@@ -37,7 +37,7 @@ extern unsigned char const OVERWINTER_NO_JOINSPLITS[32];
 #ifdef HAVE_LIQUID
 
 extern unsigned char const SYMMETRIC_KEY_SEED[18];
-extern unsigned char const SLIP77_LABEL[10];
+extern unsigned char const SLIP77_LABEL[12];
 
 #endif
 

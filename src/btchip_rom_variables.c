@@ -55,7 +55,7 @@ unsigned char const OVERWINTER_NO_JOINSPLITS[32] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 #ifdef HAVE_LIQUID
 
 unsigned char const SYMMETRIC_KEY_SEED[18] = { 'S', 'y', 'm', 'm', 'e', 't', 'r', 'i', 'c', ' ', 'k', 'e', 'y', ' ', 's', 'e', 'e', 'd' };
-unsigned char const SLIP77_LABEL[10] = { 0x00, 'S', 'L', 'I', 'P', '-', '0', '0', '7', '7', 0, 0 };
+unsigned char const SLIP77_LABEL[12] = { 0x00, 'S', 'L', 'I', 'P', '-', '0', '0', '7', '7', 0, 0 };
 
 #endif
 
