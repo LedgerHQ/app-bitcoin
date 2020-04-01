@@ -73,10 +73,10 @@ unsigned short btchip_apdu_liquid_get_commitments() {
         }
 #endif        
 
-        os_memmove(assetTag, G_io_apdu_buffer + ISO_OFFSET_CDATA, 32);
+        memmove(assetTag, G_io_apdu_buffer + ISO_OFFSET_CDATA, 32);
 
         for (assetIndex=0; assetIndex<NUM_LIQUID_ASSETS; assetIndex++) {
-            if (os_memcmp(assetTag, LIQUID_ASSETS[assetIndex].tag, sizeof(assetTag)) == 0) {
+            if (memcmp(assetTag, LIQUID_ASSETS[assetIndex].tag, sizeof(assetTag)) == 0) {
                 break;
             }
         }
@@ -84,21 +84,21 @@ unsigned short btchip_apdu_liquid_get_commitments() {
             return BTCHIP_SW_INCORRECT_DATA;
         }
 
-        os_memmove(value, G_io_apdu_buffer + ISO_OFFSET_CDATA + 32, 8);
+        memmove(value, G_io_apdu_buffer + ISO_OFFSET_CDATA + 32, 8);
         outputIndex = btchip_read_u32(G_io_apdu_buffer + ISO_OFFSET_CDATA + 32 + 8, 1, 0);
 #ifdef HAVE_LIQUID_HEADLESS        
         if ((p1 == P1_USE_VBF) || (p1 == P1_USE_ABF_VBF)) {
 #else
         if (p1 == P1_USE_VBF) {
 #endif            
-            os_memmove(vbf, G_io_apdu_buffer + ISO_OFFSET_CDATA + 32 + 8 + 4, 32);
+            memmove(vbf, G_io_apdu_buffer + ISO_OFFSET_CDATA + 32 + 8 + 4, 32);
         }
         else {
             btchip_derive_abf_vbf(outputIndex, false, vbf);
         }
 #ifdef HAVE_LIQUID_HEADLESS        
         if (p1 == P1_USE_ABF_VBF) {
-            os_memmove(abf, G_io_apdu_buffer + ISO_OFFSET_CDATA + 32 + 8 + 4 + 32, 32);
+            memmove(abf, G_io_apdu_buffer + ISO_OFFSET_CDATA + 32 + 8 + 4 + 32, 32);
         }
         else {
             btchip_derive_abf_vbf(outputIndex, true, abf);
@@ -108,12 +108,16 @@ unsigned short btchip_apdu_liquid_get_commitments() {
 #endif        
         
             
-        liquid_crypto_generator_tweak_full(LIQUID_ASSETS[assetIndex].generator, abf, generator, G_io_apdu_buffer);
-        liquid_crypto_pedersen_commit(vbf, value, generator, commitment);
+        if (liquid_crypto_generator_tweak_full(LIQUID_ASSETS[assetIndex].generator, abf, generator, G_io_apdu_buffer)) {
+            return BTCHIP_SW_INCORRECT_DATA;
+        }
+        if (liquid_crypto_pedersen_commit(vbf, value, generator, commitment)) {
+            return BTCHIP_SW_INCORRECT_DATA;
+        }
 
-        os_memmove(G_io_apdu_buffer + offset, abf, 32);
+        memmove(G_io_apdu_buffer + offset, abf, 32);
         offset += 32;
-        os_memmove(G_io_apdu_buffer + offset, vbf, 32);
+        memmove(G_io_apdu_buffer + offset, vbf, 32);
         offset += 32;
 #ifdef HAVE_LIQUID_HEADLESS
         G_io_apdu_buffer[offset++] = ((p1 == P1_USE_VBF || p1 == P1_USE_ABF_VBF) ? LIQUID_TRUSTED_COMMITMENT_FLAG_HOST_PROVIDED_VBF : 0);
@@ -122,14 +126,14 @@ unsigned short btchip_apdu_liquid_get_commitments() {
 #endif        
         btchip_write_u32_be(G_io_apdu_buffer + offset, outputIndex);
         offset += 4;
-        os_memmove(G_io_apdu_buffer + offset, generator, 65);
+        memmove(G_io_apdu_buffer + offset, generator, 65);
         liquid_crypto_generator_compress(G_io_apdu_buffer + offset);
         offset += 33;
-        os_memmove(G_io_apdu_buffer + offset, commitment, 33);
+        memmove(G_io_apdu_buffer + offset, commitment, 33);
         offset += 33;
-        os_memmove(G_io_apdu_buffer + offset, assetTag, 32);
+        memmove(G_io_apdu_buffer + offset, assetTag, 32);
         offset += 32;
-        os_memmove(G_io_apdu_buffer + offset, value, 8);
+        memmove(G_io_apdu_buffer + offset, value, 8);
         offset += 8;
 
         cx_hmac_sha256(N_btchip.bkp.trustedinput_key, sizeof(N_btchip.bkp.trustedinput_key), 

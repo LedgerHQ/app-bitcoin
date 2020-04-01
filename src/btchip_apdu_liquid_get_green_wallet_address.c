@@ -19,6 +19,7 @@
 
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
+#include "btchip_bagl_extensions.h"
 
 #ifndef HAVE_LIQUID_TEST
 
@@ -121,15 +122,18 @@ static size_t scriptint_to_bytes(uint32_t v, unsigned char *bytes_out)
     return len;
 }
 
-void derive_bip32_public(uint8_t *pubkey, uint8_t *chaincode, uint32_t index) {
+static int derive_bip32_public(uint8_t *pubkey, uint8_t *chaincode, uint32_t index) {
 	uint8_t tmp[65];
 	uint8_t tmp2[65];
-	os_memmove(tmp, pubkey, 65);
+	memmove(tmp, pubkey, 65);
 	btchip_compress_public_key_value(tmp);
 	U4BE_ENCODE(tmp, 33, index);
 	cx_hmac_sha512(chaincode, 32, tmp, 33 + 4, tmp, 64);
-	liquid_crypto_generator_tweak_full(pubkey, tmp, pubkey, tmp2);
-	os_memmove(chaincode, tmp + 32, 32);
+	if (liquid_crypto_generator_tweak_full(pubkey, tmp, pubkey, tmp2)) {
+		return -1;
+	}
+	memmove(chaincode, tmp + 32, 32);
+	return 0;
 }
 
 unsigned short btchip_apdu_liquid_get_green_wallet_address() {
@@ -173,27 +177,35 @@ unsigned short btchip_apdu_liquid_get_green_wallet_address() {
 
  	btchip_private_derive_keypair((uint8_t*)PIC(GA_MASTER_KEYPATH), 1, G_io_apdu_buffer);
  	btchip_compress_public_key_value(btchip_public_key_D.W);
- 	os_memmove(G_io_apdu_buffer + 32, btchip_public_key_D.W, 33);
+ 	memmove(G_io_apdu_buffer + 32, btchip_public_key_D.W, 33);
  	cx_hmac_sha512(GA_KEY, sizeof(GA_KEY), G_io_apdu_buffer, 32 + 33, G_io_apdu_buffer, 64);
 
  	// Get service key
 
- 	os_memmove(G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_PUB, GA_ROOT_PUBKEY, 65);
- 	os_memmove(G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_CHAINCODE, GA_ROOT_CHAINCODE, 32);
- 	derive_bip32_public(G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_PUB, G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_CHAINCODE, 
- 		(subaccount == 0 ? INIT_SERVICEPATH_NO_SUBACCOUNT : INIT_SERVICEPATH_SUBACCOUNT));
+ 	memmove(G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_PUB, GA_ROOT_PUBKEY, 65);
+ 	memmove(G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_CHAINCODE, GA_ROOT_CHAINCODE, 32);
+ 	if (derive_bip32_public(G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_PUB, G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_CHAINCODE,
+ 		(subaccount == 0 ? INIT_SERVICEPATH_NO_SUBACCOUNT : INIT_SERVICEPATH_SUBACCOUNT))) {
+ 		return BTCHIP_SW_INCORRECT_DATA;
+ 	}
  	for (i=0; i<64; i+=2) {
-		derive_bip32_public(G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_PUB, G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_CHAINCODE, 
-			U2BE(G_io_apdu_buffer, i)); 		
+		if (derive_bip32_public(G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_PUB, G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_CHAINCODE, 
+			U2BE(G_io_apdu_buffer, i))) {
+			return BTCHIP_SW_INCORRECT_DATA;
+		}
  	}
 	if (subaccount != 0) {
-		derive_bip32_public(G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_PUB, G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_CHAINCODE, 
-			subaccount); 		
+		if (derive_bip32_public(G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_PUB, G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_CHAINCODE, 
+			subaccount)) {
+			return BTCHIP_SW_INCORRECT_DATA;
+		}
 	}
-	derive_bip32_public(G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_PUB, G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_CHAINCODE, 
-			pointer); 		
+	if (derive_bip32_public(G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_PUB, G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_CHAINCODE, 
+			pointer)) {
+		return BTCHIP_SW_INCORRECT_DATA;
+	}
 	btchip_compress_public_key_value(G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_PUB);
-	os_memmove(G_io_apdu_buffer, G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_PUB, 33);
+	memmove(G_io_apdu_buffer, G_io_apdu_buffer + OFFSET_TMP_SERVICEKEY_PUB, 33);
 
 	// Get user key
 
@@ -219,7 +231,7 @@ unsigned short btchip_apdu_liquid_get_green_wallet_address() {
 		G_io_apdu_buffer[i++] = OP_1SUB;
 		G_io_apdu_buffer[i++] = OP_IF;
 		G_io_apdu_buffer[i++] = 33;
-		os_memmove(G_io_apdu_buffer + i, G_io_apdu_buffer, 33);
+		memmove(G_io_apdu_buffer + i, G_io_apdu_buffer, 33);
 		i += 33;
 		G_io_apdu_buffer[i++] = OP_CHECKSIGVERIFY;
 		G_io_apdu_buffer[i++] = OP_ELSE;
@@ -229,17 +241,17 @@ unsigned short btchip_apdu_liquid_get_green_wallet_address() {
 		G_io_apdu_buffer[i++] = OP_DROP;
 		G_io_apdu_buffer[i++] = OP_ENDIF;
 		G_io_apdu_buffer[i++] = 33;
-		os_memmove(G_io_apdu_buffer + i, btchip_public_key_D.W, 33);
+		memmove(G_io_apdu_buffer + i, btchip_public_key_D.W, 33);
 		i += 33;
 		G_io_apdu_buffer[i++] = OP_CHECKSIG;
 	}
 	else {
 		G_io_apdu_buffer[i++] = OP_1 + 1;
 		G_io_apdu_buffer[i++] = 33;
-		os_memmove(G_io_apdu_buffer + i, G_io_apdu_buffer, 33);
+		memmove(G_io_apdu_buffer + i, G_io_apdu_buffer, 33);
 		i += 33;
 		G_io_apdu_buffer[i++] = 33;
-		os_memmove(G_io_apdu_buffer + i, btchip_public_key_D.W, 33);
+		memmove(G_io_apdu_buffer + i, btchip_public_key_D.W, 33);
 		i += 33;
 		G_io_apdu_buffer[i++] = OP_1 + 1;
 		G_io_apdu_buffer[i++] = OP_CHECKMULTISIG;
@@ -258,7 +270,7 @@ unsigned short btchip_apdu_liquid_get_green_wallet_address() {
 
 	G_io_apdu_buffer[0] = OP_HASH160;
 	G_io_apdu_buffer[1] = HASH160_LENGTH;
-	os_memmove(G_io_apdu_buffer + 2, tmp, HASH160_LENGTH);
+	memmove(G_io_apdu_buffer + 2, tmp, HASH160_LENGTH);
 	G_io_apdu_buffer[2 + HASH160_LENGTH] = OP_EQUAL;
 
  	cx_hmac_sha256(masterBlindingKey, sizeof(masterBlindingKey), 
@@ -273,17 +285,17 @@ unsigned short btchip_apdu_liquid_get_green_wallet_address() {
  	G_io_apdu_buffer[i++] = COIN_P2SH_VERSION;
 	cx_ecdsa_init_private_key(BTCHIP_CURVE, masterBlindingKey, 32, &privateKey);
 	cx_ecfp_generate_pair(BTCHIP_CURVE, &publicKey, &privateKey, 1);
-	os_memset(&privateKey, 0, sizeof(privateKey));
+	memset(&privateKey, 0, sizeof(privateKey));
 	btchip_compress_public_key_value(publicKey.W);
-	os_memmove(G_io_apdu_buffer + i, publicKey.W, 33);
+	memmove(G_io_apdu_buffer + i, publicKey.W, 33);
 	i += 33;
-	os_memmove(G_io_apdu_buffer + i, tmp, HASH160_LENGTH);
+	memmove(G_io_apdu_buffer + i, tmp, HASH160_LENGTH);
 	i += HASH160_LENGTH;
 
 	// Add checksum
 	cx_hash_sha256(G_io_apdu_buffer + OFFSET_TMP_SCRIPT, i - OFFSET_TMP_SCRIPT, tmp, sizeof(tmp));
 	cx_hash_sha256(tmp, 32, tmp, sizeof(tmp));
-	os_memmove(G_io_apdu_buffer + i, tmp, 4);
+	memmove(G_io_apdu_buffer + i, tmp, 4);
 	i += 4;
 
 	outputLen = OFFSET_TMP_SCRIPT;

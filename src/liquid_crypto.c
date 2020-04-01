@@ -72,56 +72,56 @@ bool liquid_crypto_is_quad_var(unsigned char *a) {
 	cx_math_multm(x3, x2, x2, SECP256K1_FIELD, 32);
 	cx_math_multm(x3, x3, a, SECP256K1_FIELD, 32);
 
-	os_memmove(x6, x3, 32);
+	memmove(x6, x3, 32);
 	for (j=0; j<3; j++) {
 		cx_math_multm(x6, x6, x6, SECP256K1_FIELD, 32);
 	}
 	cx_math_multm(x6, x6, x3, SECP256K1_FIELD, 32);
 
-	os_memmove(x9, x6, 32);
+	memmove(x9, x6, 32);
 	for (j=0; j<3; j++) {
 		cx_math_multm(x9, x9, x9, SECP256K1_FIELD, 32);
 	}
 	cx_math_multm(x9, x9, x3, SECP256K1_FIELD, 32);
 
-	os_memmove(x11, x9, 32);
+	memmove(x11, x9, 32);
 	for (j=0; j<2; j++) {
 		cx_math_multm(x11, x11, x11, SECP256K1_FIELD, 32);
 	}
 	cx_math_multm(x11, x11, x2, SECP256K1_FIELD, 32);
 
-	os_memmove(x22, x11, 32);
+	memmove(x22, x11, 32);
 	for (j=0; j<11; j++) {
 		cx_math_multm(x22, x22, x22, SECP256K1_FIELD, 32);
 	}
 	cx_math_multm(x22, x22, x11, SECP256K1_FIELD, 32);
 
-	os_memmove(x44, x22, 32);
+	memmove(x44, x22, 32);
 	for (j=0; j<22; j++) {
 		cx_math_multm(x44, x44, x44, SECP256K1_FIELD, 32);
 	}
 	cx_math_multm(x44, x44, x22, SECP256K1_FIELD, 32);
 
-	os_memmove(x88, x44, 32);
+	memmove(x88, x44, 32);
 	for (j=0; j<44; j++) {
 		cx_math_multm(x88, x88, x88, SECP256K1_FIELD, 32);
 	}
 	cx_math_multm(x88, x88, x44, SECP256K1_FIELD, 32);
     
 
-	os_memmove(x176, x88, 32);
+	memmove(x176, x88, 32);
 	for (j=0; j<88; j++) {
 		cx_math_multm(x176, x176, x176, SECP256K1_FIELD, 32);
 	}
 	cx_math_multm(x176, x176, x88, SECP256K1_FIELD, 32);
 
-	os_memmove(x220, x176, 32);
+	memmove(x220, x176, 32);
 	for (j=0; j<44; j++) {
 		cx_math_multm(x220, x220, x220, SECP256K1_FIELD, 32);
 	}
 	cx_math_multm(x220, x220, x44, SECP256K1_FIELD, 32);
 
-	os_memmove(x223, x220, 32);
+	memmove(x223, x220, 32);
 	for (j=0; j<3; j++) {
 		cx_math_multm(x223, x223, x223, SECP256K1_FIELD, 32);
 	}
@@ -129,7 +129,7 @@ bool liquid_crypto_is_quad_var(unsigned char *a) {
 
 	/* The final result is then assembled using a sliding window over the blocks. */
 
-	os_memmove(t1, x223, 32);
+	memmove(t1, x223, 32);
 	for (j=0; j<23; j++) {
 		cx_math_multm(t1, t1, t1, SECP256K1_FIELD, 32);
 	}
@@ -145,7 +145,7 @@ bool liquid_crypto_is_quad_var(unsigned char *a) {
 
 	cx_math_multm(t1, r, r, SECP256K1_FIELD, 32);
 
-	return (os_memcmp(t1, a, 32) == 0);
+	return (memcmp(t1, a, 32) == 0);
 }
 #endif
 
@@ -154,14 +154,16 @@ bool liquid_crypto_is_quad_var(unsigned char *a) {
 	uint8_t p_one_shr[32];
 	uint8_t res[32];
 
-	os_memset(p_one_shr, 0, sizeof(p_one_shr));
+	memset(p_one_shr, 0, sizeof(p_one_shr));
 	p_one_shr[31] = 1;
 	cx_math_sub(p_one_shr, SECP256K1_FIELD, p_one_shr, 32);
 	cx_math_shiftr(p_one_shr, 32, 1);
-	cx_math_powm(res, a, p_one_shr, 32, SECP256K1_FIELD, 32);
+	cx_math_powm(res, a, p_one_shr, 32, SECP256K1_FIELD, 32);	
+	if (!cx_math_is_zero(res, 30)) {
+		return false;
+	}
 	return (res[31] == 1);
 }
-
 
 // secp256k1 G
 static uint8_t const PEDERSEN_GENERATOR[] = { 
@@ -172,26 +174,40 @@ static uint8_t const PEDERSEN_GENERATOR[] = {
   0xfd, 0x17, 0xb4, 0x48, 0xa6, 0x85, 0x54, 0x19, 0x9c, 0x47, 0xd0, 0x8f, 0xfb, 0x10, 0xd4, 0xb8
 };
 
-void liquid_crypto_pedersen_commit(unsigned char *blindingFactor, uint8_t *value64BE, unsigned char *generator, unsigned char *output) {
+int liquid_crypto_pedersen_commit(const uint8_t *blindingFactor, const uint8_t *value64BE, const uint8_t *generator, uint8_t *output) {
 	uint8_t scalar[32];
 	uint8_t *point1 = G_io_apdu_buffer;
 	uint8_t *point2 = G_io_apdu_buffer + 65;
-	os_memset(scalar, 0, 32);
-	os_memmove(scalar + 24, value64BE, 8);
-	os_memmove(point1, PEDERSEN_GENERATOR, 65);
+	if ((cx_math_is_zero(blindingFactor, 32) || (cx_math_cmp(blindingFactor, SECP256K1_FIELD, 32) > 0))) {
+		return -1;
+	}	
+	memset(scalar, 0, 32);
+	memmove(scalar + 24, value64BE, 8);
+	memmove(point1, PEDERSEN_GENERATOR, 65);
 	cx_ecfp_scalar_mult(CX_CURVE_SECP256K1, point1, 65, blindingFactor, 32);
-	os_memmove(point2, generator, 65);
+	memmove(point2, generator, 65);
 	cx_ecfp_scalar_mult(CX_CURVE_SECP256K1, point2, 65, scalar, 32);
 	cx_ecfp_add_point(CX_CURVE_SECP256K1, point1, point1, point2, 65);
+	if (cx_math_is_zero(point1, 65)) {
+		return -1;
+	}
 	output[0]	= 9 ^ liquid_crypto_is_quad_var(point1 + 33);
-	os_memmove(output + 1, point1 + 1, 32);
+	memmove(output + 1, point1 + 1, 32);
+	return 0;
 }
 
-void liquid_crypto_generator_tweak_full(unsigned char *generator, unsigned char *blindingFactor, unsigned char *output, unsigned char *tmp65) {
+int liquid_crypto_generator_tweak_full(const unsigned char *generator, const unsigned char *blindingFactor, unsigned char *output, unsigned char *tmp65) {
 	uint8_t *point1 = tmp65;
-	os_memmove(point1, PEDERSEN_GENERATOR, 65);
+	if ((cx_math_is_zero(blindingFactor, 32) || (cx_math_cmp(blindingFactor, SECP256K1_FIELD, 32) > 0))) {
+		return -1;
+	}	
+	memmove(point1, PEDERSEN_GENERATOR, 65);
 	cx_ecfp_scalar_mult(CX_CURVE_SECP256K1, point1, 65, blindingFactor, 32);
 	cx_ecfp_add_point(CX_CURVE_SECP256K1, output, generator, point1, 65);
+	if (cx_math_is_zero(output, 65)) {
+		return -1;
+	}
+	return 0;
 }
 
 void liquid_crypto_generator_compress(unsigned char *generator) {

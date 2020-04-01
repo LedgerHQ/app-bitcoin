@@ -20,8 +20,8 @@
 
 #include <stdint.h>
 
-void liquid_crypto_pedersen_commit(unsigned char *blindingFactor, uint8_t *value64BE, unsigned char *generator, unsigned char *output);
-void liquid_crypto_generator_tweak_full(unsigned char *generator, unsigned char *blindingFactor, unsigned char *output, unsigned char *tmp65);
+int liquid_crypto_pedersen_commit(const uint8_t *blindingFactor, const uint8_t *value64BE, const uint8_t *generator, uint8_t *output);
+int liquid_crypto_generator_tweak_full(const unsigned char *generator, const unsigned char *blindingFactor, unsigned char *output, unsigned char *tmp65); 
 void liquid_crypto_generator_compress(unsigned char *generator);
 
 void liquid_crypto_test(void);
