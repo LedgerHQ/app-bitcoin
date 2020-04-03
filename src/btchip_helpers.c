@@ -201,17 +201,19 @@ void btchip_write_u32_le(unsigned char *buffer, unsigned long int value) {
 }
 
 void btchip_retrieve_keypair_discard(unsigned char *privateComponent,
-                                     unsigned char derivePublic) {
+                                     unsigned char derivePublic,
+                                     cx_ecfp_private_key_t * private_key,
+                                     cx_ecfp_public_key_t* public_key) {
     BEGIN_TRY {
         TRY {
             cx_ecdsa_init_private_key(BTCHIP_CURVE, privateComponent, 32,
-                                      &btchip_private_key_D);
+                                      private_key);
 
             PRINTF("Using private component\n%.*H\n",32,privateComponent);
 
             if (derivePublic) {
-                cx_ecfp_generate_pair(BTCHIP_CURVE, &btchip_public_key_D,
-                                      &btchip_private_key_D, 1);
+                cx_ecfp_generate_pair(BTCHIP_CURVE, public_key,
+                                      private_key, 1);
             }
         }
         FINALLY {
@@ -307,7 +309,9 @@ unsigned short btchip_decode_base58_address(unsigned char *in,
 
 void btchip_private_derive_keypair(unsigned char *bip32Path,
                                    unsigned char derivePublic,
-                                   unsigned char *out_chainCode) {
+                                   unsigned char *out_chainCode,
+                                   cx_ecfp_private_key_t * private_key,
+                                   cx_ecfp_public_key_t* public_key) {
     unsigned char bip32PathLength;
     unsigned char i;
     unsigned int bip32PathInt[MAX_BIP32_PATH];
@@ -325,7 +329,7 @@ void btchip_private_derive_keypair(unsigned char *bip32Path,
     io_seproxyhal_io_heartbeat();
     os_perso_derive_node_bip32(CX_CURVE_256K1, bip32PathInt, bip32PathLength,
                                privateComponent, out_chainCode);    
-    btchip_retrieve_keypair_discard(privateComponent, derivePublic);
+    btchip_retrieve_keypair_discard(privateComponent, derivePublic, private_key, public_key);
     io_seproxyhal_io_heartbeat();
     os_memset(privateComponent, 0, sizeof(privateComponent));
 }

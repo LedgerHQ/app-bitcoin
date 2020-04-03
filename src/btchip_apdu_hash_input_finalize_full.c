@@ -233,6 +233,8 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
     unsigned char persistentCommit = 0;
     unsigned char hashOffset = 0;
     unsigned char numOutputs = 0;
+    cx_ecfp_private_key_t private_key;
+    cx_ecfp_public_key_t public_key;
 
     apduLength = G_io_apdu_buffer[ISO_OFFSET_LC];
 
@@ -287,16 +289,16 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                            G_io_apdu_buffer + ISO_OFFSET_CDATA,
                            MAX_BIP32_PATH_LENGTH);
                 btchip_private_derive_keypair(
-                    transactionSummary->summarydata.keyPath, 1, NULL);
+                    transactionSummary->summarydata.keyPath, 1, NULL, &private_key, &public_key);
                 if (((N_btchip.bkp.config.options &
                       BTCHIP_OPTION_UNCOMPRESSED_KEYS) != 0)) {
                     keyLength = 65;
                 } else {
-                    btchip_compress_public_key_value(btchip_public_key_D.W);
+                    btchip_compress_public_key_value(public_key.W);
                     keyLength = 33;
                 }
                 btchip_public_key_hash160(
-                    btchip_public_key_D.W,                            // IN
+                    public_key.W,                                     // IN
                     keyLength,                                        // INLEN
                     transactionSummary->summarydata.changeAddress + 1 // OUT
                     );
@@ -525,6 +527,7 @@ unsigned short btchip_apdu_hash_input_finalize_full() {
 
 unsigned char btchip_bagl_user_action(unsigned char confirming) {
     unsigned short sw = BTCHIP_SW_OK;
+
     // confirm and finish the apdu exchange //spaghetti
 
     if (confirming) {

@@ -30,6 +30,7 @@ unsigned short btchip_apdu_hash_sign() {
     unsigned char *parameters = G_io_apdu_buffer + ISO_OFFSET_CDATA;
     unsigned short sw;
     unsigned char keyPath[MAX_BIP32_PATH_LENGTH];
+    cx_ecfp_private_key_t private_key;
 
     SB_CHECK(N_btchip.bkp.config.operationMode);
     switch (SB_GET(N_btchip.bkp.config.operationMode)) {
@@ -127,7 +128,7 @@ unsigned short btchip_apdu_hash_sign() {
 
             // Fetch the private key
 
-            btchip_private_derive_keypair(keyPath, 0, NULL);
+            btchip_private_derive_keypair(keyPath, 0, NULL, &private_key, NULL);
 
             // TODO optional : check the public key against the associated non
             // blank input to sign
@@ -153,7 +154,7 @@ unsigned short btchip_apdu_hash_sign() {
 
             // Sign
             btchip_signverify_finalhash(
-                &btchip_private_key_D, 1, hash2, sizeof(hash2),
+                &private_key, 1, hash2, sizeof(hash2),
                 G_io_apdu_buffer, sizeof(G_io_apdu_buffer),
                 ((N_btchip.bkp.config.options &
                   BTCHIP_OPTION_DETERMINISTIC_SIGNATURE) != 0));

@@ -43,7 +43,8 @@ void btchip_bagl_confirm_message_signature(void);
 void btchip_bagl_user_action_message_signing(unsigned char confirming);
 
 // Public key display
-void btchip_bagl_display_public_key(unsigned char *derivation_path);
+uint8_t set_key_path_to_display(unsigned char* keyPath);
+void btchip_bagl_display_public_key(uint8_t is_derivation_path_unusual);
 void btchip_bagl_user_action_display(unsigned char confirming);
 
 void btchip_bagl_request_pubkey_approval(void);

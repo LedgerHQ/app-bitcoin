@@ -24,13 +24,32 @@
 #include "cashaddr.h"
 #include "btchip_apdu_get_wallet_public_key.h"
 
+int get_public_key_chain_code(unsigned char* keyPath, bool uncompressedPublicKeys, unsigned char* publicKey, unsigned char* chainCode) {
+    cx_ecfp_private_key_t private_key;
+    cx_ecfp_public_key_t public_key;
+    int keyLength = 0;
+    btchip_private_derive_keypair(keyPath, 1, chainCode, &private_key, &public_key);
+    // Then encode it
+    if (uncompressedPublicKeys) {
+        keyLength = 65;
+    } else {
+        btchip_compress_public_key_value(public_key.W);
+        keyLength = 33;
+    }
+
+    os_memmove(publicKey, public_key.W,
+               sizeof(public_key.W));
+    return keyLength;
+}
+
 unsigned short btchip_apdu_get_wallet_public_key() {
     unsigned char keyLength;
     unsigned char uncompressedPublicKeys =
         ((N_btchip.bkp.config.options & BTCHIP_OPTION_UNCOMPRESSED_KEYS) != 0);
-    unsigned char keyPath[MAX_BIP32_PATH_LENGTH];
     uint32_t request_token;
     unsigned char chainCode[32];
+    uint8_t is_derivation_path_unusual;
+    
     bool display = (G_io_apdu_buffer[ISO_OFFSET_P1] == P1_DISPLAY);
     bool display_request_token = N_btchip.pubKeyRequestRestriction && (G_io_apdu_buffer[ISO_OFFSET_P1] == P1_REQUEST_TOKEN) && G_io_apdu_media == IO_APDU_MEDIA_U2F;
     bool require_user_approval = N_btchip.pubKeyRequestRestriction && !(display_request_token || display) && G_io_apdu_media == IO_APDU_MEDIA_U2F;
@@ -67,8 +86,8 @@ unsigned short btchip_apdu_get_wallet_public_key() {
     if (G_io_apdu_buffer[ISO_OFFSET_LC] < 0x01) {
         return BTCHIP_SW_INCORRECT_LENGTH;
     }
-    os_memmove(keyPath, G_io_apdu_buffer + ISO_OFFSET_CDATA,
-               MAX_BIP32_PATH_LENGTH);
+
+    is_derivation_path_unusual = set_key_path_to_display(G_io_apdu_buffer + ISO_OFFSET_CDATA);
 
     if(display_request_token){
         uint8_t request_token_offset = ISO_OFFSET_CDATA + G_io_apdu_buffer[ISO_OFFSET_CDATA]*4 + 1;
@@ -91,21 +110,9 @@ unsigned short btchip_apdu_get_wallet_public_key() {
 
     PRINTF("pin ok\n");
 
-    btchip_private_derive_keypair(keyPath, 1, chainCode);
-
-
     G_io_apdu_buffer[0] = 65;
+    keyLength = get_public_key_chain_code(G_io_apdu_buffer + ISO_OFFSET_CDATA, uncompressedPublicKeys, G_io_apdu_buffer + 1, chainCode);
 
-    // Then encode it
-    if (uncompressedPublicKeys) {
-        keyLength = 65;
-    } else {
-        btchip_compress_public_key_value(btchip_public_key_D.W);
-        keyLength = 33;
-    }
-
-    os_memmove(G_io_apdu_buffer + 1, btchip_public_key_D.W,
-               sizeof(btchip_public_key_D.W));
     if (cashAddr) {
         uint8_t tmp[20];
         btchip_public_key_hash160(G_io_apdu_buffer + 1, // IN
@@ -166,7 +173,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         os_memmove(G_io_apdu_buffer + 200, G_io_apdu_buffer + 67, keyLength);
         G_io_apdu_buffer[200 + keyLength] = '\0';
         btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
-        btchip_bagl_display_public_key(keyPath);
+        btchip_bagl_display_public_key(is_derivation_path_unusual);
     }
     // If the token requested has already been approved in a previous call, the source is trusted so don't ask for approval again
     else if(display_request_token &&
