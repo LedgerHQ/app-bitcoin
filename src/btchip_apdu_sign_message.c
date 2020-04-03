@@ -239,6 +239,8 @@ unsigned short btchip_apdu_sign_message() {
 unsigned short btchip_compute_hash() {
     unsigned char hash[32];
     unsigned short sw = BTCHIP_SW_OK;
+    cx_ecfp_private_key_t private_key;
+
     btchip_context_D.outLength = 0;
     BEGIN_TRY {
         TRY {
@@ -249,9 +251,9 @@ unsigned short btchip_compute_hash() {
                     32, hash, 32);
             btchip_private_derive_keypair(
                 btchip_context_D.transactionSummary.summarydata.keyPath, 0,
-                NULL);
+                NULL, &private_key, NULL);
             btchip_signverify_finalhash(
-                &btchip_private_key_D, 1, hash, sizeof(hash), // IN
+                &private_key, 1, hash, sizeof(hash), // IN
                 G_io_apdu_buffer, 100,                        // OUT
                 ((N_btchip.bkp.config.options &
                   BTCHIP_OPTION_DETERMINISTIC_SIGNATURE) != 0));

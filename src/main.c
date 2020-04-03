@@ -2641,12 +2641,15 @@ void btchip_bagl_confirm_message_signature() {
 #endif // TARGET_
 }
 
-void btchip_bagl_display_public_key(unsigned char* derivation_path) {
+uint8_t set_key_path_to_display(unsigned char* keyPath) {
+    bip32_print_path(keyPath, vars.tmp_warning.derivation_path, MAX_DERIV_PATH_ASCII_LENGTH);
+    return bip44_derivation_guard(keyPath, false);
+}
+
+void btchip_bagl_display_public_key(uint8_t is_derivation_path_unusual) {
     // append a white space at the end of the address to avoid glitch on nano S
     strcat(G_io_apdu_buffer + 200, " ");
     bip32_print_path(derivation_path, vars.tmp_warning.derivation_path, sizeof(vars.tmp_warning.derivation_path));
-    uint8_t is_derivation_path_unusual = bip44_derivation_guard(derivation_path, false);
-
 #if defined(TARGET_BLUE)
 
     if(is_derivation_path_unusual){
@@ -2886,7 +2889,11 @@ __attribute__((section(".boot"))) int main(int arg0) {
 #else
     // exit critical section
     __asm volatile("cpsie i");
-    
+
+    //TODO: Remove me
+    volatile unsigned char buffer[512];
+    os_memcpy(buffer, (unsigned char *)"JOPA", 5);
+
     PRINTF("Hello from bitcoin\n");
     // ensure exception will work as planned
     os_boot();

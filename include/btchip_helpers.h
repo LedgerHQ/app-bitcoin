@@ -48,7 +48,9 @@ void btchip_write_u32_be(unsigned char *buffer, unsigned long int value);
 void btchip_write_u32_le(unsigned char *buffer, unsigned long int value);
 
 void btchip_retrieve_keypair_discard(unsigned char *privateComponent,
-                                     unsigned char derivePublic);
+                                     unsigned char derivePublic, 
+                                     cx_ecfp_private_key_t * private_key,
+                                     cx_ecfp_public_key_t* public_key);
 
 void btchip_perform_double_hash(unsigned char *in, unsigned short inlen,
                                 unsigned char *out,
@@ -65,9 +67,12 @@ unsigned short btchip_decode_base58_address(unsigned char *in,
                                             unsigned short inlen,
                                             unsigned char *out,
                                             unsigned short outlen);
+
 void btchip_private_derive_keypair(unsigned char *bip32Path,
                                    unsigned char derivePublic,
-                                   unsigned char *out_chainCode);
+                                   unsigned char *out_chainCode,
+                                   cx_ecfp_private_key_t * private_key,
+                                   cx_ecfp_public_key_t* public_key);
 
 unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_path);
 unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned char max_out_len);
