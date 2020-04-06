@@ -33,7 +33,7 @@ typedef struct assetDefinition_t {
 
 #else
 
-#define NUM_LIQUID_ASSETS 3
+#define NUM_LIQUID_ASSETS 5
 
 #endif
 
