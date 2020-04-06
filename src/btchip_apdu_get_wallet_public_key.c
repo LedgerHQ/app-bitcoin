@@ -114,7 +114,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
     keyLength = get_public_key_chain_code(G_io_apdu_buffer + ISO_OFFSET_CDATA, uncompressedPublicKeys, G_io_apdu_buffer + 1, chainCode);
 
     if (cashAddr) {
-        uint8_t tmp[20];
+        uint8_t tmp[32];
         btchip_public_key_hash160(G_io_apdu_buffer + 1, // IN
                                   keyLength,            // INLEN
                                   tmp);
@@ -128,7 +128,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
             150,                   // MAXOUTLEN
             G_coin_config->p2pkh_version, 0);
     } else {
-        uint8_t tmp[22];
+        uint8_t tmp[34];
         tmp[0] = 0x00;
         tmp[1] = 0x14;
         btchip_public_key_hash160(G_io_apdu_buffer + 1, // IN

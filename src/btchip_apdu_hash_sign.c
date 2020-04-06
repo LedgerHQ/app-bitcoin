@@ -130,9 +130,6 @@ unsigned short btchip_apdu_hash_sign() {
 
             btchip_private_derive_keypair(keyPath, 0, NULL, &private_key, NULL);
 
-            // TODO optional : check the public key against the associated non
-            // blank input to sign
-
             // Finalize the hash
 
             if (btchip_context_D.usingOverwinter) {
@@ -153,8 +150,8 @@ unsigned short btchip_apdu_hash_sign() {
             PRINTF("Hash2\n%.*H\n", sizeof(hash2), hash2);
 
             // Sign
-            btchip_signverify_finalhash(
-                &private_key, 1, hash2, sizeof(hash2),
+            btchip_sign_finalhash(
+                &private_key, hash2, sizeof(hash2),
                 G_io_apdu_buffer, sizeof(G_io_apdu_buffer),
                 ((N_btchip.bkp.config.options &
                   BTCHIP_OPTION_DETERMINISTIC_SIGNATURE) != 0));

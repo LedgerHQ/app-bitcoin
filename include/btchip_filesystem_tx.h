@@ -45,7 +45,7 @@ struct btchip_transaction_summary_data_s {
     unsigned char fees[8];           // only in wallet mode
     unsigned char changeAmount[8];   // only in wallet mode
     unsigned char outputAddress[21]; // only in wallet mode
-    unsigned char changeAddress[21]; // only in wallet mode
+    unsigned char changeAddress[33]; // only in wallet mode
     unsigned char keyPath[MAX_BIP32_PATH_LENGTH];
 };
 typedef struct btchip_transaction_summary_data_s
