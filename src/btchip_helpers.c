@@ -510,8 +510,6 @@ void btchip_derive_master_blinding_key(unsigned char *target) {
     // FIXME : replace by new syscall when available
     os_perso_derive_node_bip32(CX_CURVE_256K1, NULL, 0, out, out + 32);
     cx_hmac_sha512(SYMMETRIC_KEY_SEED, sizeof(SYMMETRIC_KEY_SEED), out, sizeof(out), out, sizeof(out));
-    //cx_hmac_sha512(out, 32, SLIP77_LABEL, sizeof(SLIP77_LABEL), out, sizeof(out));
-    // for compatibility with the old (broken) test cases
     cx_hmac_sha512(out, 32, SLIP77_LABEL, sizeof(SLIP77_LABEL) - 2, out, sizeof(out));
     memmove(target, out + 32, 32);    
 #endif        
