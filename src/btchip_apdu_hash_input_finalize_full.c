@@ -91,7 +91,7 @@ static bool check_output_displayable() {
                       20) == 0) {
             changeFound = true;
         } else if (isP2sh && btchip_context_D.usingSegwit) {
-            unsigned char changeSegwit[22];
+            unsigned char changeSegwit[32];
             changeSegwit[0] = 0x00;
             changeSegwit[1] = 0x14;
             os_memmove(changeSegwit + 2,
@@ -220,6 +220,30 @@ static bool handle_output_state() {
     return processed;
 }
 
+void get_public_key(unsigned char* keyPath, cx_ecfp_public_key_t* public_key) {
+    cx_ecfp_private_key_t private_key;
+    btchip_private_derive_keypair(keyPath, 1, NULL, &private_key, public_key);
+}
+
+// out should be 32 bytes, even only 20 bytes is significant for output
+void get_pubkey_hash160(unsigned char* keyPath, unsigned char* out) {
+    cx_ecfp_public_key_t public_key;
+    int keyLength;
+    get_public_key(keyPath, &public_key);
+    if (((N_btchip.bkp.config.options &
+            BTCHIP_OPTION_UNCOMPRESSED_KEYS) != 0)) {
+        keyLength = 65;
+    } else {
+        btchip_compress_public_key_value(public_key.W);
+        keyLength = 33;
+    }
+    btchip_public_key_hash160(
+        public_key.W,   // IN
+        keyLength,      // INLEN
+        out             // OUT
+    );
+}
+
 unsigned short btchip_apdu_hash_input_finalize_full_internal(
     btchip_transaction_summary_t *transactionSummary) {
     unsigned char authorizationHash[32];
@@ -233,8 +257,6 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
     unsigned char persistentCommit = 0;
     unsigned char hashOffset = 0;
     unsigned char numOutputs = 0;
-    cx_ecfp_private_key_t private_key;
-    cx_ecfp_public_key_t public_key;
 
     apduLength = G_io_apdu_buffer[ISO_OFFSET_LC];
 
@@ -267,7 +289,6 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             }
 
             if (p1 == FINALIZE_P1_CHANGEINFO) {
-                unsigned char keyLength;
                 if (!btchip_context_D.transactionContext.firstSigned) {
                 // Already validated, should be prevented on the client side
                 return_OK:
@@ -288,20 +309,9 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                 os_memmove(transactionSummary->summarydata.keyPath,
                            G_io_apdu_buffer + ISO_OFFSET_CDATA,
                            MAX_BIP32_PATH_LENGTH);
-                btchip_private_derive_keypair(
-                    transactionSummary->summarydata.keyPath, 1, NULL, &private_key, &public_key);
-                if (((N_btchip.bkp.config.options &
-                      BTCHIP_OPTION_UNCOMPRESSED_KEYS) != 0)) {
-                    keyLength = 65;
-                } else {
-                    btchip_compress_public_key_value(public_key.W);
-                    keyLength = 33;
-                }
-                btchip_public_key_hash160(
-                    public_key.W,                                     // IN
-                    keyLength,                                        // INLEN
-                    transactionSummary->summarydata.changeAddress + 1 // OUT
-                    );
+
+                get_pubkey_hash160(transactionSummary->summarydata.keyPath, transactionSummary->summarydata.changeAddress + 1);
+                
                 os_memmove(
                     btchip_context_D.tmpCtx.output.changeAddress,
                     transactionSummary->summarydata.changeAddress,
