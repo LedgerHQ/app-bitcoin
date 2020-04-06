@@ -15,11 +15,13 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef BTCHIP_BCD_H
+#ifndef BTCHIP_AMOUNT_STRING_H
 
-#define BTCHIP_BCD_H
+#define BTCHIP_AMOUNT_STRING_H
 
-unsigned char
-btchip_convert_hex_amount_to_displayable(unsigned char *amount);
+#define DEFAULT_BTC_DECIMALS 8
+
+int btchip_convert_amount_string(uint8_t *amountBuffer, uint8_t decimals, unsigned char *output, size_t outputSize);
 
 #endif
+

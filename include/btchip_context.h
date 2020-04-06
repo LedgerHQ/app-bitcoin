@@ -280,6 +280,7 @@ struct btchip_context_s {
     unsigned char liquidAssetTag[32];
     unsigned char liquidAssetReference;
     unsigned char liquidValue[8];
+    unsigned char liquidFee[8];
     unsigned char liquidBlindingKey[33];
 #endif    
 };

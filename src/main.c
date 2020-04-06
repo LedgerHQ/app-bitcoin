@@ -1694,63 +1694,6 @@ UX_FLOW(ux_sign_flow,
 
 //////////////////////////////////////////////////////////////////////
 
-UX_STEP_NOCB(ux_confirm_full_flow_1_step, 
-    pnn, 
-    {
-      &C_icon_eye,
-      "Review",
-      "transaction",
-    });
-UX_STEP_NOCB(
-    ux_confirm_full_flow_2_step, 
-    bnnn_paging, 
-    {
-      .title = "Amount",
-      .text = vars.tmp.fullAmount
-    });
-UX_STEP_NOCB(
-    ux_confirm_full_flow_3_step, 
-    bnnn_paging, 
-    {
-      .title = "Address",
-      .text = vars.tmp.fullAddress,
-    });
-UX_STEP_NOCB(
-    ux_confirm_full_flow_4_step, 
-    bnnn_paging, 
-    {
-      .title = "Fees",
-      .text = vars.tmp.feesAmount,
-    });
-UX_STEP_VALID(
-    ux_confirm_full_flow_5_step, 
-    pbb, 
-    io_seproxyhal_touch_verify_ok(NULL),
-    {
-      &C_icon_validate_14,
-      "Accept",
-      "and send",
-    });
-UX_STEP_VALID(
-    ux_confirm_full_flow_6_step, 
-    pb, 
-    io_seproxyhal_touch_verify_cancel(NULL),
-    {
-      &C_icon_crossmark,
-      "Reject",
-    });
-// confirm_full: confirm transaction / Amount: fullAmount / Address: fullAddress / Fees: feesAmount
-UX_FLOW(ux_confirm_full_flow,
-  &ux_confirm_full_flow_1_step,
-  &ux_confirm_full_flow_2_step,
-  &ux_confirm_full_flow_3_step,
-  &ux_confirm_full_flow_4_step,
-  &ux_confirm_full_flow_5_step,
-  &ux_confirm_full_flow_6_step
-);
-
-//////////////////////////////////////////////////////////////////////
-
 UX_STEP_NOCB(
     ux_confirm_single_flow_1_step, 
     pnn, 
@@ -2188,7 +2131,7 @@ uint8_t prepare_fees() {
         unsigned char borrow = 0;
 #ifdef HAVE_LIQUID        
         if (btchip_context_D.usingLiquid) {
-            memmove(fees, btchip_context_D.liquidValue, 8);
+            memmove(fees, btchip_context_D.liquidFee, 8);
         }
         else {
             borrow = transaction_amount_sub_be(
@@ -2231,9 +2174,10 @@ uint8_t prepare_fees() {
             vars.tmp.fullAmount[coinNameOffset] = ' ';
             btchip_context_D.tmp =
                 (unsigned char *)(vars.tmp.fullAmount + coinNameOffset + 1);
-            textSize = btchip_convert_hex_amount_to_displayable(fees);
-            vars.tmp.fullAmount[textSize + coinNameOffset + 1] =
-                '\0';
+            if (btchip_convert_amount_string(fees, DEFAULT_BTC_DECIMALS, btchip_context_D.tmp, sizeof(vars.tmp.fullAmount) - coinNameOffset - 1)) {
+                PRINTF("Error converting fees\n");
+                goto error;
+            }
         }
     }
 
@@ -2365,16 +2309,19 @@ void prepare_single_amount() {
             }
             headerLength = strlen(vars.tmp.fullAmount);
             btchip_context_D.tmp = vars.tmp.fullAmount + headerLength;
-            textSize = btchip_convert_hex_amount_to_displayable(btchip_context_D.currentOutput + offset + 3 + 4 + 4 + 4);
-            vars.tmp.fullAmount[textSize + headerLength] = '\0';
+            if (btchip_convert_amount_string(btchip_context_D.currentOutput + offset + 3 + 4 + 4 + 4, DEFAULT_BTC_DECIMALS, btchip_context_D.tmp, sizeof(vars.tmp.fullAmount) - headerLength)) {
+                strcpy(btchip_context_D.tmp, "ERROR");
+            }
     }
     else {
         uint8_t coinNameOffset = btchip_context_D.shortCoinIdLength;
-#ifdef HAVE_LIQUID        
+        uint8_t decimals = DEFAULT_BTC_DECIMALS;
+#ifdef HAVE_LIQUID                
         if (btchip_context_D.usingLiquid) {
             if (btchip_context_D.liquidAssetReference) {
                 strcpy(vars.tmp.fullAmount, LIQUID_ASSETS[btchip_context_D.liquidAssetReference - 1].ticker);
                 coinNameOffset = strlen(vars.tmp.fullAmount);
+                decimals = LIQUID_ASSETS[btchip_context_D.liquidAssetReference - 1].decimals;
             }
             else {
                 strcpy(vars.tmp.fullAmount, "LIQUID");
@@ -2390,281 +2337,15 @@ void prepare_single_amount() {
         vars.tmp.fullAmount[coinNameOffset] = ' ';
         btchip_context_D.tmp =
             (unsigned char *)(vars.tmp.fullAmount + coinNameOffset + 1);
-        textSize = btchip_convert_hex_amount_to_displayable(amount);
-        vars.tmp.fullAmount[textSize + coinNameOffset + 1] =
-            '\0';
+        if (btchip_convert_amount_string(amount, decimals, btchip_context_D.tmp, sizeof(vars.tmp.fullAmount) - coinNameOffset - 1)) {
+            strcpy(btchip_context_D.tmp, "ERROR");
+        }
     }
 }
 
 uint8_t prepare_single_output() {
     prepare_single_amount();
     return 1;
-}
-
-uint8_t prepare_full_output(uint8_t checkOnly) {
-    unsigned int offset = 0;
-    int numberOutputs;
-    int i;
-    unsigned int currentPos = 0;
-    unsigned char amount[8], totalOutputAmount[8], fees[8];
-    char tmp[80];
-    unsigned char outputPos = 0, changeFound = 0, specialOpFound = 0;
-    unsigned char borrow;
-    if (btchip_context_D.transactionContext.relaxed &&
-        !btchip_context_D.transactionContext.consumeP2SH) {
-        if (!checkOnly) {
-            PRINTF("Error : Mixed inputs");
-        }
-        goto error;
-    }
-    if (btchip_context_D.transactionContext.consumeP2SH) {
-        if (checkOnly) {
-            goto error;
-        }
-        vars.tmp.fullAmount[0] = '\0';
-        vars.tmp.feesAmount[0] = '\0';
-        strcpy(vars.tmp.fullAddress, "P2SH");
-        return 1;
-    }
-    // Parse output, locate the change output location
-    memset(totalOutputAmount, 0, sizeof(totalOutputAmount));
-    numberOutputs = btchip_context_D.currentOutput[offset++];
-    if (numberOutputs > 3) {
-        if (!checkOnly) {
-            PRINTF("Error : Too many outputs");
-        }
-        goto error;
-    }
-    for (i = 0; i < numberOutputs; i++) {
-        unsigned char nullAmount = 1;
-        unsigned int j;
-        unsigned char isOpReturn, isP2sh, isNativeSegwit;
-        unsigned char isOpCreate, isOpCall;
-
-        for (j = 0; j < 8; j++) {
-            if (btchip_context_D.currentOutput[offset + j] != 0) {
-                nullAmount = 0;
-                break;
-            }
-        }
-        btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset, 8);
-        transaction_amount_add_be(totalOutputAmount, totalOutputAmount, amount);
-        offset += 8; // skip amount
-        isOpReturn = btchip_output_script_is_op_return(
-            btchip_context_D.currentOutput + offset);
-        isP2sh = btchip_output_script_is_p2sh(btchip_context_D.currentOutput +
-                                              offset);
-        isNativeSegwit = btchip_output_script_is_native_witness(
-            btchip_context_D.currentOutput + offset);
-        isOpCreate = btchip_output_script_is_op_create(
-            btchip_context_D.currentOutput + offset);
-        isOpCall = btchip_output_script_is_op_call(
-            btchip_context_D.currentOutput + offset);
-        // Always notify OP_RETURN to the user
-        if (nullAmount && isOpReturn) {
-            if (!checkOnly) {
-                PRINTF("Error : Unexpected OP_RETURN");
-            }
-            goto error;
-        }
-        if ((nullAmount && isOpReturn) ||
-             ((G_coin_config->kind == COIN_KIND_QTUM) && (isOpCall || isOpCreate))) {
-            specialOpFound = 1;
-        }
-        if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
-                                             offset) &&
-            !isP2sh && !(nullAmount && isOpReturn) &&
-            (!(G_coin_config->kind == COIN_KIND_QTUM) ||
-             (!isOpCreate && !isOpCall))) {
-            if (!checkOnly) {
-                PRINTF("Error : Unrecognized input script");
-            }
-            goto error;
-        } else if (!btchip_output_script_is_regular(
-                       btchip_context_D.currentOutput + offset) &&
-                   !isP2sh && !(nullAmount && isOpReturn)) {
-            if (!checkOnly) {
-                PRINTF("Error : Unrecognized input script");
-            }
-            goto error;
-        }
-        if (((G_coin_config->kind == COIN_KIND_QTUM) &&
-             btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn &&
-             !isOpCreate && !isOpCall) ||
-            (!(G_coin_config->kind == COIN_KIND_QTUM) &&
-             btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn)) {
-            unsigned char addressOffset =
-                (isNativeSegwit ? OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET
-                                : isP2sh ? OUTPUT_SCRIPT_P2SH_PRE_LENGTH
-                                         : OUTPUT_SCRIPT_REGULAR_PRE_LENGTH);
-            if (memcmp(btchip_context_D.currentOutput + offset +
-                              addressOffset,
-                          btchip_context_D.tmpCtx.output.changeAddress + 1,
-                          20) == 0) {
-                if (changeFound) {
-                    if (!checkOnly) {
-                        PRINTF("Error : Multiple change output found");
-                    }
-                    goto error;
-                }
-                changeFound = 1;
-            } else {
-                outputPos = currentPos;
-            }
-        }
-        offset += 1 + btchip_context_D.currentOutput[offset];
-        currentPos++;
-    }
-    if (btchip_context_D.tmpCtx.output.changeInitialized && !changeFound) {
-        if (!checkOnly) {
-            PRINTF("Error : change output not found");
-        }
-        goto error;
-    }
-    if ((numberOutputs > 1) && (!changeFound || !specialOpFound)) {
-        if (!checkOnly) {
-            PRINTF("Error : too many inputs");
-        }
-        goto error;
-    }
-    borrow = transaction_amount_sub_be(
-            fees, btchip_context_D.transactionContext.transactionAmount,
-            totalOutputAmount);
-    if (borrow && G_coin_config->kind != COIN_KIND_KOMODO) {
-        if (!checkOnly) {
-            PRINTF("Error : Fees not consistent");
-        }
-        goto error;
-    }
-    if (!checkOnly) {
-        // Format validation message
-        currentPos = 0;
-        offset = 1;
-        btchip_context_D.tmp = (unsigned char *)tmp;
-        for (i = 0; i < numberOutputs; i++) {
-            if (((G_coin_config->kind == COIN_KIND_QTUM) &&
-                 !btchip_output_script_is_op_return(
-                     btchip_context_D.currentOutput + offset + 8) &&
-                 !btchip_output_script_is_op_create(
-                     btchip_context_D.currentOutput + offset + 8) &&
-                 !btchip_output_script_is_op_call(
-                     btchip_context_D.currentOutput + offset + 8)) ||
-                (!(G_coin_config->kind == COIN_KIND_QTUM) &&
-                 !btchip_output_script_is_op_return(
-                     btchip_context_D.currentOutput + offset + 8))) {
-                unsigned char versionSize;
-                int addressOffset;
-                unsigned char address[22];
-                unsigned short version;
-                unsigned char isNativeSegwit;
-                btchip_swap_bytes(amount,
-                                  btchip_context_D.currentOutput + offset, 8);
-                offset += 8;
-                isNativeSegwit = btchip_output_script_is_native_witness(
-                    btchip_context_D.currentOutput + offset);
-                if (!isNativeSegwit) {
-                    if (btchip_output_script_is_regular(
-                            btchip_context_D.currentOutput + offset)) {
-                        addressOffset = offset + 4;
-                        version = btchip_context_D.payToAddressVersion;
-                    } else {
-                        addressOffset = offset + 3;
-                        version = btchip_context_D.payToScriptHashVersion;
-                    }
-                    if (version > 255) {
-                        versionSize = 2;
-                        address[0] = (version >> 8);
-                        address[1] = version;
-                    } else {
-                        versionSize = 1;
-                        address[0] = version;
-                    }
-                    memmove(address + versionSize,
-                               btchip_context_D.currentOutput + addressOffset,
-                               20);
-                }
-                if (currentPos == outputPos) {
-                    unsigned short textSize = 0;
-                    if (!isNativeSegwit) {
-                        // Prepare address
-                        if (btchip_context_D.usingCashAddr) {
-                            cashaddr_encode(
-                                address + versionSize, 20, tmp, sizeof(tmp),
-                                (version ==
-                                         btchip_context_D.payToScriptHashVersion
-                                     ? CASHADDR_P2SH
-                                     : CASHADDR_P2PKH));
-                        } else {
-                            textSize = btchip_public_key_to_encoded_base58(
-                                address, 20 + versionSize, (unsigned char *)tmp,
-                                sizeof(tmp), version, 1);
-                            tmp[textSize] = '\0';
-                        }
-                    } else if (G_coin_config->native_segwit_prefix) {
-                        segwit_addr_encode(
-                            tmp, PIC(G_coin_config->native_segwit_prefix), 0,
-                            btchip_context_D.currentOutput + offset +
-                                OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET,
-                            btchip_context_D.currentOutput
-                                [offset +
-                                 OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET -
-                                 1]);
-                    }
-
-                    strncpy(vars.tmp.fullAddress, tmp, sizeof(vars.tmp.fullAddress));
-                    vars.tmp.fullAddress[sizeof(vars.tmp.fullAddress) - 1] = '\0';
- 
-                    // Prepare amount
-
-                    memmove(vars.tmp.fullAmount,
-                               btchip_context_D.shortCoinId,
-                               btchip_context_D.shortCoinIdLength);
-                    vars.tmp.fullAmount[btchip_context_D.shortCoinIdLength] =
-                        ' ';
-                    btchip_context_D.tmp =
-                        (unsigned char *)(vars.tmp.fullAmount +
-                                          btchip_context_D.shortCoinIdLength +
-                                          1);
-                    textSize = btchip_convert_hex_amount_to_displayable(amount);
-                    vars.tmp
-                        .fullAmount[textSize +
-                                    btchip_context_D.shortCoinIdLength + 1] =
-                        '\0';
-
-                    // prepare fee display
-                    if (borrow) {
-                        memmove(vars.tmp.feesAmount, "REWARD", 6);
-                        vars.tmp.feesAmount[6] = '\0';
-                    }
-                    else {
-                        memmove(vars.tmp.feesAmount,
-                               btchip_context_D.shortCoinId,
-                               btchip_context_D.shortCoinIdLength);
-                        vars.tmp.feesAmount[btchip_context_D.shortCoinIdLength] =
-                            ' ';
-                        btchip_context_D.tmp =
-                            (unsigned char *)(vars.tmp.feesAmount +
-                                          btchip_context_D.shortCoinIdLength +
-                                          1);
-                        textSize = btchip_convert_hex_amount_to_displayable(fees);
-                        vars.tmp
-                            .feesAmount[textSize +
-                                    btchip_context_D.shortCoinIdLength + 1] =
-                            '\0';
-                    }
-                    break;
-                }
-            } else {
-                offset += 8;
-            }
-            offset += 1 + btchip_context_D.currentOutput[offset];
-            currentPos++;
-        }
-    }
-    btchip_context_D.tmp = NULL;
-    return 1;    
-error:
-    return 0;
 }
 
 #define HASH_LENGTH 4
@@ -2676,23 +2357,6 @@ uint8_t prepare_message_signature() {
 
     snprintf(vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress), "%.*H...%.*H",
              8, buffer, 8, buffer + 32 - 8);
-    return 1;
-}
-
-unsigned int btchip_bagl_confirm_full_output() {
-    if (!prepare_full_output(0)) {
-        return 0;
-    }
-
-#if defined(TARGET_BLUE)
-    ui_transaction_full_blue_init();
-#elif defined(HAVE_UX_FLOW)
-    ux_flow_init(0, ux_confirm_full_flow, NULL);
-#elif defined(TARGET_NANOS)
-    ux_step = 0;
-    ux_step_count = 4;
-    UX_DISPLAY(ui_verify_nanos, ui_verify_prepro);
-#endif // TARGET_
     return 1;
 }
 

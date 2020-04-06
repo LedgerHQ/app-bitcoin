@@ -37,7 +37,11 @@
 #define FLAG_SIGNATURE 0x01
 #define FLAG_CHANGE_VALIDATED 0x80
 
+#if 0
+
 extern uint8_t prepare_full_output(uint8_t checkOnly);
+
+#endif
 
 static void btchip_apdu_hash_input_finalize_full_reset(void) {
     btchip_context_D.currentOutputOffset = 0;
@@ -442,6 +446,14 @@ static bool handle_output_state() {
         }
 #endif        
 
+#ifdef HAVE_LIQUID
+
+        if (btchip_output_script_is_fee(btchip_context_D.currentOutput + 8)) {
+            memmove(btchip_context_D.liquidFee, btchip_context_D.liquidValue, 8);
+        }
+
+#endif        
+
         if (check_output_displayable()) {
             btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
 
@@ -598,28 +610,17 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                            G_io_apdu_buffer + ISO_OFFSET_CDATA, apduLength);
                 btchip_context_D.currentOutputOffset += apduLength;
 
-                // Check if the legacy UI can be applied
-                if (!(G_coin_config->kind == COIN_KIND_QTUM) &&
-                    (G_io_apdu_buffer[ISO_OFFSET_P1] == FINALIZE_P1_LAST) &&
-                    !btchip_context_D.tmpCtx.output.multipleOutput &&
-                    prepare_full_output(1)) {
-                    btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
+                while (handle_output_state() &&
+                        (!(btchip_context_D.io_flags & IO_ASYNCH_REPLY)))
+                    ;
+
+                // Finalize the TX if necessary
+
+                if ((btchip_context_D.remainingOutputs == 0) &&
+                    (!(btchip_context_D.io_flags & IO_ASYNCH_REPLY))) {
+                     btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
                     btchip_context_D.outputParsingState =
-                        BTCHIP_OUTPUT_HANDLE_LEGACY;
-                    btchip_context_D.remainingOutputs = 0;
-                } else {
-                    while (handle_output_state() &&
-                           (!(btchip_context_D.io_flags & IO_ASYNCH_REPLY)))
-                        ;
-
-                    // Finalize the TX if necessary
-
-                    if ((btchip_context_D.remainingOutputs == 0) &&
-                        (!(btchip_context_D.io_flags & IO_ASYNCH_REPLY))) {
-                        btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
-                        btchip_context_D.outputParsingState =
-                            BTCHIP_OUTPUT_FINALIZE_TX;
-                    }
+                        BTCHIP_OUTPUT_FINALIZE_TX;
                 }
             }
 
@@ -800,10 +801,7 @@ unsigned short btchip_apdu_hash_input_finalize_full() {
                 btchip_context_D.outLength = 0;
             }
 #endif            
-        } else if (btchip_context_D.outputParsingState ==
-                   BTCHIP_OUTPUT_HANDLE_LEGACY) {
-            status = btchip_bagl_confirm_full_output();
-        }
+        } 
         else {
             status = btchip_bagl_confirm_single_output();
         }

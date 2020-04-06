@@ -24,7 +24,7 @@
 #include "btchip_rom_variables.h"
 #include "btchip_filesystem.h"
 #include "btchip_base58.h"
-#include "btchip_bcd.h"
+#include "btchip_amount_string.h"
 #include "btchip_ecc.h"
 #include "btchip_helpers.h"
 #include "btchip_transaction.h"
