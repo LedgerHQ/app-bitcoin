@@ -252,8 +252,8 @@ unsigned short btchip_compute_hash() {
             btchip_private_derive_keypair(
                 btchip_context_D.transactionSummary.summarydata.keyPath, 0,
                 NULL, &private_key, NULL);
-            btchip_signverify_finalhash(
-                &private_key, 1, hash, sizeof(hash), // IN
+            btchip_sign_finalhash(
+                &private_key, hash, sizeof(hash), // IN
                 G_io_apdu_buffer, 100,                        // OUT
                 ((N_btchip.bkp.config.options &
                   BTCHIP_OPTION_DETERMINISTIC_SIGNATURE) != 0));

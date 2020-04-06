@@ -47,11 +47,6 @@ unsigned long int btchip_read_u32(unsigned char *buffer, unsigned char be,
 void btchip_write_u32_be(unsigned char *buffer, unsigned long int value);
 void btchip_write_u32_le(unsigned char *buffer, unsigned long int value);
 
-void btchip_retrieve_keypair_discard(unsigned char *privateComponent,
-                                     unsigned char derivePublic, 
-                                     cx_ecfp_private_key_t * private_key,
-                                     cx_ecfp_public_key_t* public_key);
-
 void btchip_perform_double_hash(unsigned char *in, unsigned short inlen,
                                 unsigned char *out,
                                 unsigned char hash1Algorithm,
@@ -83,10 +78,10 @@ unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned cha
 void btchip_swap_bytes(unsigned char *target, unsigned char *source,
                        unsigned char size);
 
-void btchip_signverify_finalhash(void *keyContext, unsigned char sign,
-                                 unsigned char *in, unsigned short inlen,
-                                 unsigned char *out, unsigned short outlen,
-                                 unsigned char rfc6979);
+void btchip_sign_finalhash(void *keyContext,
+                           unsigned char *in, unsigned short inlen,
+                           unsigned char *out, unsigned short outlen,
+                           unsigned char rfc6979);
 
 void btchip_transaction_add_output(unsigned char *hash160Address,
                                    unsigned char *amount, unsigned char p2sh);

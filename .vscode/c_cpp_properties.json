@@ -7,6 +7,7 @@
                 "${env:BOLOS_SDK}/**"
             ],
             "defines": [
+                "HAVE_UX_FLOW",
                 "TARGET_NANOS",
                 "OS_IO_SEPROXYHAL",
                 "HAVE_BAGL",
