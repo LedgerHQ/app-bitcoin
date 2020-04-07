@@ -29,7 +29,7 @@ typedef struct assetDefinition_t {
 
 #ifdef HAVE_LIQUID_TEST
 
-#define NUM_LIQUID_ASSETS 5
+#define NUM_LIQUID_ASSETS 6
 
 #else
 
