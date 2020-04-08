@@ -68,10 +68,10 @@ int btchip_convert_amount_string(uint8_t *amountBuffer, uint8_t decimals, unsign
     r = print_uint64(amount % tenPow, remainderBuffer);
     padSize = decimals - strlen(r);
     tmp = r + strlen(r) - 1;
-    while ((*tmp == '0') && (tmp != r)) {
+    while ((*tmp == '0') && (tmp >= r)) {
         tmp--;
     }
-    if (tmp != r) {
+    if (tmp >= r) {
         tmp[1] = 0;
         extraSize = strlen(tmp) + 1;
     }
