@@ -32,6 +32,7 @@ void btchip_context_init() {
     os_memset(btchip_context_D.totalOutputAmount, 0,
               sizeof(btchip_context_D.totalOutputAmount));
     btchip_context_D.changeOutputFound = 0;
+    btchip_context_D.segwitWarningSeen = 0;
 
     if (N_btchip.config_valid != 0x01) {
         btchip_autosetup();

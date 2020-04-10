@@ -17,6 +17,7 @@
 
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
+#include "btchip_bagl_extensions.h"
 
 #define P1_FIRST 0x00
 #define P1_NEXT 0x80
@@ -45,6 +46,7 @@ unsigned short btchip_apdu_hash_input_start() {
         // Initialize
         btchip_context_D.transactionContext.transactionState =
             BTCHIP_TRANSACTION_NONE;
+        btchip_context_D.segwitWarningSeen = 0;
         btchip_set_check_internal_structure_integrity(1);
         btchip_context_D.transactionHashOption = TRANSACTION_HASH_BOTH;
     } else if (G_io_apdu_buffer[ISO_OFFSET_P1] != P1_NEXT) {
@@ -106,6 +108,14 @@ unsigned short btchip_apdu_hash_input_start() {
         return BTCHIP_SW_INCORRECT_P1_P2;
     }
 
+    // Warn user to update its client if input is flagged as segwit
+    if (btchip_context_D.usingSegwit && !btchip_context_D.segwitWarningSeen) {
+        btchip_context_D.segwitWarningSeen = 1;
+        btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
+        btchip_bagl_request_segwit_input_approval();
+    }
+
+    // Start parsing of the 1st chunk before warning the user
     btchip_context_D.transactionBufferPointer =
         G_io_apdu_buffer + ISO_OFFSET_CDATA;
     btchip_context_D.transactionDataRemaining = apduLength;
