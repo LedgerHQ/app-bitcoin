@@ -205,10 +205,10 @@ void btchip_write_u32_le(unsigned char *buffer, unsigned long int value) {
 void btchip_public_key_hash160(unsigned char *in, unsigned short inlen,
                                unsigned char *out) {
     cx_ripemd160_t riprip;
-
-    cx_hash_sha256(in, inlen, out, 32);
+    unsigned char buffer[32];
+    cx_hash_sha256(in, inlen, buffer, 32);
     cx_ripemd160_init(&riprip);
-    cx_hash(&riprip.header, CX_LAST, out, 32, out, 32);
+    cx_hash(&riprip.header, CX_LAST, buffer, 32, out, 20);
 }
 
 void btchip_compute_checksum(unsigned char* in, unsigned short inlen, unsigned char * output) {
