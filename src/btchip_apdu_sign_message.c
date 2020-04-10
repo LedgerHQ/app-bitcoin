@@ -99,7 +99,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                     btchip_context_D.transactionSummary.payToScriptHashVersion =
                         G_coin_config->p2sh_version;
                     os_memmove(
-                        btchip_context_D.transactionSummary.summarydata.keyPath,
+                        btchip_context_D.transactionSummary.keyPath,
                         G_io_apdu_buffer + offset, MAX_BIP32_PATH_LENGTH);
                     offset += (4 * G_io_apdu_buffer[offset]) + 1;
                     if (p2 == P2_LEGACY) {
@@ -204,8 +204,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                     CLOSE_TRY;
                     goto discard;
                 }
-                if (checkBitId(btchip_context_D.transactionSummary.summarydata
-                                   .keyPath) != BITID_NONE) {
+                if (checkBitId(btchip_context_D.transactionSummary.keyPath) != BITID_NONE) {
                     sw = btchip_compute_hash();
                 } else {
                     btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
@@ -250,7 +249,7 @@ unsigned short btchip_compute_hash() {
             cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST, hash,
                     32, hash, 32);
             btchip_private_derive_keypair(
-                btchip_context_D.transactionSummary.summarydata.keyPath, 0,
+                btchip_context_D.transactionSummary.keyPath, 0,
                 NULL, &private_key, NULL);
             btchip_sign_finalhash(
                 &private_key, hash, sizeof(hash), // IN

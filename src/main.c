@@ -31,7 +31,6 @@
 #include "glyphs.h"
 #include "swap_lib_calls.h"
 
-#include "usbd_core.h"
 
 #define __NAME3(a, b, c) a##b##c
 #define NAME3(a, b, c) __NAME3(a, b, c)
@@ -2267,7 +2266,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                                          : OUTPUT_SCRIPT_REGULAR_PRE_LENGTH);
             if (os_memcmp(btchip_context_D.currentOutput + offset +
                               addressOffset,
-                          btchip_context_D.tmpCtx.output.changeAddress + 1,
+                          btchip_context_D.tmpCtx.output.changeAddress,
                           20) == 0) {
                 if (changeFound) {
                     if (!checkOnly) {
