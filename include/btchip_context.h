@@ -24,7 +24,7 @@
 #include "btchip_secure_value.h"
 #include "btchip_filesystem_tx.h"
 
-#define MAX_OUTPUT_TO_CHECK 72
+#define MAX_OUTPUT_TO_CHECK 75
 #define MAX_COIN_ID 13
 #define MAX_SHORT_COIN_ID 5
 
@@ -139,7 +139,7 @@ typedef struct btchip_transaction_context_s btchip_transaction_context_t;
 
 struct btchip_tmp_output_s {
     /** Change address if initialized */
-    unsigned char changeAddress[21];
+    unsigned char changeAddress[20];
     /** Flag set if the change address was initialized */
     unsigned char changeInitialized;
     /** Flag set if the change address was checked */

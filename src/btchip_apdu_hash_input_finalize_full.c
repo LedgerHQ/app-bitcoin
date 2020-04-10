@@ -87,15 +87,15 @@ static bool check_output_displayable() {
                                      : OUTPUT_SCRIPT_REGULAR_PRE_LENGTH);
         if (!isP2sh &&
             os_memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
-                      btchip_context_D.tmpCtx.output.changeAddress + 1,
+                      btchip_context_D.tmpCtx.output.changeAddress,
                       20) == 0) {
             changeFound = true;
         } else if (isP2sh && btchip_context_D.usingSegwit) {
-            unsigned char changeSegwit[32];
+            unsigned char changeSegwit[22];
             changeSegwit[0] = 0x00;
             changeSegwit[1] = 0x14;
             os_memmove(changeSegwit + 2,
-                       btchip_context_D.tmpCtx.output.changeAddress + 1, 20);
+                       btchip_context_D.tmpCtx.output.changeAddress, 20);
             btchip_public_key_hash160(changeSegwit, 22, changeSegwit);
             if (os_memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
                           changeSegwit, 20) == 0) {
@@ -251,10 +251,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
     unsigned short sw = BTCHIP_SW_OK;
     unsigned char *target = G_io_apdu_buffer;
     unsigned char keycardActivated = 0;
-    unsigned char screenPaired = 0;
-    unsigned char deepControl = 0;
     unsigned char p1 = G_io_apdu_buffer[ISO_OFFSET_P1];
-    unsigned char persistentCommit = 0;
     unsigned char hashOffset = 0;
     unsigned char numOutputs = 0;
 
@@ -306,24 +303,20 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     // the client side
                     goto return_OK;
                 }
-                os_memmove(transactionSummary->summarydata.keyPath,
+                os_memmove(transactionSummary->keyPath,
                            G_io_apdu_buffer + ISO_OFFSET_CDATA,
                            MAX_BIP32_PATH_LENGTH);
 
-                get_pubkey_hash160(transactionSummary->summarydata.keyPath, transactionSummary->summarydata.changeAddress + 1);
+                get_pubkey_hash160(transactionSummary->keyPath, btchip_context_D.tmpCtx.output.changeAddress);
                 
-                os_memmove(
-                    btchip_context_D.tmpCtx.output.changeAddress,
-                    transactionSummary->summarydata.changeAddress,
-                    sizeof(transactionSummary->summarydata.changeAddress));
                 btchip_context_D.tmpCtx.output.changeInitialized = 1;
                 btchip_context_D.tmpCtx.output.changeAccepted = 0;
 
                 // if the bip44 change path provided is not canonical or its index are unsual, ask for user approval
-                if(bip44_derivation_guard(transactionSummary->summarydata.keyPath, true)) {
+                if(bip44_derivation_guard(transactionSummary->keyPath, true)) {
                     btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
                     btchip_context_D.outputParsingState = BTCHIP_BIP44_CHANGE_PATH_VALIDATION;
-                    btchip_bagl_request_change_path_approval(transactionSummary->summarydata.keyPath);
+                    btchip_bagl_request_change_path_approval(transactionSummary->keyPath);
                 }
 
                 goto return_OK;
@@ -441,7 +434,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
 
                 // Generate new nonce
 
-                cx_rng(transactionSummary->summarydata.transactionNonce, 8);
+                cx_rng(transactionSummary->transactionNonce, 8);
             }
 
             G_io_apdu_buffer[0] = 0x00;
