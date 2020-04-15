@@ -42,7 +42,7 @@ from helpers.deviceappbtc import DeviceAppBtc, BTC_P1, BTC_P2
 
 class TestLedgerjsTx:
 
-    ledgerjs_tests = [
+    ledgerjs_test_data = [
         #"btc 3" test data
         [
             [
@@ -101,8 +101,8 @@ class TestLedgerjsTx:
         # ]
     ]
 
-    @pytest.mark.parametrize('test_data_', ledgerjs_tests)
-    def test_ledgerjs(self, test_data_: List[List[bytes]]) -> None:
+    @pytest.mark.parametrize('test_data_', ledgerjs_test_data)
+    def test_replay_ledgerjs_tests(self, test_data_: List[List[bytes]]) -> None:
         """Verify the Btc app with a test Tx known to work.
         Data is from ledgerjs repo, file "Btc.test.js", test "btc 2"
         """
@@ -211,7 +211,8 @@ class TestTxSegwitTrustedInputsNano:
         ]
 
         # can't verify the input hash as idk what data from the tx is double-SHA-256 -hashed
-        # Can't verify the HMAC as idk the HMAC key (in Flash). Only check output index & amount.
+        # Can't verify the HMAC as idk the HMAC key (in Flash). 
+        # ==> Only check output index & amount.
         self.check_valid(trusted_inputs[0], out_index="00000000", out_amount="d7ee7c0100000000")
 
 
@@ -338,15 +339,15 @@ class TestTxSegwitTrustedInputsNano:
                  # Witnesses (1 for each input if Marker+Flag=0001)
                  # /!\ remove witnesses for `GetTrustedInput`
                  "0247"
-                 "30440220495838c36533616d8cbd6474842459596f4f312dce5483fe6507"
-                 "91c82e17221c02200660520a2584144915efa8519a72819091e5ed78c526"
-                 "89b24235182f17d96302012102ddf4af49ff0eae1d507cc50c86f903cd6a"
-                 "a0395f3239759c440ea67556a3b91b"
+                 "3044""0220""495838c36533616d8cbd6474842459596f4f312dce5483fe650791c8"
+                 "2e17221c""0220""0660520a2584144915efa8519a72819091e5ed78c52689b24235"
+                 "182f17d96302""01""2102""ddf4af49ff0eae1d507cc50c86f903cd6aa0395f323975"
+                 "9c440ea67556a3b91b"
                  "0247"
-                 "304402200090c2507517abc7a9cb32452aabc8d1c8a0aee75ce63618ccd9"
-                 "01542415f2db02205bb1d22cb6e8173e91dc82780481ea55867b8e753c35"
-                 "424da664f1d2662ecb1301210254c54648226a45dd2ad79f736ebf7d5f0f"
-                 "c03b6f8f0e6d4a61df4e531aaca431"
+                 "3044""0220""0090c2507517abc7a9cb32452aabc8d1c8a0aee75ce63618ccd90154"
+                 "2415f2db""0220""5bb1d22cb6e8173e91dc82780481ea55867b8e753c35424da664"
+                 "f1d2662ecb13""01""2102""54c54648226a45dd2ad79f736ebf7d5f0fc03b6f8f0e6d"
+                 "4a61df4e531aaca431"
                  # lock_time (4 bytes)
                  "a7011900"
              ))
@@ -373,7 +374,6 @@ class TestTxSegwitTrustedInputsNano:
             "76a914e4d3a1ec51102902f6bbede1318047880c9c768088ac"
             # sequence_no (4 bytes)
             "fdffffff"
-
             # Out-counter (varint 1-9 bytes)
             "02"
             # 1st valuein satoshis (8 bytes)
@@ -451,20 +451,20 @@ class TestTxSegwitTrustedInputsNano:
         print(f"    sigHasType = {bytes([response[-1]]).hex()}")
 
 
-    @pytest.mark.skip(reason="Can't seem to work out how to send the tx data to send correctly to the app."
-                             "Warning screen is shown however. Comment decorator to run.")
+    # @pytest.mark.skip(reason="Can't seem to work out how to split the tx data to send correctly to the app."
+    #                          "Warning screen is shown however. Comment decorator to run.")
     def test_submit_true_segwit_tx_shows_warning(self) -> None:
         """Test signing a btc transaction w/ segwit inputs submitted as such shows warning screen
         
-        This mimics the behavior of a wallet that has not yet been updated to work around 
-        the fact that segwit inputs cannot be verified.
+        This mimics the behavior of a wallet that has not yet been updated to prevent  
+        signing tx with unverified segwit inputs .
 
         BTC Testnet segwit tx used as a "prevout" tx.
         txid: 5387ef4d09919951399fe3a6d94354c92c78328e77dbafa5dad5647569f1e02c
         VO_P2WPKH
         """
         # Amount of the 1st output of a segwit tx
-        segwit_prevout_0_amount = bytes.fromhex("1027000000000000")
+        segwit_prevout_0_amount = bytes.fromhex("40420f0000000000") # 0.1 BTC
 
         # The tx we want to sign, referencing the hash of a prevout segwit tx in its input.
         tx_to_sign = bytes.fromhex(
@@ -485,8 +485,7 @@ class TestTxSegwitTrustedInputsNano:
             "fdffffff"
 
             # Out-counter (varint 1-9 bytes)
-            # "02"
-            "01"
+            "02"
             # 1st valuein satoshis (8 bytes)
             "1027000000000000"  # 10000 satoshis = 0.0001 BTC
             # 1st Txout-script length (varint 1-9 bytes)
@@ -494,11 +493,11 @@ class TestTxSegwitTrustedInputsNano:
             # 1st Txout-script (a.k.a. scriptPubKey)
             "0014161d283ebbe0e6bc3d90f4c456f75221e1b3ca0f"
             # 2nd value in satoshis (8 bytes)
-            # "64190f0000000000"  # 989540 satoshis = 0,0098954 BTC
+            "64190f0000000000"  # 989540 satoshis = 0,0989540 BTC
             # 2nd Txout-script length (varint 1-9 bytes)
-            # "16"  # 22
+            "16"  # 22
             # 2nd Txout-script (a.k.a. scriptPubKey)
-            # "00144c5133c242683d33c61c4964611d82dcfe0d7a9a"
+            "00144c5133c242683d33c61c4964611d82dcfe0d7a9a"
             # lock_time (4 bytes)
             "a7011900"
         )
@@ -507,74 +506,96 @@ class TestTxSegwitTrustedInputsNano:
 
         # Send Untrusted Transaction Input Hash Start without performing a GetTrustedInput 
         # first (as would do a wallet not yet updated). 
-        # From file "btc.asc": 
+        # From app doc "btc.asc": 
         #   "When using Segregated Witness Inputs the signing mechanism differs 
         #    slightly:
         #    - The transaction shall be processed first with all inputs having a null script length 
         #    - Then each input to sign shall be processed as part of a pseudo transaction with a 
         #      single input and no outputs."
         
-        # 1. Construct a pseudo-tx without input script, to be sent 1st...
-        print("\n--* Untrusted Transaction Input Hash Start - Send tx first w/ all inputs having a null script length")
-        tx_to_sign_part1 = bytes.fromhex(
-            tx_to_sign[:41].hex() 
-            + "00"                      # Null input script length
-            + tx_to_sign[67:71].hex()   # Skip input script to send input_sequence
-        )
-
-        tx_part1_chunks_len = [
-            5,              # len(version||input_count)
-            32 + 4 + 1 + 4, # len(input_hash||prevout_index||scriptSig_len == 0||input_sequence)
+        # 1.1 Construct a pseudo-tx without input script, to be sent hashed 1st...
+        print("\n--* Untrusted Transaction Input Hash Start - Hash tx first w/ all inputs having a null script length")
+        ptx_to_hash_part1 = tx_to_sign[:5]          \
+                          + bytes.fromhex("02")     \
+                          + tx_to_sign[5:41]        \
+                          + segwit_prevout_0_amount \
+                          + bytes.fromhex("00")     \
+                          + tx_to_sign[67:71]
+        ptx_to_hash_part1_chunks_len = [
+            5,                  # len(version||input_count)
+            1+ 32 + 4 + 8 + 1,  # len(segwit_input_marker||input_hash||prevout_index||prevou_amount||scriptSig_len == 0)
+            4                   # len(input_sequence)
         ]
+
         btc.untrustedTxInputHashStart(
             p1="00",
             p2="02",    # Tx contains segwit inputs, this value should show a warning on 
                         # the device but operation should be allowed to proceed
-            data=tx_to_sign_part1,
-            chunks_len=tx_part1_chunks_len)
+            data=ptx_to_hash_part1,
+            chunks_len=ptx_to_hash_part1_chunks_len)
         print("    OK")
 
-        # 2. Send each input separately in a pseudo tx
-        print("\n--* Untrusted Transaction Input Hash Start - Send each segwit input separately")
-        tx_to_sign_part2 = bytes.fromhex(
-            tx_to_sign[:4].hex()                # Version
-            + "01"                              # 1 input at a time
-            + "02" + tx_to_sign[5:41].hex()     # segwit marker + input tx hash + out_index
-            + segwit_prevout_0_amount           # input amount
-            + tx_to_sign[41:41 + 1 + tx_to_sign[41] + 4].hex()  # script length + script + sequence
+        # 1.2 Finalize the input-centric-, pseudo-tx hash with the remainder of that tx
+        # 1.2.1 Start with change address path
+        print("\n--* Untrusted Transaction Input Hash Finalize Full - Handle change address")
+        ptx_to_hash_part2 = bytes.fromhex(
+            "05"                                        # Number of path elements
+            "8000003180000001800000000000000100000045") # Bip-32 path for change output
+        ptx_to_hash_part2_chunks_len = [1 + 5*4]
+
+        btc.untrustedTxInputHashFinalize(
+            p1="ff",            # derive change addr Bip-32 path
+            data=ptx_to_hash_part2,
+            chunks_len=ptx_to_hash_part2_chunks_len
         )
-        tx_part2_chunks_len = [
-            5,                  # len(version||input_count)
-            1 + 32 + 4 + 8 + 1, # len(segwit_marker||input_hash||prevout_index||amount||scriptSig_len != 0)
-            -1,                 # get input script len from last byte of previous chunk
-            4                   # len(input_sequence)
+        print("    OK")
+
+        # 1.2.2 Continue w/ tx to sign outputs & scripts
+        print("\n--* Untrusted Transaction Input Hash Finalize Full - COntinue w/ hash of tx output")
+        ptx_to_hash_part3 = tx_to_sign[71:-4]          # output_count||repeated(output_amount||scriptPubkey)
+        ptx_to_hash_part3_chunks_len = [len(ptx_to_hash_part3)]
+
+        btc.untrustedTxInputHashFinalize(
+            p1="00",
+            data=ptx_to_hash_part3,
+            chunks_len=ptx_to_hash_part3_chunks_len
+        )
+        print("    OK")
+        # We're done w/ the hashing of the pseudo-tx with all inputs w/o scriptSig.
+
+        # 2. Now hash each input with its scriptSig individually, each in a pseudo-tx w/o outputs
+        print("\n--* Untrusted Transaction Input Hash Start, step 2 - Hash again each input individually (only 1)")
+        ptx2_for_input1 = tx_to_sign[:5]            \
+                        + bytes.fromhex("02")       \
+                        + tx_to_sign[5:41]          \
+                        + segwit_prevout_0_amount   \
+                        + tx_to_sign[41:71]
+        ptx2_for_input1_chunks_len = [
+            5,                          # len(version||input_count)
+            1 + 32 + 4 + 8 + 1,         # len(segwit_input_marker||input_hash||prevout_index||prevout_amount||scriptSig_len)
+            -1                          # get len(scripSig) from last byte of previous chunk & send scriptSig + input_sequence
         ]
+
         btc.untrustedTxInputHashStart(
             p1="00",
-            p2="02",            # Should not show the nag screen again
-            data=tx_to_sign_part2,
-            chunks_len=tx_part2_chunks_len)
+            p2="80",            # Continue previously started tx hash
+            data=ptx2_for_input1,
+            chunks_len=ptx2_for_input1_chunks_len
+        )
         print("    OK")
 
-        # 3. Send Untrusted Transaction Input Hash Finalize (from outputs_count up to
-        #    tx locktime, excluded). No chunks required here.
-        print("\n--* Untrusted Transaction Input Hash Finalize Full")
-        tx_to_sign_part2 = tx_to_sign[71:-4]
-        response = btc.untrustedTxInputHashFinalize(
-            p1="80",
-            data=tx_to_sign_part2)
-        print(f"    OK, Response = {response.hex()}")
-        assert response.hex() == "0000"
+        # 3. Sign tx at last
+        print("\n--* untrusted Transaction Sign")
+        tx_to_sign_data = bytes.fromhex(
+            "05"                                        # Number of path elements
+            "80000031800000018000000000000000000001f6"  # Bip-32 path for change output
+            "00"                                        # RFU byte
+            "00000000"                                  # Locktime
+            "01"                                        # sigHashType = 0x01
+        )
 
-        #4. Send Untrusted Hash Sign (w/ arbitrary BIP32 path, RFU (00) byte, BE-encoded 
-        #   locktime & sigHashType = 01)
-        print("\n--* Untrusted Transaction Sign")
-        in_data = bytes.fromhex("03"+"80000000"+"00000000"+"00000000")  \
-                + bytes(1)                                              \
-                + bytes(reversed(tx_to_sign[-4:]))                      \
-                + bytes.fromhex("01")
-
-        response = btc.untrustedHashSign(data=in_data)
+        response = btc.untrustedHashSign(
+            data = tx_to_sign_data
+        )        
         print(f"    OK, (R,S) = {response[:-1].hex()}")
         print(f"    sigHashType = {bytes([response[-1]]).hex()}")
-
