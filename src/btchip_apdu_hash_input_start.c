@@ -46,7 +46,6 @@ unsigned short btchip_apdu_hash_input_start() {
         // Initialize
         btchip_context_D.transactionContext.transactionState =
             BTCHIP_TRANSACTION_NONE;
-        btchip_context_D.segwitWarningSeen = 0;
         btchip_set_check_internal_structure_integrity(1);
         btchip_context_D.transactionHashOption = TRANSACTION_HASH_BOTH;
     } else if (G_io_apdu_buffer[ISO_OFFSET_P1] != P1_NEXT) {
@@ -103,6 +102,9 @@ unsigned short btchip_apdu_hash_input_start() {
             os_memset(&btchip_context_D.tmpCtx.output, 0,
                       sizeof(btchip_context_D.tmpCtx.output));
             btchip_context_D.tmpCtx.output.changeAccepted = 1;
+            // Reset segwitWarningSeen flag to prevent displaying the warning for each 
+            // segwit input when coontinuing from a previous session (P2=0x80)
+            btchip_context_D.segwitWarningSeen = 0;
         }
     } else if (G_io_apdu_buffer[ISO_OFFSET_P2] != P2_CONTINUE) {
         return BTCHIP_SW_INCORRECT_P1_P2;
@@ -115,7 +117,7 @@ unsigned short btchip_apdu_hash_input_start() {
         btchip_bagl_request_segwit_input_approval();
     }
 
-    // Start parsing of the 1st chunk before warning the user
+    // Start parsing of the 1st chunk
     btchip_context_D.transactionBufferPointer =
         G_io_apdu_buffer + ISO_OFFSET_CDATA;
     btchip_context_D.transactionDataRemaining = apduLength;
