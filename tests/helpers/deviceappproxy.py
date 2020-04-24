@@ -36,7 +36,6 @@ class DeviceAppProxy:
                   chunks_lengths: Optional[List[int]] = None) -> bytes:
         # Get the APDU as bytes & send them to device
         apdu = self.btc.apdu(name, p1=p1, p2=p2, data=data, le=le)
-        print(f"[device <] {apdu.hex()}")
         hdr = apdu[0:4]
         payload = apdu[5:]
 
@@ -71,21 +70,23 @@ class DeviceAppProxy:
                     offs += total_len
                 else:            
                     capdu = hdr + chunk_len.to_bytes(1,'big') + chunk
+                    print(f"[device <] {capdu.hex()}")
                     if not hasattr(self, "dongle") or not hasattr(self.dongle, "opened") or not self.dongle.opened:
                         self.dongle = getDongle(False)  # in case a previous self.send_chunked_apdu() call closed it
                     response = self.dongle.exchange(capdu)
                     offs += chunk_len + skip_bytes
                     skip_bytes = 0
+                    _resp = response.hex() if len(response) else "OK"
+                    print(f"[device >] {_resp}")
         else:
             # Auto splitting of large APDUs into chunks of equal length until payload is exhausted
-            response = self._send_chunked_apdu(apdu=hdr, data=payload)
-
-        print(f"[device >] {response.hex()}")
+            response = self._send_chunked_apdu(apdu=hdr, data=payload)        
         return response
 
     @dongle_connected
     def sendRawApdu(self, 
                     apdu: bytes) -> bytes:
+        print(f"[device <] {apdu.hex()}")
         return self.dongle.exchange(apdu)
 
     @dongle_connected
@@ -99,8 +100,12 @@ class DeviceAppProxy:
             #    chunk += b'\x99'
             # 6A82 expected in this case
             capdu = apdu + len(chunk).to_bytes(1,'big') + chunk
+            print(f"[device <] {capdu.hex()}")
             response = self.dongle.exchange(bytes(capdu))
+            _resp = response.hex() if len(response) else "OK"
+            print(f"[device >] {_resp}")
             apdu = apdu[:2] + (apdu[2] | 0x80).to_bytes(1,'big') + apdu[3:]
+
         return response
 
     def close(self) -> None:

@@ -83,3 +83,4 @@ class DeviceAppBtc(DeviceAppProxy):
     def untrustedHashSign(self, 
                           data: BytesOrStr) -> bytes:
         return self.sendApdu("untrustedHashSign", "00", "00", data)
+
