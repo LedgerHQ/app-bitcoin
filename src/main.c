@@ -1954,7 +1954,7 @@ UX_STEP_NOCB(
     bnnn_paging, 
     {
       .title = "Address",
-      .text = G_io_apdu_buffer,
+      .text = vars.tmp.fullAddress,
     });
 UX_STEP_VALID(
     ux_display_liquid_green_address_flow_2_step, 
@@ -2511,6 +2511,8 @@ void btchip_bagl_request_change_path_approval(unsigned char* change_path)
 
 void btchip_bagl_liquid_display_green_address() {
 
+    strncpy(vars.tmp.fullAddress, G_io_apdu_buffer, sizeof(vars.tmp.fullAddress));
+    vars.tmp.fullAddress[sizeof(vars.tmp.fullAddress) - 1] = '\0';
     ux_flow_init(0, ux_display_liquid_green_address_flow, NULL);
     
 }
