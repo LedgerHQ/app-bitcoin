@@ -20,6 +20,12 @@
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
 
+#ifdef HAVE_LIQUID_HEADLESS
+
+#include "headless_storage.h"
+
+#endif
+
 #define ISSUANCE_P1_MORE 0x00
 #define ISSUANCE_P1_LAST 0x80
 
@@ -42,6 +48,23 @@ unsigned short btchip_apdu_liquid_provide_issuance_information() {
 		btchip_context_D.segwit.cache.hashedIssuance, 32);
 
 	if (p1 == ISSUANCE_P1_LAST) {
+
+#ifdef HAVE_LIQUID_HEADLESS
+
+		if (N_storage.headless) {
+			// Liquid headless adds the issuance cache to the authorization hash
+			cx_sha256_init(&btchip_context_D.transactionHashAuthorization);
+			cx_hash(&btchip_context_D.transactionHashAuthorization.header, 0, 
+				btchip_context_D.transactionSummary.authorizationHash, sizeof(btchip_context_D.transactionSummary.authorizationHash), 
+				NULL, 0);
+			cx_hash(&btchip_context_D.transactionHashAuthorization.header, CX_LAST, 
+				btchip_context_D.segwit.cache.hashedIssuance, sizeof(btchip_context_D.segwit.cache.hashedIssuance), 
+				btchip_context_D.transactionSummary.authorizationHash, sizeof(btchip_context_D.transactionSummary.authorizationHash));
+			PRINTF("Updated authorization hash\n%.*H\n",32,btchip_context_D.transactionSummary.authorizationHash);                
+		}
+
+#endif
+
 		cx_sha256_init(&btchip_context_D.transactionHashFull.sha256);
 		cx_hash(&btchip_context_D.transactionHashFull.sha256.header,
 			CX_LAST,

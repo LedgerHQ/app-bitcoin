@@ -83,8 +83,10 @@ enum btchip_transaction_state_e {
     BTCHIP_TRANSACTION_PRESIGN_READY = 0x09,
     /** Transaction fully parsed, ready to be signed */
     BTCHIP_TRANSACTION_SIGN_READY = 0x0a,
-    /** Transaction is waiting for Liquid issuance information to be provided */
+    /** Transaction is waiting for Liquid issuance information associated to all inputs to be provided */
     BTCHIP_TRANSACTION_WAIT_LIQUID_ISSUANCE = 0x0b,
+    //** Transaction is waiting for Liquid Issuance associated to an input being signed to be provided */
+    BTCHIP_TRANSACTION_INPUT_HASHING_IN_PROGRESS_LIQUID_ISSUANCE = 0x0c,
 };
 typedef enum btchip_transaction_state_e btchip_transaction_state_t;
 
@@ -219,6 +221,7 @@ struct btchip_context_s {
     unsigned char liquidHostProvidedVbf;
 #ifdef HAVE_LIQUID_HEADLESS
     unsigned char liquidBlindOutput;
+    unsigned char liquidIssuanceInput;
 #endif
 
 #endif    

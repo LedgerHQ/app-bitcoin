@@ -18,6 +18,13 @@
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
 
+#ifdef HAVE_LIQUID_HEADLESS
+
+#include "headless_storage.h"
+
+#endif
+
+
 #define CONSENSUS_BRANCH_ID_OVERWINTER 0x5ba81b19
 #define CONSENSUS_BRANCH_ID_SAPLING 0x76b809bb
 #define CONSENSUS_BRANCH_ID_ZCLASSIC 0x930b540d
@@ -361,6 +368,10 @@ void transaction_parse(unsigned char parseMode) {
                             check_transaction_available(
                                 36); // prevout : 32 hash + 4 index
                             if (!btchip_context_D.segwitParsedOnce) {
+#ifdef HAVE_LIQUID                                
+                                // Clear issuance (0x80000000) and pegin (0x40000000) flags
+                                btchip_context_D.transactionBufferPointer[35] &= 0x7F;
+#endif                                
                                 if (btchip_context_D.usingOverwinter) {
                                     cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.transactionBufferPointer, 36, NULL, 0);
                                 }
@@ -371,7 +382,7 @@ void transaction_parse(unsigned char parseMode) {
                                         0,
                                         btchip_context_D.transactionBufferPointer,
                                         36, NULL, 0);
-                                }
+                                }                                
                                 transaction_offset_increase(36);
 #ifdef HAVE_LIQUID                                
                                 if (!btchip_context_D.usingLiquid) {
@@ -411,6 +422,23 @@ void transaction_parse(unsigned char parseMode) {
                                 unsigned char ctSize;
                                 btchip_context_D.transactionHashOption =
                                     TRANSACTION_HASH_FULL;
+
+#if defined(HAVE_LIQUID) && defined(HAVE_LIQUID_HEADLESS)
+
+                                if (btchip_context_D.usingLiquid && N_storage.headless && ((btchip_context_D.transactionBufferPointer[35] & 0x80) != 0)) {
+                                    btchip_context_D.liquidIssuanceInput = 1;
+                                    PRINTF("Handling issuance input\n");
+                                }
+                                else {
+                                    btchip_context_D.liquidIssuanceInput = 0;
+                                }
+
+#endif                                
+
+#ifdef HAVE_LIQUID
+                                // Clear issuance (0x80000000) and pegin (0x40000000) flags
+                                btchip_context_D.transactionBufferPointer[35] &= 0x3F;
+#endif                                
                                 transaction_offset_increase(36);
                                 btchip_context_D.transactionHashOption = 0;
 #ifdef HAVE_LIQUID                                
@@ -641,6 +669,17 @@ void transaction_parse(unsigned char parseMode) {
                             }
                         }
                         transaction_offset_increase(4);
+
+#if defined(HAVE_LIQUID) && defined(HAVE_LIQUID_HEADLESS)                        
+
+                        // Process issuance data
+                        if (btchip_context_D.usingLiquid && btchip_context_D.segwitParsedOnce && btchip_context_D.liquidIssuanceInput) {
+
+                            btchip_context_D.transactionContext.transactionState = BTCHIP_TRANSACTION_INPUT_HASHING_IN_PROGRESS_LIQUID_ISSUANCE;
+                            goto ok;
+                        }
+
+#endif                        
                         // Move to next input
                         btchip_context_D.transactionContext
                             .transactionRemainingInputsOutputs--;
@@ -668,6 +707,36 @@ void transaction_parse(unsigned char parseMode) {
                         dataAvailable;
                     break;
                 }
+
+#ifdef HAVE_LIQUID
+
+                case BTCHIP_TRANSACTION_INPUT_HASHING_IN_PROGRESS_LIQUID_ISSUANCE: {
+                    unsigned char ctSize;
+                    unsigned char i;
+                    // blinding nonce and entropy
+                    for (i=0; i<2; i++) {
+                        check_transaction_available(32);
+                        transaction_offset_increase(32);
+                    }
+                    // issuance amount and inflation keys
+                    for (i=0; i<2; i++) {
+                        check_transaction_available(1); 
+                        ctSize = btchip_get_confidential_data_size(btchip_context_D.transactionBufferPointer[0], false, false);
+                        check_transaction_available(ctSize);
+                        transaction_offset_increase(ctSize);
+                    }
+                    // Move to next input
+                    btchip_context_D.transactionContext
+                        .transactionRemainingInputsOutputs--;
+                    btchip_context_D.transactionContext
+                        .transactionCurrentInputOutput++;
+                    btchip_context_D.transactionContext.transactionState =
+                        BTCHIP_TRANSACTION_DEFINED_WAIT_INPUT;
+                    continue;
+                }
+
+#endif                
+
                 case BTCHIP_TRANSACTION_INPUT_HASHING_DONE: {
                     PRINTF("Input hashing done\n");
                     if (parseMode == PARSE_MODE_SIGNATURE) {
