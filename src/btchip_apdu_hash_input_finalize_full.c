@@ -404,7 +404,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     cx_hash(
                         &btchip_context_D.transactionHashAuthorization.header,
                         CX_LAST, G_io_apdu_buffer, 0, authorizationHash, 32);
-                    PRINTF("Auth Hash:\n%.*H\n", authorizationHash, 32);
+                    PRINTF("Auth Hash:\n%.*H\n", 32, authorizationHash);
                 } else {
                     cx_hash(
                         &btchip_context_D.transactionHashAuthorization.header,
@@ -412,7 +412,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                         (unsigned char *)&btchip_context_D.segwit.cache,
                         sizeof(btchip_context_D.segwit.cache),
                         authorizationHash, 32);
-                    PRINTF("Auth Hash:\n%.*H\n", authorizationHash, 32);
+                    PRINTF("Auth Hash:\n%.*H\n", 32, authorizationHash);
                 }
             }
 

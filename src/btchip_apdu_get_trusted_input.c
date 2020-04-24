@@ -21,8 +21,6 @@
 #define GET_TRUSTED_INPUT_P1_FIRST 0x00
 #define GET_TRUSTED_INPUT_P1_NEXT 0x80
 
-#define TRUSTEDINPUT_SIZE 48
-
 unsigned short btchip_apdu_get_trusted_input() {
     unsigned char apduLength;
     unsigned char dataOffset = 0;
@@ -94,11 +92,11 @@ unsigned short btchip_apdu_get_trusted_input() {
 
         cx_hmac_sha256(N_btchip.bkp.trustedinput_key,
                        sizeof(N_btchip.bkp.trustedinput_key), G_io_apdu_buffer,
-                       TRUSTEDINPUT_SIZE, trustedInputSignature, 32);
-        os_memmove(G_io_apdu_buffer + TRUSTEDINPUT_SIZE, trustedInputSignature,
+                       TRUSTED_INPUT_SIZE, trustedInputSignature, 32);
+        os_memmove(G_io_apdu_buffer + TRUSTED_INPUT_SIZE, trustedInputSignature,
                    8);
 
-        btchip_context_D.outLength = 0x38;
+        btchip_context_D.outLength = TRUSTED_INPUT_TOTAL_SIZE;
     }
     return BTCHIP_SW_OK;
 }

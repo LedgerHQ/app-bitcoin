@@ -28,6 +28,17 @@
 #define P2_NEW_SEGWIT_SAPLING 0x05
 #define P2_CONTINUE 0x80
 
+#define IS_INPUT()                                                          \
+    (G_io_apdu_buffer[ISO_OFFSET_LC] - 1 > 8                                \
+     && G_io_apdu_buffer[ISO_OFFSET_LC] - 1 <= TRUSTED_INPUT_TOTAL_SIZE + 2  \
+     && G_io_apdu_buffer[ISO_OFFSET_CDATA] <= 0x02)                         \
+
+#define IS_INPUT_TRUSTED()                                                  \
+    (G_io_apdu_buffer[ISO_OFFSET_CDATA] == 0x01                             \
+     && G_io_apdu_buffer[ISO_OFFSET_CDATA + 1] == TRUSTED_INPUT_TOTAL_SIZE   \
+     && G_io_apdu_buffer[ISO_OFFSET_CDATA + 2] == MAGIC_TRUSTED_INPUT       \
+     && G_io_apdu_buffer[ISO_OFFSET_CDATA + 3] == 0x00)
+
 unsigned short btchip_apdu_hash_input_start() {
     unsigned char apduLength;
     apduLength = G_io_apdu_buffer[ISO_OFFSET_LC];
@@ -110,8 +121,15 @@ unsigned short btchip_apdu_hash_input_start() {
         return BTCHIP_SW_INCORRECT_P1_P2;
     }
 
-    // Warn user to update its client if input is flagged as segwit
-    if (btchip_context_D.usingSegwit && !btchip_context_D.segwitWarningSeen) {
+    // In segwit mode, warn user one time only to update its client wallet...
+    if (btchip_context_D.usingSegwit 
+        && !btchip_context_D.segwitWarningSeen
+        &&(G_io_apdu_buffer[ISO_OFFSET_P1] == P1_NEXT)
+        && (G_io_apdu_buffer[ISO_OFFSET_P2] != P2_CONTINUE)
+        // ...if input is not passed as a TrustedInput
+        && IS_INPUT() 
+        && !IS_INPUT_TRUSTED())
+    {
         btchip_context_D.segwitWarningSeen = 1;
         btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
         btchip_bagl_request_segwit_input_approval();
