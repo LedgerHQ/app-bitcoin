@@ -33,7 +33,7 @@
 
 extern uint8_t prepare_full_output(uint8_t checkOnly);
 
-static void btchip_apdu_hash_input_finalize_full_reset(void) {
+void btchip_apdu_hash_input_finalize_full_reset(void) {
     btchip_context_D.currentOutputOffset = 0;
     btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS;
     os_memset(btchip_context_D.totalOutputAmount, 0,
@@ -121,7 +121,7 @@ static bool check_output_displayable() {
     return displayable;
 }
 
-static bool handle_output_state() {
+bool handle_output_state() {
     uint32_t discardSize = 0;
     btchip_context_D.discardSize = 0;
     bool processed = false;
@@ -314,6 +314,11 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
 
                 // if the bip44 change path provided is not canonical or its index are unsual, ask for user approval
                 if(bip44_derivation_guard(transactionSummary->keyPath, true)) {
+                    if (btchip_context_D.called_from_swap) {
+                        PRINTF("In swap mode only standart path is allowed\n");
+                        sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
+                        goto discardTransaction;
+                    }
                     btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
                     btchip_context_D.outputParsingState = BTCHIP_BIP44_CHANGE_PATH_VALIDATION;
                     btchip_bagl_request_change_path_approval(transactionSummary->keyPath);
