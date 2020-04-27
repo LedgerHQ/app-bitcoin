@@ -237,6 +237,9 @@ struct btchip_context_s {
     unsigned char nExpiryHeight[4];
     unsigned char nLockTime[4];
     unsigned char sigHashType[4];
+
+    /*Is swap mode*/
+    unsigned char called_from_swap;
 };
 typedef struct btchip_context_s btchip_context_t;
 
