@@ -721,7 +721,8 @@ void transaction_parse(unsigned char parseMode) {
                     // issuance amount and inflation keys
                     for (i=0; i<2; i++) {
                         check_transaction_available(1); 
-                        ctSize = btchip_get_confidential_data_size(btchip_context_D.transactionBufferPointer[0], false, false);
+                        // inflation key can be null if processing a reissuance
+                        ctSize = btchip_get_confidential_data_size(btchip_context_D.transactionBufferPointer[0], true, (i == 1));
                         check_transaction_available(ctSize);
                         transaction_offset_increase(ctSize);
                     }
