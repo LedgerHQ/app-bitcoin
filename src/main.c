@@ -29,6 +29,7 @@
 #include "cashaddr.h"
 
 #include "glyphs.h"
+#include "btchip_display_variables.h"
 #include "swap_lib_calls.h"
 
 
@@ -41,7 +42,6 @@ unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 
 #define BAGL_FONT_OPEN_SANS_LIGHT_16_22PX_AVG_WIDTH 10
 #define BAGL_FONT_OPEN_SANS_REGULAR_10_13PX_AVG_WIDTH 8
-#define MAX_CHAR_PER_LINE 25
 
 #define COLOR_BG_1 0xF9F9F9
 #define COLOR_APP COIN_COLOR_HDR      // bitcoin 0xFCB653
@@ -74,33 +74,6 @@ unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 
 
 #if defined(TARGET_BLUE)
-#include "qrcodegen.h"
-
-union {
-    struct {
-        char addressSummary[40]; // beginning of the output address ... end of
-        char fullAmount[65];     // full amount
-        char fullAddress[65];
-        // the address
-        char feesAmount[40]; // fees
-        char output_numbering[10];
-    } tmp;
-
-    struct {
-        char addressSummary[MAX_CHAR_PER_LINE + 1];
-        bagl_icon_details_t icon_details;
-        unsigned int colors[2];
-        unsigned char qrcode[qrcodegen_BUFFER_LEN_FOR_VERSION(3)];
-    } tmpqr;
-
-    struct {
-        // A bip44 path contains 5 elements, which max length in ascii is 10 char + optional quote "'" + "/" + \0"
-        char derivation_path [MAX_DERIV_PATH_ASCII_LENGTH];
-    } tmp_warning;
-
-    unsigned int dummy; // ensure the whole vars is aligned for the CM0 to
-                        // operate correctly
-} vars;
 
 void load_qr_code(unsigned char *data){
     // must assert spi buffer is longer than the requested qrcode len.
@@ -149,34 +122,6 @@ void copy_element_and_map_coin_colors(const bagl_element_t *element) {
     tmp_element.overfgcolor = map_color(tmp_element.overfgcolor);
     tmp_element.overbgcolor = map_color(tmp_element.overbgcolor);
 }
-
-#else
-
-union {
-    struct {
-        // char addressSummary[40]; // beginning of the output address ... end
-        // of
-
-        char fullAddress[65]; // the address
-        char fullAmount[20];  // full amount
-        char feesAmount[20];  // fees
-    } tmp;
-
-    struct {
-        char derivation_path [MAX_DERIV_PATH_ASCII_LENGTH];
-    } tmp_warning;
-
-    /*
-    struct {
-      bagl_icon_details_t icon_details;
-      unsigned int colors[2];
-      unsigned char qrcode[qrcodegen_BUFFER_LEN_FOR_VERSION(3)];
-    } tmpqr;
-
-      unsigned int dummy; // ensure the whole vars is aligned for the CM0 to
-      operate correctly
-    */
-} vars;
 #endif
 
 unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e);
@@ -1982,6 +1927,13 @@ unsigned char io_event(unsigned char channel) {
         break;
 
     case SEPROXYHAL_TAG_TICKER_EVENT:
+        // TODO: found less hacky way to exit library after sending response
+        // this mechanism is used for Swap/Exhcange functionality
+        // when application is in silient mode, and should return to caller,
+        // after responding some APDUs
+        if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
+            os_lib_end();
+        }
         UX_TICKER_EVENT(G_io_seproxyhal_spi_buffer, {
             // don't redisplay if UX not allowed (pin locked in the common bolos
             // ux ?)
@@ -2004,6 +1956,16 @@ unsigned char io_event(unsigned char channel) {
 
     // command has been processed, DO NOT reset the current APDU transport
     return 1;
+}
+
+uint8_t check_fee_swap() {
+    unsigned char fees[8];
+    unsigned char borrow;
+
+    borrow = transaction_amount_sub_be(
+            fees, btchip_context_D.transactionContext.transactionAmount,
+            btchip_context_D.totalOutputAmount);
+    return (borrow == 0) && (memcmp(fees, vars.swap_data.fees, 8) == 0);
 }
 
 uint8_t prepare_fees() {
@@ -2047,82 +2009,78 @@ error:
 #define MAIDSAFE_ASSETID 3
 #define USDT_ASSETID 31
 
+void get_address_from_output_script(unsigned char* script, int script_size, char* out, int out_size) {
+    if (btchip_output_script_is_op_return(script)) {
+        strcpy(out, "OP_RETURN");
+        return;    
+    }
+    if ((G_coin_config->kind == COIN_KIND_QTUM) &&
+        btchip_output_script_is_op_create(script, script_size)) {
+        strcpy(out, "OP_CREATE");
+        return;
+    }
+    if ((G_coin_config->kind == COIN_KIND_QTUM) &&
+        btchip_output_script_is_op_call(script, script_size)) {
+        strcpy(out, "OP_CALL");
+        return;
+    }
+    if (btchip_output_script_is_native_witness(script)) {
+        if (G_coin_config->native_segwit_prefix) {
+            segwit_addr_encode(
+                out, PIC(G_coin_config->native_segwit_prefix), 0,
+                script + OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET,
+                script[OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET - 1]);
+        }
+        return;
+    }
+    unsigned char versionSize;
+    unsigned char address[22];
+    unsigned short textSize;
+    int addressOffset = 3;
+    unsigned short version = G_coin_config->p2sh_version;
+
+    if (btchip_output_script_is_regular(script)) {
+        addressOffset = 4;
+        version = G_coin_config->p2pkh_version;
+    }
+    
+    if (version > 255) {
+        versionSize = 2;
+        address[0] = (version >> 8);
+        address[1] = version;
+    } else {
+        versionSize = 1;
+        address[0] = version;
+    }
+    os_memmove(address + versionSize, script + addressOffset, 20);
+
+    // Prepare address
+    if (btchip_context_D.usingCashAddr) {
+        cashaddr_encode(
+            address + versionSize, 20, out, out_size,
+            (version == G_coin_config->p2sh_version
+                    ? CASHADDR_P2SH
+                    : CASHADDR_P2PKH));
+    } else {
+        textSize = btchip_public_key_to_encoded_base58(
+            address, 20 + versionSize, (unsigned char *)out,
+            out_size, version, 1);
+        out[textSize] = '\0';
+    }
+}
+
 uint8_t prepare_single_output() {
     // TODO : special display for OP_RETURN
     unsigned char amount[8];
-    char tmp[80];
     unsigned int offset = 0;
-    unsigned char versionSize;
-    int addressOffset = 1; // for static analyzer only
-    unsigned char address[22];
-    unsigned short version = 0; // for static analyzer only
     unsigned short textSize;
-    unsigned char nativeSegwit;
-
-    vars.tmp.fullAddress[0] = '\0';
+    char tmp[80] = {0};
+    
     btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset, 8);
     offset += 8;
-    nativeSegwit = btchip_output_script_is_native_witness(
-        btchip_context_D.currentOutput + offset);
-    if (btchip_output_script_is_op_return(btchip_context_D.currentOutput +
-                                          offset)) {
-            strcpy(vars.tmp.fullAddress, "OP_RETURN");
-    } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
-               btchip_output_script_is_op_create(
-                   btchip_context_D.currentOutput + offset,
-                   sizeof(btchip_context_D.currentOutput) - offset)) {
-        strcpy(vars.tmp.fullAddress, "OP_CREATE");
-    } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
-               btchip_output_script_is_op_call(
-                 btchip_context_D.currentOutput + offset,
-                 sizeof(btchip_context_D.currentOutput) - offset)) {
-        strcpy(vars.tmp.fullAddress, "OP_CALL");
-    } else if (nativeSegwit) {
-        addressOffset = offset + OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET;
-    } else if (btchip_output_script_is_regular(btchip_context_D.currentOutput +
-                                               offset)) {
-        addressOffset = offset + 4;
-        version = G_coin_config->p2pkh_version;
-    } else {
-        addressOffset = offset + 3;
-        version = G_coin_config->p2sh_version;
-    }
-    if (vars.tmp.fullAddress[0] == 0) {
-        if (!nativeSegwit) {
-            if (version > 255) {
-                versionSize = 2;
-                address[0] = (version >> 8);
-                address[1] = version;
-            } else {
-                versionSize = 1;
-                address[0] = version;
-            }
-            os_memmove(address + versionSize,
-                       btchip_context_D.currentOutput + addressOffset, 20);
-
-            // Prepare address
-            if (btchip_context_D.usingCashAddr) {
-                cashaddr_encode(
-                    address + versionSize, 20, tmp, sizeof(tmp),
-                    (version == G_coin_config->p2sh_version
-                         ? CASHADDR_P2SH
-                         : CASHADDR_P2PKH));
-            } else {
-                textSize = btchip_public_key_to_encoded_base58(
-                    address, 20 + versionSize, (unsigned char *)tmp,
-                    sizeof(tmp), version, 1);
-                tmp[textSize] = '\0';
-            }
-        } else if (G_coin_config->native_segwit_prefix) {
-            segwit_addr_encode(
-                tmp, PIC(G_coin_config->native_segwit_prefix), 0,
-                btchip_context_D.currentOutput + addressOffset,
-                btchip_context_D.currentOutput[addressOffset - 1]);
-        }
-
-        strncpy(vars.tmp.fullAddress, tmp, sizeof(vars.tmp.fullAddress));
-        vars.tmp.fullAddress[sizeof(vars.tmp.fullAddress) - 1] = '\0';
-    }
+    
+    get_address_from_output_script(btchip_context_D.currentOutput + offset,  sizeof(btchip_context_D.currentOutput) - offset, tmp, sizeof(tmp));
+    strncpy(vars.tmp.fullAddress, tmp, sizeof(vars.tmp.fullAddress) - 1);
 
     // Prepare amount
 
@@ -2313,11 +2271,9 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                  !btchip_output_script_is_op_return(
                      btchip_context_D.currentOutput + offset + 8) &&
                  !btchip_output_script_is_op_create(
-                     btchip_context_D.currentOutput + offset + 8,
-                     sizeof(btchip_context_D.currentOutput) - offset - 8) &&
+                     btchip_context_D.currentOutput + offset + 8, sieof(btchip_context_D.currentOutput) - offset - 8) &&
                  !btchip_output_script_is_op_call(
-                     btchip_context_D.currentOutput + offset + 8,
-                     sizeof(btchip_context_D) - offset - 8)) ||
+                     btchip_context_D.currentOutput + offset + 8, sieof(btchip_context_D.currentOutput) - offset - 8)) ||
                 (!(G_coin_config->kind == COIN_KIND_QTUM) &&
                  !btchip_output_script_is_op_return(
                      btchip_context_D.currentOutput + offset + 8))) {
@@ -2465,7 +2421,94 @@ unsigned int btchip_bagl_confirm_full_output() {
     return 1;
 }
 
+extern bool handle_output_state();
+extern void btchip_apdu_hash_input_finalize_full_reset(void);
+
+// Analog of btchip_bagl_confirm_single_output to work
+// in silent mode, when called from SWAP app
+unsigned int btchip_silent_confirm_single_output() {
+    char tmp[80] = {0};
+    while (true) {
+        // in swap operation we can only have 1 "external" output
+        if (vars.swap_data.was_address_checked) {
+            return 0;
+        }
+        vars.swap_data.was_address_checked = 1;
+        // check amount
+        if (memcmp(btchip_context_D.currentOutput, vars.swap_data.amount, 8) != 0) {
+            return 0;
+        }
+        get_address_from_output_script(btchip_context_D.currentOutput + 8, sizeof(btchip_context_D.currentOutput) - 8, tmp, sizeof(tmp));
+        if (strcmp(tmp, vars.swap_data.destination_address) != 0) {
+            return 0;
+        }
+    
+        // Check if all inputs have been confirmed
+
+        if (btchip_context_D.outputParsingState ==
+            BTCHIP_OUTPUT_PARSING_OUTPUT) {
+            btchip_context_D.remainingOutputs--;
+            if (btchip_context_D.remainingOutputs == 0)
+                break;
+        }
+        
+        os_memmove(btchip_context_D.currentOutput,
+                    btchip_context_D.currentOutput +
+                        btchip_context_D.discardSize,
+                    btchip_context_D.currentOutputOffset -
+                        btchip_context_D.discardSize);
+        btchip_context_D.currentOutputOffset -= btchip_context_D.discardSize;
+        btchip_context_D.io_flags &= ~IO_ASYNCH_REPLY;
+        while (handle_output_state() &&
+                (!(btchip_context_D.io_flags & IO_ASYNCH_REPLY)))
+            ;
+        if (!(btchip_context_D.io_flags & IO_ASYNCH_REPLY)) {
+            // Out of data to process, wait for the next call
+            break;
+        }
+    }
+
+    if ((btchip_context_D.outputParsingState == BTCHIP_OUTPUT_PARSING_OUTPUT) &&
+        (btchip_context_D.remainingOutputs == 0)) {
+        btchip_context_D.outputParsingState = BTCHIP_OUTPUT_FINALIZE_TX;
+        // check fees
+        unsigned char fees[8];
+
+        if ((transaction_amount_sub_be(fees,
+                                       btchip_context_D.transactionContext.transactionAmount,
+                                       btchip_context_D.totalOutputAmount) != 0) ||
+            (memcmp(fees, vars.swap_data.fees, 8) != 0)) {
+            return 0;
+        }
+    }
+    
+    if (btchip_context_D.outputParsingState == BTCHIP_OUTPUT_FINALIZE_TX) {
+        btchip_context_D.transactionContext.firstSigned = 0;
+
+        if (btchip_context_D.usingSegwit &&
+            !btchip_context_D.segwitParsedOnce) {
+            // This input cannot be signed when using segwit - just restart.
+            btchip_context_D.segwitParsedOnce = 1;
+            PRINTF("Segwit parsed once\n");
+            btchip_context_D.transactionContext.transactionState =
+                BTCHIP_TRANSACTION_NONE;
+        } else {
+            btchip_context_D.transactionContext.transactionState =
+                BTCHIP_TRANSACTION_SIGN_READY;
+        }
+    }
+    if (btchip_context_D.outputParsingState == BTCHIP_OUTPUT_FINALIZE_TX) {
+        // we've finished the processing of the input
+        btchip_apdu_hash_input_finalize_full_reset();
+    }
+
+    return 1;
+}
+
 unsigned int btchip_bagl_confirm_single_output() {
+    if (btchip_context_D.called_from_swap) {
+        return btchip_silent_confirm_single_output();
+    }
     // TODO : remove when supporting multi output
 #if defined(TARGET_BLUE)
     if (btchip_context_D.transactionContext.consumeP2SH) {
@@ -2473,7 +2516,6 @@ unsigned int btchip_bagl_confirm_single_output() {
         return 1;
     }
 #endif
-
     if (!prepare_single_output()) {
         return 0;
     }
@@ -2495,6 +2537,10 @@ unsigned int btchip_bagl_confirm_single_output() {
 }
 
 unsigned int btchip_bagl_finalize_tx() {
+    if (btchip_context_D.called_from_swap) {
+        return check_fee_swap();
+    }
+
     if (!prepare_fees()) {
         return 0;
     }
@@ -2535,7 +2581,7 @@ uint8_t set_key_path_to_display(unsigned char* keyPath) {
 void btchip_bagl_display_public_key(uint8_t is_derivation_path_unusual) {
     // append a white space at the end of the address to avoid glitch on nano S
     strcat(G_io_apdu_buffer + 200, " ");
-    bip32_print_path(derivation_path, vars.tmp_warning.derivation_path, sizeof(vars.tmp_warning.derivation_path));
+
 #if defined(TARGET_BLUE)
 
     if(is_derivation_path_unusual){
@@ -2761,13 +2807,27 @@ __attribute__((section(".boot"))) int main(int arg0) {
     // exit critical section
     __asm volatile("cpsie i");
 
-    //TODO: Remove me
-    volatile unsigned char buffer[512];
-    os_memcpy(buffer, (unsigned char *)"JOPA", 5);
-
     PRINTF("Hello from bitcoin\n");
     // ensure exception will work as planned
     os_boot();
+
+    //TODO: test code, remove me
+        unsigned int ret_val;
+        create_transaction_parameters_t call_parameters;
+        swap_data_t lo;
+        unsigned char amount[8] = {0x20, 0xa1, 0x07};
+        unsigned char fee[8] = {0x82, 0x02};
+        strcpy(lo.destination_address, "3N3Vt1A1DKkjbdAZPAuHYFPE7eusnpTDtg");
+        memcpy(lo.amount, amount, 8);
+        memcpy(lo.fees, fee, 8);
+        lo.was_address_checked = 0;
+        call_parameters.amount = lo.amount;
+        call_parameters.amount_length = 8;
+        call_parameters.fee_amount = lo.fees;
+        call_parameters.fee_amount_length = 8;
+        call_parameters.destination_address = lo.destination_address;
+        library_main(SIGN_TRANSACTION_IN, (unsigned int*)&call_parameters, &ret_val);
+
     if (!arg0) {
         // Bitcoin application launched from dashboard
         coin_main();

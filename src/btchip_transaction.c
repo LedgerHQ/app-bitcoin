@@ -17,6 +17,7 @@
 
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
+#include "btchip_display_variables.h"
 
 #define CONSENSUS_BRANCH_ID_OVERWINTER 0x5ba81b19
 #define CONSENSUS_BRANCH_ID_SAPLING 0x76b809bb
@@ -273,6 +274,12 @@ void transaction_parse(unsigned char parseMode) {
                         .transactionRemainingInputsOutputs =
                         transaction_get_varint();
                     PRINTF("Number of inputs : " DEBUG_LONG "\n",btchip_context_D.transactionContext.transactionRemainingInputsOutputs);
+                    if (btchip_context_D.called_from_swap) {
+                        // remember number of inputs to know when to exit from library
+                        // we will count number of already signed inputs and compare with this value
+                        vars.swap_data.totalNumberOfInputs = 
+                            btchip_context_D.transactionContext.transactionRemainingInputsOutputs;
+                    }
                     // Ready to proceed
                     btchip_context_D.transactionContext.transactionState =
                         BTCHIP_TRANSACTION_DEFINED_WAIT_INPUT;

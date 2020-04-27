@@ -228,6 +228,9 @@ unsigned short btchip_apdu_sign_message_internal() {
 }
 
 unsigned short btchip_apdu_sign_message() {
+    if (btchip_context_D.called_from_swap) {
+        return BTCHIP_SW_SECURITY_STATUS_NOT_SATISFIED;
+    }
     unsigned short sw = btchip_apdu_sign_message_internal();
     if (btchip_context_D.io_flags & IO_ASYNCH_REPLY) {
         btchip_bagl_confirm_message_signature();

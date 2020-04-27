@@ -27,6 +27,7 @@ void btchip_context_init() {
     PRINTF("Backup size %d\n", sizeof(N_btchip.bkp));
     os_memset(&btchip_context_D, 0, sizeof(btchip_context_D));
     SB_SET(btchip_context_D.halted, 0);
+    btchip_context_D.called_from_swap = 0;
     btchip_context_D.currentOutputOffset = 0;
     btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS;
     os_memset(btchip_context_D.totalOutputAmount, 0,

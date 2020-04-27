@@ -22,6 +22,7 @@
 #include "os_io_seproxyhal.h"
 
 #include "btchip_apdu_constants.h"
+#include "btchip_display_variables.h"
 
 #define BTCHIP_TECHNICAL_NOT_IMPLEMENTED 0x99
 
@@ -75,6 +76,9 @@ void app_dispatch(void) {
 #endif // IO_APP_ACTIVITY
 
         sendSW:
+            if (btchip_context_D.called_from_swap && (btchip_context_D.sw != BTCHIP_SW_OK)) {
+                vars.swap_data.should_exit = 1;
+            }
             // prepare SW after replied data
             G_io_apdu_buffer[btchip_context_D.outLength] =
                 (btchip_context_D.sw >> 8);

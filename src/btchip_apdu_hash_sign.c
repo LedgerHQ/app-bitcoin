@@ -17,6 +17,7 @@
 
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
+#include "btchip_display_variables.h"
 
 #define SIGHASH_ALL 0x01
 
@@ -160,6 +161,15 @@ unsigned short btchip_apdu_hash_sign() {
             G_io_apdu_buffer[btchip_context_D.outLength++] = sighashType;
 
             sw = BTCHIP_SW_OK;
+            if (btchip_context_D.called_from_swap) {
+                // if we signed all outputs we should exit,
+                // but only after sending response, so lets raise the 
+                // vars.swap_data.should_exit flag and check it on timer later
+                vars.swap_data.alreadySignedInputs++;
+                if (vars.swap_data.alreadySignedInputs >= vars.swap_data.totalNumberOfInputs) {
+                    vars.swap_data.should_exit = 1;
+                }
+            }
 
             // Then discard the transaction and reply
         }
