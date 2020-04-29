@@ -62,10 +62,8 @@ class DeviceAppBtc(DeviceAppProxy):
         return self.sendApdu("getTrustedInput", "00", "00", data, chunks_lengths=chunks_len)
 
     def getWalletPublicKey(self, 
-                           p1: BytesOrStr, 
-                           p2: BytesOrStr, 
                            data: BytesOrStr) -> bytes:
-        return self.sendApdu("getWalletPublicKey", p1, p2, data)
+        return self.sendApdu("getWalletPublicKey", "00", "00", data)
     
     def untrustedTxInputHashStart(self, 
                                   p1: BytesOrStr, 

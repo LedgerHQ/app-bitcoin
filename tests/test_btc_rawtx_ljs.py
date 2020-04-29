@@ -9,6 +9,7 @@ from helpers.deviceappbtc import DeviceAppBtc
 class LedgerjsApdu:
     commands: List[str]
     expected_resp: Optional[str] = field(default=None)
+    check_sig_format: Optional[bool] = field(default=None)
 
 
 # Test data below is extracted from ledgerjs repo, file "ledgerjs/packages/hw-app-btc/tests/Btc.test.js"
@@ -16,7 +17,8 @@ test_btc_get_wallet_public_key = [
     LedgerjsApdu(   # GET PUBLIC KEY - on 44'/0'/0'/0 path
         commands=["e040000011048000002c800000008000000000000000"],
         # Response id seed-dependent, mening verification is possible only w/ speculos (test seed known). 
-        # TODO: implement/use deviceapp_soft's existing seed derivation + pubkey/address/chaincode in deviceappbtc.
+        # TODO: implement a simulator class a la DeviceAppSoft with BTC tx-related 
+        # functions (seed derivation, signature, etc).
         #expected_resp="410486b865b52b753d0a84d09bc20063fab5d8453ec33c215d4019a5801c9c6438b917770b2782e29a9ecc6edb67cd1f0fbf05ec4c1236884b6d686d6be3b1588abb2231334b453654666641724c683466564d36756f517a7673597135767765744a63564dbce80dd580792cd18af542790e56aa813178dc28644bb5f03dbd44c85f2d2e7a"
     )
 ]
@@ -34,7 +36,7 @@ test_btc2 =  [
             "e042800022a0860100000000001976a9144533f5fb9b4817f713c48f0bfe96b9f50c476c9b88ac",
             "e04280000400000000",
         ],
-        expected_resp="3200----c773da236484dae8f0fdba3d7e0ba1d05070d1a34fc44943e638441262a04f1001000000a086010000000000----------------"
+        expected_resp="3200" + "--"*2 + "c773da236484dae8f0fdba3d7e0ba1d05070d1a34fc44943e638441262a04f1001000000a086010000000000" + "--"*8
     ), 
     LedgerjsApdu(   # GET PUBLIC KEY
         commands=["e04000000d03800000000000000000000000"],
@@ -56,7 +58,7 @@ test_btc2 =  [
     ),
     LedgerjsApdu(   # UNTRUSTED HASH SIGN - output will be different than ledgerjs test
         commands=["e04800001303800000000000000000000000000000000001"],
-        #expected_resp="3145022100ff492ad0b3a634aa7751761f7e063bf6ef4148cd44ef8930164580d5ba93a17802206fac94b32e296549e2e478ce806b58d61cfacbfed35ac4ceca26ac531f92b20a01"
+        check_sig_format=True      # Only check DER format
     )
 ]
 
@@ -73,7 +75,7 @@ test_btc3 = [
             "e042800022a0860100000000001976a9144533f5fb9b4817f713c48f0bfe96b9f50c476c9b88ac",
             "e04280000400000000"
         ],
-        expected_resp="3200----c773da236484dae8f0fdba3d7e0ba1d05070d1a34fc44943e638441262a04f1001000000a086010000000000----------------"
+        expected_resp="3200" + "--"*2 + "c773da236484dae8f0fdba3d7e0ba1d05070d1a34fc44943e638441262a04f1001000000a086010000000000" + "--"*8
     ),
     LedgerjsApdu(   # UNTRUSTED HASH TRANSACTION INPUT START - 
         commands= [
@@ -90,7 +92,7 @@ test_btc3 = [
     ),
     LedgerjsApdu(   # UNTRUSTED HASH SIGN - on 0'/0/0 path
         commands=["e04800001303800000000000000000000000000000000001"],
-        expected_resp="3045022100b5b1813992282b9a1fdd957b9751d79dc21018abc6586336e272212cc89cfe84022053765a1da0bdb5a0631a9866f1fd4c583589d5188b11cfa302fc20cd2611a71e01"
+        check_sig_format=True
     )
 ]
 
@@ -101,7 +103,7 @@ test_btc4 = [
     ),
     LedgerjsApdu(  # SIGN MESSAGE - part 2, Null byte as end of msg
         commands=["e04e80000100"],
-        expected_resp="3045022100e32b32b8a6b4228155ba4d1a536d8fed9900606663fbbf4ea420ed8e944f9c18022053c97c74d2f6d8620d060584dc7886f5f3003684bb249508eb7066215172281a01"
+        check_sig_format=True
     )
 ]
 
@@ -134,7 +136,7 @@ test_btc_seg_multi = [
     ),
     LedgerjsApdu(   # UNTRUSTED HASH SIGN - for input 1
         commands=["e04800001b058000003180000001800000050000000000000000000000000001"],
-        expected_resp="30440220081d5f82ec23759eaf93519819faa1037faabdc27277c8594f5e8e2ba04cb24502206dfff160629ef1fbae78c74d59bfa8c7d59f873c905b196cf2e3efa2273db98801"
+        check_sig_format=True
     ),
     LedgerjsApdu(  # UNTRUSTED HASH TRANSACTION INPUT START - Continue w/ pseudo tx w/ input 2 + script + seq
         commands=[
@@ -145,7 +147,7 @@ test_btc_seg_multi = [
     ),
     LedgerjsApdu(   # UNTRUSTED HASH SIGN - for input 2
         commands=["e04800001b058000003180000001800000050000000000000000000000000001"],
-        expected_resp="3145022100c820c90ce84c6567617733cd6409c4b8f7469b863d811a3cdc73bf3fa43912bc0220320b7fd259939a6821d371f2b49a755d1ca588bffb1476fbb2da68907427b54b01"
+        check_sig_format=True
     )
 ]
 
@@ -169,7 +171,7 @@ test_btc_sig_p2sh_seg = [
     ),
     LedgerjsApdu(   # UNTRUSTED HASH SIGN - on 0'/0/0 path
         commands=["e04800001303800000000000000000000000000000000001"],
-        expected_resp="3045022100932934ee326c19c81b72fb03cec0fb79ff980a8076639f77c7edec35bd59da1e02205e4030e8e0fd2405f6db2fe044c49d3f191adbdc0e05ec7ed4dcc4c6fe7310e501"
+        check_sig_format=True
     )
 ]
 
@@ -180,22 +182,17 @@ test_sign_message = [
     ),
     LedgerjsApdu(   # SIGN MESSAGE - Null byte as end of message
         commands=["e04e80000100"],
-        #expected_resp="314402205eac720be544d3959a760d9bfd6a0e7c86d128fd1030038f06d85822608804e20220385d83273c9d03c469596292fb354b07d193034f83c2633a4c1f057838e12a5b"
+        check_sig_format=True
     )
 ]
 
 
 class TestLedgerjsBtcTx(BaseTestBtc):
 
-    # "btc 2" test data - deactivated, fails on 2nd "UNTRUSTED HASH TRANSACTION INPUT START" APDU (sw=6f01)
-    # "" test data - deactivated 
-    # ledgerjs_test_data = [ test_btc_get_wallet_public_key, test_btc3, test_btc4, 
-    #                        test_btc_seg_multi, test_btc_sig_p2sh_seg, test_sign_message, 
-    #                        # test_btc2]
-    # ledgerjs_test_data = [ test_btc_get_wallet_public_key, test_btc3, test_btc4, 
-    #                        test_btc_seg_multi, test_btc_sig_p2sh_seg, test_sign_message]
-
-    ledgerjs_test_data = [test_btc_seg_multi]
+    # Some test data deactivated as they pre-date the last version of the btc tx parser
+    ledgerjs_test_data = [ test_btc_get_wallet_public_key, test_btc3, test_btc4, 
+                           test_sign_message,] 
+                           # test_btc_sig_p2sh_seg, test_btc_seg_multi, test_btc2]
 
     @pytest.mark.parametrize('test_data', ledgerjs_test_data)
     def test_replay_ledgerjs_tests(self, test_data: List[LedgerjsApdu]) -> None:
@@ -210,4 +207,6 @@ class TestLedgerjsBtcTx(BaseTestBtc):
             for command in apdu.commands:
                 response = btc.sendRawApdu(bytes.fromhex(command))
             if apdu.expected_resp is not None:
-                self.check_raw_apdu_resp(apdu.expected_resp, response.hex())
+                self.check_raw_apdu_resp(apdu.expected_resp, response)
+            elif apdu.check_sig_format is not None and apdu.check_sig_format == True:
+                self.check_signature(response)  # Only format is checked
