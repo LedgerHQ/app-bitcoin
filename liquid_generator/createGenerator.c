@@ -47,6 +47,13 @@ void swap32(unsigned char *target, unsigned char *src) {
 	}
 }
 
+int illegal;
+
+void illegal_callback(const char *message, void *data) {
+	//printf("ILLEGAL %s\n", message);
+	//illegal = 1;
+}
+
 int main(int argc, char **argv) {
 	unsigned char out[65];
 	unsigned char blind[32];
@@ -58,6 +65,7 @@ int main(int argc, char **argv) {
 	size_t outSize = sizeof(out);
 	int i, index;
 	ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
+	secp256k1_context_set_illegal_callback(ctx, illegal_callback, NULL);
 
 #if 0
 	//secp256k1_generator_generate_blinded(ctx, &gen, KEY, BLIND);
@@ -112,22 +120,70 @@ retry:
 	index = 0;
 	while(ASSETS[index]) {
 		unsigned char *asset = ASSETS[index];
+		unsigned char tmp[32];
+		unsigned char outBlind[33];
+		unsigned char outTest[33];
+		int parity = 0;
+		memset(tmp, 0x11, sizeof(tmp));
 		printf("Generator for ");
 		for (i=0; i<32; i++) {
 			printf("%.2x", asset[i]);
 		}
 		printf("\n");
 		swap32(blind, asset);
+		secp256k1_generator_generate_blinded(ctx, &genBlind, blind, tmp);
+		secp256k1_generator_serialize(ctx, outBlind, &genBlind);
 		secp256k1_generator_generate(ctx, &gen, blind);
 		secp256k1_generator_serialize(ctx, out, &gen);
+                printf("Blind generator ");
+                for (i=0; i<33; i++) {
+                        printf("%.2x", outBlind[i]);
+                }
 		printf("Non blinded generator ");
 		for (i=0; i<33; i++) {
 			printf("%.2x", out[i]);
 		}
 		printf("\n");
+		illegal = 0;
 		out[0] = 0x02;
+		outSize = 33;
 		secp256k1_ec_pubkey_parse(ctx, &pub, out, 33);
+		secp256k1_ec_pubkey_tweak_add(ctx, &pub, tmp);
+		if (!illegal) {
+			secp256k1_ec_pubkey_serialize(ctx, outTest, &outSize, &pub, SECP256K1_EC_COMPRESSED);
+			printf("Test 0x02\n");
+			for (i=0; i<33; i++) {
+				printf("%.2x", outTest[i]);
+			}
+			printf("\n\n");
+			if (memcmp(outTest + 1, outBlind + 1, 32) == 0) {
+				parity = 0x02;
+			}	
+		}
+		illegal = 0;
+                out[0] = 0x03;
+		outSize = 33;
+                secp256k1_ec_pubkey_parse(ctx, &pub, out, 33);
+                secp256k1_ec_pubkey_tweak_add(ctx, &pub, tmp);
+		if (!illegal) {
+                	secp256k1_ec_pubkey_serialize(ctx, outTest, &outSize, &pub, SECP256K1_EC_COMPRESSED);
+                	printf("Test 0x03\n");
+                	for (i=0; i<33; i++) {
+                        	printf("%.2x", outTest[i]);
+                	}
+                	printf("\n\n");
+			if (memcmp(outTest + 1, outBlind + 1, 32) == 0) {
+				parity = 0x03;
+			}
+		}
+		printf("Parity %d\n", parity);
+		outSize = 65;
+		out[0] = parity;
+                secp256k1_ec_pubkey_parse(ctx, &pub, out, 33);
 		secp256k1_ec_pubkey_serialize(ctx, out, &outSize, &pub, SECP256K1_EC_UNCOMPRESSED);
+                for (i=0; i<32; i++) {
+                        printf("%.2x", asset[i]);
+		}
 		printf("Full non blinded generator ");
 		for (i=0; i<65; i++) {
 			printf("%.2x", out[i]);
