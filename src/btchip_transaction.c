@@ -20,6 +20,7 @@
 
 #define CONSENSUS_BRANCH_ID_OVERWINTER 0x5ba81b19
 #define CONSENSUS_BRANCH_ID_SAPLING 0x76b809bb
+#define CONSENSUS_BRANCH_ID_ZCLASSIC 0x930b540d
 
 #define DEBUG_LONG "%d"
 
@@ -156,9 +157,14 @@ void transaction_parse(unsigned char parseMode) {
                         if (btchip_context_D.segwitParsedOnce) {
                             uint8_t parameters[16];
                             os_memmove(parameters, OVERWINTER_PARAM_SIGHASH, 16);
-                            btchip_write_u32_le(parameters + 12,
-                                btchip_context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING ?
-                                CONSENSUS_BRANCH_ID_SAPLING : CONSENSUS_BRANCH_ID_OVERWINTER);
+                            if (G_coin_config->kind == COIN_KIND_ZCLASSIC) {
+                                btchip_write_u32_le(parameters + 12, CONSENSUS_BRANCH_ID_ZCLASSIC);
+                            }
+                            else {
+                                btchip_write_u32_le(parameters + 12,
+                                    btchip_context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING ?
+                                    (G_coin_config->zcash_consensus_branch_id != 0 ? G_coin_config->zcash_consensus_branch_id : CONSENSUS_BRANCH_ID_SAPLING) : CONSENSUS_BRANCH_ID_OVERWINTER);
+                            }
                             cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, parameters, 16);
                         }
                     }
@@ -247,8 +253,10 @@ void transaction_parse(unsigned char parseMode) {
                     }
 
                     if (G_coin_config->flags & FLAG_PEERCOIN_SUPPORT) {
-                        if (btchip_context_D.coinFamily ==
-                            BTCHIP_FAMILY_PEERCOIN) {
+                        if ((btchip_context_D.coinFamily ==
+                            BTCHIP_FAMILY_PEERCOIN) || 
+                            ((btchip_context_D.coinFamily == BTCHIP_FAMILY_STEALTH) && 
+                            (btchip_context_D.transactionVersion[0] < 2))) {
                             // Timestamp
                             check_transaction_available(4);
                             transaction_offset_increase(4);

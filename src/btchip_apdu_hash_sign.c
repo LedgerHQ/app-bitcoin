@@ -30,7 +30,6 @@ unsigned short btchip_apdu_hash_sign() {
     unsigned char *parameters = G_io_apdu_buffer + ISO_OFFSET_CDATA;
     btchip_transaction_summary_t
         transactionSummary; // could be removed with a refactor
-    unsigned char *authorization;
     unsigned short sw;
     unsigned char keyPath[MAX_BIP32_PATH_LENGTH];
     cx_sha256_t localHash;
@@ -105,7 +104,6 @@ unsigned short btchip_apdu_hash_sign() {
                        MAX_BIP32_PATH_LENGTH);
             parameters += (4 * G_io_apdu_buffer[ISO_OFFSET_CDATA]) + 1;
             authorizationLength = *(parameters++);
-            authorization = parameters;
             parameters += authorizationLength;
             lockTime = btchip_read_u32(parameters, 1, 0);
             parameters += 4;
