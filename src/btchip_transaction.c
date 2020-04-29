@@ -367,14 +367,22 @@ void transaction_parse(unsigned char parseMode) {
                                 PRINTF("Invalid signature\n");
                                 goto fail;
                             }
-                        }
-                        // Handle segwit inputs
-                        if (btchip_context_D.usingSegwit) {
-                            if (trustedInputFlag) {
-                                // Skip TI-specific bytes before the hash i.e. 0x38||0x32||0x00||Nonce (2B)
-                                transaction_offset_increase(5);
+                            // Hmac is valid. If TrustedInput contains a segwit input, update data pointer & length
+                            // to fake the parser into believing a normal segwit input was received. Do not use
+                            // transaction_offset_increase() here as it could update the hash being computed.
+                            if (btchip_context_D.usingSegwit) {
+                                // Overwrite the no longer needed HMAC's 1st byte w/ the input script length byte.
+                                *(btchip_context_D.transactionBufferPointer + 1 + TRUSTED_INPUT_SIZE + 1) = 
+                                    *(btchip_context_D.transactionBufferPointer + 1 + TRUSTED_INPUT_TOTAL_SIZE + 1);
+                                // Set tx data pointer on TI header's (i.e. 0x38||0x32||0x00||Nonce (2B)) last byte 
+                                // before prevout tx hash. Also remove HMAC size from remaining data length.
+                                btchip_context_D.transactionBufferPointer += 5;
+                                btchip_context_D.transactionDataRemaining -= (5+8);
                             }
-
+                        }
+                        // Handle pure segwit inputs, whether trusted or not (i.e. InputHashStart 1st APDU's P2==02 
+                        // & data[0]=={0x01, 0x02})
+                        if (btchip_context_D.usingSegwit) {
                             transaction_offset_increase(1);     // Set tx pointer on 1st byte of hash
                             check_transaction_available(
                                 36); // prevout : 32 hash + 4 index 
@@ -422,12 +430,8 @@ void transaction_parse(unsigned char parseMode) {
                                 btchip_context_D.transactionHashOption =
                                     TRANSACTION_HASH_FULL;
                             }
-                            // Skip final HMac in TI mode to point to input script length byte
-                            if (trustedInputFlag) {
-                                transaction_offset_increase(8);
-                            }
                         } 
-                        // Handle non-segwit inputs (i.e. InputHashStart 1st APDU[P2]==00 && APDU[5]==0x00)
+                        // Handle non-segwit inputs (i.e. InputHashStart 1st APDU's P2==00 && data[0]==0x00)
                         else if (!trustedInputFlag) {
                             // Only authorized in relaxed wallet and server
                             // modes
