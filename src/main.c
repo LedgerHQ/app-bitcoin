@@ -2067,11 +2067,13 @@ uint8_t prepare_single_output() {
             strcpy(vars.tmp.fullAddress, "OP_RETURN");
     } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
                btchip_output_script_is_op_create(
-                   btchip_context_D.currentOutput + offset)) {
+                   btchip_context_D.currentOutput + offset,
+                   sizeof(btchip_context_D.currentOutput) - offset)) {
         strcpy(vars.tmp.fullAddress, "OP_CREATE");
     } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
-               btchip_output_script_is_op_call(btchip_context_D.currentOutput +
-                                               offset)) {
+               btchip_output_script_is_op_call(
+                 btchip_context_D.currentOutput + offset,
+                 sizeof(btchip_context_D.currentOutput) - offset)) {
         strcpy(vars.tmp.fullAddress, "OP_CALL");
     } else if (nativeSegwit) {
         addressOffset = offset + OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET;
@@ -2218,9 +2220,11 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         isNativeSegwit = btchip_output_script_is_native_witness(
             btchip_context_D.currentOutput + offset);
         isOpCreate = btchip_output_script_is_op_create(
-            btchip_context_D.currentOutput + offset);
+            btchip_context_D.currentOutput + offset,
+            sizeof(btchip_context_D.currentOutput) - offset);
         isOpCall = btchip_output_script_is_op_call(
-            btchip_context_D.currentOutput + offset);
+            btchip_context_D.currentOutput + offset,
+            sizeof(btchip_context_D.currentOutput) - offset);
         // Always notify OP_RETURN to the user
         if (nullAmount && isOpReturn) {
             if (!checkOnly) {
@@ -2307,9 +2311,11 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                  !btchip_output_script_is_op_return(
                      btchip_context_D.currentOutput + offset + 8) &&
                  !btchip_output_script_is_op_create(
-                     btchip_context_D.currentOutput + offset + 8) &&
+                     btchip_context_D.currentOutput + offset + 8,
+                     sizeof(btchip_context_D.currentOutput) - offset - 8) &&
                  !btchip_output_script_is_op_call(
-                     btchip_context_D.currentOutput + offset + 8)) ||
+                     btchip_context_D.currentOutput + offset + 8,
+                     sizeof(btchip_context_D) - offset - 8)) ||
                 (!(G_coin_config->kind == COIN_KIND_QTUM) &&
                  !btchip_output_script_is_op_return(
                      btchip_context_D.currentOutput + offset + 8))) {
@@ -2522,8 +2528,7 @@ void btchip_bagl_confirm_message_signature() {
 void btchip_bagl_display_public_key(unsigned char* derivation_path) {
     // append a white space at the end of the address to avoid glitch on nano S
     strcat(G_io_apdu_buffer + 200, " ");
-
-    bip32_print_path(derivation_path, vars.tmp_warning.derivation_path, MAX_DERIV_PATH_ASCII_LENGTH);
+    bip32_print_path(derivation_path, vars.tmp_warning.derivation_path, sizeof(vars.tmp_warning.derivation_path));
     uint8_t is_derivation_path_unusual = bip44_derivation_guard(derivation_path, false);
 
 #if defined(TARGET_BLUE)
@@ -2579,7 +2584,7 @@ void btchip_bagl_request_pubkey_approval()
 
 void btchip_bagl_request_change_path_approval(unsigned char* change_path)
 {
-    bip32_print_path(change_path, vars.tmp_warning.derivation_path, MAX_DERIV_PATH_ASCII_LENGTH);
+    bip32_print_path(change_path, vars.tmp_warning.derivation_path, sizeof(vars.tmp_warning.derivation_path));
  #if defined(TARGET_BLUE)
     UX_DISPLAY(ui_request_change_path_approval_blue, ui_request_change_path_approval_blue_prepro);
 #elif defined(HAVE_UX_FLOW)

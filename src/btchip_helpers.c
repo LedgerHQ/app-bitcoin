@@ -124,18 +124,24 @@ unsigned char btchip_output_script_is_op_return(unsigned char *buffer) {
     return (buffer[1] == 0x6A);
 }
 
-unsigned char btchip_output_script_is_op_create(unsigned char *buffer) {
+static unsigned char output_script_is_op_create_or_call(unsigned char *buffer,
+                                                        size_t size,
+                                                        unsigned char value) {
     return (!btchip_output_script_is_regular(buffer) &&
             !btchip_output_script_is_p2sh(buffer) &&
             !btchip_output_script_is_op_return(buffer) && (buffer[0] <= 0xEA) &&
-            (buffer[buffer[0]] == 0xC1));
+            (buffer[0] < size) &&
+            (buffer[buffer[0]] == value));
 }
 
-unsigned char btchip_output_script_is_op_call(unsigned char *buffer) {
-    return (!btchip_output_script_is_regular(buffer) &&
-            !btchip_output_script_is_p2sh(buffer) &&
-            !btchip_output_script_is_op_return(buffer) && (buffer[0] <= 0xEA) &&
-            (buffer[buffer[0]] == 0xC2));
+unsigned char btchip_output_script_is_op_create(unsigned char *buffer,
+                                                size_t size) {
+    return output_script_is_op_create_or_call(buffer, size, 0xC1);
+}
+
+unsigned char btchip_output_script_is_op_call(unsigned char *buffer,
+                                              size_t size) {
+    return output_script_is_op_create_or_call(buffer, size, 0xC2);
 }
 
 unsigned char btchip_rng_u8_modulo(unsigned char modulo) {
@@ -225,7 +231,7 @@ void btchip_public_key_hash160(unsigned char *in, unsigned short inlen,
     cx_sha256_init(&u.shasha);
     cx_hash(&u.shasha.header, CX_LAST, in, inlen, buffer, 32);
     cx_ripemd160_init(&u.riprip);
-    cx_hash(&u.riprip.header, CX_LAST, buffer, 32, out, 32);
+    cx_hash(&u.riprip.header, CX_LAST, buffer, 32, out, 20);
 }
 
 unsigned short btchip_public_key_to_encoded_base58(
@@ -401,8 +407,13 @@ unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned cha
 
 #if defined(TARGET_BLUE)
     // if the path is longer than 30 char, split the string in multiple strings of length 30
-    uint8_t len=strnlen(out, MAX_DERIV_PATH_ASCII_LENGTH);
+    uint8_t len=strnlen(out, max_out_len);
     uint8_t num_split = len/30;
+
+    // account for the '\0' line delimiters appended
+    if(len + num_split > max_out_len){
+        THROW(EXCEPTION);
+    }
 
     for(i = 1; i<= num_split; i++) {
         os_memmove(out+30*i, out+(30*i-1), len-29*i);
