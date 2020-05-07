@@ -2,7 +2,7 @@ import pytest
 from dataclasses import dataclass, field
 from functools import reduce
 from typing import List, Optional
-from helpers.basetest import BaseTestBtc, LedgerjsApdu, TxData
+from helpers.basetest import BaseTestBtc, LedgerjsApdu, TxData, CONSENSUS_BRANCH_ID
 from helpers.deviceappbtc import DeviceAppBtc, CommException
 
 
@@ -59,46 +59,43 @@ test_zcash_prefix_cmds = [
     )
 ]
 
-# test_zcash_tx_sign_gti =  [
-#     LedgerjsApdu(   # GET TRUSTED INPUT
-#         commands=[
-#             "e042000009000000010400008001",
-#             "e042800025edc69b8179fd7c6a11a8a1ba5d17017df5e09296c3a1acdada0d94e199f68857010000006b",
-#             "e042800032483045022100e8043cd498714122a78b6ecbf8ced1f74d1c65093c5e2649336dfa248aea9ccf022023b13e57595635452130",
-#             "e0428000321c91ed0fe7072d295aa232215e74e50d01a73b005dac01210201e1c9d8186c093d116ec619b7dad2b7ff0e7dd16f42d458da",
-#             "e04280000b1100831dc4ff72ffffff00",
-#             "e04280000102",
-#             "e042800022a0860100000000001976a914fa9737ab9964860ca0c3e9ad6c7eb3bc9c8f6fb588ac",
-#             "e0428000224d949100000000001976a914b714c60805804d86eb72a38c65ba8370582d09e888ac",
-#             "e04280000400000000",
-#         ],
-#         expected_resp="3200" + "--"*2 + "20b7c68231303b2425a91b12f05bd6935072e9901137ae30222ef6d60849fc51010000004d94910000000000" + "--"*8
-#     ), 
-# ]
+test_zcash_tx_sign_gti =  [
+    LedgerjsApdu(   # GET TRUSTED INPUT
+        commands=[
+            "e042000009000000010400008001",
+            "e042800025edc69b8179fd7c6a11a8a1ba5d17017df5e09296c3a1acdada0d94e199f68857010000006b",
+            "e042800032483045022100e8043cd498714122a78b6ecbf8ced1f74d1c65093c5e2649336dfa248aea9ccf022023b13e57595635452130",
+            "e0428000321c91ed0fe7072d295aa232215e74e50d01a73b005dac01210201e1c9d8186c093d116ec619b7dad2b7ff0e7dd16f42d458da",
+            "e04280000b1100831dc4ff72ffffff00",
+            "e04280000102",
+            "e042800022a0860100000000001976a914fa9737ab9964860ca0c3e9ad6c7eb3bc9c8f6fb588ac",
+            "e0428000224d949100000000001976a914b714c60805804d86eb72a38c65ba8370582d09e888ac",
+            "e04280000400000000",
+        ],
+        expected_resp="3200" + "--"*2 + "20b7c68231303b2425a91b12f05bd6935072e9901137ae30222ef6d60849fc51010000004d94910000000000" + "--"*8
+    ), 
+]
 
-
-
-
-# test_zcash_tx_to_sign_abandonned = [
-#     LedgerjsApdu(   # GET PUBLIC KEY
-#         commands=["e040000015058000002c80000085800000000000000100000001"],  # on 44'/133'/0'/1/1
-#     ),
-#     LedgerjsApdu(   # UNTRUSTED HASH TRANSACTION INPUT START
-#         commands=[
-#             "e0440005090400008085202f8901",
-#             "e04480053b013832004d0420b7c68231303b2425a91b12f05bd6935072e9901137ae30222ef6d60849fc51010000004d9491000000000045e1e144cb88d4d800",
-#             "e044800504ffffff00",
-#         ]
-#     ),
-#     LedgerjsApdu(   # UNTRUSTED HASH TRANSACTION INPUT FINALIZE FULL
-#         commands=[
-#             "e04aff0015058000002c80000085800000000000000100000003",
-#             # "e04a0000320240420f00000000001976a91490360f7a0b0e50d5dd0c924fc1d6e7adb8519c9388ac39498200000000001976a91425ea06"
-#             "e04a0000230140420f00000000001976a91490360f7a0b0e50d5dd0c924fc1d6e7adb8519c9388ac"
-#         ],  # tx aborted on 2nd command
-#         expected_sw="6985"
-#     ),
-# ]
+test_zcash_tx_to_sign_abandonned = [
+    LedgerjsApdu(   # GET PUBLIC KEY
+        commands=["e040000015058000002c80000085800000000000000100000001"],  # on 44'/133'/0'/1/1
+    ),
+    LedgerjsApdu(   # UNTRUSTED HASH TRANSACTION INPUT START
+        commands=[
+            "e0440005090400008085202f8901",
+            "e04480053b013832004d0420b7c68231303b2425a91b12f05bd6935072e9901137ae30222ef6d60849fc51010000004d9491000000000045e1e144cb88d4d800",
+            "e044800504ffffff00",
+        ]
+    ),
+    LedgerjsApdu(   # UNTRUSTED HASH TRANSACTION INPUT FINALIZE FULL
+        commands=[
+            "e04aff0015058000002c80000085800000000000000100000003",
+            # "e04a0000320240420f00000000001976a91490360f7a0b0e50d5dd0c924fc1d6e7adb8519c9388ac39498200000000001976a91425ea06"
+            "e04a0000230140420f00000000001976a91490360f7a0b0e50d5dd0c924fc1d6e7adb8519c9388ac"
+        ],  # tx aborted on 2nd command
+        expected_sw="6985"
+    ),
+]
 
 test_zcash_tx_sign_restart_prefix_cmds = [
     LedgerjsApdu(
@@ -118,50 +115,44 @@ test_zcash_tx_sign_restart_prefix_cmds = [
     )
 ]
 
-# test_zcash_tx_to_sign_finalized = test_zcash_tx_sign_gti + [
-#     LedgerjsApdu(   # GET PUBLIC KEY
-#         commands=["e040000015058000002c80000085800000000000000100000001"],  # on 44'/133'/0'/1/1
-#     ),
-#     LedgerjsApdu(   # UNTRUSTED HASH TRANSACTION INPUT START
-#         commands=[
-#             "e0440005090400008085202f8901",
-#             "e04480053b""013832004d""0420b7c68231303b2425a91b12f05bd6935072e9901137ae30222ef6d60849fc51""01000000""4d94910000000000""45e1e144cb88d4d8""00",
-#             "e044800504ffffff00",
-#         ]
-#     ),
-#     LedgerjsApdu(   # UNTRUSTED HASH TRANSACTION INPUT FINALIZE FULL
-#         commands=[
-#             "e04aff0015058000002c80000085800000000000000100000003",
-#             # "e04a0000320240420f00000000001976a91490360f7a0b0e50d5dd0c924fc1d6e7adb8519c9388ac39498200000000001976a91425ea06"
+test_zcash_tx_to_sign_finalized = test_zcash_tx_sign_gti + [
+    LedgerjsApdu(   # GET PUBLIC KEY
+        commands=["e040000015058000002c80000085800000000000000100000001"],  # on 44'/133'/0'/1/1
+    ),
+    LedgerjsApdu(   # UNTRUSTED HASH TRANSACTION INPUT START
+        commands=[
+            "e0440005090400008085202f8901",
+            "e04480053b""013832004d""0420b7c68231303b2425a91b12f05bd6935072e9901137ae30222ef6d60849fc51""01000000""4d94910000000000""45e1e144cb88d4d8""00",
+            "e044800504ffffff00",
+        ]
+    ),
+    LedgerjsApdu(   # UNTRUSTED HASH TRANSACTION INPUT FINALIZE FULL
+        commands=[
+            "e04aff0015058000002c80000085800000000000000100000003",
+            # "e04a0000320240420f00000000001976a91490360f7a0b0e50d5dd0c924fc1d6e7adb8519c9388ac39498200000000001976a91425ea06"
             
-#             "e04a0000230140420f00000000001976a91490360f7a0b0e50d5dd0c924fc1d6e7adb8519c9388ac"
-#             "e04a8000045eb3f840"
-#         ],
-#         expected_resp="0000"
-#     ),
+            "e04a0000230140420f00000000001976a91490360f7a0b0e50d5dd0c924fc1d6e7adb8519c9388ac"
+            "e04a8000045eb3f840"
+        ],
+        expected_resp="0000"
+    ),
 
-#     LedgerjsApdu(
-#         commands=[
-#             "e044008509""0400008085202f8901",
-#             "e04480853b""013832004d04""20b7c68231303b2425a91b12f05bd6935072e9901137ae30222ef6d60849fc51""01000000""4d94910000000000""45e1e144cb88d4d8""19",
-#             "e04480851d""76a9140a146582553b2f5537e13cef6659e82ed8f69b8f88ac""ffffff00",
+    LedgerjsApdu(
+        commands=[
+            "e044008509""0400008085202f8901",
+            "e04480853b""013832004d04""20b7c68231303b2425a91b12f05bd6935072e9901137ae30222ef6d60849fc51""01000000""4d94910000000000""45e1e144cb88d4d8""19",
+            "e04480851d""76a9140a146582553b2f5537e13cef6659e82ed8f69b8f88ac""ffffff00",
 
-#             "e048000015""058000002c80000085800000000000000100000001"
-#         ],
-#         check_sig_format=True
-#     )
-# ]
-
-
-# ledgerjs_test_data = [
-#     test_zcash_prefix_cmds, test_zcash_tx_sign_gti, test_zcash_tx_to_sign_abandonned, 
-#     test_zcash_tx_sign_restart_prefix_cmds, test_zcash_tx_to_sign_finalized
-# ]
-ledgerjs_test_data = [
-    test_zcash_prefix_cmds
+            "e048000015""058000002c80000085800000000000000100000001"
+        ],
+        check_sig_format=True
+    )
 ]
-ledgerjs_test_data2 = [
-    test_zcash_tx_sign_restart_prefix_cmds
+
+
+ledgerjs_test_data = [
+    test_zcash_prefix_cmds, test_zcash_tx_sign_gti, test_zcash_tx_to_sign_abandonned, 
+    test_zcash_tx_sign_restart_prefix_cmds, test_zcash_tx_to_sign_finalized
 ]
 
 
@@ -256,17 +247,25 @@ class TestLedgerjsZcashTx(BaseTestBtc):
                 raise error
 
 
+    @pytest.mark.skip(reason="Hardcoded TrustedInput can't be replayed on a different device than the one that generated it")
+    @pytest.mark.zcash
     @pytest.mark.manual
     @pytest.mark.parametrize('test_data', ledgerjs_test_data)
     def test_replay_zcash_test(self, test_data: List[LedgerjsApdu]) -> None:
         """
-        Replay of raw apdus from @gre
+        Replay of raw apdus from @gre. 
+        
+        First time an output is presented for validation, it must be rejected by user
+        Then tx will be restarted and on 2nd presentation of outputs they have to be 
+        accepted.
         """
         apdus = test_data
         btc = DeviceAppBtc()
         self._send_raw_apdus(apdus, btc)
 
 
+    @pytest.mark.skip(reason="Almost OK, missing info on how/when to send the branch_id to the app for signing to suceed")
+    @pytest.mark.zcash
     @pytest.mark.manual
     def test_replay_zcash_test2(self) -> None:
         """
@@ -421,12 +420,13 @@ class TestLedgerjsZcashTx(BaseTestBtc):
             print("    Final hash OK")
 
             # 3.2 Sign tx at last. Param is:
-            #       Num_derivs||Dest output path||User validation code length (0x00)||tx locktime||sigHashType(always 0x01)
+            #       Num_derivs||Dest output path||RFU (0x00)||tx locktime||sigHashType(always 0x01)||Branch_id for overwinter (4B)
             print("\n--* Untrusted Transaction Hash Sign")
             tx_to_sign_data = output_path   \
                 + bytes.fromhex("00")       \
                 + tx_to_sign[-4:]           \
-                + bytes.fromhex("01")
+                + bytes.fromhex("01")       \
+                + CONSENSUS_BRANCH_ID.OVERWINTER
 
             response = btc.untrustedHashSign(
                 data = tx_to_sign_data

@@ -180,6 +180,8 @@ test_sign_message = [
 ]
 
 
+@pytest.mark.manual
+@pytest.mark.btc
 class TestLedgerjsBtcTx(BaseTestBtc):
 
     # Some test data deactivated as they pre-date the last version of the btc tx parser

@@ -217,6 +217,8 @@ test12_data = TxData(
     expected_sig=expected_der_sig
 )
 
+@pytest.mark.btc
+@pytest.mark.manual
 class TestBtcSegwitTxLjs(BaseTestBtc):
 
     @pytest.mark.parametrize("test_data", [test12_data])

@@ -7,6 +7,12 @@ class NID:
     MAINNET = bytes.fromhex("00")
     TESTNET = bytes.fromhex("6f")
 
+class CONSENSUS_BRANCH_ID:
+    OVERWINTER = bytes.fromhex("5ba81b19")
+    SAPLING = bytes.fromhex("76b809bb")
+    ZCLASSIC = bytes.fromhex("930b540d")
+
+
 @dataclass
 class LedgerjsApdu:
     commands: List[str]

@@ -225,6 +225,7 @@ segwwit_tx_2_outputs = TrustedInputTestData(
     prevout_amount=[bytes.fromhex(amount) for amount in ("9b3242bf01000000", "1027000000000000")]
 )
 
+@pytest.mark.btc
 class TestBtcTxGetTrustedInput(BaseTestBtc):
     """
     Tests of the GetTrustedInput APDU

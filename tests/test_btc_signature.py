@@ -150,6 +150,8 @@ test12_data = TxData(
     expected_sig=expected_der_sig
 )
 
+@pytest.mark.btc
+@pytest.mark.manual
 class TestBtcTxSignature(BaseTestBtc):
 
     @pytest.mark.parametrize("test_data", [test12_data])
@@ -164,7 +166,7 @@ class TestBtcTxSignature(BaseTestBtc):
            - Then each input to sign shall be processed as part of a pseudo transaction with a 
              single input and no outputs."
 
-        - /!\ Seed to initialize device with is:
+        - Attention: Seed to initialize device with is:
             "palm hammer feel bulk sting broccoli six stay ramp develop hip pony play"
             "never tourist phrase wrist prepare ladder egg lottery aware dinner express"
         """
