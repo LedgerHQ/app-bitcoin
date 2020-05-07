@@ -1,6 +1,6 @@
 from typing import Optional, List
 from .apduabstract import BytesOrStr
-from ledgerblue.comm import getDongle
+from ledgerblue.comm import getDongle, CommException
 
 
 #decorator that try to connect to a physical dongle before executing a method
@@ -87,7 +87,10 @@ class DeviceAppProxy:
     def sendRawApdu(self, 
                     apdu: bytes) -> bytes:
         print(f"[device <] {apdu.hex()}")
-        return self.dongle.exchange(apdu)
+        response = self.dongle.exchange(apdu)
+        _resp = response.hex() if len(response) else "OK"
+        print(f"[device >] {_resp}")
+        return response
 
     @dongle_connected
     def _send_chunked_apdu(self, 

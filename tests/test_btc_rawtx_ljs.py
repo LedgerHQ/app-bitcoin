@@ -1,15 +1,8 @@
 import pytest
 from dataclasses import dataclass, field
 from typing import List, Optional
-from helpers.basetest import BaseTestBtc
+from helpers.basetest import BaseTestBtc, LedgerjsApdu
 from helpers.deviceappbtc import DeviceAppBtc
-
-
-@dataclass
-class LedgerjsApdu:
-    commands: List[str]
-    expected_resp: Optional[str] = field(default=None)
-    check_sig_format: Optional[bool] = field(default=None)
 
 
 # Test data below is extracted from ledgerjs repo, file "ledgerjs/packages/hw-app-btc/tests/Btc.test.js"

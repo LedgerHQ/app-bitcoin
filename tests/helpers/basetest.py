@@ -8,6 +8,13 @@ class NID:
     TESTNET = bytes.fromhex("6f")
 
 @dataclass
+class LedgerjsApdu:
+    commands: List[str]
+    expected_resp: Optional[str] = field(default=None)
+    expected_sw: Optional[str] = field(default=None)
+    check_sig_format: Optional[bool] = field(default=None)
+
+@dataclass
 class TxData:
     tx_to_sign: bytes
     utxos: List[bytes]

@@ -1,6 +1,6 @@
 from typing import Optional, List
 from .apduabstract import ApduSet, ApduDict, CApdu, BytesOrStr
-from .deviceappproxy import DeviceAppProxy, dongle_connected
+from .deviceappproxy import DeviceAppProxy, dongle_connected, CommException
 
 
 class BTC_P1:
