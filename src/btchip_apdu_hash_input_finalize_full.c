@@ -76,7 +76,7 @@ static bool check_output_displayable() {
         (!(G_coin_config->kind == COIN_KIND_QTUM) &&
          !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
          !isP2sh && !(nullAmount && isOpReturn))) {
-        PRINTF("Error : Unrecognized input script");
+        PRINTF("Error : Unrecognized output script");
         THROW(EXCEPTION);
     }
     if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {
