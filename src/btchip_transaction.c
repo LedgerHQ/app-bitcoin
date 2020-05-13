@@ -279,6 +279,8 @@ void transaction_parse(unsigned char parseMode) {
                         // we will count number of already signed inputs and compare with this value
                         vars.swap_data.totalNumberOfInputs = 
                             btchip_context_D.transactionContext.transactionRemainingInputsOutputs;
+                        // Reseting the flag, because we should check address ones for each input
+                        vars.swap_data.was_address_checked = 0;
                     }
                     // Ready to proceed
                     btchip_context_D.transactionContext.transactionState =
