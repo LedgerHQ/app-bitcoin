@@ -2428,6 +2428,7 @@ extern void btchip_apdu_hash_input_finalize_full_reset(void);
 // in silent mode, when called from SWAP app
 unsigned int btchip_silent_confirm_single_output() {
     char tmp[80] = {0};
+    unsigned char amount[8];
     while (true) {
         // in swap operation we can only have 1 "external" output
         if (vars.swap_data.was_address_checked) {
@@ -2435,7 +2436,8 @@ unsigned int btchip_silent_confirm_single_output() {
         }
         vars.swap_data.was_address_checked = 1;
         // check amount
-        if (memcmp(btchip_context_D.currentOutput, vars.swap_data.amount, 8) != 0) {
+        btchip_swap_bytes(amount, btchip_context_D.currentOutput, 8);
+        if (memcmp(amount, vars.swap_data.amount, 8) != 0) {
             return 0;
         }
         get_address_from_output_script(btchip_context_D.currentOutput + 8, sizeof(btchip_context_D.currentOutput) - 8, tmp, sizeof(tmp));
@@ -2812,6 +2814,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
     os_boot();
 
     //TODO: test code, remove me
+    /*
         unsigned int ret_val;
         create_transaction_parameters_t call_parameters;
         swap_data_t lo;
@@ -2827,7 +2830,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
         call_parameters.fee_amount_length = 8;
         call_parameters.destination_address = lo.destination_address;
         library_main(SIGN_TRANSACTION_IN, (unsigned int*)&call_parameters, &ret_val);
-
+    */
     if (!arg0) {
         // Bitcoin application launched from dashboard
         coin_main();
