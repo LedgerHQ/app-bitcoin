@@ -308,6 +308,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                            MAX_BIP32_PATH_LENGTH);
 
                 get_pubkey_hash160(transactionSummary->keyPath, btchip_context_D.tmpCtx.output.changeAddress);
+                PRINTF("Change address = %.*H\n", 20, btchip_context_D.tmpCtx.output.changeAddress);
                 
                 btchip_context_D.tmpCtx.output.changeInitialized = 1;
                 btchip_context_D.tmpCtx.output.changeAccepted = 0;
