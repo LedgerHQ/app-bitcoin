@@ -2545,16 +2545,19 @@ unsigned int btchip_silent_confirm_single_output() {
     while (true) {
         // in swap operation we can only have 1 "external" output
         if (vars.swap_data.was_address_checked) {
+            PRINTF("Address was already checked\n");
             return 0;
         }
         vars.swap_data.was_address_checked = 1;
         // check amount
         btchip_swap_bytes(amount, btchip_context_D.currentOutput, 8);
         if (memcmp(amount, vars.swap_data.amount, 8) != 0) {
+            PRINTF("Amount not matched\n");
             return 0;
         }
         get_address_from_output_script(btchip_context_D.currentOutput + 8, sizeof(btchip_context_D.currentOutput) - 8, tmp, sizeof(tmp));
         if (strcmp(tmp, vars.swap_data.destination_address) != 0) {
+            PRINTF("Address not matched\n");
             return 0;
         }
     
@@ -2593,6 +2596,7 @@ unsigned int btchip_silent_confirm_single_output() {
                                        btchip_context_D.transactionContext.transactionAmount,
                                        btchip_context_D.totalOutputAmount) != 0) ||
             (memcmp(fees, vars.swap_data.fees, 8) != 0)) {
+            PRINTF("Fees is not matched\n");
             return 0;
         }
     }
