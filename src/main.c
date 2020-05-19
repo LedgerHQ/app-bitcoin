@@ -2078,7 +2078,26 @@ uint8_t check_fee_swap() {
     borrow = transaction_amount_sub_be(
             fees, btchip_context_D.transactionContext.transactionAmount,
             btchip_context_D.totalOutputAmount);
-    return (borrow == 0) && (memcmp(fees, vars.swap_data.fees, 8) == 0);
+    if ((borrow != 0) || (memcmp(fees, vars.swap_data.fees, 8) != 0))
+        return 0;
+    btchip_context_D.transactionContext.firstSigned = 0;
+
+    if (btchip_context_D.usingSegwit &&  !btchip_context_D.segwitParsedOnce) {
+        // This input cannot be signed when using segwit - just restart.
+        btchip_context_D.segwitParsedOnce = 1;
+        PRINTF("Segwit parsed once\n");
+        btchip_context_D.transactionContext.transactionState =
+        BTCHIP_TRANSACTION_NONE;
+    } else {
+        btchip_context_D.transactionContext.transactionState =
+        BTCHIP_TRANSACTION_SIGN_READY;
+    }
+    btchip_context_D.sw = 0x9000;
+    btchip_context_D.outLength = 0;
+    G_io_apdu_buffer[btchip_context_D.outLength++] = 0x90;
+    G_io_apdu_buffer[btchip_context_D.outLength++] = 0x00;
+
+    return 1;
 }
 
 uint8_t prepare_fees() {
