@@ -76,8 +76,11 @@ void app_dispatch(void) {
 #endif // IO_APP_ACTIVITY
 
         sendSW:
-            if (btchip_context_D.called_from_swap && (btchip_context_D.sw != BTCHIP_SW_OK)) {
-                vars.swap_data.should_exit = 1;
+            if (btchip_context_D.called_from_swap) {
+                btchip_context_D.io_flags &= ~IO_ASYNCH_REPLY;
+                if(btchip_context_D.sw != BTCHIP_SW_OK) {
+                    vars.swap_data.should_exit = 1;
+                }
             }
             // prepare SW after replied data
             G_io_apdu_buffer[btchip_context_D.outLength] =
