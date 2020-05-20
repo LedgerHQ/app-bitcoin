@@ -229,6 +229,7 @@ output_paths = [
     bytes.fromhex("058000002c80000085800000000000000000000004")     # 44'/133'/0'/0/4
 ]
 
+@pytest.mark.zcash
 class TestLedgerjsZcashTx(BaseTestBtc):
 
     def _send_raw_apdus(self, apdus: List[LedgerjsApdu], device: DeviceAppBtc):
@@ -248,7 +249,6 @@ class TestLedgerjsZcashTx(BaseTestBtc):
 
 
     @pytest.mark.skip(reason="Hardcoded TrustedInput can't be replayed on a different device than the one that generated it")
-    @pytest.mark.zcash
     @pytest.mark.manual
     @pytest.mark.parametrize('test_data', ledgerjs_test_data)
     def test_replay_zcash_test(self, test_data: List[LedgerjsApdu]) -> None:
@@ -264,8 +264,6 @@ class TestLedgerjsZcashTx(BaseTestBtc):
         self._send_raw_apdus(apdus, btc)
 
 
-    @pytest.mark.skip(reason="Almost OK, missing info on how/when to send the branch_id to the app for signing to suceed")
-    @pytest.mark.zcash
     @pytest.mark.manual
     def test_replay_zcash_test2(self) -> None:
         """
@@ -337,7 +335,7 @@ class TestLedgerjsZcashTx(BaseTestBtc):
         ptx_to_hash_part1 = reduce(lambda x, y: x+y, ptx_to_hash_part1)     # Get a single bytes object
 
         ptx_to_hash_part1_chunks_len = [
-            9                           # len(version||flags||input_count) - skip segwit version+flag bytes
+            9                                   # len(version||flags||input_count) - skip segwit version+flag bytes
         ]
         for trusted_input in trusted_inputs:
             ptx_to_hash_part1_chunks_len.extend([
@@ -347,9 +345,7 @@ class TestLedgerjsZcashTx(BaseTestBtc):
 
         btc.untrustedTxInputHashStart(
             p1="00",
-            # p2="02",    # /!\ "02" to activate BIP 143 signature (b/c the pseudo-tx 
-            #             # contains segwit inputs encapsulated in TrustedInputs).
-            p2="05",    # Value used for Zcash (TBC if bit 143 sig is activated when bit#1 is 0)
+            p2="05",    # Value used for Zcash
             data=ptx_to_hash_part1,
             chunks_len=ptx_to_hash_part1_chunks_len
         )
@@ -382,13 +378,37 @@ class TestLedgerjsZcashTx(BaseTestBtc):
         print("    OK")
         # We're done w/ the hashing of the pseudo-tx with all inputs w/o scriptSig.
 
+        # 2.2.3. Zcash-specific: "When using Overwinter/Sapling, UNTRUSTED HASH SIGN is 
+        #        called with an empty authorization and nExpiryHeight following the first 
+        #        UNTRUSTED HASH TRANSACTION INPUT FINALIZE FULL"
+        print("\n--* Untrusted Has Sign - with empty Auth & nExpiryHeight")
+        branch_id_data = [
+            bytes.fromhex(
+                "00"                    # Number of derivations (None)
+                "00"                    # Empty validation code
+            ),
+            tx_to_sign[-4:],            # locktime
+            bytes.fromhex("01"),        # SigHashType - always 01
+            bytes.fromhex("00000000")   # Empty nExpiryHeight
+        ]
+        response = btc.untrustedHashSign(
+            data = reduce(lambda x, y: x+y, branch_id_data)
+        )
+
+
         # 3. Sign each input individually. Because inputs are segwit, hash each input with its scriptSig 
         #    and sequence individually, each in a pseudo-tx w/o output_count, outputs nor locktime. 
         print("\n--* Untrusted Transaction Input Hash Start, step 2 - Hash again each input individually (only 1)")
-        # Inputs are P2WPKH, so use 0x1976a914{20-byte-pubkey-hash}88ac as scriptSig in this step.
-        # HCL TBC: is the above also true for Zcash tx?
-        input_scripts = [bytes.fromhex("1976a914") + pubkey.pubkey_hash + bytes.fromhex("88ac") 
-                         for pubkey in pubkeys_data]
+        # Inputs are P2WPKH, so use 0x1976a914{20-byte-pubkey-hash}88ac from utxo as scriptSig in this step.
+        #
+        # From btc.asc: "The input scripts shall be prepared by the host for the transaction signing process as 
+        #   per bitcoin rules : the current input script being signed shall be the previous output script (or the 
+        #   redeeming script when consuming a P2SH output, or the scriptCode when consuming a BIP 143 output), and 
+        #   other input script shall be null."
+        input_scripts = [utxos[0][196:196 + utxos[0][196] + 1]]
+        # input_scripts = [tx_to_sign[45:45 + tx_to_sign[45] + 1]]
+        # input_scripts = [bytes.fromhex("1976a914") + pubkey.pubkey_hash + bytes.fromhex("88ac") 
+                        #  for pubkey in pubkeys_data]
         ptx_for_inputs = [
             [   tx_to_sign[:8],                 # Tx version||zcash flags
                 bytes.fromhex("0101"),          # Input_count||TrustedInput marker byte
@@ -412,8 +432,7 @@ class TestLedgerjsZcashTx(BaseTestBtc):
             # 3.1 Send pseudo-tx w/ sigScript
             btc.untrustedTxInputHashStart(
                 p1="00",
-                p2="80",        # to continue previously started tx hash
-#                p2="85",        # to continue previously started zcash tx hash (85 TBC)
+                p2="80",        # to continue previously started tx hash, be it BTc or other BTC-like coin
                 data=reduce(lambda x,y: x+y, ptx_for_input),
                 chunks_len=ptx_chunks_len
             )
@@ -426,7 +445,7 @@ class TestLedgerjsZcashTx(BaseTestBtc):
                 + bytes.fromhex("00")       \
                 + tx_to_sign[-4:]           \
                 + bytes.fromhex("01")       \
-                + CONSENSUS_BRANCH_ID.OVERWINTER
+                + bytes.fromhex("00000000")
 
             response = btc.untrustedHashSign(
                 data = tx_to_sign_data

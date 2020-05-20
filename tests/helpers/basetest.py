@@ -11,6 +11,7 @@ class CONSENSUS_BRANCH_ID:
     OVERWINTER = bytes.fromhex("5ba81b19")
     SAPLING = bytes.fromhex("76b809bb")
     ZCLASSIC = bytes.fromhex("930b540d")
+    ZCASH = bytes.fromhex("2BB40E60")
 
 
 @dataclass
