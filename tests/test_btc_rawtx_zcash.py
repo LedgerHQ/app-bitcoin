@@ -156,43 +156,103 @@ ledgerjs_test_data = [
 ]
 
 
+utxo_single = bytes.fromhex(
+    # https://sochain.com/api/v2/tx/ZEC/ec9033381c1cc53ada837ef9981c03ead1c7c41700ff3a954389cfaddc949256
+    # Version @offset 0
+    "04000080"
+    # versionGroupId @offset 4
+    "85202f89"
+    # Input count @offset 8
+    "01"
+    # Input prevout hash @offset 9
+    "53685b8809efc50dd7d5cb0906b307a1b8aa5157baa5fc1bd6fe2d0344dd193a"
+    # Input prevout idx @offset 41
+    "00000000"
+    # Input script length @offset 45
+    "6b"
+    # Input script (107 bytes) @ offset 46
+    "483045022100ca0be9f37a4975432a52bb65b25e483f6f93d577955290bb7fb0"
+    "060a93bfc92002203e0627dff004d3c72a957dc9f8e4e0e696e69d125e4d8e27"
+    "5d119001924d3b48012103b243171fae5516d1dc15f9178cfcc5fdc67b0a8830"
+    "55c117b01ba8af29b953f6"
+    # Input sequence @offset 151
+    "ffffffff"
+    # Output count @offset 155
+    "01"
+    # Output #1 value @offset 156
+    "4072070000000000"
+    # Output #1 script length @offset 164
+    "19"
+    # Output #1 script (25 bytes) @offset 165
+    "76a91449964a736f3713d64283fd0018626ba50091c7e988ac"
+    # Locktime @offset 190
+    "00000000"
+    # Extra payload (size of everything remaining, specific to btc app inner protocol @offset 194
+    "0F"
+    # Expiry @offset 195
+    "00000000"
+    # valueBalance @offset 199
+    "0000000000000000"
+    # vShieldedSpend @offset 207
+    "00"
+    # vShieldedOutput @offset 208
+    "00"
+    # vJoinSplit @offset 209
+    "00"
+)
+
+
 utxos = [
     # Considered a segwit tx - segwit flags couldn't be extracted from raw 
     # Get Trusted Input APDUs as they are not supposed to be sent w/ these APDUs.
     bytes.fromhex(
         # Version @offset 0
         "04000080"
-        # Input count @offset 4
+        # versionGroupId @offset 4
+        "85202f89"
+        # Input count @offset 8
         "01"
-        # Input prevout hash @offset 5
+        # Input prevout hash @offset 9
         "edc69b8179fd7c6a11a8a1ba5d17017df5e09296c3a1acdada0d94e199f68857"
-        # Input prevout idx @offset 37
+        # Input prevout idx @offset 41
         "01000000"
-        # Input script length @offset 41
+        # Input script length @offset 45
         "6b"
-        # Input script (107 bytes) @ offset 42
+        # Input script (107 bytes) @ offset 46
         "483045022100e8043cd498714122a78b6ecbf8ced1f74d1c65093c5e2649336d"
         "fa248aea9ccf022023b13e575956354521301c91ed0fe7072d295aa232215e74"
         "e50d01a73b005dac01210201e1c9d8186c093d116ec619b7dad2b7ff0e7dd16f"
         "42d458da1100831dc4ff72"
-        # Input sequence @offset 149
+        # Input sequence @offset 153
         "ffffff00"
-        # Output count @offset 153
+        # Output count @offset 157
         "02"
-        # Output #1 value @offset 154
+        # Output #1 value @offset 160
         "a086010000000000"
-        # Output #1 script length @offset 162
+        # Output #1 script length @offset 168
         "19"
-        # Output #1 script (25 bytes) @offset 163
+        # Output #1 script (25 bytes) @offset 167
         "76a914fa9737ab9964860ca0c3e9ad6c7eb3bc9c8f6fb588ac"
-        # Output #2 value @offset 188
+        # Output #2 value @offset 192
         "4d94910000000000"      # 9 540 685 units of ZEC smallest currency available
-        # Output #2 script length @offset 196
+        # Output #2 script length @offset 200
         "19"
-        # Output #2 script (25 bytes) @offset 197
+        # Output #2 script (25 bytes) @offset 201
         "76a914b714c60805804d86eb72a38c65ba8370582d09e888ac"
-        # Locktime @offset 222
+        # Locktime @offset 226
         "00000000"
+        # Extra payload (size of everything remaining, specific to btc app inner protocol @offset 230
+        "0F"
+        # Expiry @offset 231
+        "00000000"
+        # valueBalance @offset 235
+        "0000000000000000"
+        # vShieldedSpend @offset 243
+        "00"
+        # vShieldedOutput @offset 244
+        "00"
+        # vJoinSplit @offset 245
+        "00"
     )
 ]
 
@@ -204,7 +264,7 @@ tx_to_sign = bytes.fromhex(
     # Input count @offset 8
     "01"
     # Input's prevout hash @offset 9
-    "20b7c68231303b2425a91b12f05bd6935072e9901137ae30222ef6d60849fc51"
+    "d35f0793da27a5eacfe984c73b1907af4b50f3aa3794ba1bb555b9233addf33f"
     # Prevout idx @offset 41
     "01000000"
     # input sequence @offset 45
@@ -263,6 +323,34 @@ class TestLedgerjsZcashTx(BaseTestBtc):
         btc = DeviceAppBtc()
         self._send_raw_apdus(apdus, btc)
 
+    @pytest.mark.manual
+    def test_get_single_trusted_input(self) -> None:
+
+        btc = DeviceAppBtc()
+
+        # 1. Get Trusted Input
+        print("\n--* Get Trusted Input - from utxos")
+        input_datum =  bytes.fromhex("00000000") + utxo_single
+        utxo_chunk_len = [
+            4 + 5 + 4,  # len(prevout_index (BE)||version||input_count||versionGroupId)
+            37,  # len(prevout_hash||prevout_index||len(scriptSig))
+            -1,  # len(scriptSig, from last byte of previous chunk) + len(input_sequence)
+            1,  # len(output_count)
+            34,  # len(output_value #1||len(scriptPubkey #1)||scriptPubkey #1)
+            4 + 1,  # len(locktime || extra_data)
+            4+16+1+1+1  # len(Expiry||valueBalance||vShieldedSpend||vShieldedOutput||vJoinSplit)
+        ]
+
+        trusted_input = btc.getTrustedInput(data=input_datum, chunks_len=utxo_chunk_len)
+
+        self.check_trusted_input(
+            trusted_input,
+            out_index=bytes.fromhex("00000000"),
+            out_amount=bytes.fromhex("4072070000000000"),
+            out_hash=bytes.fromhex("569294dcadcf8943953aff0017c4c7d1ea031c98f97e83da3ac51c1c383390ec")
+        )
+
+        print("    OK")
 
     @pytest.mark.manual
     def test_replay_zcash_test2(self) -> None:
@@ -282,13 +370,14 @@ class TestLedgerjsZcashTx(BaseTestBtc):
         input_data = [out_idx + utxo for out_idx, utxo in zip(output_indexes, utxos)]
         utxos_chunks_len = [
             [   # utxo #1
-                4+5,            # len(prevout_index (BE)||version||input_count)
-                37,             # len(prevout_hash||prevout_index||len(scriptSig))
-                -1,             # len(scriptSig, from last byte of previous chunk) + len(input_sequence)
-                1,              # len(output_count) 
-                34,             # len(output_value #1||len(scriptPubkey #1)||scriptPubkey #1) 
-                34,             # len(output_value #2||len(scriptPubkey #2)||scriptPubkey #2) 
-                4               # len(locktime)
+                4+5+4,                # len(prevout_index (BE)||version||input_count||versionGroupId)
+                37,                 # len(prevout_hash||prevout_index||len(scriptSig))
+                -1,                 # len(scriptSig, from last byte of previous chunk) + len(input_sequence)
+                1,                  # len(output_count)
+                34,                 # len(output_value #1||len(scriptPubkey #1)||scriptPubkey #1)
+                34,                 # len(output_value #2||len(scriptPubkey #2)||scriptPubkey #2)
+                4 + 1,              # len(locktime)
+                4 + 16 + 1 + 1 + 1  # len(Expiry||valueBalance||vShieldedSpend||vShieldedOutput||vJoinSplit)
             ]
         ]
         trusted_inputs = [
@@ -300,7 +389,7 @@ class TestLedgerjsZcashTx(BaseTestBtc):
         ]
         print("    OK")
 
-        out_amounts = [utxos[0][188:188+8]]     # UTXO tx's 2nd output's value
+        out_amounts = [utxos[0][192:192+8]]     # UTXO tx's 2nd output's value
         prevout_hashes = [tx_to_sign[9:9+32]]
         for trusted_input, out_idx, out_amount, prevout_hash in zip(
             trusted_inputs, output_indexes, out_amounts, prevout_hashes

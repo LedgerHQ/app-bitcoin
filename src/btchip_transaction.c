@@ -22,6 +22,14 @@
 #define CONSENSUS_BRANCH_ID_SAPLING 0x76b809bb
 #define CONSENSUS_BRANCH_ID_ZCLASSIC 0x930b540d
 
+// Check if fOverwintered flag is set and if nVersion is >= 0x03
+#define TRUSTED_INPUT_OVERWINTER ( (G_coin_config->kind == COIN_KIND_ZCASH || \
+                                    G_coin_config->kind == COIN_KIND_ZCLASSIC || \
+                                    G_coin_config->kind == COIN_KIND_KOMODO) && \ 
+                                    (btchip_read_u32(btchip_context_D.transactionVersion, 0, 0) & (1<<31)) && \
+                                    (btchip_read_u32(btchip_context_D.transactionVersion, 0, 0) ^ (1<<31)) >= 0x03 \
+                                ) 
+
 #define DEBUG_LONG "%d"
 
 void check_transaction_available(unsigned char x) {
@@ -249,7 +257,8 @@ void transaction_parse(unsigned char parseMode) {
                                btchip_context_D.transactionBufferPointer, 4);
                     transaction_offset_increase(4);
 
-                    if (btchip_context_D.usingOverwinter) {
+                    if (btchip_context_D.usingOverwinter ||
+                        TRUSTED_INPUT_OVERWINTER) {
                         // nVersionGroupId
                         check_transaction_available(4);
                         os_memmove(btchip_context_D.nVersionGroupId,
