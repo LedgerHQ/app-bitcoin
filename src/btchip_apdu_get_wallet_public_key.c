@@ -56,7 +56,9 @@ unsigned short btchip_apdu_get_wallet_public_key() {
     bool segwit = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_SEGWIT);
     bool nativeSegwit = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NATIVE_SEGWIT);
     bool cashAddr = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_CASHADDR);
-
+    if (display && btchip_context_D.called_from_swap) {
+        return BTCHIP_SW_INCORRECT_DATA;
+    }
     switch (G_io_apdu_buffer[ISO_OFFSET_P1]) {
     case P1_NO_DISPLAY:
     case P1_DISPLAY:
@@ -86,8 +88,9 @@ unsigned short btchip_apdu_get_wallet_public_key() {
     if (G_io_apdu_buffer[ISO_OFFSET_LC] < 0x01) {
         return BTCHIP_SW_INCORRECT_LENGTH;
     }
-
-    is_derivation_path_unusual = set_key_path_to_display(G_io_apdu_buffer + ISO_OFFSET_CDATA);
+    if (display) {
+        is_derivation_path_unusual = set_key_path_to_display(G_io_apdu_buffer + ISO_OFFSET_CDATA);
+    }
 
     if(display_request_token){
         uint8_t request_token_offset = ISO_OFFSET_CDATA + G_io_apdu_buffer[ISO_OFFSET_CDATA]*4 + 1;
