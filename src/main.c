@@ -2806,27 +2806,35 @@ void library_main(unsigned int call_id, unsigned int* call_parameters, unsigned 
 
 __attribute__((section(".boot"))) int main(int arg0) {
 #ifdef USE_LIB_BITCOIN
-    unsigned int libcall_params[4];
-    btchip_altcoin_config_t coin_config;
-    init_coin_config(&coin_config);
-    PRINTF("Hello from litecoin\n");
-    check_api_level(CX_COMPAT_APILEVEL);
-    // delegate to bitcoin app/lib
-    libcall_params[0] = "Bitcoin";
-    libcall_params[2] = &coin_config;
-    if (arg0) {
-        // call as a library
-        libcall_params[1] = ((unsigned int *)arg0)[0] | 0x100;
-        libcall_params[3] = ((unsigned int *)arg0)[1]; // library arguments
-        os_lib_call(&libcall_params);
-        ((unsigned int *)arg0)[0] = libcall_params[1];
-        os_lib_end();
+    BEGIN_TRY {
+        TRY {
+            unsigned int libcall_params[4];
+            btchip_altcoin_config_t coin_config;
+            init_coin_config(&coin_config);
+            PRINTF("Hello from litecoin\n");
+            check_api_level(CX_COMPAT_APILEVEL);
+            // delegate to bitcoin app/lib
+            libcall_params[0] = "Bitcoin";
+            libcall_params[2] = &coin_config;
+            if (arg0) {
+                // call as a library
+                libcall_params[1] = ((unsigned int *)arg0)[0] | 0x100;
+                libcall_params[3] = ((unsigned int *)arg0)[1]; // library arguments
+                os_lib_call(&libcall_params);
+                ((unsigned int *)arg0)[0] = libcall_params[1];
+                os_lib_end();
+            }
+            else {
+                // launch coin application
+                libcall_params[1] = 0x100; // use the Init call, as we won't exit
+                os_lib_call(&libcall_params);
+            }
+        }
+        FINALLY {
+            app_exit();
+        }
     }
-    else {
-        // launch coin application
-        libcall_params[1] = 0x100; // use the Init call, as we won't exit
-        os_lib_call(&libcall_params);
-    }
+    END_TRY;
     // no return
 #else
     // exit critical section
@@ -2836,24 +2844,6 @@ __attribute__((section(".boot"))) int main(int arg0) {
     // ensure exception will work as planned
     os_boot();
 
-    //TODO: test code, remove me
-    /*
-        unsigned int ret_val;
-        create_transaction_parameters_t call_parameters;
-        swap_data_t lo;
-        unsigned char amount[8] = {0x20, 0xa1, 0x07};
-        unsigned char fee[8] = {0x82, 0x02};
-        strcpy(lo.destination_address, "3N3Vt1A1DKkjbdAZPAuHYFPE7eusnpTDtg");
-        memcpy(lo.amount, amount, 8);
-        memcpy(lo.fees, fee, 8);
-        lo.was_address_checked = 0;
-        call_parameters.amount = lo.amount;
-        call_parameters.amount_length = 8;
-        call_parameters.fee_amount = lo.fees;
-        call_parameters.fee_amount_length = 8;
-        call_parameters.destination_address = lo.destination_address;
-        library_main(SIGN_TRANSACTION_IN, (unsigned int*)&call_parameters, &ret_val);
-    */
     if (!arg0) {
         // Bitcoin application launched from dashboard
         coin_main();
