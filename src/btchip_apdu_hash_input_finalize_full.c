@@ -76,7 +76,7 @@ static bool check_output_displayable() {
         (!(G_coin_config->kind == COIN_KIND_QTUM) &&
          !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
          !isP2sh && !(nullAmount && isOpReturn))) {
-        PRINTF("Error : Unrecognized input script");
+        PRINTF("Error : Unrecognized output script");
         THROW(EXCEPTION);
     }
     if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {
@@ -404,7 +404,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     cx_hash(
                         &btchip_context_D.transactionHashAuthorization.header,
                         CX_LAST, G_io_apdu_buffer, 0, authorizationHash, 32);
-                    PRINTF("Auth Hash:\n%.*H\n", authorizationHash, 32);
+                    PRINTF("Auth Hash:\n%.*H\n", 32, authorizationHash);
                 } else {
                     cx_hash(
                         &btchip_context_D.transactionHashAuthorization.header,
@@ -412,7 +412,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                         (unsigned char *)&btchip_context_D.segwit.cache,
                         sizeof(btchip_context_D.segwit.cache),
                         authorizationHash, 32);
-                    PRINTF("Auth Hash:\n%.*H\n", authorizationHash, 32);
+                    PRINTF("Auth Hash:\n%.*H\n", 32, authorizationHash);
                 }
             }
 
