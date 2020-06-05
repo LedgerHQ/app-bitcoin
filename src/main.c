@@ -2899,23 +2899,19 @@ void coin_main() {
     coin_main_with_config(&coin_config);
 }
 
-void library_main_with_config(btchip_altcoin_config_t *config, unsigned int call_id, unsigned int* call_parameters, unsigned int* return_value) {
-    *return_value = 0;
+void library_main_with_config(btchip_altcoin_config_t *config, unsigned int command, unsigned int* call_parameters) {
     BEGIN_TRY {
         TRY {
             PRINTF("Inside a library \n");
-            switch (call_id) {
-                case CHECK_ADDRESS_IN:
+            switch (command) {
+                case CHECK_ADDRESS:
                     handle_check_address((check_address_parameters_t*)call_parameters, config);
-                    *return_value = CHECK_ADDRESS_OUT;
                 break;
-                case SIGN_TRANSACTION_IN:
+                case SIGN_TRANSACTION:
                     handle_swap_sign_transaction((create_transaction_parameters_t*)call_parameters, config);
-                    *return_value = SIGN_TRANSACTION_OUT;
                 break;
-                case GET_PRINTABLE_AMOUNT_IN:
+                case GET_PRINTABLE_AMOUNT:
                     handle_get_printable_amount((get_printable_amount_parameters_t*)call_parameters, config);
-                    *return_value = GET_PRINTABLE_AMOUNT_OUT;
                 break;
             }
         }
@@ -2923,38 +2919,39 @@ void library_main_with_config(btchip_altcoin_config_t *config, unsigned int call
     }
     END_TRY;
     os_lib_end();
-    app_exit();
 }
 
-void library_main(unsigned int call_id, unsigned int* call_parameters, unsigned int* return_value) {
+void library_main(unsigned int call_id, unsigned int* call_parameters) {
     btchip_altcoin_config_t coin_config;
     init_coin_config(&coin_config);
-    library_main_with_config(&coin_config, call_id, call_parameters, return_value);
+    library_main_with_config(&coin_config, call_id, call_parameters);
 }
 
 __attribute__((section(".boot"))) int main(int arg0) {
 #ifdef USE_LIB_BITCOIN
     BEGIN_TRY {
         TRY {
-            unsigned int libcall_params[4];
+            unsigned int libcall_params[5];
             btchip_altcoin_config_t coin_config;
             init_coin_config(&coin_config);
             PRINTF("Hello from litecoin\n");
             check_api_level(CX_COMPAT_APILEVEL);
             // delegate to bitcoin app/lib
             libcall_params[0] = "Bitcoin";
-            libcall_params[2] = &coin_config;
+            libcall_params[1] = 0x100;
+            libcall_params[2] = RUN_APPLICATION;
+            libcall_params[3] = &coin_config;
+            libcall_params[4] = 0;
             if (arg0) {
                 // call as a library
-                libcall_params[1] = ((unsigned int *)arg0)[0] | 0x100;
-                libcall_params[3] = ((unsigned int *)arg0)[1]; // library arguments
+                libcall_params[2] = ((unsigned int *)arg0)[1];
+                libcall_params[4] = ((unsigned int *)arg0)[3]; // library arguments
                 os_lib_call(&libcall_params);
                 ((unsigned int *)arg0)[0] = libcall_params[1];
                 os_lib_end();
             }
             else {
                 // launch coin application
-                libcall_params[1] = 0x100; // use the Init call, as we won't exit
                 os_lib_call(&libcall_params);
             }
         }
@@ -2977,17 +2974,27 @@ __attribute__((section(".boot"))) int main(int arg0) {
         coin_main();
         return 0;
     }
-    unsigned int call_id = ((unsigned int *)arg0)[0];
-    if (call_id == 0x100) {
-        // *coin application launched from dashboard
-        coin_main_with_config((btchip_altcoin_config_t *)((unsigned int *)arg0)[1]);
+    if (((unsigned int *)arg0)[0] != 0x100) {
+        app_exit();
         return 0;
     }
-    // Called as a library
-    if (call_id & 0x100)
-        library_main_with_config((btchip_altcoin_config_t *)((unsigned int *)arg0)[1], call_id & (~0x100), ((unsigned int *)arg0)[2], &((unsigned int *)arg0)[0]);
-    else
-        library_main(call_id, ((unsigned int *)arg0)[1], &((unsigned int *)arg0)[0]);
+    unsigned int command = ((unsigned int *)arg0)[1];
+    btchip_altcoin_config_t * coin_config = ((unsigned int *)arg0)[2];
+    switch (command) {
+        case RUN_APPLICATION:
+            // coin application launched from dashboard
+            if (coin_config == NULL)
+                app_exit();
+            else
+                coin_main_with_config((btchip_altcoin_config_t *)((unsigned int *)arg0)[1]);    
+        break;
+        default:
+            if (coin_config == NULL)
+                library_main(command, ((unsigned int *)arg0)[3]);// called as bitcoin library
+            else
+                library_main_with_config(coin_config, command, ((unsigned int *)arg0)[3]);// called as coin library
+        break;
+    }
 #endif // USE_LIB_BITCOIN
     return 0;
 }
