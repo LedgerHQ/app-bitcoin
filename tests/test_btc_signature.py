@@ -35,7 +35,8 @@ import pytest
 from typing import Optional, List
 from functools import reduce
 from helpers.basetest import BaseTestBtc, BtcPublicKey, TxData
-from helpers.deviceappbtc import DeviceAppBtc
+from helpers.deviceappproxy.deviceappbtc import DeviceAppBtc
+from helpers.txparser.transaction import Tx, TxType, TxParse
 
 # BTC Testnet segwit tx used as a "prevout" tx.
 # txid: 2CE0F1697564D5DAA5AFDB778E32782CC95443D9A6E39F39519991094DEF8753
@@ -178,43 +179,29 @@ class TestBtcTxSignature(BaseTestBtc):
         expected_der_sig = test_data.expected_sig
 
         btc = DeviceAppBtc()
-
+        tx = TxParse.from_raw(raw_tx=tx_to_sign)
+        parsed_utxos = [TxParse.from_raw(raw_tx=utxo) for utxo in utxos]
         # 1. Get trusted inputs (submit prevout tx + output index)
         print("\n--* Get Trusted Inputs")
         # Data to submit is: prevout_index (BE)||utxo tx
-        output_indexes = [
-            tx_to_sign[37+4-1:37-1:-1],
-        ]
-        input_data = [out_idx + utxo for out_idx, utxo in zip(output_indexes, utxos)]
-        utxos_chunks_len = [
-            [
-                (4+4, 2, 1),    # len(prevout_index (BE)||version||input_count) - (skip 2-byte segwit Marker+flags)
-                37,             # len(prevout_hash #1||prevout_index #1||len(scriptSig #1) = 0x00)
-                4,              # len(input_sequence)
-                37,             # len(prevout_hash #2||prevout_index #2||len(scriptSig #2) = 0x00)
-                4,              # len(input_sequence)
-                1,              # len(output_count)
-                31,             # len(output_value||len(scriptPubkey)||scriptPubkey)
-                (335+4, 4)      # len(locktime) - skip witness data
-            ],
-        ]
+
+        output_indexes = [_input.prev_tx_out_index for _input in tx.inputs]
         trusted_inputs = [
             btc.getTrustedInput(
-                data=input_datum,
-                chunks_len=chunks_len
+                prev_out_index=out_idx.val,
+                parsed_tx=parsed_utxo,
+                raw_tx=utxo
             )
-            for (input_datum, chunks_len) in zip(input_data, utxos_chunks_len)
-        ]
+            for (out_idx, parsed_utxo, utxo) in zip(output_indexes, parsed_utxos, utxos)]
         print("    OK")
 
-        out_amounts = [utxos[0][90:90+8]]
-        prevout_hashes = [tx_to_sign[5:5+32]]
-        for trusted_input, out_idx, out_amount, prevout_hash in zip(
-            trusted_inputs, output_indexes, out_amounts, prevout_hashes
-            ):
+        out_amounts = [_output.value.buf for parsed_utxo in parsed_utxos for _output in parsed_utxo.outputs]
+        prevout_hashes = [_input.prev_tx_hash for _input in tx.inputs]
+        for trusted_input, out_idx, out_amount, prevout_hash \
+                in zip(trusted_inputs, output_indexes, out_amounts, prevout_hashes):
             self.check_trusted_input(
                 trusted_input, 
-                out_index=out_idx[::-1],    # LE for comparison w/ out_idx in trusted_input
+                out_index=out_idx.buf,      # LE for comparison w/ out_idx in trusted_input
                 out_amount=out_amount,      # utxo output #1 is requested in tx to sign input
                 out_hash=prevout_hash       # prevout hash in tx to sign
             )
@@ -232,59 +219,27 @@ class TestBtcTxSignature(BaseTestBtc):
         #     being replaced with the previously obtained TrustedInput, it is prefixed it with the marker
         #     byte for TrustedInputs (0x01) that the BTC app expects to check the Trusted Input's HMAC.
         print("\n--* Untrusted Transaction Input Hash Start - Hash tx to sign first w/ all inputs having a null script length")
-        input_sequences = [tx_to_sign[67:67+4]]
-        ptx_to_hash_part1 = [tx_to_sign[:5]]
-        for trusted_input, input_sequence in zip(trusted_inputs, input_sequences):
-            ptx_to_hash_part1.extend([
-                bytes.fromhex("01"),            # TrustedInput marker byte, triggers the TrustedInput's HMAC verification
-                bytes([len(trusted_input)]),
-                trusted_input,
-                bytes.fromhex("00"),            # Input script length = 0 (no sigScript)
-                input_sequence
-            ])
-        ptx_to_hash_part1 = reduce(lambda x, y: x+y, ptx_to_hash_part1)     # Get a single bytes object
-
-        ptx_to_hash_part1_chunks_len = [
-            5,                              # len(version||input_count)
-        ]
-        for trusted_input in trusted_inputs:
-            ptx_to_hash_part1_chunks_len.extend([
-                1 + 1 + len(trusted_input) + 1, # len(trusted_input_marker||len(trusted_input)||trusted_input||len(scriptSig) == 0)
-                4                               # len(input_sequence)
-        ])
-
-        btc.untrustedTxInputHashStart(
+        btc.untrustedTxInputHashStart2(
             p1="00",
-            p2="02",    # /!\ "02" to activate BIP 143 signature (b/c the pseudo-tx 
+            p2="02",    # /!\ "02" to activate BIP 143 signature (b/c the pseudo-tx
                         # contains segwit inputs encapsulated in TrustedInputs).
-            data=ptx_to_hash_part1,
-            chunks_len=ptx_to_hash_part1_chunks_len
-        )
+            parsed_tx=tx,
+            trusted_inputs=trusted_inputs)
         print("    OK")
 
         # 2.2 Finalize the input-centric-, pseudo-tx hash with the remainder of that tx
         # 2.2.1 Start with change address path
         print("\n--* Untrusted Transaction Input Hash Finalize Full - Handle change address")
-        ptx_to_hash_part2 = change_path
-        ptx_to_hash_part2_chunks_len = [len(ptx_to_hash_part2)]
-
-        btc.untrustedTxInputHashFinalize(
+        btc.untrustedTxInputHashFinalize2(
             p1="ff",    # to derive BIP 32 change address
-            data=ptx_to_hash_part2,
-            chunks_len=ptx_to_hash_part2_chunks_len
-        )
+            tx_data=change_path)
         print("    OK")
 
         # 2.2.2 Continue w/ tx to sign outputs & scripts
         print("\n--* Untrusted Transaction Input Hash Finalize Full - Continue w/ hash of tx output")
-        ptx_to_hash_part3 = tx_to_sign[71:-4]          # output_count||repeated(output_amount||scriptPubkey)
-        ptx_to_hash_part3_chunks_len = [len(ptx_to_hash_part3)]
-
         response = btc.untrustedTxInputHashFinalize(
             p1="00",
-            data=ptx_to_hash_part3,
-            chunks_len=ptx_to_hash_part3_chunks_len
-        )
+            tx_data=tx)
         assert response == bytes.fromhex("0000")
         print("    OK")
         # We're done w/ the hashing of the pseudo-tx with all inputs w/o scriptSig.
@@ -293,52 +248,63 @@ class TestBtcTxSignature(BaseTestBtc):
         #    and sequence individually, each in a pseudo-tx w/o output_count, outputs nor locktime. 
         print("\n--* Untrusted Transaction Input Hash Start, step 2 - Hash again each input individually (only 1)")
         
-        # # Inputs are P2WPKH, so use 0x1976a914{20-byte-pubkey-hash}88ac as scriptSig in this step.
-        input_scripts = [tx_to_sign[41:41 + tx_to_sign[41] + 1]]    # tx already contains the correct input script for P2WPKH
-        # input_scripts = [bytes.fromhex("1976a914") + pubkey.pubkey_hash + bytes.fromhex("88ac") 
-        #                  for pubkey in pubkeys_data]
-
-        # Inputs scripts in the tx to sign are already w/ the correct form 
-        ptx_for_inputs = [
-            [   tx_to_sign[:5],                         # Tx version||Input_count
-                bytes.fromhex("01"),                    # TrustedInput marker
-                bytes([len(trusted_input)]),
-                trusted_input,           
-                input_script,
-                input_sequence
-            ] for trusted_input, input_script, input_sequence in zip(trusted_inputs, input_scripts, input_sequences)
-        ]
-
-        ptx_chunks_lengths = [
-            [
-                5,                              # len(version||input_count)
-                1 + 1 + len(trusted_input) + 1, # len(trusted_input_marker||len(trusted_input)||trusted_input||scriptSig_len == 0x19)
-                -1                              # get len(scripSig) from last byte of previous chunk + len(input_sequence)
-            ] for trusted_input in trusted_inputs
-        ]
-
+        # # # Inputs are P2WPKH, so use 0x1976a914{20-byte-pubkey-hash}88ac as scriptSig in this step.
+        # input_scripts = [tx_to_sign[41:41 + tx_to_sign[41] + 1]]    # tx already contains the correct input script for P2WPKH
+        # # input_scripts = [bytes.fromhex("1976a914") + pubkey.pubkey_hash + bytes.fromhex("88ac")
+        # #                  for pubkey in pubkeys_data]
+        #
+        # # Inputs scripts in the tx to sign are already w/ the correct form
+        # ptx_for_inputs = [
+        #     [   tx_to_sign[:5],                         # Tx version||Input_count
+        #         bytes.fromhex("01"),                    # TrustedInput marker
+        #         bytes([len(trusted_input)]),
+        #         trusted_input,
+        #         input_script,
+        #         input_sequence
+        #     ] for trusted_input, input_script, input_sequence in zip(trusted_inputs, input_scripts, input_sequences)
+        # ]
+        #
+        # ptx_chunks_lengths = [
+        #     [
+        #         5,                              # len(version||input_count)
+        #         1 + 1 + len(trusted_input) + 1, # len(trusted_input_marker||len(trusted_input)||trusted_input||scriptSig_len == 0x19)
+        #         -1                              # get len(scripSig) from last byte of previous chunk + len(input_sequence)
+        #     ] for trusted_input in trusted_inputs
+        # ]
+        #
         # Hash & sign each input individually
-        for ptx_for_input, ptx_chunks_len, output_path in zip(ptx_for_inputs, ptx_chunks_lengths, output_paths):
+        # for ptx_for_input, ptx_chunks_len, output_path in zip(ptx_for_inputs, ptx_chunks_lengths, output_paths):
+        #     # 3.1 Send pseudo-tx w/ sigScript
+        #     btc.untrustedTxInputHashStart2(
+        #         p1="00",
+        #         p2="80",        # to continue previously started tx hash
+        #         data=reduce(lambda x,y: x+y, ptx_for_input),
+        #         chunks_len=ptx_chunks_len
+        #     )
+        for trusted_input, output_path in zip(trusted_inputs, output_paths):
             # 3.1 Send pseudo-tx w/ sigScript
-            btc.untrustedTxInputHashStart(
+            btc.untrustedTxInputHashStart2(
                 p1="00",
                 p2="80",        # to continue previously started tx hash
-                data=reduce(lambda x,y: x+y, ptx_for_input),
-                chunks_len=ptx_chunks_len
-            )
+                parsed_tx=tx,
+                trusted_inputs=trusted_input)
             print("    Final hash OK")
 
             # 3.2 Sign tx at last. Param is:
             #       Num_derivs||Dest output path||User validation code length (0x00)||tx locktime||sigHashType(always 0x01)
             print("\n--* Untrusted Transaction Hash Sign")
-            tx_to_sign_data = output_path   \
-                + bytes.fromhex("00")       \
-                + tx_to_sign[-4:]           \
-                + bytes.fromhex("01")
+            # tx_to_sign_data = output_path   \
+            #     + bytes.fromhex("00")       \
+            #     + tx_to_sign[-4:]           \
+            #     + bytes.fromhex("01")
 
-            response = btc.untrustedHashSign(
-                data = tx_to_sign_data
-            )        
+            # response = btc.untrustedHashSign(
+            #     data = tx_to_sign_data
+            # )
+            response = btc.untrustedHashSign2(
+                output_path= output_path,
+                parsed_tx=tx
+            )
             self.check_signature(response)
             #self.check_signature(response, expected_der_sig)
             print("    Signature OK\n")

@@ -1,13 +1,16 @@
-from typing import Optional, List
+import subprocess
+import time
+from typing import Optional, Union, List, cast
 from ledgerblue.comm import getDongle
-from .apduabstract import BytesOrStr
+from ledgerblue.commTCP import DongleServer
+from .apduabstract import BytesOrStr, CApdu
 
 
 # decorator that try to connect to a physical dongle before executing a method
 def dongle_connected(func: callable) -> callable:
     def wrapper(self, *args, **kwargs):
         if not hasattr(self, "dongle") or not hasattr(self.dongle, "opened") or not self.dongle.opened:
-            self.dongle = getDongle(False)
+            self.dongle: DongleServer = cast(DongleServer, getDongle(False))
         ret = func(self, *args, **kwargs)
         self.close()
         return ret
@@ -16,103 +19,139 @@ def dongle_connected(func: callable) -> callable:
 
 class DeviceAppProxy:
 
-    def __init__(self, 
-                mnemonic: str = "",
-                debug: bool = True,
-                delay_connect: bool = True,
-                chunk_size: int = 200 + 11) -> None:
+    def __init__(self,
+                 mnemonic: str = "",
+                 debug: bool = True,
+                 delay_connect: bool = True,
+                 chunk_size: int = 200 + 11) -> None:
+        self.dongle: Optional[DongleServer] = None
         self.chunk_size = chunk_size
         self.mnemonic = mnemonic
+        self.process = None
         if not delay_connect:
             self.dongle = getDongle(debug)
 
     @dongle_connected
-    def sendApdu(self, 
-                  name: str, 
-                  p1: BytesOrStr, 
-                  p2: BytesOrStr, 
-                  data: Optional[BytesOrStr] = None,
-                  le: Optional[BytesOrStr] = None, 
-                  chunks_lengths: Optional[List[int]] = None) -> bytes:
+    def send_apdu(self,
+                  apdu: Union[CApdu, bytes],
+                  data: Optional[List[BytesOrStr]] = None,
+                  p1_msb_means_next: bool = True) -> BytesOrStr:
+        """Send APDUs to a Ledger device."""
+        def _bytes(str_bytes: BytesOrStr) -> bytes:
+            ret = str_bytes if type(str_bytes) is bytes \
+                else bytes([cast(int, str_bytes)]) if type(str_bytes) is int \
+                else bytes.fromhex(str_bytes) if type(str_bytes) is str else None
+            if ret:
+                return ret
+            raise TypeError(f"{str_bytes} cannot be converted to bytes")
+
+        def _set_p1(header: bytearray,
+                    data_chunk: bytes,
+                    chunks_list: List[bytes],
+                    p1_msb_is_next_blk: bool) -> None:
+            if p1_msb_is_next_blk:
+                header[2] |= 0x80  # Set "Next block" signalization bit after 1st chunk.
+            elif data_chunk == chunks_list[-1]:   # And p1 msb means "last block"
+                header[2] |= 0x80     # Set "Last block" signalization bit for last chunk
+
+        def _send_chunked_apdu(apdu_header: bytearray,
+                               apdu_payload: bytes,
+                               p1_msb_is_next: bool) -> bytes:
+            resp: Optional[bytes] = None
+            chunks = [apdu_payload[i:i + self.chunk_size] for i in range(0, len(apdu_payload), self.chunk_size)]
+            for chunk in chunks:
+                c_apdu = apdu_header + len(chunk).to_bytes(1, 'big') + chunk
+                print(f"[device <] {c_apdu.hex()}")
+                resp = self.dongle.exchange(bytes(c_apdu))
+                chunk_resp = resp.hex() if len(resp) else "OK"
+                print(f"[device >] {chunk_resp}")
+                _set_p1(apdu_header, chunk, chunks, p1_msb_is_next)
+            return resp
+
         # Get the APDU as bytes & send them to device
-        apdu = self.btc.apdu(name, p1=p1, p2=p2, data=data, le=le)
-        hdr = apdu[0:4]
-        payload = apdu[5:]
+        hdr: bytearray = bytearray(apdu[0:4])
+        response: BytesOrStr = None
 
-        if chunks_lengths:
-            # Large APDU is split in chunks the lengths of which are provided in chunks_lengths param
-            offs = 0
-            skip_bytes = 0
-            for i in range(len(chunks_lengths)):
-                if i > 0:
-                    hdr = hdr[:2] + (hdr[2] | 0x80).to_bytes(1, 'big') + hdr[3:]
-                chunk_len = chunks_lengths[i]
-                
-                if type(chunk_len) is tuple:
-                    if len(chunk_len) not in (2, 3):
-                        raise ValueError("Tuples in chunks_lengths must contain exactly 2 ou 3 integers e.g. (offset, len) or (len1, skip_len, len2)")
-                    if len(chunk_len) == 2:     # chunk_len = (offset, len)
-                        offs = chunk_len[0]
-                        chunk_len = chunk_len[1]
-                        chunk = payload[offs:offs+chunk_len]
-                    else:                       # chunk_len = (len1, skip_len, len2)
-                        skip_bytes = chunk_len[1]
-                        chunk = payload[offs:offs+chunk_len[0]]
-                        start_chunk2 = offs + chunk_len[0] + skip_bytes
-                        chunk += payload[start_chunk2:start_chunk2+chunk_len[2]]
-                        chunk_len = chunk_len[0] + chunk_len[2]
-                elif chunk_len != -1:   # type is int
-                    chunk = payload[offs:offs+chunk_len]
-
-                if chunk_len == -1:     # inputs, total length is in last byte of previous chunks
-                    total_len = int(payload[offs - 1]) + 4
-                    response = self._send_chunked_apdu(apdu=hdr, data=payload[offs:offs+total_len])
-                    offs += total_len
-                else:            
-                    capdu = hdr + chunk_len.to_bytes(1,'big') + chunk
-                    print(f"[device <] {capdu.hex()}")
-                    if not hasattr(self, "dongle") or not hasattr(self.dongle, "opened") or not self.dongle.opened:
-                        self.dongle = getDongle(False)  # in case a previous self.send_chunked_apdu() call closed it
-                    response = self.dongle.exchange(capdu)
-                    offs += chunk_len + skip_bytes
-                    skip_bytes = 0
-                    _resp = response.hex() if len(response) else "OK"
-                    print(f"[device >] {_resp}")
+        if data and len(data) > 1:
+            # Payload already split in chunks of the appropriate lengths
+            payload_chunks = [_bytes(d) for d in data]
+            for _chunk in payload_chunks:
+                capdu = bytearray(hdr + len(_chunk).to_bytes(1, 'big') + _chunk)
+                print(f"[device <] {capdu.hex()}")
+                if not hasattr(self, "dongle") or not hasattr(self.dongle, "opened") or not self.dongle.opened:
+                    # In case a previous _send_chunked_apdu() call closed the dongle
+                    self.dongle = getDongle(False)
+                response = self.dongle.exchange(capdu)
+                _resp = response.hex() if len(response) else "OK"
+                print(f"[device >] {_resp}")
+                _set_p1(hdr, _chunk, payload_chunks, p1_msb_means_next)
         else:
-            # Auto splitting of large APDUs into chunks of equal length until payload is exhausted
-            response = self._send_chunked_apdu(apdu=hdr, data=payload)        
+            # Payload is a single chunk. Perform auto splitting, if necessary, of large payloads into chunks of
+            # equal length until payload is exhausted
+            response = _send_chunked_apdu(apdu_header=hdr,
+                                          apdu_payload=data[0],
+                                          p1_msb_is_next=p1_msb_means_next)
         return response
 
     @dongle_connected
-    def sendRawApdu(self, 
-                    apdu: bytes) -> bytes:
+    def send_raw_apdu(self,
+                      apdu: bytes) -> BytesOrStr:
         print(f"[device <] {apdu.hex()}")
-        response = self.dongle.exchange(apdu)
-        _resp = response.hex() if len(response) else "OK"
+        response: BytesOrStr = self.dongle.exchange(apdu)
+        _resp: Union[bytes, str] = response.hex() if len(response) else "OK"
         print(f"[device >] {_resp}")
-        return response
-
-    @dongle_connected
-    def _send_chunked_apdu(self, 
-                           apdu: bytes, 
-                           data: bytes) -> bytes:
-        for chunk in [data[i:i + self.chunk_size] for i in range(0, len(data), self.chunk_size)]:
-            # tmp test overflow
-            # if len(chunk) < chunkSize:
-            #    print("increasing virtually last apdu")
-            #    chunk += b'\x99'
-            # 6A82 expected in this case
-            capdu = apdu + len(chunk).to_bytes(1,'big') + chunk
-            print(f"[device <] {capdu.hex()}")
-            response = self.dongle.exchange(bytes(capdu))
-            _resp = response.hex() if len(response) else "OK"
-            print(f"[device >] {_resp}")
-            apdu = apdu[:2] + (apdu[2] | 0x80).to_bytes(1,'big') + apdu[3:]
-
         return response
 
     def close(self) -> None:
         if hasattr(self, "dongle"):
             if hasattr(self.dongle, "opened") and self.dongle.opened:
-                self.dongle.close()
+                cast(DongleServer, self.dongle).close()
             self.dongle = None
+
+    def run(self,
+            speculos_path: str,
+            app_path: str,
+            library_path: Optional[str] = None,
+            model: Union[str, str] = 'nanos',
+            sdk: str = '1.6',
+            args: Optional[List] = None,
+            headless: bool = True,
+            finger_port: int = 0,
+            deterministic_rng: str = "",
+            rampage: str = ""):
+        """Launch an app within Speculos"""
+
+        # if the app is already running, do nothing
+        if self.process:
+            return
+
+        cmd = [speculos_path, '--seed', self.mnemonic, '--model', model, '--sdk', sdk]
+        if args:
+            cmd += args
+        if headless:
+            cmd += ['--display', 'headless']
+        if finger_port:
+            cmd += ['--finger-port', str(finger_port)]
+        if deterministic_rng:
+            cmd += ['--deterministic-rng', deterministic_rng]
+        if rampage:
+            cmd += ['--rampage', rampage]
+        if library_path:
+            cmd += ['-l', 'Bitcoin:' + library_path]
+        cmd += [app_path]
+
+        print('[*]', cmd)
+        self.process = subprocess.Popen(cmd)
+        time.sleep(1)
+
+    def stop(self):
+        # if the app is already running, do nothing
+        if not self.process:
+            return
+
+        if self.process.poll() is None:
+            self.process.terminate()
+            time.sleep(0.2)
+        if self.process.poll() is None:
+            self.process.kill()
+        self.process.wait()

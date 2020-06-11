@@ -171,7 +171,6 @@ class TestLedgerjsZcashTx2(BaseTestBtc):
                     continue
                 raise error
 
-
     @pytest.mark.zcash
     @pytest.mark.manual
     def test_replay_zcash_with_trusted_inputs(self) -> None:
@@ -366,7 +365,6 @@ class TestLedgerjsZcashTx2(BaseTestBtc):
             self.check_signature(response)  # Check sig format only
             # self.check_signature(response, expected_der_sig)  # Can't test sig value as it depends on signing device seed
             print("    Signature OK\n")
-
 
     @pytest.mark.zcash
     @pytest.mark.manual
