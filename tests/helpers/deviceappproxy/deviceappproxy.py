@@ -1,9 +1,9 @@
 from typing import Optional, List
+from ledgerblue.comm import getDongle
 from .apduabstract import BytesOrStr
-from ledgerblue.comm import getDongle, CommException
 
 
-#decorator that try to connect to a physical dongle before executing a method
+# decorator that try to connect to a physical dongle before executing a method
 def dongle_connected(func: callable) -> callable:
     def wrapper(self, *args, **kwargs):
         if not hasattr(self, "dongle") or not hasattr(self.dongle, "opened") or not self.dongle.opened:

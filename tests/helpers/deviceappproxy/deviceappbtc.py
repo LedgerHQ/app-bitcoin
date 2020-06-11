@@ -1,6 +1,6 @@
 from typing import Optional, List
 from .apduabstract import ApduSet, ApduDict, CApdu, BytesOrStr
-from .deviceappproxy import DeviceAppProxy, dongle_connected, CommException
+from .deviceappproxy import DeviceAppProxy
 
 
 class BTC_P1:
@@ -23,18 +23,17 @@ class BTC_P2:
     P2SH_P2WPKH_ADDR = bytes.fromhex("01")
     BECH32_ADDR = bytes.fromhex("02")
     # UntrustedHashTxInputStart
-    STD_INPUTS_ = bytes.fromhex("00")
+    STD_INPUTS = bytes.fromhex("00")
     SEGWIT_INPUTS = bytes.fromhex("02")
     BCH_ADDR = bytes.fromhex("03")
-    OVW_RULES = bytes.fromhex("04") # Overwinter rules (Bitcoin Cash)
-    SPL_RULES = bytes.fromhex("05") # Sapling rules (Zcash, Komodo)
+    OVW_RULES = bytes.fromhex("04")     # Overwinter rules (Bitcoin Cash)
+    SPL_RULES = bytes.fromhex("05")     # Sapling rules (Zcash, Komodo)
     TX_NEXT_INPUT = bytes.fromhex("80")
 
 
 class DeviceAppBtc(DeviceAppProxy):
 
     default_chunk_size = 50
-
     default_mnemonic = "dose bike detect wedding history hazard blast surprise hundred ankle"\
                        "sorry charge ozone often gauge photo sponsor faith business taste front"\
                        "differ bounce chaos"
@@ -50,13 +49,10 @@ class DeviceAppBtc(DeviceAppProxy):
 
     def __init__(self, 
                  mnemonic: str = default_mnemonic) -> None:
-        self.btc = ApduSet(DeviceAppBtc.apdus, 
-                          max_lc=DeviceAppBtc.default_chunk_size)
-        super().__init__(mnemonic=mnemonic, 
-                         chunk_size=DeviceAppBtc.default_chunk_size)
+        self.btc = ApduSet(DeviceAppBtc.apdus, max_lc=DeviceAppBtc.default_chunk_size)
+        super().__init__(mnemonic=mnemonic, chunk_size=DeviceAppBtc.default_chunk_size)
 
-
-    def getTrustedInput(self, 
+    def getTrustedInput(self,
                         data: BytesOrStr, 
                         chunks_len: Optional[List[int]] = None) -> bytes:
         return self.sendApdu("getTrustedInput", "00", "00", data, chunks_lengths=chunks_len)
