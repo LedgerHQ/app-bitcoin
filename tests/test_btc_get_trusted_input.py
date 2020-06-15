@@ -35,17 +35,14 @@ import pytest
 from dataclasses import dataclass, field
 from typing import Optional, List
 from helpers.basetest import BaseTestBtc
-from helpers.deviceappbtc import DeviceAppBtc, BTC_P1, BTC_P2
+from helpers.deviceappproxy.deviceappbtc import DeviceAppBtc
+from helpers.txparser.transaction import Tx, TxParse
 
 
 @dataclass
 class TrustedInputTestData:
     # Tx to compute a TrustedInput from.
     tx: bytes
-    # List of lengths of the chunks that will be sent as APDU payloads. Depending on the APDU
-    # the APDU, the BTC app accepts payloads (composed from the tx and other data) of specific 
-    # sizes. See https://blog.ledger.com/btchip-doc/bitcoin-technical-beta.html#_get_trusted_input.
-    chunks_len: List[int]
     # List of the outputs values to be tested, as expressed in the raw tx.
     prevout_amount: List[bytes]
     # Optional, index (not offset!) in the tx of the output to compute the TrustedInput from. Ignored 
@@ -103,18 +100,6 @@ standard_tx = TrustedInputTestData(
         # Locktime
         "e3691900"
     ),
-    # The GetTrustedInput payload is (|| meaning concatenation):  output_index (4B, BE) || tx
-    # Lengths below account for this 4B prefix (see file comment for more explanation on values below)
-    chunks_len=[
-        9,      # len(output_index(4B)||version||input_count)
-        37,     # len(input1_prevout_hash||input1_prevout_index||input1_scriptSig_len)
-        -1,     # get len(input1_scriptSig) from last byte of previous chunk, add len(input1_sequence)
-        37,     # len(input2_prevout_hash||input2_prevout_index||input2_scriptSig_len)
-        -1,     # get len(input2_scriptSig) from last byte of previous chunk, add len(input2_sequence)
-        1,      # len(output_count)
-        34,     # len(output_amount||output_scriptPubkey)
-        4       # len(locktime)
-    ],
     prevout_idx=0,
     prevout_amount=[bytes.fromhex("d7ee7c0100000000")]
 )
@@ -155,24 +140,19 @@ segwit_tx = TrustedInputTestData(
         "0014e4d3a1ec51102902f6bbede1318047880c9c7680"
         # Witnesses (1 for each input if Flag=0001)
         # /!\ remove witnesses for `GetTrustedInput`
-        "0247"
-        "30440220495838c36533616d8cbd6474842459596f4f312dce5483fe650791c8"
-        "2e17221c02200660520a2584144915efa8519a72819091e5ed78c52689b24235"
-        "182f17d96302012102ddf4af49ff0eae1d507cc50c86f903cd6aa0395f323975"
-        "9c440ea67556a3b91b"
-        "0247"
-        "304402200090c2507517abc7a9cb32452aabc8d1c8a0aee75ce63618ccd90154"
-        "2415f2db02205bb1d22cb6e8173e91dc82780481ea55867b8e753c35424da664"
-        "f1d2662ecb1301210254c54648226a45dd2ad79f736ebf7d5f0fc03b6f8f0e6d"
-        "4a61df4e531aaca431"
+        # "0247"
+        # "30440220495838c36533616d8cbd6474842459596f4f312dce5483fe650791c8"
+        # "2e17221c02200660520a2584144915efa8519a72819091e5ed78c52689b24235"
+        # "182f17d96302012102ddf4af49ff0eae1d507cc50c86f903cd6aa0395f323975"
+        # "9c440ea67556a3b91b"
+        # "0247"
+        # "304402200090c2507517abc7a9cb32452aabc8d1c8a0aee75ce63618ccd90154"
+        # "2415f2db02205bb1d22cb6e8173e91dc82780481ea55867b8e753c35424da664"
+        # "f1d2662ecb1301210254c54648226a45dd2ad79f736ebf7d5f0fc03b6f8f0e6d"
+        # "4a61df4e531aaca431"
         # lock_time (4 bytes)
         "a7011900"
     ),
-        # First tuple in list below is used to concatenate output_idx||version||input_count while
-        # skip the 2-byte segwit-specific flag ("0001") in between.
-        # Value 341 = locktime offset in APDU payload (i.e. skip all witness data).
-        # Finally, tx contains no scriptSig, so no "-1" trick is necessary.
-    chunks_len= [(4+4, 2, 1), 37, 4, 37, 4, 1, 31, (335+4, 4)],
     prevout_idx=0,
     prevout_amount=[bytes.fromhex("01410f0000000000")]
 )
@@ -220,17 +200,17 @@ segwwit_tx_2_outputs = TrustedInputTestData(
         # lock_time (4 bytes)
         "1f7f1900"
     ),
-    chunks_len=[(8, 2, 1), 37, -1, 1, 32, 32, (253, 4)],
     num_outputs=2,
     prevout_amount=[bytes.fromhex(amount) for amount in ("9b3242bf01000000", "1027000000000000")]
 )
+
 
 @pytest.mark.btc
 class TestBtcTxGetTrustedInput(BaseTestBtc):
     """
     Tests of the GetTrustedInput APDU
     """
-    test_data = [ standard_tx, segwit_tx ]
+    test_data = [standard_tx, segwit_tx]
 
     @pytest.mark.parametrize("testdata", test_data)
     def test_get_trusted_input(self, testdata: TrustedInputTestData) -> None:
@@ -238,24 +218,24 @@ class TestBtcTxGetTrustedInput(BaseTestBtc):
         Perform a GetTrustedInput for a non-segwit tx on Nano device.
         """
         btc = DeviceAppBtc()
-
-        prevout_idx = [idx for idx in range(testdata.num_outputs)] \
-            if testdata.num_outputs is not None else [testdata.prevout_idx]
+        tx: Tx = TxParse.from_raw(raw_tx=testdata.tx)
 
         # Get TrustedInputs for all requested outputs in the tx
+        prevout_idx = [idx for idx in range(testdata.num_outputs)] if testdata.num_outputs is not None \
+            else [testdata.prevout_idx]
+
         trusted_inputs = [
-            btc.getTrustedInput(
-                data=idx.to_bytes(4, 'big') + testdata.tx,
-                chunks_len=testdata.chunks_len 
-            )
-            for idx in prevout_idx
-        ]
+            btc.getTrustedInput2(
+                prev_out_index=idx,
+                parsed_tx=tx,
+                raw_tx=testdata.tx)
+            for idx in prevout_idx]
 
         # Check each TrustedInput content
-        for (trusted_input, idx, amount) in zip(trusted_inputs, prevout_idx, testdata.prevout_amount):
+        prevout_amounts = [output.value for output in tx.outputs]
+        for (trusted_input, idx, amount) in zip(trusted_inputs, prevout_idx, prevout_amounts):
             self.check_trusted_input(
-                trusted_input, 
-                out_index=idx.to_bytes(4, 'little'), 
-                out_amount=amount
+                trusted_input,
+                out_index=idx.to_bytes(4, 'little'),
+                out_amount=amount.buf
             )
-
