@@ -225,7 +225,7 @@ class TestBtcTxGetTrustedInput(BaseTestBtc):
             else [testdata.prevout_idx]
 
         trusted_inputs = [
-            btc.getTrustedInput2(
+            btc.getTrustedInput(
                 prev_out_index=idx,
                 parsed_tx=tx,
                 raw_tx=testdata.tx)
