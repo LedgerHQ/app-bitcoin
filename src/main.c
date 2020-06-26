@@ -2774,6 +2774,7 @@ void coin_main() {
 void library_main_with_config(btchip_altcoin_config_t *config, unsigned int command, unsigned int* call_parameters) {
     BEGIN_TRY {
         TRY {
+            check_api_level(CX_COMPAT_APILEVEL);
             PRINTF("Inside a library \n");
             switch (command) {
                 case CHECK_ADDRESS:
@@ -2786,11 +2787,11 @@ void library_main_with_config(btchip_altcoin_config_t *config, unsigned int comm
                     handle_get_printable_amount((get_printable_amount_parameters_t*)call_parameters, config);
                 break;
             }
+            os_lib_end();
         }
         FINALLY {}
     }
     END_TRY;
-    os_lib_end();
 }
 
 void library_main(unsigned int call_id, unsigned int* call_parameters) {
@@ -2837,7 +2838,6 @@ __attribute__((section(".boot"))) int main(int arg0) {
     // exit critical section
     __asm volatile("cpsie i");
 
-    PRINTF("Hello from bitcoin\n");
     // ensure exception will work as planned
     os_boot();
 
