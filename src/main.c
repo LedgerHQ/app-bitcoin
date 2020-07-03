@@ -2828,9 +2828,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
                 os_lib_call(&libcall_params);
             }
         }
-        FINALLY {
-            app_exit();
-        }
+        FINALLY {}
     }
     END_TRY;
     // no return
@@ -2858,7 +2856,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
             if (coin_config == NULL)
                 app_exit();
             else
-                coin_main_with_config((btchip_altcoin_config_t *)((unsigned int *)arg0)[1]);    
+                coin_main_with_config((btchip_altcoin_config_t *)((unsigned int *)arg0)[2]);    
         break;
         default:
             if (coin_config == NULL)
