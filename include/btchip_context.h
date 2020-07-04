@@ -20,12 +20,13 @@
 #define BTCHIP_CONTEXT_H
 
 #include "os.h"
+#include "cx.h"
 #include "btchip_secure_value.h"
 #include "btchip_filesystem_tx.h"
 
 #define MAX_OUTPUT_TO_CHECK 200
 #define MAX_COIN_ID 13
-#define MAX_SHORT_COIN_ID 5 
+#define MAX_SHORT_COIN_ID 5
 
 #define MAGIC_TRUSTED_INPUT 0x32
 #define MAGIC_DEV_KEY 0x01
@@ -88,8 +89,7 @@ enum btchip_output_parsing_state_e {
     BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS = 0x01,
     BTCHIP_OUTPUT_PARSING_OUTPUT = 0x02,
     BTCHIP_OUTPUT_FINALIZE_TX = 0x03,
-    BTCHIP_BIP44_CHANGE_PATH_VALIDATION = 0x04,
-    BTCHIP_OUTPUT_HANDLE_LEGACY = 0xFF
+    BTCHIP_BIP44_CHANGE_PATH_VALIDATION = 0x04
 };
 typedef enum btchip_output_parsing_state_e btchip_output_parsing_state_t;
 
@@ -170,9 +170,9 @@ struct btchip_context_s {
     /** Current short Coin ID */
     unsigned char shortCoinId[MAX_SHORT_COIN_ID];
     /** Current Coin ID length */
-    unsigned char coinIdLength;    
+    unsigned char coinIdLength;
     /** Current short Coin ID length */
-    unsigned char shortCoinIdLength;        
+    unsigned char shortCoinIdLength;
 
     /** Non protected transaction context */
 
@@ -198,6 +198,8 @@ struct btchip_context_s {
     unsigned char usingSegwit;
     unsigned char usingCashAddr;
     unsigned char segwitParsedOnce;
+    /** Prevents display of segwit input warning at each InputHashStart APDU */
+    unsigned char segwitWarningSeen;
 
     /* /Segregated Witness changes */
 
@@ -241,7 +243,7 @@ struct btchip_context_s {
     unsigned int discardSize;
     unsigned char outputParsingState;
     unsigned char totalOutputAmount[8];
-    unsigned char changeOutputFound;    
+    unsigned char changeOutputFound;
 
     /* Overwinter */
     unsigned char usingOverwinter;
@@ -249,14 +251,14 @@ struct btchip_context_s {
     unsigned char nVersionGroupId[4];
     unsigned char nExpiryHeight[4];
     unsigned char nLockTime[4];
-    unsigned char sigHashType[4];    
+    unsigned char sigHashType[4];
 };
 typedef struct btchip_context_s btchip_context_t;
 
 
 /**
  * Structure to configure the bitcoin application for a given altcoin
- * 
+ *
  */
 typedef enum btchip_coin_flags_e {
     FLAG_PEERCOIN_UNITS=1,
@@ -288,12 +290,13 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_BITCOIN_PRIVATE,
     COIN_KIND_HORIZEN,
     COIN_KIND_GAMECREDITS,
-    COIN_KIND_ZCOIN, 
+    COIN_KIND_ZCOIN,
     COIN_KIND_ZCLASSIC,
     COIN_KIND_XSN,
     COIN_KIND_NIX,
     COIN_KIND_LBRY,
-    COIN_KIND_RESISTANCE
+    COIN_KIND_RESISTANCE,
+    COIN_KIND_RAVENCOIN
 } btchip_coin_kind_t;
 
 typedef struct btchip_altcoin_config_s {

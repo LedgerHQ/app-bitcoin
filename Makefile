@@ -26,8 +26,8 @@ DEFINES_LIB = USE_LIB_BITCOIN
 APP_LOAD_PARAMS= --curve secp256k1 $(COMMON_LOAD_PARAMS)
 
 APPVERSION_M=1
-APPVERSION_N=3
-APPVERSION_P=17
+APPVERSION_N=4
+APPVERSION_P=2
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 APP_LOAD_FLAGS=--appFlags 0x250 --dep Bitcoin:$(APPVERSION)
 
@@ -62,7 +62,7 @@ APPNAME ="Bitcoin Gold"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),litecoin)
 # Litecoin
-DEFINES   += COIN_P2PKH_VERSION=48 COIN_P2SH_VERSION=50 COIN_FAMILY=1 COIN_COINID=\"Litecoin\" COIN_COINID_HEADER=\"LITECOIN\" COIN_COLOR_HDR=0xCCCCCC COIN_COLOR_DB=0xE6E6E6 COIN_COINID_NAME=\"Litecoin\" COIN_COINID_SHORT=\"LTC\" COIN_NATIVE_SEGWIT_PREFIX=\"ltc1\" COIN_KIND=COIN_KIND_LITECOIN COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
+DEFINES   += COIN_P2PKH_VERSION=48 COIN_P2SH_VERSION=50 COIN_FAMILY=1 COIN_COINID=\"Litecoin\" COIN_COINID_HEADER=\"LITECOIN\" COIN_COLOR_HDR=0xCCCCCC COIN_COLOR_DB=0xE6E6E6 COIN_COINID_NAME=\"Litecoin\" COIN_COINID_SHORT=\"LTC\" COIN_NATIVE_SEGWIT_PREFIX=\"ltc\" COIN_KIND=COIN_KIND_LITECOIN COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
 APPNAME ="Litecoin"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),dogecoin)
@@ -109,7 +109,7 @@ APPNAME ="Peercoin"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),pivx)
 # PivX
-DEFINES   += COIN_P2PKH_VERSION=30 COIN_P2SH_VERSION=13 COIN_FAMILY=1 COIN_COINID=\"DarkNet\" COIN_COINID_HEADER=\"PIVX\" COIN_COLOR_HDR=0x46385D COIN_COLOR_DB=0x9E96AA COIN_COINID_NAME=\"PivX\" COIN_COINID_SHORT=\"PIV\" COIN_KIND=COIN_KIND_PIVX
+DEFINES   += COIN_P2PKH_VERSION=30 COIN_P2SH_VERSION=13 COIN_FAMILY=1 COIN_COINID=\"DarkNet\" COIN_COINID_HEADER=\"PIVX\" COIN_COLOR_HDR=0x46385D COIN_COLOR_DB=0x9E96AA COIN_COINID_NAME=\"PivX\" COIN_COINID_SHORT=\"PIVX\" COIN_KIND=COIN_KIND_PIVX
 APPNAME ="PivX"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),stealth)
@@ -128,7 +128,7 @@ DEFINES   += COIN_P2PKH_VERSION=71 COIN_P2SH_VERSION=5 COIN_FAMILY=1 COIN_COINID
 APPNAME ="Vertcoin"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),digibyte)
-DEFINES   += COIN_P2PKH_VERSION=30 COIN_P2SH_VERSION=63 COIN_FAMILY=1 COIN_COINID=\"DigiByte\" COIN_COINID_HEADER=\"DIGIBYTE\" COIN_COLOR_HDR=0x2864AE COIN_COLOR_DB=0x94B2D7 COIN_COINID_NAME=\"DigiByte\" COIN_COINID_SHORT=\"DGB\" COIN_NATIVE_SEGWIT_PREFIX=\"dgb1\" COIN_KIND=COIN_KIND_DIGIBYTE COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
+DEFINES   += COIN_P2PKH_VERSION=30 COIN_P2SH_VERSION=63 COIN_FAMILY=1 COIN_COINID=\"DigiByte\" COIN_COINID_HEADER=\"DIGIBYTE\" COIN_COLOR_HDR=0x2864AE COIN_COLOR_DB=0x94B2D7 COIN_COINID_NAME=\"DigiByte\" COIN_COINID_SHORT=\"DGB\" COIN_NATIVE_SEGWIT_PREFIX=\"dgb\" COIN_KIND=COIN_KIND_DIGIBYTE COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
 APPNAME ="Digibyte"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),qtum)
@@ -174,6 +174,11 @@ else ifeq ($(COIN),resistance)
 # Resistance
 DEFINES   += COIN_P2PKH_VERSION=7063 COIN_P2SH_VERSION=7068 COIN_FAMILY=1 COIN_COINID=\"Res\" COIN_COINID_HEADER=\"RES\" COIN_COLOR_HDR=0x3790CA COIN_COLOR_DB=0x9BC8E5 COIN_COINID_NAME=\"Res\" COIN_COINID_SHORT=\"RES\" COIN_KIND=COIN_KIND_RESISTANCE
 APPNAME ="Resistance"
+APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),ravencoin)
+# Ravencoin
+DEFINES   += COIN_P2PKH_VERSION=60 COIN_P2SH_VERSION=122 COIN_FAMILY=1 COIN_COINID=\"Ravencoin\" COIN_COINID_HEADER=\"RAVENCOIN\" COIN_COLOR_HDR=0x2E4A80 COIN_COLOR_DB=0x74829E COIN_COINID_NAME=\"Ravencoin\" COIN_COINID_SHORT=\"RVN\" COIN_KIND=COIN_KIND_RAVENCOIN
+APPNAME ="Ravencoin"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
@@ -234,13 +239,12 @@ DEFINES       += HAVE_BAGL_ELLIPSIS # long label truncation feature
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_REGULAR_11PX
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_EXTRABOLD_11PX
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_LIGHT_16PX
-DEFINES		    += HAVE_UX_FLOW
+DEFINES       += HAVE_UX_FLOW
 endif
 
 # Enabling debug PRINTF
 DEBUG = 0
 ifneq ($(DEBUG),0)
-
         ifeq ($(TARGET_NAME),TARGET_NANOX)
                 DEFINES   += HAVE_PRINTF PRINTF=mcu_usb_printf
         else
@@ -298,7 +302,7 @@ ifeq ($(TARGET_NAME),TARGET_NANOS)
 
 	ifneq "$(wildcard $(BOLOS_SDK)/lib_ux/src/ux_flow_engine.c)" ""
 		SDK_SOURCE_PATH  += lib_ux
-		DEFINES		       += HAVE_UX_FLOW		
+		DEFINES		       += HAVE_UX_FLOW
 	endif
 
 endif
@@ -320,11 +324,11 @@ dep/%.d: %.c Makefile
 ifeq ($(TARGET_NAME),TARGET_NANOX)
 
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry ravencoin
 
 else
 
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry resistance
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry ravencoin resistance
 
 endif
