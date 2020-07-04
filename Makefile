@@ -72,7 +72,7 @@ APPNAME ="Dogecoin"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),denarius)
 # Denarius
-DEFINES   += COIN_P2PKH_VERSION=30 COIN_P2SH_VERSION=90 COIN_FAMILY=2 COIN_COINID=\"Denarius\" COIN_COINID_HEADER=\"DENARIUS\" COIN_COLOR_HDR=0x7A7A7A COIN_COLOR_DB=0xB2B2B2 COIN_COINID_NAME=\"Denarius\" COIN_COINID_SHORT=\"DNR\" COIN_KIND=COIN_KIND_DNR
+DEFINES   += COIN_P2PKH_VERSION=30 COIN_P2SH_VERSION=90 COIN_FAMILY=2 COIN_COINID=\"Denarius\" COIN_COINID_HEADER=\"DENARIUS\" COIN_COLOR_HDR=0x7A7A7A COIN_COLOR_DB=0xB2B2B2 COIN_COINID_NAME=\"Denarius\" COIN_COINID_SHORT=\"D\" COIN_KIND=COIN_KIND_D
 APPNAME ="Denarius"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),dash)
@@ -324,11 +324,11 @@ dep/%.d: %.c Makefile
 ifeq ($(TARGET_NAME),TARGET_NANOX)
 
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry ravencoin
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin denarius dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry ravencoin
 
 else
 
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry ravencoin resistance
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin denarius dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry ravencoin resistance
 
 endif
