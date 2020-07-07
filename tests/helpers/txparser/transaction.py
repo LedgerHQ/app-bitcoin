@@ -1,9 +1,11 @@
-from .txtypes import *
 from io import BytesIO, SEEK_CUR, SEEK_END
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Optional, List, Union, cast, Any, Tuple  # >= 3.6
 from hashlib import sha256
+# Shorter list of unused types from wildcard import than the actually used ones
+# pylint: disable=unused-wildcard-import
+from .txtypes import *
 
 
 @dataclass
@@ -22,8 +24,8 @@ class SegwitExtFooter(TxExtension):
             s: bytes
         sig: Sig
         other: bytes
-    witness_count: varint
-    witness_len: varint
+    witness_count: varint   # Bytes representation not needed so varint as type here instead of TxVarInt is fine
+    witness_len: varint     # Same as above
     witness: List[WitnessData]
 
 
@@ -94,10 +96,11 @@ class TxParse:
             ``parsed_tx = TxParse.from_raw(raw_btc_tx)``
     """
 
+    # pylint: disable=too-many-statements
     @classmethod
     def from_raw(cls,
                  raw_tx: Union[bytes, str],
-                 endianness: lbstr = 'little') -> Tx:
+                 endianness: byteorder = 'little') -> Tx:
         """
         Returns a TX object with members initialized from the parsing of the rawTx parameter
 
@@ -122,18 +125,19 @@ class TxParse:
                 """Recursive hashing of all significant items of a composite object.
                 This inner function is written in a way could be made to an independent one,
                 able to hash the content of any composite dataclass or dict object."""
-                if obj is not None and type(obj) is not bytes:
+                if obj is not None and not isinstance(obj, (bytes, bytearray)):
                     # Each items in a list of objects must be parsed entirely
-                    if type(obj) is list:
+                    if isinstance(obj, list):
                         for i, item in enumerate(obj):
-                            path.append(str(i+1))   # Display the item rank in the list
+                            path.append(str(i + 1))   # Display the item rank in the list
                             _recursive_hash_obj(item, hasher, ignored_fields, path, show_path)
                             path.pop()
                     else:
                         # Recursively descend into object
                         attrs = list(obj.__dict__.items())
                         for key, value in attrs:
-                            # Ignore fields that shan't be hashed
+                            # Ignore fields that shan't be hashed => explicitly test for segwit types
+                            # pylint: disable=C0123
                             if key not in ignored_fields and value is not None and \
                                     type(value) not in (SegwitExtHeader, SegwitExtFooter):
                                 tmp = path[:]
@@ -146,7 +150,7 @@ class TxParse:
                     hasher.update(cast(bytes, obj))
 
             h1, h2 = (sha256(), sha256())
-            if type(tx) is bytes:
+            if isinstance(tx, (bytes, bytearray)):
                 # Raw tx => hash everything in one go. /!\ Should not be used with a Segwit tx,
                 # use a parsed tx object instead for the hash to be correctly computed.
                 h1.update(tx)
@@ -163,7 +167,7 @@ class TxParse:
 
         def _read_varint(buf: BytesIO,
                          prefix: Optional[bytes] = None,
-                         bytes_order: lbstr = 'little') -> TxVarInt:
+                         bytes_order: byteorder = 'little') -> TxVarInt:
             """Returns the size encoded as a varint in the next 1 to 9 bytes of buf."""
             return TxVarInt.from_raw(buf, prefix, bytes_order)
 
@@ -177,7 +181,7 @@ class TxParse:
 
         def _read_uint(buf: BytesIO,
                        bytes_len: int,
-                       bytes_order: lbstr = 'little') -> int:
+                       bytes_order: byteorder = 'little') -> int:
             """Returns the arbitrary-length integer value encoded in the next 'bytes_len' bytes of 'buf'."""
             b: bytes = buf.read(bytes_len)
             if len(b) < bytes_len:
@@ -188,21 +192,21 @@ class TxParse:
             """Returns the next byte in 'buf'."""
             return cast(u8, _read_uint(buf, 1))
 
-        def _read_u16(buf: BytesIO, bytes_order: lbstr = 'little') -> u16:
+        def _read_u16(buf: BytesIO, bytes_order: byteorder = 'little') -> u16:
             """Returns the integer value encoded in the next 2 bytes of 'buf'."""
             return cast(u16, _read_uint(buf, 2, bytes_order))
 
-        def _read_u32(buf: BytesIO, bytes_order: lbstr = 'little') -> u32:
+        def _read_u32(buf: BytesIO, bytes_order: byteorder = 'little') -> u32:
             """Returns the integer value encoded in the next 4 bytes of 'buf'."""
             return cast(u32, _read_uint(buf, 4, bytes_order))
 
-        def _read_tx_int(buf: BytesIO, count: int, bytes_order: lbstr) -> (int, bytes):
+        def _read_tx_int(buf: BytesIO, count: int, bytes_order: byteorder) -> (int, bytes):
             tmp: bytes = _read_bytes(buf, count)
             return int.from_bytes(tmp, bytes_order), deepcopy(tmp)
 
         def _parse_inputs(buf: BytesIO,
                           in_count: int,
-                          bytes_order: lbstr = 'little') -> List[TxInput]:
+                          bytes_order: byteorder = 'little') -> List[TxInput]:
             """Returns a list of TxInputs containing the raw tx's input fields."""
             _inputs: List[TxInput] = []
             for _ in range(in_count):
@@ -233,7 +237,7 @@ class TxParse:
 
         def _parse_outputs(buf: BytesIO,
                            out_count: int,
-                           bytes_order: lbstr = 'little') -> List[TxOutput]:
+                           bytes_order: byteorder = 'little') -> List[TxOutput]:
             """Returns a list of TxOutputs containing the raw tx's output fields."""
             _outputs: List[TxOutput] = []
             for _ in range(out_count):
@@ -251,7 +255,7 @@ class TxParse:
                         script=out_script))
             return _outputs
 
-        def _parse_zcash_footer(buf: BytesIO, bytes_order: lbstr = 'little') -> Optional[ZcashExtFooter]:
+        def _parse_zcash_footer(buf: BytesIO, bytes_order: byteorder = 'little') -> Optional[ZcashExtFooter]:
             expiry_height: Optional[TxInt4] = None
             value_balance: Optional[TxInt8] = None
             shielded_spend_count: Optional[TxVarInt] = None
@@ -265,11 +269,11 @@ class TxParse:
             binding_sig: Optional[bytes32] = None
 
             if version.val >= 3:
-                ival, bval = _read_tx_int(buf, 4, bytes_order)
-                expiry_height = TxInt4(val=cast(u32, ival), buf=cast(bytes4, bval))
+                iv, bv = _read_tx_int(buf, 4, bytes_order)
+                expiry_height = TxInt4(val=cast(u32, iv), buf=cast(bytes4, bv))
             if version.val >= 4:
-                ival, bval = _read_tx_int(buf, 8, bytes_order)
-                value_balance = TxInt8(val=cast(u64, ival), buf=cast(bytes8, bval))
+                iv, bv = _read_tx_int(buf, 8, bytes_order)
+                value_balance = TxInt8(val=cast(u64, iv), buf=cast(bytes8, bv))
                 shielded_spend_count = _read_varint(buf, bytes_order=bytes_order)
                 shielded_spend = _read_bytes(buf, 384 * shielded_spend_count.val) \
                     if shielded_spend_count.val > 0 else None
@@ -332,7 +336,7 @@ class TxParse:
         #
         # Transaction parsing code starts here
         #
-        raw_tx_bytes: bytes = bytes.fromhex(raw_tx) if type(raw_tx) == str else raw_tx
+        raw_tx_bytes: bytes = bytes.fromhex(raw_tx) if isinstance(raw_tx, str) else raw_tx
         io_buf: BytesIO = BytesIO(raw_tx_bytes)
         ivers, bvers = _read_tx_int(io_buf, 4, endianness)
         version: TxInt4 = TxInt4(
@@ -355,7 +359,7 @@ class TxParse:
                 val=cast(u32, ival),
                 buf=cast(bytes4, bval)
             )
-            overwintered_flag = True if ivers & 0x80000000 else False
+            overwintered_flag = bool(ivers & 0x80000000)
 
         input_count: TxVarInt = _read_varint(io_buf)
         inputs: List[TxInput] = _parse_inputs(io_buf, input_count.val)

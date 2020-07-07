@@ -19,16 +19,15 @@ The tests below rely on two utilitity classes to work around that issue:
 """
 
 import pytest
-from helpers.basetest import BaseTestBtc, BtcPublicKey
-from helpers.deviceappproxy.deviceappbtc import DeviceAppBtc
-from helpers.txparser.transaction import Tx, TxType, TxHashMode, TxParse
-from conftest import btc_sign_tx_test_data, SignTxTestData
+from helpers.basetest import BaseTestBtc
+from helpers.deviceappproxy.deviceappbtc import DeviceAppBtc, BTC_P1
+from helpers.txparser.transaction import TxHashMode, TxParse
+from conftest import SignTxTestData
 
 
 @pytest.mark.btc
 @pytest.mark.manual
 class TestBtcTxSignature(BaseTestBtc):
-
     @pytest.mark.parametrize("use_trusted_inputs", [True, False])
     def test_sign_tx_with_trusted_segwit_input(self,
                                                use_trusted_inputs: bool,
@@ -36,11 +35,11 @@ class TestBtcTxSignature(BaseTestBtc):
         """
         Test signing a btc transaction w/ segwit inputs submitted as TrustedInputs
 
-        From app doc "btc.asc": 
-          "When using Segregated Witness Inputs the signing mechanism differs 
+        From app doc "btc.asc":
+          "When using Segregated Witness Inputs the signing mechanism differs
            slightly:
-           - The transaction shall be processed first with all inputs having a null script length 
-           - Then each input to sign shall be processed as part of a pseudo transaction with a 
+           - The transaction shall be processed first with all inputs having a null script length
+           - Then each input to sign shall be processed as part of a pseudo transaction with a
              single input and no outputs."
         """
         # Start test
@@ -94,7 +93,7 @@ class TestBtcTxSignature(BaseTestBtc):
         for pubkey in pubkeys_data:
             print(pubkey)
 
-        # 2.1 Construct a pseudo-tx without input script, to be hashed 1st. The original segwit input 
+        # 2.1 Construct a pseudo-tx without input script, to be hashed 1st. The original segwit input
         #     being replaced with the previously obtained TrustedInput, it is prefixed it with the marker
         #     byte for TrustedInputs (0x01) that the BTC app expects to check the Trusted Input's HMAC.
         print("\n--* Untrusted Transaction Input Hash Start - Hash tx to sign first w/ all inputs "
@@ -110,21 +109,21 @@ class TestBtcTxSignature(BaseTestBtc):
         # 2.2.1 Start with change address path
         print("\n--* Untrusted Transaction Input Hash Finalize Full - Handle change address")
         btc.untrusted_hash_tx_input_finalize(
-            p1="ff",    # to derive BIP 32 change address
+            p1=BTC_P1.CHANGE_PATH,    # to derive BIP 32 change address
             data=change_path)
         print("    OK")
 
         # 2.2.2 Continue w/ tx to sign outputs & scripts
         print("\n--* Untrusted Transaction Input Hash Finalize Full - Continue w/ hash of tx output")
         response = btc.untrusted_hash_tx_input_finalize(
-            p1="00",
+            p1=BTC_P1.MORE_BLOCKS,
             data=parsed_tx)
         assert response == bytes.fromhex("0000")
         print("    OK")
         # We're done w/ the hashing of the pseudo-tx with all inputs w/o scriptSig.
 
-        # 3. Sign each input individually. Because inputs are segwit, hash each input with its scriptSig 
-        #    and sequence individually, each in a pseudo-tx w/o output_count, outputs nor locktime. 
+        # 3. Sign each input individually. Because inputs are segwit, hash each input with its scriptSig
+        #    and sequence individually, each in a pseudo-tx w/o output_count, outputs nor locktime.
         print("\n--* Untrusted Transaction Input Hash Start, step 2 - Hash again each input individually (only 1)")
         for idx, (tx_input, output_path) in enumerate(zip(tx_inputs, output_paths)):
             # 3.1 Send pseudo-tx w/ sigScript

@@ -1,8 +1,5 @@
-from typing import List, Dict, Union, Optional, cast, NewType, Tuple
+from typing import List, Dict, Optional, cast, NewType, Tuple, AnyStr
 from dataclasses import dataclass, field
-
-# Type aliases
-BytesOrStr = NewType("BytesOrStr", Union[bytes, str])
 
 
 @dataclass
@@ -12,12 +9,12 @@ class CApdu:
         OUT: int = 1
         INOUT: int = 2
     data: List[bytes]
-    cla: BytesOrStr = field(default="00")
-    ins: BytesOrStr = field(default="00")
-    p1: BytesOrStr = field(default="00")
-    p2: BytesOrStr = field(default="00")
-    lc: BytesOrStr = field(default="00")
-    le: BytesOrStr = field(default="00")
+    cla: AnyStr = field(default="00")
+    ins: AnyStr = field(default="00")
+    p1: AnyStr = field(default="00")
+    p2: AnyStr = field(default="00")
+    lc: AnyStr = field(default="00")
+    le: AnyStr = field(default="00")
     typ: Type = field(default=Type.INOUT)
 
 
@@ -35,12 +32,12 @@ class ApduSet:
         self.max_lc = max_lc
 
     @staticmethod
-    def _bytes(data: BytesOrStr) -> bytes:
-        if type(data) is bytes:
+    def _bytes(data: AnyStr) -> bytes:
+        if isinstance(data, (bytes, bytearray)):
             return data
-        if type(data) is int:
+        if isinstance(data, int):
             return bytes([cast(int, data)])
-        if type(data) is str:
+        if isinstance(data, str):
             return bytes.fromhex(data)
         raise TypeError(f"{data} cannot be converted to bytes")
 
@@ -53,16 +50,16 @@ class ApduSet:
         """Sets a new CApsu internal dictionary if it wasn't set at instanciation time,
         unless overwrite is True."""
         if not self.apdus or overwrite is True:
-            if type(new_apdus) is not dict:
+            if not isinstance(new_apdus, dict):
                 raise ValueError("Attribute newApdus must be a dictionary containing CApdu "
                                  "instances as values")
             ApduSet._apdus = new_apdus
 
     def apdu(self, name: str,
-             p1: Optional[BytesOrStr] = None,
-             p2: Optional[BytesOrStr] = None,
-             data: Optional[List[BytesOrStr]] = None,
-             le: Optional[BytesOrStr] = None) -> Tuple[bytes, List[Optional[bytes]]]:
+             p1: Optional[AnyStr] = None,
+             p2: Optional[AnyStr] = None,
+             data: Optional[List[AnyStr]] = None,
+             le: Optional[AnyStr] = None) -> Tuple[bytes, List[Optional[bytes]]]:
         """Returns the raw bytes for the C-APDU header requested by name.
         """
 
@@ -94,29 +91,28 @@ class ApduSet:
     def __setitem__(self, key: str, value: CApdu) -> None:
         """Change an existing APDU or add a new one to the APDU dict
         """
-        if type(value) is not CApdu:
+        if not isinstance(value, CApdu):
             raise ValueError(f"Syntax '{self.__class__.__name__}[{key}] = value' "
                              f"only accept CApdu instances as value")
         self.apdus[key] = value
 
     def set_params(self, key: str,
-                   p1: Optional[BytesOrStr] = None,
-                   p2: Optional[BytesOrStr] = None,
-                   data: Optional[List[BytesOrStr]] = None,
-                   le: Optional[BytesOrStr] = None):
+                   p1: Optional[AnyStr] = None,
+                   p2: Optional[AnyStr] = None,
+                   data: Optional[List[AnyStr]] = None,
+                   le: Optional[AnyStr] = None):
         """Set the parameters and payload of a specific APDU
         """
         # Check all params
         if self.apdus.keys() is None or key not in self.apdus:
             raise KeyError(f"{key} APDU is not supported by this instance (or instance is empty?)")
-        params_valid: bool = all(True if type(param) in (str, bytes, list) else False for param in (p1, p2, data))
+        params_valid: bool = all(bool(isinstance(param, (str, bytes, list))) for param in (p1, p2, data))
         if not params_valid:
             raise ValueError("Parameters must either be single byte (e.g. p1 or p2), multiple bytes"
                              " (e.g. data) or an hex string adhering to these constraints")
         # Set APDU parameters & payload
-        if (p1 and len(self._bytes(p1)) > 1) \
-                or (p2 and len(self._bytes(p2)) > 1) \
-                or (le and len(self._bytes(le)) > 1):
+        params_invalid: bool = any(bool(param and len(self._bytes(param)) > 1) for param in (p1, p2, le))
+        if params_invalid:
             raise ValueError("When provided, P1, P2 and Le parameters must be 1-byte long")
 
         # Set default values for p1, p2 and le if they were not provided

@@ -1,9 +1,9 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, List, Any
 import hashlib
 import base58
-from .deviceappproxy.deviceappproxy import DeviceAppProxy
 from ledgerblue.commException import CommException
+from .deviceappproxy.deviceappproxy import DeviceAppProxy
 
 
 class NID:
@@ -23,13 +23,13 @@ class BtcPublicKey:
     def __init__(self, apdu_response: bytes, network_id: NID = NID.TESTNET) -> None:
         self.nid: NID = network_id
         self.pubkey_len: int = apdu_response[0]
-        self.pubkey: bytes = apdu_response[1:1+self.pubkey_len]
+        self.pubkey: bytes = apdu_response[1:1 + self.pubkey_len]
         self.pubkey_comp: bytes = (3 if self.pubkey[0] % 2 else 2).to_bytes(1, 'big') \
                                   + self.pubkey[1:self.pubkey_len >> 1]    # -1 not necessary w/ >>
         self.pubkey_comp_len: int = len(self.pubkey_comp)
-        self.address_len: int = apdu_response[1+self.pubkey_len]
-        self.address: str = apdu_response[1+self.pubkey_len+1:1+self.pubkey_len+1+self.address_len].decode()
-        self.chaincode: bytes = apdu_response[1+self.pubkey_len+1+self.address_len:]
+        self.address_len: int = apdu_response[1 + self.pubkey_len]
+        self.address: str = apdu_response[1 + self.pubkey_len + 1:1 + self.pubkey_len + 1 + self.address_len].decode()
+        self.chaincode: bytes = apdu_response[1 + self.pubkey_len + 1 + self.address_len:]
         self.pubkey_hash: bytes = base58.b58decode(self.address)
         self.pubkey_hash_len: int = len(self.pubkey_hash)
         self.pubkey_hash = self.pubkey_hash[1:-4]   # remove network id & hash checksum
@@ -45,11 +45,11 @@ class BtcPublicKey:
 
 class BaseTestBtc:
     """
-    Base class for tests of BTC app, contains data validators. 
+    Base class for tests of BTC app, contains data validators.
     """
     @staticmethod
     def check_trusted_input(trusted_input: bytes,
-                            out_index: bytes, 
+                            out_index: bytes,
                             out_amount: bytes,
                             out_hash: Optional[bytes] = None) -> None:
         print(f"    Magic marker = {trusted_input[:2].hex()}")
@@ -60,8 +60,8 @@ class BaseTestBtc:
         print(f"    SHA-256 HMAC = {trusted_input[48:].hex()}")
         # Note: Signature value can't be asserted since the HMAC key is secret in the device
         assert trusted_input[:2] == bytes.fromhex("3200")
-        assert trusted_input[36:40] == out_index      
-        assert trusted_input[40:48] == out_amount     
+        assert trusted_input[36:40] == out_index
+        assert trusted_input[40:48] == out_amount
         if out_hash:
             assert trusted_input[4:36] == out_hash
 
@@ -82,7 +82,7 @@ class BaseTestBtc:
         len_s = resp[offs_s - 1]
         print(f"    OK, response = {resp.hex()}")
         print(f"     - Parity = {'odd' if parity_bit else 'even'}")
-        print(f"     - R = {resp[offs_r:offs_r+len_r].hex()} ({len_r} bytes)")    
+        print(f"     - R = {resp[offs_r:offs_r+len_r].hex()} ({len_r} bytes)")
         print(f"     - S = {resp[offs_s:offs_s+len_s].hex()} ({len_s} bytes)")
         if resp[1] == len(resp) - 3:
             print(f"     - sigHashType = {bytes([resp[-1]]).hex()}")
@@ -100,19 +100,19 @@ class BaseTestBtc:
 
     @staticmethod
     def check_raw_apdu_resp(expected: str, received: bytes) -> None:
-        # Not a very elegant way to skip sections of the received response that vary 
-        # (marked with 2 '-' char per byte to skip in the expected response i.e. '--'), 
+        # Not a very elegant way to skip sections of the received response that vary
+        # (marked with 2 '-' char per byte to skip in the expected response i.e. '--'),
         # but does the job.
         def expected_len(exp_str: str) -> int:
             tok = exp_str.split('-')
             dash_count = exp_str.count('-') >> 1
             return dash_count + (len("".join([t for t in tok if len(tok)])) >> 1)
-        
+
         assert len(received) == expected_len(expected)
         recv = received.hex()
-        for i in range(len(expected)):
-            if expected[i] != '-':
-                assert recv[i] == expected[i]
+        for exp_char, recv_char in zip(expected, recv):
+            if exp_char != '-':
+                assert recv_char == exp_char
 
     @staticmethod
     def split_pubkey_data(data: bytes) -> BtcPublicKey:
@@ -147,10 +147,9 @@ class BaseTestZcash(BaseTestBtc):
                 if response:
                     if apdu.expected_resp is not None:
                         self.check_raw_apdu_resp(apdu.expected_resp, response)
-                    elif apdu.check_sig_format is not None and apdu.check_sig_format == True:
+                    elif apdu.check_sig_format is not None and apdu.check_sig_format is True:
                         self.check_signature(response)  # Only format is checked
             except CommException as error:
                 if apdu.expected_sw is not None and error.sw.hex() == apdu.expected_sw:
                     continue
                 raise error
-

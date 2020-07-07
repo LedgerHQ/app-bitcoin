@@ -1,6 +1,6 @@
 # Note on APDU payload chunks splitting:
 # --------------------------------------
-# The BTC app tx parser requires the tx data to be sent in chunks. For some tx fields 
+# The BTC app tx parser requires the tx data to be sent in chunks. For some tx fields
 # it doesn't matter where the field is cut but for others it does and the rule is unclear.
 #
 # The tx data splitting into the appropriate payload chunks is now delegated to the

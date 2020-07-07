@@ -1,11 +1,12 @@
 from io import BytesIO
 from sys import version_info
-from typing import NewType, Optional, cast
 from dataclasses import dataclass
 assert version_info.major >= 3, "Python 3 required!"
 if version_info.minor >= 8:
-    from typing import Literal
+    # pylint: disable=no-name-in-module
+    from typing import NewType, Optional, cast, Literal
 elif version_info.minor <= 6:   # TypedDict & Literal not yet standard in 3.6
+    from typing import NewType, Optional, cast
     from typing_extensions import Literal
 
 # Types of the transaction fields, used to check fields lengths
@@ -14,16 +15,16 @@ u16 = NewType("u16", int)  # 2-byte int
 u32 = NewType("u32", int)  # 4-byte int
 u64 = NewType("u64", int)  # 8-byte int
 i64 = NewType("i64", int)  # 8-byte int, signed
-varint = NewType("varint", int)     # 1-9 bytes
-byte = NewType("byte", type(bytes(1)))          # 1 byte
-bytes2 = NewType("bytes2", type(bytes(2)))      # 2 bytes
-bytes4 = NewType("bytes4", type(bytes(4)))      # 4 bytes
-bytes8 = NewType("bytes8", type(bytes(8)))      # 8 bytes
-bytes16 = NewType("bytes16", type(bytes(16)))   # 16 bytes
-bytes32 = NewType("bytes32", type(bytes(32)))   # 32 bytes
-bytes64 = NewType("bytes64", type(bytes(64)))   # 64 bytes
+varint = NewType("varint", int)       # 1-9 bytes
+byte = NewType("byte", bytes)         # 1 byte
+bytes2 = NewType("bytes2", bytes)     # 2 bytes
+bytes4 = NewType("bytes4", bytes)     # 4 bytes
+bytes8 = NewType("bytes8", bytes)     # 8 bytes
+bytes16 = NewType("bytes16", bytes)   # 16 bytes
+bytes32 = NewType("bytes32", bytes)   # 32 bytes
+bytes64 = NewType("bytes64", bytes)   # 64 bytes
 txtype = NewType("txtype", int)
-lbstr = NewType("lbstr", Literal['big', 'little'])
+byteorder = NewType("byteorder", Literal['big', 'little'])
 
 
 # Types for the supported kinds of transactions. Extend as needed.
@@ -77,7 +78,7 @@ class TxHashMode:
 
     @property
     def is_hash_no_script(self):
-        return not self.is_hash_with_script(self._hash_mode)
+        return not self.is_hash_with_script
 
     @property
     def is_btc_input_hash(self) -> bool:
@@ -106,7 +107,7 @@ class TxHashMode:
     @property
     def is_segwit_zcash_or_sapling_input_hash(self) -> bool:
         return self.is_segwit_input_hash or self.is_zcash_or_sapling_input_hash
-    
+
     @property
     def is_btc_or_bcash_input_hash(self) -> bool:
         return self.is_btc_input_hash or self.is_bcash_input_hash
@@ -158,10 +159,10 @@ class TxVarInt(TxInt):
         int_value: int = value if value is not None else cls.val if cls.val is not None else 0
         if int_value < 0xfd:
             return int_value.to_bytes(1, endianness)
-        elif int_value <= 0xffff:
+        if int_value <= 0xffff:
             bval = int_value.to_bytes(2, endianness)
             return b'\xfd' + bval if endianness == 'big' else bval + b'\xfd'
-        elif int_value <= 0xffffffff:
+        if int_value <= 0xffffffff:
             bval = int_value.to_bytes(4, endianness)
             return b'\xff' + bval if endianness == 'big' else bval + b'\xfd'
         raise ValueError(f"Value {int_value} too big to be encoded as a varint")
@@ -169,7 +170,7 @@ class TxVarInt(TxInt):
     @staticmethod
     def from_raw(buf: BytesIO,
                  prefix: Optional[bytes] = None,
-                 endianness: lbstr = 'big'):
+                 endianness: byteorder = 'big'):
         """Returns the size encoded as a varint in the next 1 to 9 bytes of buf."""
         b: bytes = prefix if prefix else buf.read(1)
         n: int = {b"\xfd": 2, b"\xfe": 4, b"\xff": 8}.get(b, 1)  # default to 1

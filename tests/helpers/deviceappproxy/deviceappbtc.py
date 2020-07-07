@@ -1,9 +1,9 @@
-from typing import Optional, List, cast, Union
-from .apduabstract import ApduSet, ApduDict, CApdu, BytesOrStr
+from typing import Optional, List, cast, Union, AnyStr
+from .apduabstract import ApduSet, ApduDict, CApdu
 from .deviceappproxy import DeviceAppProxy
 # Dependency to txparser could be avoided but at the expense of a more complex design
 # which I don't have time for.
-from ..txparser.transaction import Tx, TxType, TxVarInt, TxHashMode, ZcashExtHeader, ZcashExtFooter, lbstr, TxInput
+from ..txparser.transaction import Tx, TxType, TxVarInt, TxHashMode, ZcashExtHeader, ZcashExtFooter, byteorder, TxInput
 
 
 class BTC_P1:
@@ -46,7 +46,8 @@ class DeviceAppBtc(DeviceAppProxy):
         "UntrustedHashTxInputStart": CApdu(cla='e0', ins='44', data=[], typ=CApdu.Type.IN),
         "UntrustedHashSign": CApdu(cla='e0', ins='48', p1='00', p2='00', data=[], typ=CApdu.Type.INOUT),
         "UntrustedHashTxInputFinalize": CApdu(cla='e0', ins='4a', p2='00', data=[], typ=CApdu.Type.INOUT),
-        # Other APDUs supported by the BTC app not needed for these tests
+        # Other APDUs supported by the BTC app not needed for these tests but can be added along with the
+        # appropriate interface API method
     }
 
     def __init__(self,
@@ -56,7 +57,7 @@ class DeviceAppBtc(DeviceAppProxy):
         super().__init__(mnemonic=mnemonic, chunk_size=DeviceAppBtc.default_chunk_size)
 
     @staticmethod
-    def _get_input_index(tx: Tx, _input: bytes, endianness: lbstr = 'little'):
+    def _get_input_index(tx: Tx, _input: bytes, endianness: byteorder = 'little'):
         # Extract prev tx output idx from given input
         standard_idx_offset = 33
         trusted_input_idx_offset = 38
@@ -138,7 +139,7 @@ class DeviceAppBtc(DeviceAppProxy):
         prevout_idx_be: bytes = prev_out_index.to_bytes(4, 'big')
         # APDU accepts chunks in the order below:
         # 1. desired prevout index (BE) || tx version (|| VersionGroupId if Zcash) || tx input count
-        payload_chunks: List[bytes] = [
+        payload_chunks: List[AnyStr] = [
             prevout_idx_be + parsed_tx.version.buf + cast(ZcashExtHeader, parsed_tx.header.ext).version_group_id.buf
             + parsed_tx.input_count.buf
             if parsed_tx.type in (TxType.Zcash, TxType.ZcashSapling)
@@ -165,12 +166,14 @@ class DeviceAppBtc(DeviceAppProxy):
         else:
             payload_chunks.append(parsed_tx.lock_time.buf)
 
-        return self.send_apdu(*self.btc.apdu("GetTrustedInput", p1="00", p2="00", data=payload_chunks))
+        return self.send_apdu(*self.btc.apdu("GetTrustedInput", p1=BTC_P1.FIRST_BLOCK, p2="00", data=payload_chunks))
 
     def get_wallet_public_key(self,
-                              data: BytesOrStr) -> bytes:
-        return self.send_apdu(*self.btc.apdu("GetWalletPublicKey", p1="00", p2="00", data=[data]))
+                              data: AnyStr) -> bytes:
+        return self.send_apdu(
+            *self.btc.apdu("GetWalletPublicKey", p1=BTC_P1.SHOW_ADDR, p2=BTC_P2.LEGACY_ADDR, data=[data]))
 
+    # pylint: disable=too-many-branches
     def untrusted_hash_tx_input_start(self,
                                       parsed_tx: Tx,
                                       parsed_utxos: List[Tx],
@@ -178,19 +181,19 @@ class DeviceAppBtc(DeviceAppProxy):
                                       input_num: Optional[int] = None,
                                       mode: TxHashMode = TxHashMode(TxHashMode.LegacyBtc | TxHashMode.Trusted
                                                                     | TxHashMode.WithScript),
-                                      endianness: lbstr = 'little') -> bytes:
+                                      endianness: byteorder = 'little') -> bytes:
         """Hash the inputs of the tx data"""
-        def _get_p2() -> BytesOrStr:
+        def _get_p2() -> AnyStr:
             if mode.is_hash_with_script:
-                return "80"
-            elif mode.is_segwit_input_hash:
-                return "02"
-            elif mode.is_bcash_input_hash:
-                return "03"
-            elif mode.is_zcash_input_hash:
-                return "04"
-            elif mode.is_sapling_input_hash:
-                return "05"
+                return BTC_P2.TX_NEXT_INPUT
+            if mode.is_segwit_input_hash:
+                return BTC_P2.SEGWIT_INPUTS
+            if mode.is_bcash_input_hash:
+                return BTC_P2.BCH_ADDR
+            if mode.is_zcash_input_hash:
+                return BTC_P2.OVW_RULES
+            if mode.is_sapling_input_hash:
+                return BTC_P2.SPL_RULES
             raise ValueError(f"Invalid hash mode requested")
 
         def pubkey_hash_from_script(pubkey_script: bytes) -> bytes:
@@ -286,15 +289,16 @@ class DeviceAppBtc(DeviceAppProxy):
                         ])
 
         p2 = _get_p2()
-        return self.send_apdu(*self.btc.apdu("UntrustedHashTxInputStart", p1="00", p2=p2, data=payload_chunks))
+        return self.send_apdu(
+            *self.btc.apdu("UntrustedHashTxInputStart", p1=BTC_P1.FIRST_BLOCK, p2=p2, data=payload_chunks))
 
     def untrusted_hash_tx_input_finalize(self,
-                                         p1: BytesOrStr,
-                                         data: Union[BytesOrStr, Tx]) -> bytes:
+                                         p1: AnyStr,
+                                         data: Union[AnyStr, Tx]) -> bytes:
         """
         Submit either tx outputs or change path to hashing, depending on value of p1 argument
         """
-        param1: bytes = bytes.fromhex(p1) if type(p1) is str else p1
+        param1: bytes = bytes.fromhex(p1) if isinstance(p1, str) else p1
         if param1 in [b'\x00', b'\x80']:
             # Tx outputs path submission
             parsed_tx: Tx = data

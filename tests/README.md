@@ -24,14 +24,14 @@ Because tests are available for both the BTC app and the Zcash app (using the BT
 ###### BTC tests
 The BTC app must be loaded on the device and started.
 ```shell script
-cd <app-bitcoin-repo-path>/tests
+cd $APP_BITCOIN_REPO_PATH/tests
 pytest -x -v [-s] -m btc
 ```
 
 ###### Zcash tests
 Both the BTC and the Zcash apps must be loaded on the device. Only the Zcash app must be started.
 ```shell script
-cd <app-bitcoin-repo-path>/tests
+cd $APP_BITCOIN_REPO_PATH/tests
 pytest -x -v [-s] -m zcash
 ```
 
@@ -40,27 +40,27 @@ Procedure below assumes that the BTC and the Zcash app binaries are available.
 ###### BTC tests
 ```shell script
 # Start speculos (assuming BTC app is bin/app.elf) 
-cd <speculos-folder> 
+cd $SPECULOS_REPO_PATH 
 ./speculos.py --ontop -m nanos -k 1.6 -s <24-word seed> <app-bitcoin-repo-path>/bin/app.elf
  
 # Launch tests
-cd <app-bitcoin-repo-path>/tests
+cd $APP_BITCOIN_REPO_PATH/tests
 LEDGER_PROXY_ADDRESS=127.0.0.1 LEDGER_PROXY_PATH=9999 pytest -x -v [-s] -m btc
 ```
 
 ###### Zcash tests
 ```shell script
 # Start speculos (assuming BTC app is lib/btc.elf and Zcash app is in bin/app.elf) 
-cd <speculos-folder> 
+cd $SPECULOS_REPO_PATH 
 ./speculos.py --ontop -m nanos -k 1.6 -s <24-word seed> -l Bitcoin:<app-bitcoin-repo-path>/lib/btc.elf <app-bitcoin-repo-path>/bin/app.elf
 
 # Launch tests
-cd <app-bitcoin-repo-path>/tests
+cd $APP_BITCOIN_REPO_PATH/tests
 LEDGER_PROXY_ADDRESS=127.0.0.1 LEDGER_PROXY_PATH=9999 pytest -x -v [-s] -m zcash
 ```
 
 **Note**: 
-- When provided, the `-s` parameter triggers the display of the APDUs exchanged between the test and the device.
+- When provided, the `-s` parameter triggers the display of the APDUs exchanged between the test script and the device.
 - Tests pass green as long as user confirms the transactions/message signatures. They fail if user rejects the signing operation.
 
 
@@ -139,6 +139,11 @@ Below is a compilation of the various things to do to structure and rationalize 
     - Pro: it makes them reusable with other test environemnts than pytest but Cons: it creates a coupling between `conftest.py` and that other file.
 
 - Misc:
-  - [ ] Replace `BytesOrStr` type with `AnyStr` built-in type
+  - [ ] Add support for Bitcoin Cash (potentially nothing to do?)
+  - [ ] Turn `deviceappproxy` and `txparser` folders into proper packages installable into any virtualenv through pip. Meaning they would have their own repo in LedgerHQ and evolve separately from the BTC app.
+  - Either:
+    - [ ] Add new `deviceapp<coin>.py` files in newly modularized `deviceappproxy` to support formatting APDus for other coins e.g. Eth, Xrp, etc
+    - [ ] Or move Bitcoin-specific `deviceappbtc.py` out of `deviceappproxy` module and put in at `helper` folder (other coins tests will define a similar `deviceapp<coin>.py` based on `deviceappproxy` module in their own repo)
+  - [X] Fix style warnings from `pylint` & `pycodestyle`
+  - [X] Replace `BytesOrStr` type with `AnyStr` built-in type
   - [ ] Rename `lbstr` type to something more verbose like `ByteOrder`
-  - [ ] Turn `deviceappproxy` and `txparser` folders into proper packages installable into any virtualenv through pip. Meaning they would have their own repo in LEdgerHQ and evolve separately from the BTC app.

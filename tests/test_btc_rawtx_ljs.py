@@ -1,5 +1,5 @@
-import pytest
 from typing import List, Optional
+import pytest
 from helpers.basetest import BaseTestBtc
 from helpers.deviceappproxy.deviceappbtc import DeviceAppBtc
 from conftest import ledgerjs_test_data, LedgerjsApdu
@@ -17,14 +17,14 @@ class TestLedgerjsBtcTx(BaseTestBtc):
     @pytest.mark.parametrize('test_data', ledgerjs_test_data())
     def test_replay_ledgerjs_tests(self, test_data: List[LedgerjsApdu]) -> None:
         """
-        Verify the Btc app with test Tx extracted from the ledjerjs package 
+        Verify the Btc app with test Tx extracted from the ledjerjs package
         that are supposedly known to work.
         """
         apdus = test_data
         btc = DeviceAppBtc()
         response: Optional[bytes] = None
         # All apdus shall return 9000 + potentially some data
-        for apdu in apdus:      
+        for apdu in apdus:
             for command in apdu.commands:
                 response = btc.send_raw_apdu(bytes.fromhex(command))
             if apdu.expected_resp is not None:

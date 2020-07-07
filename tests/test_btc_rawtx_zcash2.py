@@ -1,8 +1,8 @@
-import pytest
 from typing import List
+import pytest
 from helpers.basetest import BaseTestZcash
-from helpers.deviceappproxy.deviceappbtc import DeviceAppBtc
-from helpers.txparser.transaction import Tx, TxType, TxHashMode, TxParse, ZcashExtFooter
+from helpers.deviceappproxy.deviceappbtc import DeviceAppBtc, BTC_P1
+from helpers.txparser.transaction import Tx, TxHashMode, TxParse
 from conftest import zcash2_prefix_cmds, SignTxTestData, LedgerjsApdu
 
 
@@ -82,21 +82,21 @@ class TestLedgerjsZcashTx2(BaseTestZcash):
         # 2.2.1 Start with change address path
         print("\n--* Untrusted Transaction Input Hash Finalize Full - Handle change address")
         btc.untrusted_hash_tx_input_finalize(
-            p1="ff",    # to derive BIP 32 change address
+            p1=BTC_P1.CHANGE_PATH,    # to derive BIP 32 change address
             data=change_path)
         print("    OK")
 
         # 2.2.2 Continue w/ tx to sign outputs & scripts
         print("\n--* Untrusted Transaction Input Hash Finalize Full - Continue w/ hash of tx output")
         response = btc.untrusted_hash_tx_input_finalize(
-            p1="00",
+            p1=BTC_P1.MORE_BLOCKS,
             data=parsed_tx)
         assert response == bytes.fromhex("0000")
         print("    OK")
         # We're done w/ the hashing of the pseudo-tx with all inputs w/o scriptSig.
 
-        # 2.2.3. Zcash-specific: "When using Overwinter/Sapling, UNTRUSTED HASH SIGN is 
-        #        called with an empty authorization and nExpiryHeight following the first 
+        # 2.2.3. Zcash-specific: "When using Overwinter/Sapling, UNTRUSTED HASH SIGN is
+        #        called with an empty authorization and nExpiryHeight following the first
         #        UNTRUSTED HASH TRANSACTION INPUT FINALIZE FULL"
         print("\n--* Untrusted Has Sign - with empty Auth & nExpiryHeight")
         _ = btc.untrusted_hash_sign(
@@ -104,13 +104,13 @@ class TestLedgerjsZcashTx2(BaseTestZcash):
             output_path=None)     # For untrusted_hash_sign() to behave as described in above comment
 
         # 3. Sign each input individually. Because tx to sign is Zcash Sapling, hash each input with its scriptSig
-        #    and sequence individually, each in a pseudo-tx w/o output_count, outputs nor locktime. 
+        #    and sequence individually, each in a pseudo-tx w/o output_count, outputs nor locktime.
         print("\n--* Untrusted Transaction Input Hash Start, step 2 - Hash again each input individually (only 1)")
         # Inputs are P2WPKH, so use 0x1976a914{20-byte-pubkey-hash}88ac from utxo as scriptSig in this step.
         #
-        # From btc.asc: "The input scripts shall be prepared by the host for the transaction signing process as 
-        #   per bitcoin rules : the current input script being signed shall be the previous output script (or the 
-        #   redeeming script when consuming a P2SH output, or the scriptCode when consuming a BIP 143 output), and 
+        # From btc.asc: "The input scripts shall be prepared by the host for the transaction signing process as
+        #   per bitcoin rules : the current input script being signed shall be the previous output script (or the
+        #   redeeming script when consuming a P2SH output, or the scriptCode when consuming a BIP 143 output), and
         #   other input script shall be null."
         for idx, (tx_input, output_path) in enumerate(zip(tx_inputs, output_paths)):
             # 3.1 Send pseudo-tx w/ sigScript

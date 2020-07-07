@@ -1,9 +1,9 @@
 import subprocess
 import time
-from typing import Optional, Union, List, cast
+from typing import Optional, Union, List, AnyStr, cast
 from ledgerblue.comm import getDongle
 from ledgerblue.commTCP import DongleServer
-from .apduabstract import BytesOrStr, CApdu
+from .apduabstract import CApdu
 
 
 # decorator that try to connect to a physical dongle before executing a method
@@ -34,13 +34,13 @@ class DeviceAppProxy:
     @dongle_connected
     def send_apdu(self,
                   apdu: Union[CApdu, bytes],
-                  data: Optional[List[BytesOrStr]] = None,
-                  p1_msb_means_next: bool = True) -> BytesOrStr:
+                  data: Optional[List[AnyStr]] = None,
+                  p1_msb_means_next: bool = True) -> AnyStr:
         """Send APDUs to a Ledger device."""
-        def _bytes(str_bytes: BytesOrStr) -> bytes:
-            ret = str_bytes if type(str_bytes) is bytes \
-                else bytes([cast(int, str_bytes)]) if type(str_bytes) is int \
-                else bytes.fromhex(str_bytes) if type(str_bytes) is str else None
+        def _bytes(str_bytes: AnyStr) -> bytes:
+            ret = str_bytes if isinstance(str_bytes, bytes) \
+                else bytes([cast(int, str_bytes)]) if isinstance(str_bytes, int) \
+                else bytes.fromhex(str_bytes) if isinstance(str_bytes, str) else None
             if ret:
                 return ret
             raise TypeError(f"{str_bytes} cannot be converted to bytes")
@@ -63,14 +63,14 @@ class DeviceAppProxy:
                 c_apdu = apdu_header + len(chunk).to_bytes(1, 'big') + chunk
                 print(f"[device <] {c_apdu.hex()}")
                 resp = self.dongle.exchange(bytes(c_apdu))
-                chunk_resp = resp.hex() if len(resp) else "OK"
+                chunk_resp = resp.hex() if len(resp) > 0 else "OK"
                 print(f"[device >] {chunk_resp}")
                 _set_p1(apdu_header, chunk, chunks, p1_msb_is_next)
             return resp
 
         # Get the APDU as bytes & send them to device
         hdr: bytearray = bytearray(apdu[0:4])
-        response: BytesOrStr = None
+        response: Optional[AnyStr] = None
 
         if data and len(data) > 1:
             # Payload already split in chunks of the appropriate lengths
@@ -82,7 +82,7 @@ class DeviceAppProxy:
                     # In case a previous _send_chunked_apdu() call closed the dongle
                     self.dongle = getDongle(False)
                 response = self.dongle.exchange(capdu)
-                _resp = response.hex() if len(response) else "OK"
+                _resp = response.hex() if len(response) > 0 else "OK"
                 print(f"[device >] {_resp}")
                 _set_p1(hdr, _chunk, payload_chunks, p1_msb_means_next)
         else:
@@ -95,10 +95,10 @@ class DeviceAppProxy:
 
     @dongle_connected
     def send_raw_apdu(self,
-                      apdu: bytes) -> BytesOrStr:
+                      apdu: bytes) -> AnyStr:
         print(f"[device <] {apdu.hex()}")
-        response: BytesOrStr = self.dongle.exchange(apdu)
-        _resp: Union[bytes, str] = response.hex() if len(response) else "OK"
+        response: AnyStr = self.dongle.exchange(apdu)
+        _resp: Union[bytes, str] = response.hex() if len(response) > 0 else "OK"
         print(f"[device >] {_resp}")
         return response
 
