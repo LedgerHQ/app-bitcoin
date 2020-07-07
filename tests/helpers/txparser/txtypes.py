@@ -24,7 +24,7 @@ bytes16 = NewType("bytes16", bytes)   # 16 bytes
 bytes32 = NewType("bytes32", bytes)   # 32 bytes
 bytes64 = NewType("bytes64", bytes)   # 64 bytes
 txtype = NewType("txtype", int)
-byteorder = NewType("byteorder", Literal['big', 'little'])
+byteorder = Literal['big', 'little']
 
 
 # Types for the supported kinds of transactions. Extend as needed.

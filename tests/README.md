@@ -146,4 +146,4 @@ Below is a compilation of the various things to do to structure and rationalize 
     - [ ] Or move Bitcoin-specific `deviceappbtc.py` out of `deviceappproxy` module and put in at `helper` folder (other coins tests will define a similar `deviceapp<coin>.py` based on `deviceappproxy` module in their own repo)
   - [X] Fix style warnings from `pylint` & `pycodestyle`
   - [X] Replace `BytesOrStr` type with `AnyStr` built-in type
-  - [ ] Rename `lbstr` type to something more verbose like `ByteOrder`
+  - [X] Rename `lbstr` type to something more verbose like `ByteOrder`
