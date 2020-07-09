@@ -143,11 +143,12 @@ class TxParse:
                                 tmp = path[:]
                                 tmp.append(key)
                                 _recursive_hash_obj(getattr(obj, key), hasher, ignored_fields, tmp, show_path)
-                else:
+                elif isinstance(obj, (bytes, bytearray)):
                     # Terminal byte object, add it to the hash
                     if show_path:
                         print(f"Adding to hash: {'/'.join(path)} = {cast(bytes, obj).hex()}")
                     hasher.update(cast(bytes, obj))
+                # else return without hashing a None object (not supported by sha256())
 
             h1, h2 = (sha256(), sha256())
             if isinstance(tx, (bytes, bytearray)):
