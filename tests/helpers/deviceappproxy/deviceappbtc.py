@@ -1,5 +1,5 @@
 from typing import Optional, List, cast, Union, AnyStr
-from .apduabstract import ApduSet, ApduDict, CApdu
+from .apduabstract import ApduDict, ApduDictType, CApdu
 from .deviceappproxy import DeviceAppProxy
 # Dependency to txparser could be avoided but at the expense of a more complex design
 # which I don't have time for.
@@ -40,7 +40,7 @@ class DeviceAppBtc(DeviceAppProxy):
                        "sorry charge ozone often gauge photo sponsor faith business taste front" \
                        "differ bounce chaos"
 
-    apdus: ApduDict = {
+    apdus: ApduDictType = {
         "GetWalletPublicKey": CApdu(cla='e0', ins='40', data=[], typ=CApdu.Type.INOUT),
         "GetTrustedInput": CApdu(cla='e0', ins='42', p2='00', data=[], typ=CApdu.Type.INOUT),
         "UntrustedHashTxInputStart": CApdu(cla='e0', ins='44', data=[], typ=CApdu.Type.IN),
@@ -52,7 +52,7 @@ class DeviceAppBtc(DeviceAppProxy):
 
     def __init__(self,
                  mnemonic: str = default_mnemonic) -> None:
-        self.btc = ApduSet(DeviceAppBtc.apdus, max_lc=DeviceAppBtc.default_chunk_size)
+        self.btc = ApduDict(DeviceAppBtc.apdus, max_lc=DeviceAppBtc.default_chunk_size)
         self._tx_endianness: str = 'little'
         super().__init__(mnemonic=mnemonic, chunk_size=DeviceAppBtc.default_chunk_size)
 
@@ -262,31 +262,22 @@ class DeviceAppBtc(DeviceAppProxy):
         # Compose a list of: input || script_len (possibly 0) || script (possibly None) || sequence_nb
         for f_input, script in zip(formatted_inputs, scripts):
             input_idx = self._get_input_index(parsed_tx, f_input, endianness)
-            # add input with or without input script, depending on hashing phase
-            if mode.is_segwit_zcash_or_sapling_input_hash:
-                if mode.is_hash_with_script:
-                    payload_chunks.extend(
-                        [  # [input||script_len, script||sequence]
-                            f_input + TxVarInt.to_bytes(len(script), 'little'),
-                            script + parsed_tx.inputs[input_idx].sequence_nb.buf
-                        ])
-                else:   # Hash inputs w/o scripts
-                    payload_chunks.extend(
-                        [  # [input||0 (no script), sequence]
-                            f_input + b'\x00', parsed_tx.inputs[input_idx].sequence_nb.buf
-                        ])
-            else:   # BTC or BCash tx
-                if script is not None:
-                    payload_chunks.extend(
-                        [  # [input||script_len, script||sequence]
-                            f_input + TxVarInt.to_bytes(len(script), 'little'),
-                            script + parsed_tx.inputs[input_idx].sequence_nb.buf
-                        ])
-                else:
-                    payload_chunks.extend(
-                        [  # [input||script_len (00), sequence]
-                            f_input + b'\x00', parsed_tx.inputs[input_idx].sequence_nb.buf
-                        ])
+            # add input with or without input script, depending on hashing phase and coin type:
+            # - Legacy BTC, Bcash (TBC for the latter): app needs only 1 hashing phase so hash input with its script
+            # - Segwit BTC, Zcash: app needs 2 hashing phases for inputs, one w/o scripts and 1 with scripts
+            with_script = (mode.is_btc_or_bcash_input_hash and script is not None) \
+                          or (mode.is_segwit_zcash_or_sapling_input_hash and mode.is_hash_with_script)
+            if with_script:
+                payload_chunks.extend(
+                    [  # [input||script_len, script||sequence]
+                        f_input + TxVarInt.to_bytes(len(script), 'little'),
+                        script + parsed_tx.inputs[input_idx].sequence_nb.buf
+                    ])
+            else:   # Hash inputs w/o scripts
+                payload_chunks.extend(
+                    [  # [input||0 (no script), sequence]
+                        f_input + b'\x00', parsed_tx.inputs[input_idx].sequence_nb.buf
+                    ])
 
         p2 = _get_p2()
         return self.send_apdu(

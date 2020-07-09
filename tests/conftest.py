@@ -410,10 +410,7 @@ def zcash_sign_tx_test_data() -> SignTxTestData:
     )
 
     test_change_path = bytes.fromhex("058000002c80000085800000000000000100000003")   # 44'/133'/0'/1/3
-    test_output_paths = [
-        bytes.fromhex("058000002c80000085800000000000000100000001"),    # 44'/133'/0'/1/1
-        bytes.fromhex("058000002c80000085800000000000000000000004")     # 44'/133'/0'/0/4
-    ]
+    test_output_paths = [bytes.fromhex("058000002c80000085800000000000000100000001")]    # 44'/133'/0'/1/1
 
     return SignTxTestData(
         tx_to_sign=test_tx_to_sign,

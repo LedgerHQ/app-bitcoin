@@ -45,9 +45,11 @@ class TestLedgerjsZcashTx(BaseTestZcash):
         print("    OK")
 
     @pytest.mark.manual
+    @pytest.mark.parametrize("use_trusted_inputs", [True, False])
     @pytest.mark.parametrize("prefix_cmds", zcash_prefix_cmds())
     def test_sign_zcash_tx_with_trusted_zec_sap_inputs(self,
                                                        zcash_sign_tx_test_data: SignTxTestData,
+                                                       use_trusted_inputs: bool,
                                                        prefix_cmds: List[List[LedgerjsApdu]]) -> None:
         """
         Replay of real Zcash tx with inputs from a Zcash tx, trusted inputs on
@@ -64,27 +66,35 @@ class TestLedgerjsZcashTx(BaseTestZcash):
         # 0. Send the Get Version raw apdus
         self.send_ljs_apdus(apdus=prefix_cmds, device=btc)
 
-        # 1. Get Trusted Input
-        print("\n--* Get Trusted Input - from utxos")
-        output_indexes = [_input.prev_tx_out_index for _input in parsed_tx.inputs]
-        trusted_inputs = [
-            btc.get_trusted_input(
-                prev_out_index=out_idx.val,
-                parsed_tx=parsed_utxo)
-            for (out_idx, parsed_utxo, utxo) in zip(output_indexes, parsed_utxos, utxos)]
-        print("    OK")
+        if use_trusted_inputs:
+            hash_mode_1 = TxHashMode(TxHashMode.ZcashSapling | TxHashMode.Trusted | TxHashMode.NoScript)
+            hash_mode_2 = TxHashMode(TxHashMode.ZcashSapling | TxHashMode.Trusted | TxHashMode.WithScript)
 
-        out_amounts = [_output.value.buf for parsed_utxo in parsed_utxos for _output in parsed_utxo.outputs]
-        requested_amounts = [out_amounts[out_idx.val] for out_idx in output_indexes]
-        prevout_hashes = [_input.prev_tx_hash for _input in parsed_tx.inputs]
-        for trusted_input, out_idx, req_amount, prevout_hash \
-                in zip(trusted_inputs, output_indexes, requested_amounts, prevout_hashes):
-            self.check_trusted_input(
-                trusted_input,
-                out_index=out_idx.buf,      # LE for comparison w/ out_idx in trusted_input
-                out_amount=req_amount,      # utxo output #1 is requested in tx to sign input
-                out_hash=prevout_hash       # prevout hash in tx to sign
-            )
+            # 1. Get Trusted Input
+            print("\n--* Get Trusted Input - from utxos")
+            output_indexes = [_input.prev_tx_out_index for _input in parsed_tx.inputs]
+            tx_inputs = [
+                btc.get_trusted_input(
+                    prev_out_index=out_idx.val,
+                    parsed_tx=parsed_utxo)
+                for (out_idx, parsed_utxo, utxo) in zip(output_indexes, parsed_utxos, utxos)]
+            print("    OK")
+
+            out_amounts = [_output.value.buf for parsed_utxo in parsed_utxos for _output in parsed_utxo.outputs]
+            requested_amounts = [out_amounts[out_idx.val] for out_idx in output_indexes]
+            prevout_hashes = [_input.prev_tx_hash for _input in parsed_tx.inputs]
+            for trusted_input, out_idx, req_amount, prevout_hash \
+                    in zip(tx_inputs, output_indexes, requested_amounts, prevout_hashes):
+                self.check_trusted_input(
+                    trusted_input,
+                    out_index=out_idx.buf,      # LE for comparison w/ out_idx in trusted_input
+                    out_amount=req_amount,      # utxo output #1 is requested in tx to sign input
+                    out_hash=prevout_hash       # prevout hash in tx to sign
+                )
+        else:
+            hash_mode_1 = TxHashMode(TxHashMode.ZcashSapling | TxHashMode.Untrusted | TxHashMode.NoScript)
+            hash_mode_2 = TxHashMode(TxHashMode.ZcashSapling | TxHashMode.Untrusted | TxHashMode.WithScript)
+            tx_inputs = parsed_tx.inputs
 
         # 2.0 Get public keys for output paths & compute their hashes
         print("\n--* Get Wallet Public Key - for each tx output path")
@@ -98,9 +108,9 @@ class TestLedgerjsZcashTx(BaseTestZcash):
         print("\n--* Untrusted Transaction Input Hash Start - Hash tx to sign first w/ all inputs "
               "having a null script length")
         btc.untrusted_hash_tx_input_start(
-            mode=TxHashMode(TxHashMode.ZcashSapling | TxHashMode.Trusted | TxHashMode.NoScript),
+            mode=hash_mode_1,
             parsed_tx=parsed_tx,
-            inputs=trusted_inputs,
+            inputs=tx_inputs,
             parsed_utxos=parsed_utxos)
         print("    OK")
 
@@ -132,15 +142,15 @@ class TestLedgerjsZcashTx(BaseTestZcash):
         # 3. Sign each input individually. Because tx to sign is Zcash Sapling, hash each input with its scriptSig
         #    and sequence individually, each in a pseudo-tx w/o output_count, outputs nor locktime.
         print("\n--* Untrusted Transaction Input Hash Start, step 2 - Hash again each input individually (only 1)")
-        for idx, (trusted_input, output_path) in enumerate(zip(trusted_inputs, output_paths)):
+        for idx, (tx_input, output_path) in enumerate(zip(tx_inputs, output_paths)):
             # 3.1 Send pseudo-tx w/ sigScript
             btc.untrusted_hash_tx_input_start(
                 # continue prev. started tx hash
-                mode=TxHashMode(TxHashMode.ZcashSapling | TxHashMode.Trusted | TxHashMode.WithScript),
+                mode=hash_mode_2,
                 parsed_tx=parsed_tx,
                 parsed_utxos=parsed_utxos,
                 input_num=idx,
-                inputs=[trusted_input])
+                inputs=[tx_input])
             print("    Final hash OK")
 
             # 3.2 Sign tx at last. Param is:

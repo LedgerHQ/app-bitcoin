@@ -98,11 +98,11 @@ The tests and framework are organized as described below:
             |       communication between the app & the tests. 
             |
             |-- apduabstract.py: Define the `CApdu` dataclass (abstract representation of an APDU)
-            |       and the `ApduSet` class which is a collection of `CApdu`s supported by an app
+            |       and the `ApduDict` class which is a collection of `CApdu`s supported by an app
             |       I.e. `CApdu` collects the values of CLA, INS, P1, P2 bytes for a command 
-            |       supported by an app and `ApduSet` gathers these `CApdu`s in one place.
+            |       supported by an app and `ApduDict` gathers these `CApdu`s in one place.
             |
-            |-- deviceappbtc.py: class derived from `DeviceAppProxy` that defines the `ApduSet` of
+            |-- deviceappbtc.py: class derived from `DeviceAppProxy` that defines the `ApduDict` of
                     `CApdu`s supported by the BTC app (actually only the subset useful for the tests)
                     and "hides" them behind an higher-level API that the tests can call. That API 
                     takes care of all the app-specific intricacies of sending data to the app (e.g.
@@ -112,8 +112,9 @@ The tests and framework are organized as described below:
  
  ===
  
-### Next steps
-Below is a compilation of the various things to do to structure and rationalize  the test framework even more, so that it could easily be reused for testing another app than BTC (of course, provided the implementation of the appropriate APDU abstraction API in a `DeviceAppProxy`-derived class).
+### Next steps/TODO
+Below is a compilation of the various TODOs that can be done in order to structure and rationalize  the test framework even more, so that it could easily be reused for testing another app than BTC (of course, provided the implementation of the appropriate APDU abstraction API in a `DeviceAppProxy`-derived class). 
+Entries with a checkmark have already been dealt with. 
 
 - `helpers/basetests.py`: 
   - [ ] Replace the raw APDU from Ledgerjs logs (mostly some GetVersion-kind of APDUs) in Segwit/Zcash tests with a proper `DeviceAppBtc`-based implementation. 
@@ -139,6 +140,7 @@ Below is a compilation of the various things to do to structure and rationalize 
     - Pro: it makes them reusable with other test environemnts than pytest but Cons: it creates a coupling between `conftest.py` and that other file.
 
 - Misc:
+  - [ ] Discuss & decide on the implementation of the [suggestions from @onyb](https://github.com/LedgerHQ/app-bitcoin/pull/157#pullrequestreview-443882538)
   - [ ] Add support for Bitcoin Cash (potentially nothing to do?)
   - [ ] Turn `deviceappproxy` and `txparser` folders into proper packages installable into any virtualenv through pip. Meaning they would have their own repo in LedgerHQ and evolve separately from the BTC app.
   - Either:

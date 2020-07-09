@@ -125,7 +125,7 @@ class TxParse:
                 """Recursive hashing of all significant items of a composite object.
                 This inner function is written in a way could be made to an independent one,
                 able to hash the content of any composite dataclass or dict object."""
-                if obj is not None and not isinstance(obj, (bytes, bytearray)):
+                if obj and not isinstance(obj, (bytes, bytearray)):
                     # Each items in a list of objects must be parsed entirely
                     if isinstance(obj, list):
                         for i, item in enumerate(obj):
@@ -139,7 +139,7 @@ class TxParse:
                             # Ignore fields that shan't be hashed => explicitly test for segwit types
                             # pylint: disable=C0123
                             if key not in ignored_fields and value is not None and \
-                                    type(value) not in (SegwitExtHeader, SegwitExtFooter):
+                                    type(value) not in (SegwitExtHeader, SegwitExtFooter):  # Precise type check
                                 tmp = path[:]
                                 tmp.append(key)
                                 _recursive_hash_obj(getattr(obj, key), hasher, ignored_fields, tmp, show_path)
