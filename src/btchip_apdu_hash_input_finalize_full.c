@@ -178,7 +178,7 @@ static bool handle_output_state() {
                 break;
             }
             scriptSize =
-                btchip_read_u32(btchip_context_D.currentOutput + 9, 0, 0);
+                btchip_read_u16(btchip_context_D.currentOutput + 9, 0, 0);
             discardSize = 3;
         } else {
             // Unrealistically large script

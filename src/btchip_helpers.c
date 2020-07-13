@@ -194,7 +194,7 @@ unsigned char GetScriptSize(unsigned char *buffer, size_t maxSize, unsigned int 
         *scriptSize = buffer[0];
         *discardSize = 1;
     } else if (maxSize > 2 && buffer[0] == 0xFD) {
-        *scriptSize = btchip_read_u32(buffer + 1, 0, 0);
+        *scriptSize = btchip_read_u16(buffer + 1, 0, 0);
         *discardSize = 3;
     } else {
         return 0;
