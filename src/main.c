@@ -2175,6 +2175,12 @@ uint8_t prepare_single_output() {
     offset += 8;
     nativeSegwit = btchip_output_script_is_native_witness(
         btchip_context_D.currentOutput + offset);
+    unsigned char isOpSender = 0;
+    if(G_coin_config->kind == COIN_KIND_QTUM) {
+        isOpSender = btchip_output_script_is_op_sender(
+                 btchip_context_D.currentOutput + offset,
+                 sizeof(btchip_context_D.currentOutput) - offset);
+    }
     if (btchip_output_script_is_op_return(btchip_context_D.currentOutput +
                                           offset)) {
             strcpy(vars.tmp.fullAddress, "OP_RETURN");
@@ -2182,12 +2188,12 @@ uint8_t prepare_single_output() {
                btchip_output_script_is_op_create(
                    btchip_context_D.currentOutput + offset,
                    sizeof(btchip_context_D.currentOutput) - offset)) {
-        strcpy(vars.tmp.fullAddress, "OP_CREATE");
+        strcpy(vars.tmp.fullAddress, isOpSender ? "OP_SENDER_CREATE" : "OP_CREATE");
     } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
                btchip_output_script_is_op_call(
                  btchip_context_D.currentOutput + offset,
                  sizeof(btchip_context_D.currentOutput) - offset)) {
-        strcpy(vars.tmp.fullAddress, "OP_CALL");
+        strcpy(vars.tmp.fullAddress, isOpSender ? "OP_SENDER_CALL" : "OP_CALL");
     } else if (nativeSegwit) {
         addressOffset = offset + OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET;
     } else if (btchip_output_script_is_regular(btchip_context_D.currentOutput +

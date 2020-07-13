@@ -18,6 +18,23 @@
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
 
+/** Script opcodes */
+enum opcodetype
+{
+    // push value
+    OP_PUSHDATA1 = 0x4c,
+    OP_PUSHDATA2 = 0x4d,
+    OP_PUSHDATA4 = 0x4e,
+
+    // Execute EXT byte code.
+    OP_CREATE = 0xc1,
+    OP_CALL = 0xc2,
+    OP_SPEND = 0xc3,
+    OP_SENDER = 0xc4,
+
+    OP_INVALIDOPCODE = 0xff,
+};
+
 const unsigned char TRANSACTION_OUTPUT_SCRIPT_PRE[] = {
     0x19, 0x76, 0xA9,
     0x14}; // script length, OP_DUP, OP_HASH160, address length
@@ -120,28 +137,119 @@ unsigned char btchip_output_script_is_native_witness(unsigned char *buffer) {
     return 0;
 }
 
+unsigned char GetScriptOp(unsigned char ** pc, const unsigned char * end, unsigned char* opcodeRet)
+{
+    *opcodeRet = OP_INVALIDOPCODE;
+    if (*pc >= end)
+        return 0;
+
+    // Read instruction
+    if (end - *pc < 1)
+        return 0;
+    unsigned char opcode = *(*pc)++;
+
+    // Immediate operand
+    if (opcode <= OP_PUSHDATA4)
+    {
+        unsigned int nSize = 0;
+        if (opcode < OP_PUSHDATA1)
+        {
+            nSize = opcode;
+        }
+        else if (opcode == OP_PUSHDATA1)
+        {
+            if (end - *pc < 1)
+                return 0;
+            nSize = *(*pc)++;
+        }
+        else if (opcode == OP_PUSHDATA2)
+        {
+            if (end - *pc < 2)
+                return 0;
+
+            nSize = btchip_read_u16(*pc, 0, 0);
+            *pc += 2;
+        }
+        else if (opcode == OP_PUSHDATA4)
+        {
+            if (end - *pc < 4)
+                return 0;
+            nSize = btchip_read_u32(*pc, 0, 0);
+            *pc += 4;
+        }
+        if (end - *pc < 0 || (unsigned int)(end - *pc) < nSize)
+            return 0;
+        *pc += nSize;
+    }
+
+    *opcodeRet = opcode;
+    return 1;
+}
+
+unsigned char GetScriptSize(unsigned char *buffer, size_t maxSize, unsigned int *scriptSize, unsigned int *discardSize) 
+{
+    *scriptSize = 0;
+    *discardSize = 0;
+    if (maxSize > 0 && buffer[0] < 0xFD) {
+        *scriptSize = buffer[0];
+        *discardSize = 1;
+    } else if (maxSize > 2 && buffer[0] == 0xFD) {
+        *scriptSize = btchip_read_u32(buffer + 1, 0, 0);
+        *discardSize = 3;
+    } else {
+        return 0;
+    }
+
+    size_t bifferSize = *scriptSize + *discardSize;
+    if(bifferSize <= maxSize) {
+        return 1;
+    }
+
+    return 0;
+}
+
+int FindOp(unsigned char *buffer, size_t size, unsigned char op, unsigned char haveSize)
+{
+    int nFound = 0;
+    unsigned int scriptSize = size;
+    unsigned int discardSize = 0;
+    if(haveSize)
+        GetScriptSize(buffer, size, &scriptSize, &discardSize);
+    unsigned char opcode = OP_INVALIDOPCODE;
+    const unsigned char* end = buffer + scriptSize + discardSize;
+    unsigned char *begin = buffer + discardSize;
+    for (unsigned char * pc = begin; pc != end && GetScriptOp(&pc, end, &opcode);)
+        if (opcode == op)
+            ++nFound;
+    return nFound;
+}
+
 unsigned char btchip_output_script_is_op_return(unsigned char *buffer) {
     return (buffer[1] == 0x6A);
 }
 
-static unsigned char output_script_is_op_create_or_call(unsigned char *buffer,
+static unsigned char output_script_is_op_contract(unsigned char *buffer,
                                                         size_t size,
                                                         unsigned char value) {
     return (!btchip_output_script_is_regular(buffer) &&
             !btchip_output_script_is_p2sh(buffer) &&
-            !btchip_output_script_is_op_return(buffer) && (buffer[0] <= 0xEA) &&
-            (buffer[0] < size) &&
-            (buffer[buffer[0]] == value));
+            !btchip_output_script_is_op_return(buffer) &&
+            FindOp(buffer, size, value, 1) == 1);
 }
 
 unsigned char btchip_output_script_is_op_create(unsigned char *buffer,
                                                 size_t size) {
-    return output_script_is_op_create_or_call(buffer, size, 0xC1);
+    return output_script_is_op_contract(buffer, size, OP_CREATE);
 }
 
 unsigned char btchip_output_script_is_op_call(unsigned char *buffer,
                                               size_t size) {
-    return output_script_is_op_create_or_call(buffer, size, 0xC2);
+    return output_script_is_op_contract(buffer, size, OP_CALL);
+}
+
+unsigned char btchip_output_script_is_op_sender(unsigned char *buffer,
+                                              size_t size) {
+    return output_script_is_op_contract(buffer, size, OP_SENDER);
 }
 
 unsigned char btchip_rng_u8_modulo(unsigned char modulo) {
@@ -164,6 +272,26 @@ unsigned char btchip_secure_memcmp(const void *buf1, const void *buf2,
         return 1;
     }
     return error;
+}
+
+unsigned long int btchip_read_u16(unsigned char *buffer, unsigned char be,
+                                  unsigned char skipSign) {
+    unsigned char i;
+    unsigned long int result = 0;
+    unsigned char shiftValue = (be ? 8 : 0);
+    for (i = 0; i < 2; i++) {
+        unsigned char x = (unsigned char)buffer[i];
+        if ((i == 0) && skipSign) {
+            x &= 0x7f;
+        }
+        result += ((unsigned long int)x) << shiftValue;
+        if (be) {
+            shiftValue -= 8;
+        } else {
+            shiftValue += 8;
+        }
+    }
+    return result;
 }
 
 unsigned long int btchip_read_u32(unsigned char *buffer, unsigned char be,
