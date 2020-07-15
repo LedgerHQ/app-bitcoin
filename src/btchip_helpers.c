@@ -137,7 +137,7 @@ unsigned char btchip_output_script_is_native_witness(unsigned char *buffer) {
     return 0;
 }
 
-unsigned char GetScriptOp(unsigned char ** pc, const unsigned char * end, unsigned char* opcodeRet)
+unsigned char btchip_get_script_op(unsigned char ** pc, const unsigned char * end, unsigned char* opcodeRet)
 {
     *opcodeRet = OP_INVALIDOPCODE;
     if (*pc >= end)
@@ -186,7 +186,7 @@ unsigned char GetScriptOp(unsigned char ** pc, const unsigned char * end, unsign
     return 1;
 }
 
-unsigned char GetScriptSize(unsigned char *buffer, size_t maxSize, unsigned int *scriptSize, unsigned int *discardSize) 
+unsigned char btchip_get_script_size(unsigned char *buffer, size_t maxSize, unsigned int *scriptSize, unsigned int *discardSize) 
 {
     *scriptSize = 0;
     *discardSize = 0;
@@ -208,17 +208,17 @@ unsigned char GetScriptSize(unsigned char *buffer, size_t maxSize, unsigned int 
     return 0;
 }
 
-int FindOp(unsigned char *buffer, size_t size, unsigned char op, unsigned char haveSize)
+int btchip_find_script_op(unsigned char *buffer, size_t size, unsigned char op, unsigned char haveSize)
 {
     int nFound = 0;
     unsigned int scriptSize = size;
     unsigned int discardSize = 0;
     if(haveSize)
-        GetScriptSize(buffer, size, &scriptSize, &discardSize);
+        btchip_get_script_size(buffer, size, &scriptSize, &discardSize);
     unsigned char opcode = OP_INVALIDOPCODE;
     const unsigned char* end = buffer + scriptSize + discardSize;
     unsigned char *begin = buffer + discardSize;
-    for (unsigned char * pc = begin; pc != end && GetScriptOp(&pc, end, &opcode);)
+    for (unsigned char * pc = begin; pc != end && btchip_get_script_op(&pc, end, &opcode);)
         if (opcode == op)
             ++nFound;
     return nFound;
@@ -234,7 +234,7 @@ static unsigned char output_script_is_op_contract(unsigned char *buffer,
     return (!btchip_output_script_is_regular(buffer) &&
             !btchip_output_script_is_p2sh(buffer) &&
             !btchip_output_script_is_op_return(buffer) &&
-            FindOp(buffer, size, value, 1) == 1);
+            btchip_find_script_op(buffer, size, value, 1) == 1);
 }
 
 unsigned char btchip_output_script_is_op_create(unsigned char *buffer,
