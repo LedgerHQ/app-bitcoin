@@ -2321,7 +2321,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         unsigned char nullAmount = 1;
         unsigned int j;
         unsigned char isOpReturn, isP2sh, isNativeSegwit;
-        unsigned char isOpCreate, isOpCall;
+        unsigned char isOpCreate = 0, isOpCall = 0;
 
         for (j = 0; j < 8; j++) {
             if (btchip_context_D.currentOutput[offset + j] != 0) {
@@ -2338,12 +2338,14 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                                               offset);
         isNativeSegwit = btchip_output_script_is_native_witness(
             btchip_context_D.currentOutput + offset);
-        isOpCreate = btchip_output_script_is_op_create(
-            btchip_context_D.currentOutput + offset,
-            sizeof(btchip_context_D.currentOutput) - offset);
-        isOpCall = btchip_output_script_is_op_call(
-            btchip_context_D.currentOutput + offset,
-            sizeof(btchip_context_D.currentOutput) - offset);
+        if(G_coin_config->kind == COIN_KIND_QTUM) {
+            isOpCreate = btchip_output_script_is_op_create(
+                btchip_context_D.currentOutput + offset,
+                sizeof(btchip_context_D.currentOutput) - offset);
+            isOpCall = btchip_output_script_is_op_call(
+                btchip_context_D.currentOutput + offset,
+                sizeof(btchip_context_D.currentOutput) - offset);
+        }
         // Always notify OP_RETURN to the user
         if (nullAmount && isOpReturn) {
             if (!checkOnly) {
