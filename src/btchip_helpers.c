@@ -18,6 +18,7 @@
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
 
+#ifdef HAVE_QTUM_SUPPORT
 /** Script opcodes */
 enum opcodetype
 {
@@ -34,6 +35,7 @@ enum opcodetype
 
     OP_INVALIDOPCODE = 0xff,
 };
+#endif
 
 const unsigned char TRANSACTION_OUTPUT_SCRIPT_PRE[] = {
     0x19, 0x76, 0xA9,
@@ -137,6 +139,7 @@ unsigned char btchip_output_script_is_native_witness(unsigned char *buffer) {
     return 0;
 }
 
+#ifdef HAVE_QTUM_SUPPORT
 unsigned char btchip_get_script_op(unsigned char ** pc, const unsigned char * end, unsigned char* opcodeRet)
 {
     *opcodeRet = OP_INVALIDOPCODE;
@@ -223,11 +226,13 @@ int btchip_find_script_op(unsigned char *buffer, size_t size, unsigned char op, 
             ++nFound;
     return nFound;
 }
+#endif
 
 unsigned char btchip_output_script_is_op_return(unsigned char *buffer) {
     return (buffer[1] == 0x6A);
 }
 
+#ifdef HAVE_QTUM_SUPPORT
 static unsigned char output_script_is_op_contract(unsigned char *buffer,
                                                         size_t size,
                                                         unsigned char value) {
@@ -251,6 +256,7 @@ unsigned char btchip_output_script_is_op_sender(unsigned char *buffer,
                                               size_t size) {
     return output_script_is_op_contract(buffer, size, OP_SENDER);
 }
+#endif
 
 unsigned char btchip_rng_u8_modulo(unsigned char modulo) {
     unsigned int rng_max = 256 % modulo;
