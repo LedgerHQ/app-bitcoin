@@ -24,7 +24,9 @@
 #include "btchip_secure_value.h"
 #include "btchip_filesystem_tx.h"
 
+#ifndef MAX_OUTPUT_TO_CHECK
 #define MAX_OUTPUT_TO_CHECK 200
+#endif
 #define MAX_COIN_ID 13
 #define MAX_SHORT_COIN_ID 5
 
