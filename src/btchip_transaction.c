@@ -286,8 +286,12 @@ void transaction_parse(unsigned char parseMode) {
                     if (btchip_context_D.called_from_swap) {
                         // remember number of inputs to know when to exit from library
                         // we will count number of already signed inputs and compare with this value
-                        vars.swap_data.totalNumberOfInputs = 
-                            btchip_context_D.transactionContext.transactionRemainingInputsOutputs;
+                        // As there are a lot of different states in which we can have different number of input
+                        // (when for ex. we sign segregated witness)
+                        if (vars.swap_data.totalNumberOfInputs == 0) {
+                            vars.swap_data.totalNumberOfInputs = 
+                                btchip_context_D.transactionContext.transactionRemainingInputsOutputs;
+                        }
                         // Reseting the flag, because we should check address ones for each input
                         vars.swap_data.was_address_checked = 0;
                     }
