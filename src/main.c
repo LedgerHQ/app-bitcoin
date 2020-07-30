@@ -2041,12 +2041,9 @@ unsigned char io_event(unsigned char channel) {
 
     case SEPROXYHAL_TAG_TICKER_EVENT:
         // TODO: found less hacky way to exit library after sending response
-        // this mechanism is used for Swap/Exhcange functionality
-        // when application is in silient mode, and should return to caller,
+        // this mechanism is used for Swap/Exchange functionality
+        // when application is in silent mode, and should return to caller,
         // after responding some APDUs
-        if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
-            os_sched_exit(0);
-        }
         UX_TICKER_EVENT(G_io_seproxyhal_spi_buffer, {
             // don't redisplay if UX not allowed (pin locked in the common bolos
             // ux ?)
