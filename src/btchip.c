@@ -117,11 +117,19 @@ void app_main(void) {
 
         // os_memset(G_io_apdu_buffer, 0, 255); // paranoia
 
+        if (vars.swap_data.should_exit) {
+            btchip_context_D.io_flags |= IO_RETURN_AFTER_TX;
+        }
+
         // receive the whole apdu using the 7 bytes headers (ledger transport)
         btchip_context_D.inLength =
             io_exchange(CHANNEL_APDU | btchip_context_D.io_flags,
                         // use the previous outlength as the reply
                         btchip_context_D.outLength);
+
+        if (vars.swap_data.should_exit) {
+            os_sched_exit(0);
+        }
 
         PRINTF("New APDU received:\n%.*H\n", btchip_context_D.inLength, G_io_apdu_buffer);
 
