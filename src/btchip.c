@@ -117,7 +117,7 @@ void app_main(void) {
 
         // os_memset(G_io_apdu_buffer, 0, 255); // paranoia
 
-        if (vars.swap_data.should_exit) {
+        if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
             btchip_context_D.io_flags |= IO_RETURN_AFTER_TX;
         }
 
@@ -127,7 +127,7 @@ void app_main(void) {
                         // use the previous outlength as the reply
                         btchip_context_D.outLength);
 
-        if (vars.swap_data.should_exit) {
+        if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
             os_sched_exit(0);
         }
 
