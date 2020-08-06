@@ -135,7 +135,7 @@ int btchip_encode_base58(const unsigned char *in, size_t length,
         out[i] = BASE58ALPHABET[out[i - distance]];
   }
   os_memset(out, BASE58ALPHABET[0], zeroCount);
-  PRINTF("Length encoded %d\n", i);
-  PRINTF("Encoded\n%.*H\n",i,out);
+  // PRINTF("Length encoded %d\n", i);
+  // PRINTF("Encoded\n%.*H\n",i,out);
   return 0;
 }
