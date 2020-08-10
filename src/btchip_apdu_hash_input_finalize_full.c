@@ -46,7 +46,7 @@ static bool check_output_displayable() {
     bool displayable = true;
     unsigned char amount[8], isOpReturn, isP2sh, isNativeSegwit, j,
         nullAmount = 1;
-    unsigned char isOpCreate = 0, isOpCall = 0;
+    unsigned char isOpCreate = 0, isOpCall = 0, isOpSender = 0;
 
     for (j = 0; j < 8; j++) {
         if (btchip_context_D.currentOutput[j] != 0) {
@@ -72,6 +72,9 @@ static bool check_output_displayable() {
         isOpCall =
             btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8,
               sizeof(btchip_context_D.currentOutput) - 8);
+        isOpSender =
+            btchip_output_script_is_op_sender(btchip_context_D.currentOutput + 8,
+              sizeof(btchip_context_D.currentOutput) - 8);
     }
     #endif
     if (((G_coin_config->kind == COIN_KIND_QTUM) &&
@@ -89,7 +92,7 @@ static bool check_output_displayable() {
             (isNativeSegwit ? OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET
                             : isP2sh ? OUTPUT_SCRIPT_P2SH_PRE_LENGTH
                                      : OUTPUT_SCRIPT_REGULAR_PRE_LENGTH);
-        if (!isP2sh &&
+        if (!isP2sh && !isOpSender &&
             os_memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
                       btchip_context_D.tmpCtx.output.changeAddress + 1,
                       20) == 0) {
