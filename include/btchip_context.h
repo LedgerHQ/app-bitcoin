@@ -202,6 +202,7 @@ struct btchip_context_s {
     unsigned char segwitParsedOnce;
     /** Prevents display of segwit input warning at each InputHashStart APDU */
     unsigned char segwitWarningSeen;
+    unsigned char signOpSender;
 
     /* /Segregated Witness changes */
 

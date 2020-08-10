@@ -27,6 +27,7 @@
 #define P2_NEW_SEGWIT_OVERWINTER 0x04
 #define P2_NEW_SEGWIT_SAPLING 0x05
 #define P2_CONTINUE 0x80
+#define P2_NEW_SENDER 0x81
 
 #define IS_INPUT()                                                          \
     (G_io_apdu_buffer[ISO_OFFSET_LC] - 1 > 8                                \
@@ -67,7 +68,8 @@ unsigned short btchip_apdu_hash_input_start() {
         (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT) ||
         (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_CASHADDR) ||
         (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_OVERWINTER) ||
-        (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_SAPLING)) {
+        (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_SAPLING) ||
+        (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SENDER)) {
         // btchip_context_D.transactionContext.consumeP2SH =
         // ((N_btchip.bkp.config.options & BTCHIP_OPTION_SKIP_2FA_P2SH) != 0);
         if (G_io_apdu_buffer[ISO_OFFSET_P1] == P1_FIRST) {
@@ -78,6 +80,8 @@ unsigned short btchip_apdu_hash_input_start() {
                 (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_SAPLING);
             unsigned char usingCashAddr =
                 (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_CASHADDR);
+            unsigned char signOpSender =
+                (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SENDER);
             // Request PIN validation
             // Only request PIN validation (user presence) to start a new
             // transaction signing flow.
@@ -93,6 +97,7 @@ unsigned short btchip_apdu_hash_input_start() {
             btchip_context_D.transactionContext.consumeP2SH = 0;
             btchip_context_D.transactionContext.relaxed = 0;
             btchip_context_D.usingSegwit = usingSegwit;
+            btchip_context_D.signOpSender = signOpSender;
             btchip_context_D.usingCashAddr =
                 (G_coin_config->kind == COIN_KIND_BITCOIN_CASH ? usingCashAddr
                                                                : 0);

@@ -1698,6 +1698,15 @@ UX_STEP_VALID(
       &C_icon_crossmark,
       "Reject",
     });
+UX_STEP_VALID(
+    ux_confirm_full_flow_7_step, 
+    pbb, 
+    io_seproxyhal_touch_verify_ok(NULL),
+    {
+      &C_icon_validate_14,
+      "Sign",
+      "OP_SENDER",
+    });
 // confirm_full: confirm transaction / Amount: fullAmount / Address: fullAddress / Fees: feesAmount
 UX_FLOW(ux_confirm_full_flow,
   &ux_confirm_full_flow_1_step,
@@ -1705,6 +1714,16 @@ UX_FLOW(ux_confirm_full_flow,
   &ux_confirm_full_flow_3_step,
   &ux_confirm_full_flow_4_step,
   &ux_confirm_full_flow_5_step,
+  &ux_confirm_full_flow_6_step
+);
+
+// confirm_full: sign output sender transaction / Amount: fullAmount / Address: fullAddress / Fees: feesAmount
+UX_FLOW(ux_confirm_sender_flow,
+  &ux_confirm_full_flow_1_step,
+  &ux_confirm_full_flow_2_step,
+  &ux_confirm_full_flow_3_step,
+  &ux_confirm_full_flow_4_step,
+  &ux_confirm_full_flow_7_step,
   &ux_confirm_full_flow_6_step
 );
 
@@ -1791,11 +1810,28 @@ UX_STEP_VALID(
       &C_icon_crossmark,
       "Reject",
     });
+UX_STEP_VALID(
+    ux_finalize_flow_7_step, 
+    pbb, 
+    io_seproxyhal_touch_verify_ok(NULL),
+    {
+      &C_icon_validate_14,
+      "Sign",
+      "OP_SENDER",
+    });
 // finalize: confirm transaction / Fees: feesAmount
 UX_FLOW(ux_finalize_flow,
   &ux_finalize_flow_1_step,
   &ux_finalize_flow_4_step,
   &ux_finalize_flow_5_step,
+  &ux_finalize_flow_6_step
+);
+
+// finalize: sign output sender transaction / Fees: feesAmount
+UX_FLOW(ux_finalize_sender_flow,
+  &ux_finalize_flow_1_step,
+  &ux_finalize_flow_4_step,
+  &ux_finalize_flow_7_step,
   &ux_finalize_flow_6_step
 );
 
@@ -2584,7 +2620,12 @@ unsigned int btchip_bagl_confirm_full_output() {
 #if defined(TARGET_BLUE)
     ui_transaction_full_blue_init();
 #elif defined(HAVE_UX_FLOW)
-    ux_flow_init(0, ux_confirm_full_flow, NULL);
+    if(btchip_context_D.signOpSender) {
+        ux_flow_init(0, ux_confirm_sender_flow, NULL);
+    }
+    else {
+        ux_flow_init(0, ux_confirm_full_flow, NULL);
+    }
 #elif defined(TARGET_NANOS)
     ux_step = 0;
     ux_step_count = 4;
@@ -2630,7 +2671,12 @@ unsigned int btchip_bagl_finalize_tx() {
 #if defined(TARGET_BLUE)
     ui_transaction_finalize_blue_init();
 #elif defined(HAVE_UX_FLOW)
-    ux_flow_init(0, ux_finalize_flow, NULL);
+    if(btchip_context_D.signOpSender) {
+        ux_flow_init(0, ux_finalize_sender_flow, NULL);
+    }
+    else {
+        ux_flow_init(0, ux_finalize_flow, NULL);
+    }
 #elif defined(TARGET_NANOS)
     ux_step = 0;
     ux_step_count = 2;
