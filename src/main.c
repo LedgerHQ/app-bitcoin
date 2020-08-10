@@ -2898,6 +2898,7 @@ void app_exit(void) {
 // used when application is compiled statically (no lib dependency)
 btchip_altcoin_config_t const C_coin_config = {
     .bip44_coin_type = BIP44_COIN_TYPE,
+    .bip44_coin_type2 = BIP44_COIN_TYPE_2,
     .p2pkh_version = COIN_P2PKH_VERSION,
     .p2sh_version = COIN_P2SH_VERSION,
     .family = COIN_FAMILY,

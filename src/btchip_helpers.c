@@ -366,7 +366,8 @@ unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_pa
 
     // If the coin type doesn't match, return a warning
     if ((G_coin_config->bip44_coin_type != 0) &&
-        ((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) != G_coin_config->bip44_coin_type)) {
+        (((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) != G_coin_config->bip44_coin_type) &&
+          ((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) != G_coin_config->bip44_coin_type2))) {
         return 1;
     }    
 
@@ -410,7 +411,8 @@ unsigned char enforce_bip44_coin_type(unsigned char *bip32Path) {
     if (((bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) == 44 ||
        (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) == 49 ||
        (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) == 84) &&
-       ((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) == G_coin_config->bip44_coin_type)) {
+       (((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) == G_coin_config->bip44_coin_type) ||
+        ((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) == G_coin_config->bip44_coin_type2))) {
         // Valid BIP 44 path
         return 1;
     }
