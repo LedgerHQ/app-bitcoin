@@ -52,4 +52,9 @@ void btchip_bagl_request_change_path_approval(unsigned char* change_path);
 // UI to confirm processing of tx with segwit inputs
 void btchip_bagl_request_segwit_input_approval(void);
 
+// UI to confirm signing path
+void btchip_bagl_request_sign_path_approval(unsigned char *derivation_path);
+void btchip_bagl_user_action_signtx(unsigned char confirming, unsigned char direct);
+
+
 #endif /* _BTCHIP_BAGL_H_ */
