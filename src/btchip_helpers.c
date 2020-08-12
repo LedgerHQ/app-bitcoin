@@ -308,6 +308,13 @@ unsigned char btchip_get_script_sender_address(unsigned char *buffer,
     if(ret) btchip_get_script_p2pkh(pkh, script);
     return ret;
 }
+
+unsigned char btchip_get_sender_sig(unsigned char *buffer,
+                                              size_t size, unsigned char **sig, unsigned int *sigSize) {
+    if(sig == 0 || sigSize == 0)
+        return 0;
+    return btchip_find_script_data(buffer, size, 3, 1, sig, sigSize) && *sig != 0 && *sigSize > 0;
+}
 #endif
 
 unsigned char btchip_rng_u8_modulo(unsigned char modulo) {
