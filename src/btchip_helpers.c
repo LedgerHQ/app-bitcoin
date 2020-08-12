@@ -260,14 +260,16 @@ unsigned char btchip_find_script_data(unsigned char *buffer, size_t size, int in
     return i == index;
 }
 
-void btchip_get_script_p2pkh(const unsigned char *pkh, unsigned char *script)
+void btchip_get_script_p2pkh(const unsigned char *pkh, unsigned char *script, unsigned char haveSize)
 {
-    script[0] = OP_DUP;
-    script[1] = OP_HASH160;
-    script[2] = 0x14;
-    os_memcpy(script + 3, pkh, 20);
-    script[23] = OP_EQUALVERIFY;
-    script[24] = OP_CHECKSIG;
+    unsigned char offset = haveSize ? 1 : 0;
+    if(haveSize) script[0] = 0x19;
+    script[0 + offset] = OP_DUP;
+    script[1 + offset] = OP_HASH160;
+    script[2 + offset] = 0x14;
+    os_memcpy(script + 3 + offset, pkh, 20);
+    script[23 + offset] = OP_EQUALVERIFY;
+    script[24 + offset] = OP_CHECKSIG;
 }
 #endif
 
@@ -305,7 +307,7 @@ unsigned char btchip_get_script_sender_address(unsigned char *buffer,
     unsigned char *pkh = 0;
     unsigned int pkhSize = 0;
     unsigned char ret = btchip_find_script_data(buffer, size, 2, 1, &pkh, &pkhSize) == 1 && pkh != 0 && pkhSize == 20;
-    if(ret) btchip_get_script_p2pkh(pkh, script);
+    if(ret) btchip_get_script_p2pkh(pkh, script, 1);
     return ret;
 }
 

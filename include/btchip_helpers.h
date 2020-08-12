@@ -38,6 +38,8 @@ unsigned char btchip_output_script_is_op_call(unsigned char *buffer,
                                                 size_t size);
 unsigned char btchip_output_script_is_op_sender(unsigned char *buffer,
                                                 size_t size);
+unsigned char btchip_get_script_size(unsigned char *buffer, size_t maxSize, 
+                                                unsigned int *scriptSize, unsigned int *discardSize);
 unsigned char btchip_get_script_sender_address(unsigned char *buffer,
                                                 size_t size, unsigned char *script);
 unsigned char btchip_get_sender_sig(unsigned char *buffer,
