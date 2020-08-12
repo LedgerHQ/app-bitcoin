@@ -38,6 +38,8 @@ unsigned char btchip_output_script_is_op_call(unsigned char *buffer,
                                                 size_t size);
 unsigned char btchip_output_script_is_op_sender(unsigned char *buffer,
                                                 size_t size);
+unsigned char btchip_get_script_sender_address(unsigned char *buffer,
+                                                size_t size, unsigned char *script);
 #endif
 
 void btchip_sleep16(unsigned short delay);

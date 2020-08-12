@@ -27,6 +27,16 @@ enum opcodetype
     OP_PUSHDATA2 = 0x4d,
     OP_PUSHDATA4 = 0x4e,
 
+    // stack ops
+    OP_DUP = 0x76,
+
+    // bit logic
+    OP_EQUALVERIFY = 0x88,
+
+    // crypto
+    OP_HASH160 = 0xa9,
+    OP_CHECKSIG = 0xac,
+
     // Execute EXT byte code.
     OP_CREATE = 0xc1,
     OP_CALL = 0xc2,
@@ -140,11 +150,16 @@ unsigned char btchip_output_script_is_native_witness(unsigned char *buffer) {
 }
 
 #ifdef HAVE_QTUM_SUPPORT
-unsigned char btchip_get_script_op(unsigned char ** pc, const unsigned char * end, unsigned char* opcodeRet)
+unsigned char btchip_get_script_op(unsigned char ** pc, const unsigned char * end, unsigned char* opcodeRet, unsigned char **pvchRet, unsigned int *pvchSize)
 {
     *opcodeRet = OP_INVALIDOPCODE;
     if (*pc >= end)
         return 0;
+
+    if(pvchRet)
+        *pvchRet = 0;
+    if(pvchSize)
+        *pvchSize = 0;
 
     // Read instruction
     if (end - *pc < 1)
@@ -182,6 +197,10 @@ unsigned char btchip_get_script_op(unsigned char ** pc, const unsigned char * en
         }
         if (end - *pc < 0 || (unsigned int)(end - *pc) < nSize)
             return 0;
+        if(pvchRet)
+            *pvchRet = *pc;
+        if(pvchSize)
+            *pvchSize = nSize;
         *pc += nSize;
     }
 
@@ -221,10 +240,34 @@ int btchip_find_script_op(unsigned char *buffer, size_t size, unsigned char op, 
     unsigned char opcode = OP_INVALIDOPCODE;
     const unsigned char* end = buffer + scriptSize + discardSize;
     unsigned char *begin = buffer + discardSize;
-    for (unsigned char * pc = begin; pc != end && btchip_get_script_op(&pc, end, &opcode);)
+    for (unsigned char * pc = begin; pc != end && btchip_get_script_op(&pc, end, &opcode, 0, 0);)
         if (opcode == op)
             ++nFound;
     return nFound;
+}
+
+unsigned char btchip_find_script_data(unsigned char *buffer, size_t size, int index, unsigned char haveSize,  unsigned char **pvchRet, unsigned int *pvchSize)
+{
+    unsigned int scriptSize = size;
+    unsigned int discardSize = 0;
+    if(haveSize)
+        btchip_get_script_size(buffer, size, &scriptSize, &discardSize);
+    unsigned char opcode = OP_INVALIDOPCODE;
+    const unsigned char* end = buffer + scriptSize + discardSize;
+    unsigned char *begin = buffer + discardSize;
+    int i = 0;
+    for (unsigned char * pc = begin; i < index && pc != end && btchip_get_script_op(&pc, end, &opcode, pvchRet, pvchSize); i++);
+    return i == index;
+}
+
+void btchip_get_script_p2pkh(const unsigned char *pkh, unsigned char *script)
+{
+    script[0] = OP_DUP;
+    script[1] = OP_HASH160;
+    script[2] = 0x14;
+    os_memcpy(script + 3, pkh, 20);
+    script[23] = OP_EQUALVERIFY;
+    script[24] = OP_CHECKSIG;
 }
 #endif
 
@@ -255,6 +298,15 @@ unsigned char btchip_output_script_is_op_call(unsigned char *buffer,
 unsigned char btchip_output_script_is_op_sender(unsigned char *buffer,
                                               size_t size) {
     return output_script_is_op_contract(buffer, size, OP_SENDER);
+}
+
+unsigned char btchip_get_script_sender_address(unsigned char *buffer,
+                                              size_t size, unsigned char *script) {
+    unsigned char *pkh = 0;
+    unsigned int pkhSize = 0;
+    unsigned char ret = btchip_find_script_data(buffer, size, 2, 1, &pkh, &pkhSize) == 1 && pkh != 0 && pkhSize == 20;
+    if(ret) btchip_get_script_p2pkh(pkh, script);
+    return ret;
 }
 #endif
 
