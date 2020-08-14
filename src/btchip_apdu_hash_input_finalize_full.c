@@ -86,6 +86,25 @@ static bool check_output_displayable() {
         PRINTF("Error : Unrecognized output script");
         THROW(EXCEPTION);
     }
+    #ifdef HAVE_QTUM_SUPPORT
+    if((G_coin_config->kind == COIN_KIND_QTUM) && isOpSender && (isOpCreate || isOpCall))
+    {
+        unsigned char *sig = 0;
+        unsigned int sigSize = 0;
+        btchip_get_sender_sig(btchip_context_D.currentOutput + 8,
+                                                sizeof(btchip_context_D.currentOutput) - 8, &sig, &sigSize);
+        if(!btchip_context_D.signOpSender && sigSize == 0)
+        {
+            PRINTF("Error : No op_sender signature");
+            THROW(EXCEPTION);
+        }
+        if(btchip_context_D.signOpSender && sigSize > 0)
+        {
+            PRINTF("Error : op_sender is already signed");
+            THROW(EXCEPTION);
+        }
+    }
+    #endif
     if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {
         bool changeFound = false;
         unsigned char addressOffset =
