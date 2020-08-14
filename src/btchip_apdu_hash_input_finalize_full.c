@@ -332,10 +332,13 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     sw = BTCHIP_SW_INCORRECT_DATA;
                     goto discardTransaction;
                 }
+                #ifndef USE_NO_OVERWINTER
                 if (btchip_context_D.usingOverwinter) {
                     cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, G_io_apdu_buffer + ISO_OFFSET_CDATA + hashOffset, apduLength - hashOffset, NULL, 0);
                 }
-                else {
+                else
+                #endif
+                {
                     PRINTF("--- ADD TO HASH FULL:\n%.*H\n", apduLength - hashOffset, G_io_apdu_buffer + ISO_OFFSET_CDATA + hashOffset);
                     cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
                         G_io_apdu_buffer + ISO_OFFSET_CDATA + hashOffset,
@@ -392,10 +395,13 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
 
             if (btchip_context_D.usingSegwit) {
                 if (!btchip_context_D.segwitParsedOnce) {
+                    #ifndef USE_NO_OVERWINTER
                     if (btchip_context_D.usingOverwinter) {
                         cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, btchip_context_D.segwit.cache.hashedOutputs, 0, btchip_context_D.segwit.cache.hashedOutputs, 32);
                     }
-                    else {
+                    else
+                    #endif
+                    {
                         cx_hash(&btchip_context_D.transactionHashFull.sha256.header,
                             CX_LAST,
                             btchip_context_D.segwit.cache.hashedOutputs, 0,

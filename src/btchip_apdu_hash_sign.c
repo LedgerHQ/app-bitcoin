@@ -142,11 +142,13 @@ unsigned short btchip_apdu_hash_sign() {
             // blank input to sign
 
             // Finalize the hash
-
+            #ifndef USE_NO_OVERWINTER
             if (btchip_context_D.usingOverwinter) {
                 cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hash2, 0, hash2, 32);
             }
-            else {
+            else
+            #endif
+            {
                 btchip_write_u32_le(dataBuffer, lockTime);
                 btchip_write_u32_le(dataBuffer + 4, sighashType);
                 if(btchip_context_D.signOpSender)

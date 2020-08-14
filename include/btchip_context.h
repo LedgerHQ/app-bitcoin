@@ -98,7 +98,9 @@ typedef enum btchip_output_parsing_state_e btchip_output_parsing_state_t;
 
 typedef union multi_hash {
     cx_sha256_t sha256;
+#ifndef USE_NO_OVERWINTER
     cx_blake2b_t blake2b;
+#endif
 } multi_hash;
 
 struct segwit_hash_s {
