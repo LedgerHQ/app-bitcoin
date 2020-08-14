@@ -2194,71 +2194,6 @@ error:
 #define MAIDSAFE_ASSETID 3
 #define USDT_ASSETID 31
 
-unsigned char btchip_hash_sender_finalize(unsigned char* senderOutput)
-{
-    cx_sha256_init(&btchip_context_D.transactionOutputHash);
-
-    // Use cache data generated from Segwit
-    PRINTF("--- ADD TO HASH SENDER:\n%.*H\n", sizeof(btchip_context_D.transactionVersion), btchip_context_D.transactionVersion);
-    cx_hash(
-        &btchip_context_D.transactionOutputHash, 0,
-        btchip_context_D.transactionVersion,
-        sizeof(btchip_context_D.transactionVersion),
-        NULL, 0);
-
-    PRINTF("--- ADD TO HASH SENDER:\n%.*H\n", sizeof(btchip_context_D.segwit.cache.hashedPrevouts), btchip_context_D.segwit.cache.hashedPrevouts);
-    cx_hash(
-        &btchip_context_D.transactionOutputHash, 0,
-        btchip_context_D.segwit.cache.hashedPrevouts,
-        sizeof(btchip_context_D.segwit.cache
-               .hashedPrevouts),
-        NULL, 0);
-
-    PRINTF("--- ADD TO HASH SENDER:\n%.*H\n", sizeof(btchip_context_D.segwit.cache.hashedSequence), btchip_context_D.segwit.cache.hashedSequence);
-    cx_hash(
-        &btchip_context_D.transactionOutputHash, 0,
-        btchip_context_D.segwit.cache.hashedSequence,
-        sizeof(btchip_context_D.segwit.cache
-               .hashedSequence),
-        NULL, 0);
-
-    // Op sender specific data
-    unsigned int scriptSize = 0;
-    unsigned int discardSize = 0;
-    if(btchip_get_script_size(senderOutput + 8, sizeof(btchip_context_D.currentOutput), &scriptSize, &discardSize))
-    {
-        unsigned outputSize = 8 + scriptSize + discardSize;
-        PRINTF("--- ADD TO HASH SENDER:\n%.*H\n", outputSize, senderOutput);
-        cx_hash(
-            &btchip_context_D.transactionOutputHash, 0,
-            senderOutput,
-            outputSize,
-            NULL, 0);
-        
-        unsigned char scriptCode[26];
-        if(!btchip_get_script_sender_address(senderOutput + 8, sizeof(btchip_context_D.currentOutput), scriptCode))
-            return 0;
-
-        PRINTF("--- ADD TO HASH SENDER:\n%.*H\n", sizeof(scriptCode), scriptCode);
-        cx_hash(
-            &btchip_context_D.transactionOutputHash.header, 0,
-            scriptCode,
-            sizeof(scriptCode),
-            NULL, 0);
-
-        PRINTF("--- ADD TO HASH SENDER:\n%.*H\n", 8, senderOutput);
-        cx_hash(
-            &btchip_context_D.transactionOutputHash.header, 0,
-            senderOutput,
-            8,
-            NULL, 0);
-    }
-    else 
-        return 0;
-
-    return 1;
-}
-
 uint8_t prepare_single_output() {
     // TODO : special display for OP_RETURN
     unsigned char amount[8];
@@ -2282,11 +2217,6 @@ uint8_t prepare_single_output() {
         isOpSender = btchip_output_script_is_op_sender(
                  btchip_context_D.currentOutput + offset,
                  sizeof(btchip_context_D.currentOutput) - offset);
-        if(btchip_context_D.signOpSender && isOpSender)
-        {
-            unsigned char* senderOutput = btchip_context_D.currentOutput + offset - 8;
-            btchip_hash_sender_finalize(senderOutput);
-        }
     }
     #endif
     if (btchip_output_script_is_op_return(btchip_context_D.currentOutput +
@@ -2297,11 +2227,21 @@ uint8_t prepare_single_output() {
                btchip_output_script_is_op_create(
                    btchip_context_D.currentOutput + offset,
                    sizeof(btchip_context_D.currentOutput) - offset)) {
+        if(btchip_context_D.signOpSender && isOpSender)
+        {
+            unsigned char* senderOutput = btchip_context_D.currentOutput + offset - 8;
+            btchip_hash_sender_start(senderOutput);
+        }
         strcpy(vars.tmp.fullAddress, isOpSender ? "OP_SENDER_CREATE" : "OP_CREATE");
     } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
                btchip_output_script_is_op_call(
                  btchip_context_D.currentOutput + offset,
                  sizeof(btchip_context_D.currentOutput) - offset)) {
+        if(btchip_context_D.signOpSender && isOpSender)
+        {
+            unsigned char* senderOutput = btchip_context_D.currentOutput + offset - 8;
+            btchip_hash_sender_start(senderOutput);
+        }
         strcpy(vars.tmp.fullAddress, isOpSender ? "OP_SENDER_CALL" : "OP_CALL");
     #endif
     } else if (nativeSegwit) {

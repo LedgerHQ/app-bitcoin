@@ -15,19 +15,13 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef BTCHIP_INTERNAL_H
-#define BTCHIP_INTERNAL_H
+#ifndef BTCHIP_HASH_SENDER_SIGN_H
+#define BTCHIP_HASH_SENDER_SIGN_H
+#ifdef HAVE_QTUM_SUPPORT
+#include "os.h"
+#include "cx.h"
 
-#include "btchip.h"
-#include "btchip_public_ram_variables.h"
-#include "btchip_public_ram_key_variables.h"
-#include "btchip_rom_variables.h"
-#include "btchip_filesystem.h"
-#include "btchip_base58.h"
-#include "btchip_bcd.h"
-#include "btchip_ecc.h"
-#include "btchip_helpers.h"
-#include "btchip_transaction.h"
-#include "btchip_hash_sender_sign.h"
-
+unsigned char btchip_hash_sender_start(unsigned char* senderOutput);
+void btchip_hash_sender_finalize(unsigned char* dataBuffer, unsigned int bufferSize, unsigned char* hash1);
+#endif
 #endif

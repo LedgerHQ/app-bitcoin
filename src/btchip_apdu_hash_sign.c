@@ -153,16 +153,7 @@ unsigned short btchip_apdu_hash_sign() {
                 btchip_write_u32_le(dataBuffer + 4, sighashType);
                 if(btchip_context_D.signOpSender)
                 {
-                    PRINTF("--- ADD TO HASH SENDER:\n%.*H\n", sizeof(btchip_context_D.segwit.cache.hashedOutputs), btchip_context_D.segwit.cache.hashedOutputs);
-                    cx_hash(
-                        &btchip_context_D.transactionOutputHash.header, 0,
-                        btchip_context_D.segwit.cache.hashedOutputs,
-                        sizeof(btchip_context_D.segwit.cache
-                               .hashedOutputs),
-                        NULL, 0);
-                    PRINTF("--- ADD TO HASH SENDER:\n%.*H\n", sizeof(dataBuffer), dataBuffer);
-                    cx_hash(&btchip_context_D.transactionOutputHash.header, CX_LAST,
-                        dataBuffer, sizeof(dataBuffer), hash1, 32);
+                    btchip_hash_sender_finalize(dataBuffer, sizeof(dataBuffer), hash1);
                 }
                 else
                 {
