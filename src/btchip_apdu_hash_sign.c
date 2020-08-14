@@ -151,11 +151,13 @@ unsigned short btchip_apdu_hash_sign() {
             {
                 btchip_write_u32_le(dataBuffer, lockTime);
                 btchip_write_u32_le(dataBuffer + 4, sighashType);
+                #ifdef HAVE_QTUM_SUPPORT
                 if(btchip_context_D.signOpSender)
                 {
                     btchip_hash_sender_finalize(dataBuffer, sizeof(dataBuffer), hash1);
                 }
                 else
+                #endif
                 {
                     PRINTF("--- ADD TO HASH FULL:\n%.*H\n", sizeof(dataBuffer), dataBuffer);
                     cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,

@@ -190,7 +190,9 @@ struct btchip_context_s {
     cx_sha256_t transactionHashAuthorization;
     /** Current hash to perform (TRANSACTION_HASH_) */
     unsigned char transactionHashOption;
+    #ifdef HAVE_QTUM_SUPPORT
     cx_sha256_t transactionOutputHash;
+    #endif
 
     /* Segregated Witness changes */
 
@@ -205,7 +207,9 @@ struct btchip_context_s {
     unsigned char segwitParsedOnce;
     /** Prevents display of segwit input warning at each InputHashStart APDU */
     unsigned char segwitWarningSeen;
+    #ifdef HAVE_QTUM_SUPPORT
     unsigned char signOpSender;
+    #endif
 
     /* /Segregated Witness changes */
 

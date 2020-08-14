@@ -28,6 +28,8 @@
 #include "btchip_ecc.h"
 #include "btchip_helpers.h"
 #include "btchip_transaction.h"
+#ifdef HAVE_QTUM_SUPPORT
 #include "btchip_hash_sender_sign.h"
+#endif
 
 #endif
