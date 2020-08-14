@@ -188,6 +188,7 @@ struct btchip_context_s {
     cx_sha256_t transactionHashAuthorization;
     /** Current hash to perform (TRANSACTION_HASH_) */
     unsigned char transactionHashOption;
+    cx_sha256_t transactionOutputHash;
 
     /* Segregated Witness changes */
 

@@ -149,10 +149,26 @@ unsigned short btchip_apdu_hash_sign() {
             else {
                 btchip_write_u32_le(dataBuffer, lockTime);
                 btchip_write_u32_le(dataBuffer + 4, sighashType);
-                PRINTF("--- ADD TO HASH FULL:\n%.*H\n", sizeof(dataBuffer), dataBuffer);
+                if(btchip_context_D.signOpSender)
+                {
+                    PRINTF("--- ADD TO HASH SENDER:\n%.*H\n", sizeof(btchip_context_D.segwit.cache.hashedOutputs), btchip_context_D.segwit.cache.hashedOutputs);
+                    cx_hash(
+                        &btchip_context_D.transactionOutputHash.header, 0,
+                        btchip_context_D.segwit.cache.hashedOutputs,
+                        sizeof(btchip_context_D.segwit.cache
+                               .hashedOutputs),
+                        NULL, 0);
+                    PRINTF("--- ADD TO HASH SENDER:\n%.*H\n", sizeof(dataBuffer), dataBuffer);
+                    cx_hash(&btchip_context_D.transactionOutputHash.header, CX_LAST,
+                        dataBuffer, sizeof(dataBuffer), hash1, 32);
+                }
+                else
+                {
+                    PRINTF("--- ADD TO HASH FULL:\n%.*H\n", sizeof(dataBuffer), dataBuffer);
+                    cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
+                        dataBuffer, sizeof(dataBuffer), hash1, 32);
+                }
 
-                cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
-                    dataBuffer, sizeof(dataBuffer), hash1, 32);
                 PRINTF("Hash1\n%.*H\n", sizeof(hash1), hash1);
 
                 // Rehash

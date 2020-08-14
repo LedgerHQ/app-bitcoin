@@ -96,6 +96,8 @@ unsigned short btchip_apdu_hash_input_start() {
             btchip_context_D.transactionContext.firstSigned = 1;
             btchip_context_D.transactionContext.consumeP2SH = 0;
             btchip_context_D.transactionContext.relaxed = 0;
+            if(signOpSender)
+                usingSegwit = 1;
             btchip_context_D.usingSegwit = usingSegwit;
             btchip_context_D.signOpSender = signOpSender;
             btchip_context_D.usingCashAddr =

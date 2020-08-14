@@ -470,7 +470,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             }
 
             if (btchip_context_D.usingSegwit &&
-                !btchip_context_D.segwitParsedOnce) {
+                !btchip_context_D.segwitParsedOnce && !btchip_context_D.signOpSender) {
                 // This input cannot be signed when using segwit - just restart.
                 btchip_context_D.segwitParsedOnce = 1;
                 PRINTF("Segwit parsed once\n");
@@ -591,7 +591,7 @@ unsigned char btchip_bagl_user_action(unsigned char confirming) {
             btchip_context_D.transactionContext.firstSigned = 0;
 
             if (btchip_context_D.usingSegwit &&
-                !btchip_context_D.segwitParsedOnce) {
+                !btchip_context_D.segwitParsedOnce && !btchip_context_D.signOpSender) {
                 // This input cannot be signed when using segwit - just restart.
                 btchip_context_D.segwitParsedOnce = 1;
                 PRINTF("Segwit parsed once\n");
