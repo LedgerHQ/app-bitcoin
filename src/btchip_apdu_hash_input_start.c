@@ -17,6 +17,7 @@
 
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
+#include "btchip_bagl_extensions.h"
 
 #define P1_FIRST 0x00
 #define P1_NEXT 0x80
@@ -26,6 +27,17 @@
 #define P2_NEW_SEGWIT_OVERWINTER 0x04
 #define P2_NEW_SEGWIT_SAPLING 0x05
 #define P2_CONTINUE 0x80
+
+#define IS_INPUT()                                                          \
+    (G_io_apdu_buffer[ISO_OFFSET_LC] - 1 > 8                                \
+     && G_io_apdu_buffer[ISO_OFFSET_LC] - 1 <= TRUSTED_INPUT_TOTAL_SIZE + 2  \
+     && G_io_apdu_buffer[ISO_OFFSET_CDATA] <= 0x02)                         \
+
+#define IS_INPUT_TRUSTED()                                                  \
+    (G_io_apdu_buffer[ISO_OFFSET_CDATA] == 0x01                             \
+     && G_io_apdu_buffer[ISO_OFFSET_CDATA + 1] == TRUSTED_INPUT_TOTAL_SIZE   \
+     && G_io_apdu_buffer[ISO_OFFSET_CDATA + 2] == MAGIC_TRUSTED_INPUT       \
+     && G_io_apdu_buffer[ISO_OFFSET_CDATA + 3] == 0x00)
 
 unsigned short btchip_apdu_hash_input_start() {
     unsigned char apduLength;
@@ -101,11 +113,29 @@ unsigned short btchip_apdu_hash_input_start() {
             os_memset(&btchip_context_D.tmpCtx.output, 0,
                       sizeof(btchip_context_D.tmpCtx.output));
             btchip_context_D.tmpCtx.output.changeAccepted = 1;
+            // Reset segwitWarningSeen flag to prevent displaying the warning for each 
+            // segwit input when coontinuing from a previous session (P2=0x80)
+            btchip_context_D.segwitWarningSeen = 0;
         }
     } else if (G_io_apdu_buffer[ISO_OFFSET_P2] != P2_CONTINUE) {
         return BTCHIP_SW_INCORRECT_P1_P2;
     }
 
+    // In segwit mode, warn user one time only to update its client wallet...
+    if (btchip_context_D.usingSegwit 
+        && !btchip_context_D.segwitWarningSeen
+        &&(G_io_apdu_buffer[ISO_OFFSET_P1] == P1_NEXT)
+        && (G_io_apdu_buffer[ISO_OFFSET_P2] != P2_CONTINUE)
+        // ...if input is not passed as a TrustedInput
+        && IS_INPUT() 
+        && !IS_INPUT_TRUSTED())
+    {
+        btchip_context_D.segwitWarningSeen = 1;
+        btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
+        btchip_bagl_request_segwit_input_approval();
+    }
+
+    // Start parsing of the 1st chunk
     btchip_context_D.transactionBufferPointer =
         G_io_apdu_buffer + ISO_OFFSET_CDATA;
     btchip_context_D.transactionDataRemaining = apduLength;

@@ -31,8 +31,10 @@ unsigned char btchip_output_script_is_p2sh(unsigned char *buffer);
 unsigned char btchip_output_script_is_op_return(unsigned char *buffer);
 unsigned char btchip_output_script_is_native_witness(unsigned char *buffer);
 
-unsigned char btchip_output_script_is_op_create(unsigned char *buffer);
-unsigned char btchip_output_script_is_op_call(unsigned char *buffer);
+unsigned char btchip_output_script_is_op_create(unsigned char *buffer,
+                                                size_t size);
+unsigned char btchip_output_script_is_op_call(unsigned char *buffer,
+                                                size_t size);
 
 void btchip_sleep16(unsigned short delay);
 void btchip_sleep32(unsigned long int delayEach, unsigned long int delayRepeat);
@@ -66,6 +68,7 @@ void btchip_private_derive_keypair(unsigned char *bip32Path,
                                    unsigned char *out_chainCode);
 
 unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_path);
+unsigned char enforce_bip44_coin_type(unsigned char *bip32Path);
 unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned char max_out_len);
 
 // void btchip_set_check_internal_structure_integrity(unsigned char

@@ -124,18 +124,24 @@ unsigned char btchip_output_script_is_op_return(unsigned char *buffer) {
     return (buffer[1] == 0x6A);
 }
 
-unsigned char btchip_output_script_is_op_create(unsigned char *buffer) {
+static unsigned char output_script_is_op_create_or_call(unsigned char *buffer,
+                                                        size_t size,
+                                                        unsigned char value) {
     return (!btchip_output_script_is_regular(buffer) &&
             !btchip_output_script_is_p2sh(buffer) &&
             !btchip_output_script_is_op_return(buffer) && (buffer[0] <= 0xEA) &&
-            (buffer[buffer[0]] == 0xC1));
+            (buffer[0] < size) &&
+            (buffer[buffer[0]] == value));
 }
 
-unsigned char btchip_output_script_is_op_call(unsigned char *buffer) {
-    return (!btchip_output_script_is_regular(buffer) &&
-            !btchip_output_script_is_p2sh(buffer) &&
-            !btchip_output_script_is_op_return(buffer) && (buffer[0] <= 0xEA) &&
-            (buffer[buffer[0]] == 0xC2));
+unsigned char btchip_output_script_is_op_create(unsigned char *buffer,
+                                                size_t size) {
+    return output_script_is_op_create_or_call(buffer, size, 0xC1);
+}
+
+unsigned char btchip_output_script_is_op_call(unsigned char *buffer,
+                                              size_t size) {
+    return output_script_is_op_create_or_call(buffer, size, 0xC2);
 }
 
 unsigned char btchip_rng_u8_modulo(unsigned char modulo) {
@@ -225,7 +231,7 @@ void btchip_public_key_hash160(unsigned char *in, unsigned short inlen,
     cx_sha256_init(&u.shasha);
     cx_hash(&u.shasha.header, CX_LAST, in, inlen, buffer, 32);
     cx_ripemd160_init(&u.riprip);
-    cx_hash(&u.riprip.header, CX_LAST, buffer, 32, out, 32);
+    cx_hash(&u.riprip.header, CX_LAST, buffer, 32, out, 20);
 }
 
 unsigned short btchip_public_key_to_encoded_base58(
@@ -318,11 +324,15 @@ void btchip_private_derive_keypair(unsigned char *bip32Path,
         bip32PathInt[i] = btchip_read_u32(bip32Path, 1, 0);
         bip32Path += 4;
     }
+#ifndef TARGET_BLUE
     io_seproxyhal_io_heartbeat();
+#endif
     os_perso_derive_node_bip32(CX_CURVE_256K1, bip32PathInt, bip32PathLength,
                                privateComponent, out_chainCode);    
     btchip_retrieve_keypair_discard(privateComponent, derivePublic);
+#ifndef TARGET_BLUE
     io_seproxyhal_io_heartbeat();
+#endif
     os_memset(privateComponent, 0, sizeof(privateComponent));
 }
 
@@ -346,13 +356,20 @@ unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_pa
         bip32Path += 4;
     }
 
-    // If the path length is not compliant with BIP44 or if the purpose/coin type don't match regular usage
+    // If the path length is not compliant with BIP44 or if the purpose don't match regular usage, return a warning
     if(path_len != BIP44_PATH_LEN ||
        ((bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 44 &&
        (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 49 &&
        (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 84)) {
         return 1;
     }
+
+    // If the coin type doesn't match, return a warning
+    if ((G_coin_config->bip44_coin_type != 0) &&
+        (((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) != G_coin_config->bip44_coin_type) &&
+          ((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) != G_coin_config->bip44_coin_type2))) {
+        return 1;
+    }    
 
     // If the account or address index is very high or if the change isn't 1, return a warning
     if((bip32PathInt[BIP44_ACCOUNT_OFFSET]^0x80000000) > MAX_BIP44_ACCOUNT_RECOMMENDED ||
@@ -361,6 +378,45 @@ unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_pa
         return 1;
     }
 
+    return 0;
+}
+
+/* 
+Only enforce the structure or coin type for consumed UTXOs or a public address
+Returns 0 if the path is non compliant, or 1 if compliant
+*/
+unsigned char enforce_bip44_coin_type(unsigned char *bip32Path) {
+    unsigned char i, path_len;
+    unsigned int bip32PathInt[MAX_BIP32_PATH];
+    // No enforcement required
+    if (G_coin_config->bip44_coin_type == 0) {
+        return 1;
+    }
+    // Path is too short - always require a user validation
+    if (bip32Path[0] < 2) {
+        return 0;
+    }
+    
+    path_len = bip32Path[0];
+    bip32Path++;
+    if (path_len > MAX_BIP32_PATH) {
+        THROW(INVALID_PARAMETER);
+    }
+
+    for (i = 0; i < path_len; i++) {
+        bip32PathInt[i] = btchip_read_u32(bip32Path, 1, 0);
+        bip32Path += 4;
+    }
+
+    if (((bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) == 44 ||
+       (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) == 49 ||
+       (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) == 84) &&
+       (((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) == G_coin_config->bip44_coin_type) ||
+        ((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) == G_coin_config->bip44_coin_type2))) {
+        // Valid BIP 44 path
+        return 1;
+    }
+    // Everything else needs a user validation
     return 0;
 }
 
@@ -401,8 +457,13 @@ unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned cha
 
 #if defined(TARGET_BLUE)
     // if the path is longer than 30 char, split the string in multiple strings of length 30
-    uint8_t len=strnlen(out, MAX_DERIV_PATH_ASCII_LENGTH);
+    uint8_t len=strnlen(out, max_out_len);
     uint8_t num_split = len/30;
+
+    // account for the '\0' line delimiters appended
+    if(len + num_split > max_out_len){
+        THROW(EXCEPTION);
+    }
 
     for(i = 1; i<= num_split; i++) {
         os_memmove(out+30*i, out+(30*i-1), len-29*i);
@@ -440,7 +501,9 @@ void btchip_signverify_finalhash(void *keyContext, unsigned char sign,
                                  unsigned char *in, unsigned short inlen,
                                  unsigned char *out, unsigned short outlen,
                                  unsigned char rfc6979) {
+#ifndef TARGET_BLUE
     io_seproxyhal_io_heartbeat();
+#endif
     if (sign) {
         unsigned int info = 0;
         cx_ecdsa_sign((cx_ecfp_private_key_t *)keyContext,
@@ -453,5 +516,7 @@ void btchip_signverify_finalhash(void *keyContext, unsigned char sign,
         cx_ecdsa_verify((cx_ecfp_public_key_t *)keyContext, CX_LAST,
                         CX_SHA256, in, inlen, out, outlen);
     }
+#ifndef TARGET_BLUE
     io_seproxyhal_io_heartbeat();
+#endif
 }

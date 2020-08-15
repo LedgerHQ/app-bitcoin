@@ -166,6 +166,11 @@ unsigned short btchip_apdu_get_wallet_public_key() {
                sizeof(chainCode));
     btchip_context_D.outLength = 1 + 65 + 1 + keyLength + sizeof(chainCode);
 
+    // privacy : force display the address if the path isn't standard
+    if (!display && !enforce_bip44_coin_type(keyPath)) {
+        display = true;
+    }
+
     if (display) {
         if (keyLength > 50) {
             return BTCHIP_SW_INCORRECT_DATA;

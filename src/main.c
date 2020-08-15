@@ -179,6 +179,8 @@ union {
 
 unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e);
 unsigned int io_seproxyhal_touch_verify_ok(const bagl_element_t *e);
+unsigned int io_seproxyhal_touch_sign_cancel(const bagl_element_t *e);
+unsigned int io_seproxyhal_touch_sign_ok(const bagl_element_t *e);
 unsigned int
 io_seproxyhal_touch_message_signature_verify_cancel(const bagl_element_t *e);
 unsigned int
@@ -704,6 +706,37 @@ const bagl_element_t ui_request_change_path_approval_blue[] = {
     UI_BLUE_BUTTONS_REJECT_OR_CONFIRM("REJECT", "CONFIRM", io_seproxyhal_touch_display_cancel, io_seproxyhal_touch_display_ok)
 };
 
+const bagl_element_t ui_request_sign_path_approval_blue[] = {
+    UI_BLUE_BACKGROUND("WARNING"),
+
+    UI_BLUE_ICON(0x40, 135, 95, 50, 50, &C_blue_badge_warning, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 185, 320, "The sign path is unusual.", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 203, 320, "Reject if you're not sure.", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 220, 320, "Contact Ledger support for help.", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 271, 320, "Sign path:", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 297, 320, vars.tmp_warning.derivation_path, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 314, 320, vars.tmp_warning.derivation_path+30, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 331, 320, vars.tmp_warning.derivation_path+60, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 348, 320, vars.tmp_warning.derivation_path+90, BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+
+
+    UI_BLUE_BUTTONS_REJECT_OR_CONFIRM("REJECT", "CONFIRM", io_seproxyhal_touch_sign_cancel, io_seproxyhal_touch_sign_ok)
+};
+
+
+const bagl_element_t ui_request_segwit_input_approval_blue[] = {
+    UI_BLUE_BACKGROUND("WARNING"),
+
+    UI_BLUE_ICON(0x40, 135, 95, 50, 50, &C_blue_badge_warning, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 185, 320, "This transaction has segwit inputs", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 203, 320, "which cannot be verified.", BAGL_FONT_OPEN_SANS_SEMIBOLD_11_16PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 237, 320, "Please update Ledger Live or", BAGL_FONT_OPEN_SANS_REGULAR_11_14PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 254, 320, "the third-party wallet to a version", BAGL_FONT_OPEN_SANS_REGULAR_11_14PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+    UI_BLUE_TEXT(0, 0, 271, 320, "supporting secure segwit inputs.", BAGL_FONT_OPEN_SANS_REGULAR_11_14PX, BAGL_FONT_ALIGNMENT_CENTER, COLOR_BLACK, COLOR_BG_1),
+
+    UI_BLUE_BUTTONS_REJECT_OR_CONFIRM("CANCEL", "CONTINUE", io_seproxyhal_touch_display_cancel, io_seproxyhal_touch_display_ok)
+};
+
 unsigned int ui_display_address_blue_prepro(const bagl_element_t *element) {
     bagl_icon_details_t *icon_details = &vars.tmpqr.icon_details;
     bagl_element_t *icon_component = element;
@@ -798,6 +831,16 @@ unsigned int ui_request_change_path_approval_blue_prepro(const bagl_element_t *e
     return element;
 }
 
+unsigned int ui_request_sign_path_approval_blue_prepro(const bagl_element_t *element) {
+    copy_element_and_map_coin_colors(element);
+    return element;
+}
+
+unsigned int ui_request_segwit_input_approval_blue_prepro(const bagl_element_t *element) {
+    copy_element_and_map_coin_colors(element);
+    return element;
+}
+
 unsigned int ui_display_derivation_warning_button(unsigned int button_mask,
                                             unsigned int button_mask_counter) {
     return 0;
@@ -820,6 +863,19 @@ unsigned int ui_request_pubkey_approval_blue_button(unsigned int button_mask,
 }
 
 unsigned int ui_request_change_path_approval_blue_button(unsigned int button_mask,
+                                            unsigned int button_mask_counter)
+{
+    return 0;
+}
+
+unsigned int ui_request_sign_path_approval_blue_button(unsigned int button_mask,
+                                            unsigned int button_mask_counter)
+{
+    return 0;
+}
+
+
+unsigned int ui_request_segwit_input_approval_blue_button(unsigned int button_mask,
                                             unsigned int button_mask_counter)
 {
     return 0;
@@ -895,6 +951,43 @@ const bagl_element_t ui_request_change_path_approval_nanos[] = {
     UI_NANOS_TEXT(4, 0, 26, 128, "not sure", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px)
 };
 
+const bagl_element_t ui_request_sign_path_approval_nanos[] = {
+    UI_NANOS_BACKGROUND(),
+
+    UI_NANOS_TEXT(1, 0, 22, 128, "Warning !", BAGL_FONT_OPEN_SANS_LIGHT_16px),
+
+    UI_NANOS_TEXT(2, 0, 12, 128, "The sign path", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+    UI_NANOS_TEXT(2, 0, 26, 128, "is unusual", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    UI_NANOS_TEXT(3, 0, 12, 128, "Sign path", BAGL_FONT_OPEN_SANS_REGULAR_11px),
+    UI_NANOS_SCROLLING_TEXT(0x83, 15, 26, 98, vars.tmp_warning.derivation_path, BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    UI_NANOS_ICON_LEFT(4, BAGL_GLYPH_ICON_CROSS),
+    UI_NANOS_ICON_RIGHT(4, BAGL_GLYPH_ICON_CHECK),
+    UI_NANOS_TEXT(4, 0, 12, 128, "Reject if you're", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+    UI_NANOS_TEXT(4, 0, 26, 128, "not sure", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px)
+};
+
+
+const bagl_element_t ui_request_segwit_input_approval_nanos[] = {
+    UI_NANOS_BACKGROUND(),
+
+    UI_NANOS_TEXT(1, 0, 22, 128, "Unverified inputs !", BAGL_FONT_OPEN_SANS_LIGHT_16px),
+
+    UI_NANOS_TEXT(2, 0, 12, 128, "Update", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+    UI_NANOS_TEXT(2, 0, 26, 128, "Ledger Live", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    UI_NANOS_TEXT(3, 0, 12, 128, "Or third-party", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+    UI_NANOS_TEXT(3, 0, 26, 128, "wallet software", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+
+    UI_NANOS_ICON_LEFT(4, BAGL_GLYPH_ICON_CROSS),
+    UI_NANOS_TEXT(4, 0, 12, 128, "Cancel", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px),
+
+    UI_NANOS_ICON_RIGHT(5, BAGL_GLYPH_ICON_CHECK),
+    UI_NANOS_TEXT(5, 0, 26, 128, "Continue", BAGL_FONT_OPEN_SANS_EXTRABOLD_11px)
+};
+
 unsigned int ui_display_address_nanos_prepro(const bagl_element_t *element) {
 
     if (element->component.userid > 0) {
@@ -946,6 +1039,10 @@ unsigned int ui_display_token_nanos_button(unsigned int button_mask,
 unsigned int ui_request_pubkey_approval_nanos_button(unsigned int button_mask,
                                              unsigned int button_mask_counter);
 unsigned int ui_request_change_path_approval_nanos_button(unsigned int button_mask,
+                                             unsigned int button_mask_counter);
+unsigned int ui_request_sign_path_approval_nanos_button(unsigned int button_mask,
+                                             unsigned int button_mask_counter);
+unsigned int ui_request_segwit_input_approval_nanos_button(unsigned int button_mask,
                                              unsigned int button_mask_counter);
 
 const bagl_element_t ui_verify_nanos[] = {
@@ -1180,6 +1277,23 @@ unsigned int io_seproxyhal_touch_display_ok(const bagl_element_t *e) {
     return 0; // DO NOT REDRAW THE BUTTON
 }
 
+unsigned int io_seproxyhal_touch_sign_cancel(const bagl_element_t *e) {
+    // user denied the transaction, tell the USB side
+    btchip_bagl_user_action_signtx(0, 0);
+    // redraw ui
+    ui_idle();
+    return 0; // DO NOT REDRAW THE BUTTON
+}
+
+unsigned int io_seproxyhal_touch_sign_ok(const bagl_element_t *e) {
+    // user accepted the transaction, tell the USB side
+    btchip_bagl_user_action_signtx(1, 0);
+    // redraw ui
+    ui_idle();
+    return 0; // DO NOT REDRAW THE BUTTON
+}
+
+
 unsigned int io_seproxyhal_touch_display_token_cancel(const bagl_element_t *e) {
     // revoke previous valid token if there was one
     btchip_context_D.has_valid_token = false;
@@ -1319,7 +1433,8 @@ unsigned int ui_display_token_nanos_button(unsigned int button_mask,
     }
     return 0;
 }
- unsigned int ui_request_pubkey_approval_nanos_button(unsigned int button_mask,
+
+unsigned int ui_request_pubkey_approval_nanos_button(unsigned int button_mask,
                                              unsigned int button_mask_counter)
 {
     switch (button_mask)
@@ -1334,8 +1449,7 @@ unsigned int ui_display_token_nanos_button(unsigned int button_mask,
     return 0;
 }
 
-
- unsigned int ui_request_change_path_approval_nanos_button(unsigned int button_mask,
+unsigned int ui_request_change_path_approval_nanos_button(unsigned int button_mask,
                                              unsigned int button_mask_counter)
 {
     if (ux_step == 3)
@@ -1363,6 +1477,59 @@ unsigned int ui_display_token_nanos_button(unsigned int button_mask,
                 ux_step = (ux_step + 1) % ux_step_count;
                 // redisplay screen
                 UX_REDISPLAY();
+        }
+    }
+    return 0;
+}
+
+unsigned int ui_request_sign_path_approval_nanos_button(unsigned int button_mask,
+                                             unsigned int button_mask_counter)
+{
+    if (ux_step == 3)
+    {
+        switch (button_mask)
+        {
+        case BUTTON_EVT_RELEASED | BUTTON_LEFT:
+            io_seproxyhal_touch_sign_cancel(NULL);
+            break;
+        case BUTTON_EVT_RELEASED | BUTTON_RIGHT:
+            io_seproxyhal_touch_sign_ok(NULL);
+            break;
+        }
+    }
+    else
+    {
+        if(button_mask == (BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT))
+        {
+                // if we were looping over a single element, disable this loop and diffuse the redisplay timeout (used by scrolling text)
+                if(ux_loop_over_curr_element) {
+                    ux_loop_over_curr_element = 0;
+                    ux.callback_interval_ms = 0;
+                }
+                // prepare next screen
+                ux_step = (ux_step + 1) % ux_step_count;
+                // redisplay screen
+                UX_REDISPLAY();
+        }
+    }
+    return 0;
+}
+
+unsigned int ui_request_segwit_input_approval_nanos_button(unsigned int button_mask,
+                                             unsigned int button_mask_counter)
+{
+    // Both buttons must be pressed to validate either "Cancel" or "Continue" 
+    // as they are on separate screens
+    if (button_mask == BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT) {
+        switch (ux_step)
+        {
+        case 4:
+            io_seproxyhal_touch_display_cancel(NULL);
+            break;
+
+        case 5:
+            io_seproxyhal_touch_display_ok(NULL);
+            break;
         }
     }
     return 0;
@@ -1898,6 +2065,96 @@ UX_FLOW(ux_request_change_path_approval_flow,
   &ux_request_change_path_approval_flow_4_step
 );
 
+//////////////////////////////////////////////////////////////////////
+UX_STEP_NOCB(
+    ux_request_sign_path_approval_flow_1_step, 
+    pbb, 
+    {
+      &C_icon_eye,
+      "The sign path",
+      "is unusual",
+    });
+UX_STEP_NOCB(
+    ux_request_sign_path_approval_flow_2_step, 
+    bnnn_paging, 
+    {
+      .title = "Sign path",
+      .text = vars.tmp_warning.derivation_path,
+    });
+UX_STEP_VALID(
+    ux_request_sign_path_approval_flow_3_step, 
+    pbb, 
+    io_seproxyhal_touch_sign_cancel(NULL),
+    {
+      &C_icon_crossmark,
+      "Reject if you're",
+      "not sure",
+    });
+UX_STEP_VALID(
+    ux_request_sign_path_approval_flow_4_step, 
+    pb, 
+    io_seproxyhal_touch_sign_ok(NULL),
+    {
+      &C_icon_validate_14,
+      "Approve",
+    });
+
+UX_FLOW(ux_request_sign_path_approval_flow,
+  &ux_request_sign_path_approval_flow_1_step,
+  &ux_request_sign_path_approval_flow_2_step,
+  &ux_request_sign_path_approval_flow_3_step,
+  &ux_request_sign_path_approval_flow_4_step
+);
+
+
+//////////////////////////////////////////////////////////////////////
+UX_STEP_NOCB(
+    ux_request_segwit_input_approval_flow_1_step, 
+    pb, 
+    {
+      .icon = &C_icon_warning,
+      .line1 = "Unverified inputs"
+    });
+UX_STEP_NOCB(
+    ux_request_segwit_input_approval_flow_2_step, 
+    nn, 
+    {           
+      .line1 = "Update",
+      .line2 = " Ledger Live"
+    });
+UX_STEP_NOCB(
+    ux_request_segwit_input_approval_flow_3_step, 
+    nn
+    , 
+    {           
+      .line1 = "or third party",
+      .line2 = "wallet software"
+    });
+UX_STEP_VALID(
+    ux_request_segwit_input_approval_flow_4_step, 
+    pb, 
+    io_seproxyhal_touch_display_cancel(NULL),
+    {
+      .icon = &C_icon_crossmark,
+      .line1 = "Cancel"
+    });
+UX_STEP_VALID(
+    ux_request_segwit_input_approval_flow_5_step, 
+    pb, 
+    io_seproxyhal_touch_display_ok(NULL),
+    {
+      &C_icon_validate_14,
+      "Continue"
+    });
+
+UX_FLOW(ux_request_segwit_input_approval_flow,
+  &ux_request_segwit_input_approval_flow_1_step,
+  &ux_request_segwit_input_approval_flow_2_step,
+  &ux_request_segwit_input_approval_flow_3_step,
+  &ux_request_segwit_input_approval_flow_4_step,
+  &ux_request_segwit_input_approval_flow_5_step
+);
+
 #endif // #if defined(HAVE_UX_FLOW)
 
 void ui_idle(void) {
@@ -2067,11 +2324,13 @@ uint8_t prepare_single_output() {
             strcpy(vars.tmp.fullAddress, "OP_RETURN");
     } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
                btchip_output_script_is_op_create(
-                   btchip_context_D.currentOutput + offset)) {
+                   btchip_context_D.currentOutput + offset,
+                   sizeof(btchip_context_D.currentOutput) - offset)) {
         strcpy(vars.tmp.fullAddress, "OP_CREATE");
     } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
-               btchip_output_script_is_op_call(btchip_context_D.currentOutput +
-                                               offset)) {
+               btchip_output_script_is_op_call(
+                 btchip_context_D.currentOutput + offset,
+                 sizeof(btchip_context_D.currentOutput) - offset)) {
         strcpy(vars.tmp.fullAddress, "OP_CALL");
     } else if (nativeSegwit) {
         addressOffset = offset + OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET;
@@ -2218,9 +2477,11 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         isNativeSegwit = btchip_output_script_is_native_witness(
             btchip_context_D.currentOutput + offset);
         isOpCreate = btchip_output_script_is_op_create(
-            btchip_context_D.currentOutput + offset);
+            btchip_context_D.currentOutput + offset,
+            sizeof(btchip_context_D.currentOutput) - offset);
         isOpCall = btchip_output_script_is_op_call(
-            btchip_context_D.currentOutput + offset);
+            btchip_context_D.currentOutput + offset,
+            sizeof(btchip_context_D.currentOutput) - offset);
         // Always notify OP_RETURN to the user
         if (nullAmount && isOpReturn) {
             if (!checkOnly) {
@@ -2307,9 +2568,11 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                  !btchip_output_script_is_op_return(
                      btchip_context_D.currentOutput + offset + 8) &&
                  !btchip_output_script_is_op_create(
-                     btchip_context_D.currentOutput + offset + 8) &&
+                     btchip_context_D.currentOutput + offset + 8,
+                     sizeof(btchip_context_D.currentOutput) - offset - 8) &&
                  !btchip_output_script_is_op_call(
-                     btchip_context_D.currentOutput + offset + 8)) ||
+                     btchip_context_D.currentOutput + offset + 8,
+                     sizeof(btchip_context_D) - offset - 8)) ||
                 (!(G_coin_config->kind == COIN_KIND_QTUM) &&
                  !btchip_output_script_is_op_return(
                      btchip_context_D.currentOutput + offset + 8))) {
@@ -2522,8 +2785,7 @@ void btchip_bagl_confirm_message_signature() {
 void btchip_bagl_display_public_key(unsigned char* derivation_path) {
     // append a white space at the end of the address to avoid glitch on nano S
     strcat(G_io_apdu_buffer + 200, " ");
-
-    bip32_print_path(derivation_path, vars.tmp_warning.derivation_path, MAX_DERIV_PATH_ASCII_LENGTH);
+    bip32_print_path(derivation_path, vars.tmp_warning.derivation_path, sizeof(vars.tmp_warning.derivation_path));
     uint8_t is_derivation_path_unusual = bip44_derivation_guard(derivation_path, false);
 
 #if defined(TARGET_BLUE)
@@ -2579,7 +2841,7 @@ void btchip_bagl_request_pubkey_approval()
 
 void btchip_bagl_request_change_path_approval(unsigned char* change_path)
 {
-    bip32_print_path(change_path, vars.tmp_warning.derivation_path, MAX_DERIV_PATH_ASCII_LENGTH);
+    bip32_print_path(change_path, vars.tmp_warning.derivation_path, sizeof(vars.tmp_warning.derivation_path));
  #if defined(TARGET_BLUE)
     UX_DISPLAY(ui_request_change_path_approval_blue, ui_request_change_path_approval_blue_prepro);
 #elif defined(HAVE_UX_FLOW)
@@ -2591,6 +2853,36 @@ void btchip_bagl_request_change_path_approval(unsigned char* change_path)
     UX_DISPLAY(ui_request_change_path_approval_nanos, ui_request_change_path_approval_nanos_prepro);
 #endif // #if TARGET_ID
 }
+
+void btchip_bagl_request_sign_path_approval(unsigned char* change_path)
+{
+    bip32_print_path(change_path, vars.tmp_warning.derivation_path, sizeof(vars.tmp_warning.derivation_path));
+ #if defined(TARGET_BLUE)
+    UX_DISPLAY(ui_request_sign_path_approval_blue, ui_request_sign_path_approval_blue_prepro);
+#elif defined(HAVE_UX_FLOW)
+    ux_flow_init(0, ux_request_sign_path_approval_flow, NULL);
+#elif defined(TARGET_NANOS)
+    // append and prepend a white space to the address
+    ux_step = 0;
+    ux_step_count = 4;
+    UX_DISPLAY(ui_request_sign_path_approval_nanos, ui_request_sign_path_approval_nanos_prepro);
+#endif // #if TARGET_ID
+}
+
+void btchip_bagl_request_segwit_input_approval()
+{
+ #if defined(TARGET_BLUE)
+    UX_DISPLAY(ui_request_segwit_input_approval_blue, ui_request_segwit_input_approval_blue_prepro);
+#elif defined(HAVE_UX_FLOW)
+    ux_flow_init(0, ux_request_segwit_input_approval_flow, NULL);
+#elif defined(TARGET_NANOS)
+    ux_step = 0;
+    ux_step_count = 5;
+    UX_DISPLAY(ui_request_segwit_input_approval_nanos, NULL);
+#endif // #if TARGET_ID
+}
+
+
 
 void app_exit(void) {
     BEGIN_TRY_L(exit) {
@@ -2605,6 +2897,8 @@ void app_exit(void) {
 
 // used when application is compiled statically (no lib dependency)
 btchip_altcoin_config_t const C_coin_config = {
+    .bip44_coin_type = BIP44_COIN_TYPE,
+    .bip44_coin_type2 = BIP44_COIN_TYPE_2,
     .p2pkh_version = COIN_P2PKH_VERSION,
     .p2sh_version = COIN_P2SH_VERSION,
     .family = COIN_FAMILY,

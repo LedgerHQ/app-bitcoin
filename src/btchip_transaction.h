@@ -28,6 +28,9 @@
 #define PARSE_MODE_TRUSTED_INPUT 0x01
 #define PARSE_MODE_SIGNATURE 0x02
 
+#define TRUSTED_INPUT_SIZE   48
+#define TRUSTED_INPUT_TOTAL_SIZE (TRUSTED_INPUT_SIZE + 8)
+
 void transaction_parse(unsigned char parseMode);
 
 // target = a + b
