@@ -47,6 +47,7 @@ struct btchip_transaction_summary_data_s {
     unsigned char outputAddress[21]; // only in wallet mode
     unsigned char changeAddress[21]; // only in wallet mode
     unsigned char keyPath[MAX_BIP32_PATH_LENGTH];
+    unsigned char sighashType;
 };
 typedef struct btchip_transaction_summary_data_s
     btchip_transaction_summary_data_t;
