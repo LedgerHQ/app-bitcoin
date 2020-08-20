@@ -83,7 +83,7 @@ unsigned char btchip_hash_sender_start(unsigned char* senderOutput)
     return 1;
 }
 
-void btchip_hash_sender_finalize(unsigned char* dataBuffer, unsigned int bufferSize, unsigned char* hash1)
+void btchip_hash_sender_finalize(unsigned char* dataBuffer, unsigned int bufferSize)
 {
     PRINTF("--- ADD TO HASH SENDER:\n%.*H\n", sizeof(btchip_context_D.segwit.cache.hashedOutputs), btchip_context_D.segwit.cache.hashedOutputs);
     cx_hash(
@@ -93,7 +93,7 @@ void btchip_hash_sender_finalize(unsigned char* dataBuffer, unsigned int bufferS
                .hashedOutputs),
         NULL, 0);
     PRINTF("--- ADD TO HASH SENDER:\n%.*H\n", bufferSize, dataBuffer);
-    cx_hash(&btchip_context_D.transactionOutputHash.header, CX_LAST,
-        dataBuffer, bufferSize, hash1, 32);
+    cx_hash(&btchip_context_D.transactionOutputHash.header, 0,
+        dataBuffer, bufferSize, NULL, 0);
 }
 #endif

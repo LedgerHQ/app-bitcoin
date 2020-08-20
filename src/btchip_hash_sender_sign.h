@@ -22,6 +22,6 @@
 #include "cx.h"
 
 unsigned char btchip_hash_sender_start(unsigned char* senderOutput);
-void btchip_hash_sender_finalize(unsigned char* dataBuffer, unsigned int bufferSize, unsigned char* hash1);
+void btchip_hash_sender_finalize(unsigned char* dataBuffer, unsigned int bufferSize);
 #endif
 #endif
