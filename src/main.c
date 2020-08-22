@@ -3016,7 +3016,7 @@ btchip_altcoin_config_t const C_coin_config = {
 };
 
 __attribute__((section(".boot"))) int main(int arg0) {
-#if defined(USE_LIB_BITCOIN) || defined(USE_LIB_QTUM)
+#ifdef USE_LIB_BITCOIN
     // in RAM allocation (on stack), to allow simple simple traversal into the
     // bitcoin app (separate NVRAM zone)
     unsigned int libcall_params[3];
@@ -3052,11 +3052,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
             // ensure syscall will accept us
             check_api_level(CX_COMPAT_APILEVEL);
             // delegate to bitcoin app/lib
-            #ifdef USE_LIB_BITCOIN
             libcall_params[0] = "Bitcoin";
-            #elif USE_LIB_QTUM
-            libcall_params[0] = "Qtum";
-            #endif
             libcall_params[1] = 0x100; // use the Init call, as we won't exit
             libcall_params[2] = &coin_config;
             os_lib_call(&libcall_params);
