@@ -1800,6 +1800,17 @@ UX_STEP_VALID(
       &C_icon_crossmark,
       "Reject",
     });
+#ifdef HAVE_QTUM_SUPPORT
+UX_STEP_VALID(
+    ux_confirm_full_flow_7_step, 
+    pbb, 
+    io_seproxyhal_touch_verify_ok(NULL),
+    {
+      &C_icon_validate_14,
+      "Sign",
+      "OP_SENDER",
+    });
+#endif
 // confirm_full: confirm transaction / Amount: fullAmount / Address: fullAddress / Fees: feesAmount
 UX_FLOW(ux_confirm_full_flow,
   &ux_confirm_full_flow_1_step,
@@ -1809,6 +1820,18 @@ UX_FLOW(ux_confirm_full_flow,
   &ux_confirm_full_flow_5_step,
   &ux_confirm_full_flow_6_step
 );
+
+#ifdef HAVE_QTUM_SUPPORT
+// confirm_full: sign output sender transaction / Amount: fullAmount / Address: fullAddress / Fees: feesAmount
+UX_FLOW(ux_confirm_sender_flow,
+  &ux_confirm_full_flow_1_step,
+  &ux_confirm_full_flow_2_step,
+  &ux_confirm_full_flow_3_step,
+  &ux_confirm_full_flow_4_step,
+  &ux_confirm_full_flow_7_step,
+  &ux_confirm_full_flow_6_step
+);
+#endif
 
 //////////////////////////////////////////////////////////////////////
 
@@ -1893,6 +1916,17 @@ UX_STEP_VALID(
       &C_icon_crossmark,
       "Reject",
     });
+#ifdef HAVE_QTUM_SUPPORT
+UX_STEP_VALID(
+    ux_finalize_flow_7_step, 
+    pbb, 
+    io_seproxyhal_touch_verify_ok(NULL),
+    {
+      &C_icon_validate_14,
+      "Sign",
+      "OP_SENDER",
+    });
+#endif
 // finalize: confirm transaction / Fees: feesAmount
 UX_FLOW(ux_finalize_flow,
   &ux_finalize_flow_1_step,
@@ -1900,6 +1934,16 @@ UX_FLOW(ux_finalize_flow,
   &ux_finalize_flow_5_step,
   &ux_finalize_flow_6_step
 );
+
+#ifdef HAVE_QTUM_SUPPORT
+// finalize: sign output sender transaction / Fees: feesAmount
+UX_FLOW(ux_finalize_sender_flow,
+  &ux_finalize_flow_1_step,
+  &ux_finalize_flow_4_step,
+  &ux_finalize_flow_7_step,
+  &ux_finalize_flow_6_step
+);
+#endif
 
 //////////////////////////////////////////////////////////////////////
 UX_STEP_NOCB(
@@ -2302,6 +2346,12 @@ error:
 #define MAIDSAFE_ASSETID 3
 #define USDT_ASSETID 31
 
+#ifdef HAVE_QTUM_SUPPORT
+#define DELEGATIONS_ADDRESS "\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x86"
+#define ADD_DELEGATION_HASH "\x4c\x0e\x96\x8c"
+#define REMOVE_DELEGATION_HASH "\x3d\x66\x6e\x8b"
+#endif
+
 uint8_t prepare_single_output() {
     // TODO : special display for OP_RETURN
     unsigned char amount[8];
@@ -2313,25 +2363,126 @@ uint8_t prepare_single_output() {
     unsigned short version = 0; // for static analyzer only
     unsigned short textSize;
     unsigned char nativeSegwit;
-
     vars.tmp.fullAddress[0] = '\0';
     btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset, 8);
     offset += 8;
     nativeSegwit = btchip_output_script_is_native_witness(
         btchip_context_D.currentOutput + offset);
+    #ifdef HAVE_QTUM_SUPPORT
+    unsigned char isOpSender = 0;
+    if(G_coin_config->kind == COIN_KIND_QTUM) {
+        isOpSender = btchip_output_script_is_op_sender(
+                 btchip_context_D.currentOutput + offset,
+                 sizeof(btchip_context_D.currentOutput) - offset);
+    }
+    #endif
     if (btchip_output_script_is_op_return(btchip_context_D.currentOutput +
                                           offset)) {
             strcpy(vars.tmp.fullAddress, "OP_RETURN");
+    #ifdef HAVE_QTUM_SUPPORT
     } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
                btchip_output_script_is_op_create(
                    btchip_context_D.currentOutput + offset,
                    sizeof(btchip_context_D.currentOutput) - offset)) {
-        strcpy(vars.tmp.fullAddress, "OP_CREATE");
+        if(btchip_context_D.signOpSender && isOpSender)
+        {
+            unsigned char* senderOutput = btchip_context_D.currentOutput + offset - 8;
+            btchip_hash_sender_start(senderOutput);
+        }
+        strcpy(vars.tmp.fullAddress, isOpSender ? "OP_SENDER_CREATE" : "OP_CREATE");
     } else if ((G_coin_config->kind == COIN_KIND_QTUM) &&
                btchip_output_script_is_op_call(
                  btchip_context_D.currentOutput + offset,
                  sizeof(btchip_context_D.currentOutput) - offset)) {
-        strcpy(vars.tmp.fullAddress, "OP_CALL");
+        if(btchip_context_D.signOpSender && isOpSender)
+        {
+            unsigned char* senderOutput = btchip_context_D.currentOutput + offset - 8;
+            btchip_hash_sender_start(senderOutput);
+        }
+		unsigned char contractaddress[20];
+		int i;
+		int pos = offset + 1;
+		int outputsize;
+		if (btchip_context_D.currentOutput[offset] == 0xfd) {
+			outputsize = btchip_context_D.currentOutput[offset + 2] * 0x100
+					+ btchip_context_D.currentOutput[offset + 1] + 3;
+		} else {
+			outputsize = btchip_context_D.currentOutput[offset] + 1;
+		}
+		for (i = 0; i < sizeof(contractaddress); i++) {
+			contractaddress[i] = btchip_context_D.currentOutput[offset
+					+ outputsize - 21 + i];
+		}
+		if (strncmp(contractaddress, DELEGATIONS_ADDRESS,
+				sizeof(contractaddress)) == 0) {
+			unsigned char functionhash[4];
+			if (btchip_context_D.currentOutput[offset] == 0xfd)
+				pos += 2; // varint>255?
+			if (!isOpSender) {
+				pos += btchip_context_D.currentOutput[pos]; // version
+				pos += btchip_context_D.currentOutput[pos] + 1; // gas limit
+				pos += btchip_context_D.currentOutput[pos] + 1; // gas price
+			} else {
+				pos += btchip_context_D.currentOutput[pos]; // address version
+				pos += btchip_context_D.currentOutput[pos]; // address
+				pos += btchip_context_D.currentOutput[pos] + 1; // gas price
+				if (btchip_context_D.currentOutput[pos] == 0x4c) { // check for OP_PUSHDATA1
+					pos += btchip_context_D.currentOutput[pos + 1] + 2;
+				} else if (btchip_context_D.currentOutput[pos] == 0x00) {
+					pos += 1;
+				}
+				pos += 1; // OP_SENDER
+				pos += btchip_context_D.currentOutput[pos] + 1; // // version
+				pos += btchip_context_D.currentOutput[pos] + 1; // gas limit
+				pos += btchip_context_D.currentOutput[pos] + 1; // gas price
+			}
+			if (btchip_context_D.currentOutput[pos] == 0x4c)
+				pos++; // check for OP_PUSHDATA1
+
+			for (i = 0; i < sizeof(functionhash); i++) {
+				functionhash[i] = btchip_context_D.currentOutput[pos + 1 + i];
+			}
+			if (strncmp(functionhash, ADD_DELEGATION_HASH, sizeof(functionhash))
+					== 0) {
+				unsigned char stakeraddress[21];
+				char stakerbase58[80];
+				unsigned short stakerbase58size;
+				unsigned char delegationfee;
+				stakeraddress[0] = btchip_context_D.payToAddressVersion;
+
+				for (i = 0; i < sizeof(stakeraddress); i++) {
+					stakeraddress[i + 1] = btchip_context_D.currentOutput[pos
+							+ 17 + i];
+				}
+				stakerbase58size = btchip_public_key_to_encoded_base58(
+						stakeraddress, sizeof(stakeraddress),
+						(unsigned char*) stakerbase58, sizeof(stakerbase58),
+						btchip_context_D.payToAddressVersion, 1);
+				stakerbase58[stakerbase58size] = '\0';
+
+				delegationfee = btchip_context_D.currentOutput[pos + 17 + 20
+						+ 31];
+				snprintf(vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress),
+						"Delegate to %s (fee %d %%)", stakerbase58,
+						delegationfee);
+			} else if (strncmp(functionhash, REMOVE_DELEGATION_HASH,
+					sizeof(functionhash)) == 0) {
+				strcpy(vars.tmp.fullAddress, "Undelegate");
+			}
+		} else {
+			unsigned char contractaddressstring[41];
+			const char *hex = "0123456789ABCDEF";
+			for (i = 0; i < sizeof(contractaddressstring); i = i + 2) {
+				contractaddressstring[i] = hex[(contractaddress[i / 2] >> 4)
+						& 0xF];
+				contractaddressstring[i + 1] =
+						hex[contractaddress[i / 2] & 0xF];
+			}
+			contractaddressstring[40] = '\0';
+			snprintf(vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress),
+					"Call contract %s", contractaddressstring);
+		}
+    #endif
     } else if (nativeSegwit) {
         addressOffset = offset + OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET;
     } else if (btchip_output_script_is_regular(btchip_context_D.currentOutput +
@@ -2459,7 +2610,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         unsigned char nullAmount = 1;
         unsigned int j;
         unsigned char isOpReturn, isP2sh, isNativeSegwit;
-        unsigned char isOpCreate, isOpCall;
+        unsigned char isOpCreate = 0, isOpCall = 0;
 
         for (j = 0; j < 8; j++) {
             if (btchip_context_D.currentOutput[offset + j] != 0) {
@@ -2476,12 +2627,16 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                                               offset);
         isNativeSegwit = btchip_output_script_is_native_witness(
             btchip_context_D.currentOutput + offset);
-        isOpCreate = btchip_output_script_is_op_create(
-            btchip_context_D.currentOutput + offset,
-            sizeof(btchip_context_D.currentOutput) - offset);
-        isOpCall = btchip_output_script_is_op_call(
-            btchip_context_D.currentOutput + offset,
-            sizeof(btchip_context_D.currentOutput) - offset);
+        #ifdef HAVE_QTUM_SUPPORT
+        if(G_coin_config->kind == COIN_KIND_QTUM) {
+            isOpCreate = btchip_output_script_is_op_create(
+                btchip_context_D.currentOutput + offset,
+                sizeof(btchip_context_D.currentOutput) - offset);
+            isOpCall = btchip_output_script_is_op_call(
+                btchip_context_D.currentOutput + offset,
+                sizeof(btchip_context_D.currentOutput) - offset);
+        }
+        #endif
         // Always notify OP_RETURN to the user
         if (nullAmount && isOpReturn) {
             if (!checkOnly) {
@@ -2564,7 +2719,9 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
         offset = 1;
         btchip_context_D.tmp = (unsigned char *)tmp;
         for (i = 0; i < numberOutputs; i++) {
-            if (((G_coin_config->kind == COIN_KIND_QTUM) &&
+            if (
+                 #ifdef HAVE_QTUM_SUPPORT
+                 ((G_coin_config->kind == COIN_KIND_QTUM) &&
                  !btchip_output_script_is_op_return(
                      btchip_context_D.currentOutput + offset + 8) &&
                  !btchip_output_script_is_op_create(
@@ -2573,6 +2730,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                  !btchip_output_script_is_op_call(
                      btchip_context_D.currentOutput + offset + 8,
                      sizeof(btchip_context_D) - offset - 8)) ||
+                 #endif
                 (!(G_coin_config->kind == COIN_KIND_QTUM) &&
                  !btchip_output_script_is_op_return(
                      btchip_context_D.currentOutput + offset + 8))) {
@@ -2711,7 +2869,16 @@ unsigned int btchip_bagl_confirm_full_output() {
 #if defined(TARGET_BLUE)
     ui_transaction_full_blue_init();
 #elif defined(HAVE_UX_FLOW)
+    #ifdef HAVE_QTUM_SUPPORT
+    if(btchip_context_D.signOpSender) {
+        ux_flow_init(0, ux_confirm_sender_flow, NULL);
+    }
+    else {
+        ux_flow_init(0, ux_confirm_full_flow, NULL);
+    }
+    #else
     ux_flow_init(0, ux_confirm_full_flow, NULL);
+    #endif
 #elif defined(TARGET_NANOS)
     ux_step = 0;
     ux_step_count = 4;
@@ -2757,7 +2924,16 @@ unsigned int btchip_bagl_finalize_tx() {
 #if defined(TARGET_BLUE)
     ui_transaction_finalize_blue_init();
 #elif defined(HAVE_UX_FLOW)
+    #ifdef HAVE_QTUM_SUPPORT
+    if(btchip_context_D.signOpSender) {
+        ux_flow_init(0, ux_finalize_sender_flow, NULL);
+    }
+    else {
+        ux_flow_init(0, ux_finalize_flow, NULL);
+    }
+    #else
     ux_flow_init(0, ux_finalize_flow, NULL);
+    #endif
 #elif defined(TARGET_NANOS)
     ux_step = 0;
     ux_step_count = 2;
