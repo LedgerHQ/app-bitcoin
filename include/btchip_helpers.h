@@ -68,7 +68,7 @@ void btchip_private_derive_keypair(unsigned char *bip32Path,
                                    unsigned char *out_chainCode);
 
 unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_path);
-unsigned char enforce_bip44_coin_type(unsigned char *bip32Path);
+unsigned char enforce_bip44_coin_type(unsigned char *bip32Path, bool for_pubkey);
 unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned char max_out_len);
 
 // void btchip_set_check_internal_structure_integrity(unsigned char
