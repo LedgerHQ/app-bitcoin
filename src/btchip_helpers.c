@@ -385,16 +385,16 @@ unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_pa
 Only enforce the structure or coin type for consumed UTXOs or a public address
 Returns 0 if the path is non compliant, or 1 if compliant
 */
-unsigned char enforce_bip44_coin_type(unsigned char *bip32Path) {
+unsigned char enforce_bip44_coin_type(unsigned char *bip32Path, bool for_pubkey) {
     unsigned char i, path_len;
     unsigned int bip32PathInt[MAX_BIP32_PATH];
     // No enforcement required
     if (G_coin_config->bip44_coin_type == 0) {
         return 1;
     }
-    // Path is too short - always require a user validation
+    // Path is too short - always require a user validation if signing
     if (bip32Path[0] < 2) {
-        return 0;
+        return for_pubkey;
     }
     
     path_len = bip32Path[0];
@@ -408,11 +408,15 @@ unsigned char enforce_bip44_coin_type(unsigned char *bip32Path) {
         bip32Path += 4;
     }
 
-    if (((bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) == 44 ||
+    // Path is not compliant with BIP 44 or derivatives - valid if not signing
+    if (!(((bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) == 44 ||
        (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) == 49 ||
-       (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) == 84) &&
-       (((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) == G_coin_config->bip44_coin_type) ||
-        ((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) == G_coin_config->bip44_coin_type2))) {
+       (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) == 84))) {
+        return for_pubkey;
+    }
+
+    if  (((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) == G_coin_config->bip44_coin_type) ||
+        ((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) == G_coin_config->bip44_coin_type2)) {
         // Valid BIP 44 path
         return 1;
     }
