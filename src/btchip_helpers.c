@@ -121,7 +121,12 @@ unsigned char btchip_output_script_is_native_witness(unsigned char *buffer) {
 }
 
 unsigned char btchip_output_script_is_op_return(unsigned char *buffer) {
-    return (buffer[1] == 0x6A);
+    if (G_coin_config->kind == COIN_KIND_BITCOIN_CASH) {
+        return ((buffer[1] == 0x6A) || ((buffer[1] == 0x00) && (buffer[2] == 0x6A)));
+    }
+    else {
+        return (buffer[1] == 0x6A);
+    }
 }
 
 static unsigned char output_script_is_op_create_or_call(unsigned char *buffer,
