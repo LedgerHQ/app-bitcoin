@@ -78,7 +78,7 @@ To obtain the signature of multisignature (P2SH) inputs, call signP2SHTransactio
  - `lockTime` is the optional lockTime of the transaction to sign, or default (0)
  - `sigHashType` is the hash type of the transaction to sign, or default (all) 
 
-This method returns the signed transaction ready to be broadcast 
+This method returns array of DER encoded signatures in hex form.
 
 ```javascript
 dongle.signP2SHTransaction_async(
