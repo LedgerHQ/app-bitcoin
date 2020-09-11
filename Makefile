@@ -29,7 +29,7 @@ APPVERSION_M=1
 APPVERSION_N=4
 APPVERSION_P=8
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
-APP_LOAD_FLAGS=--appFlags 0x250 --dep Bitcoin:$(APPVERSION)
+APP_LOAD_FLAGS=--appFlags 0xa50 --dep Bitcoin:$(APPVERSION)
 
 # simplify for tests
 ifndef COIN
@@ -279,7 +279,7 @@ CC       := $(CLANGPATH)clang
 
 #CFLAGS   += -O0
 CFLAGS   += -O3 -Os
-
+CFLAGS   += -I/usr/include/
 AS     := $(GCCPATH)arm-none-eabi-gcc
 
 LD       := $(GCCPATH)arm-none-eabi-gcc

@@ -91,6 +91,7 @@
 #define BTCHIP_SW_NOT_ENOUGH_MEMORY_SPACE 0x6A84
 #define BTCHIP_SW_REFERENCED_DATA_NOT_FOUND 0x6A88
 #define BTCHIP_SW_FILE_ALREADY_EXISTS 0x6A89
+#define BTCHIP_SW_SWAP_WITHOUT_TRUSTED_INPUTS 0x6A8A
 #define BTCHIP_SW_INCORRECT_P1_P2 0x6B00
 #define BTCHIP_SW_INS_NOT_SUPPORTED 0x6D00
 #define BTCHIP_SW_CLA_NOT_SUPPORTED 0x6E00
@@ -152,7 +153,6 @@ unsigned short btchip_apdu_sign_message(void);
 unsigned short btchip_apdu_get_random(void);
 unsigned short btchip_apdu_get_firmware_version(void);
 
-unsigned short btchip_apdu_set_alternate_coin_version(void);
 unsigned short btchip_apdu_get_coin_version(void);
 
 #endif
