@@ -31,19 +31,19 @@ unsigned short btchip_apdu_get_coin_version() {
         return BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
     }
 
-    G_io_apdu_buffer[offset++] = btchip_context_D.payToAddressVersion >> 8;
-    G_io_apdu_buffer[offset++] = btchip_context_D.payToAddressVersion;
-    G_io_apdu_buffer[offset++] = btchip_context_D.payToScriptHashVersion >> 8;
-    G_io_apdu_buffer[offset++] = btchip_context_D.payToScriptHashVersion;
-    G_io_apdu_buffer[offset++] = btchip_context_D.coinFamily;
-    G_io_apdu_buffer[offset++] = btchip_context_D.coinIdLength;
-    os_memmove(G_io_apdu_buffer + offset, btchip_context_D.coinId,
-               btchip_context_D.coinIdLength);
-    offset += btchip_context_D.coinIdLength;
-    G_io_apdu_buffer[offset++] = btchip_context_D.shortCoinIdLength;
-    os_memmove(G_io_apdu_buffer + offset, btchip_context_D.shortCoinId,
-               btchip_context_D.shortCoinIdLength);
-    offset += btchip_context_D.shortCoinIdLength;
+    G_io_apdu_buffer[offset++] = G_coin_config->p2pkh_version >> 8;
+    G_io_apdu_buffer[offset++] = G_coin_config->p2pkh_version;
+    G_io_apdu_buffer[offset++] = G_coin_config->p2sh_version >> 8;
+    G_io_apdu_buffer[offset++] = G_coin_config->p2sh_version;
+    G_io_apdu_buffer[offset++] = G_coin_config->family;
+    G_io_apdu_buffer[offset++] = strlen(G_coin_config->coinid);
+    os_memmove(G_io_apdu_buffer + offset, G_coin_config->coinid,
+               strlen(G_coin_config->coinid));
+    offset += strlen(G_coin_config->coinid);
+    G_io_apdu_buffer[offset++] = strlen(G_coin_config->name_short);
+    os_memmove(G_io_apdu_buffer + offset, G_coin_config->name_short,
+               strlen(G_coin_config->name_short));
+    offset += strlen(G_coin_config->name_short);
     btchip_context_D.outLength = offset;
 
     return BTCHIP_SW_OK;

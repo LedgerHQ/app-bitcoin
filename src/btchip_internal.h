@@ -20,7 +20,6 @@
 
 #include "btchip.h"
 #include "btchip_public_ram_variables.h"
-#include "btchip_public_ram_key_variables.h"
 #include "btchip_rom_variables.h"
 #include "btchip_filesystem.h"
 #include "btchip_base58.h"

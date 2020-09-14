@@ -1,0 +1,26 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "gdb",
+            "request": "attach",
+            "name": "Attach to gdbserver",
+            "executable": "${workspaceFolder}/bin/app.elf",
+            "target": ":1234",
+            "remote": true,
+            "cwd": "${workspaceFolder}",
+            "valuesFormatting": "parseText",
+            "gdbpath": "gdb-multiarch",
+            "autorun": [
+                "set architecture arm",
+                "handle SIGILL nostop pass noprint",
+                "add-symbol-file ${workspaceFolder}/bin/app.elf 0x40000000",
+                "b *0x40000000",
+                "c"
+            ]
+        }
+    ]
+}
