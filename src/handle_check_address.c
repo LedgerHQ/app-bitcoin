@@ -38,8 +38,8 @@ bool derive_compressed_public_key(
 bool get_address_from_compressed_public_key(
     unsigned char format,
     unsigned char* compressed_pub_key,
-    unsigned char payToAddressVersion,
-    unsigned char payToScriptHashVersion,
+    unsigned short payToAddressVersion,
+    unsigned short payToScriptHashVersion,
     const char* native_segwit_prefix,
     char * address,
     unsigned char max_address_length
@@ -126,6 +126,7 @@ void handle_check_address(check_address_parameters_t* params, btchip_altcoin_con
     }
     if ((strlen(address) != strlen(params->address_to_check)) ||
         os_memcmp(address, params->address_to_check, strlen(address)) != 0) {
+        strcpy(params->address_to_check, address);
         PRINTF("Addresses doesn't match\n");
         return;
     }
