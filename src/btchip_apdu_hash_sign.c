@@ -96,7 +96,7 @@ unsigned short btchip_apdu_hash_sign() {
                 CLOSE_TRY;
                 goto catch_discardTransaction;
             }
-            os_memmove(btchip_context_D.transactionSummary.keyPath, 
+            os_memmove(btchip_context_D.transactionSummary.keyPath,
                 G_io_apdu_buffer + ISO_OFFSET_CDATA,
                 MAX_BIP32_PATH_LENGTH);
             parameters += (4 * G_io_apdu_buffer[ISO_OFFSET_CDATA]) + 1;
@@ -147,7 +147,7 @@ unsigned short btchip_apdu_hash_sign() {
             sw = BTCHIP_SW_OK;
             if (btchip_context_D.called_from_swap) {
                 // if we signed all outputs we should exit,
-                // but only after sending response, so lets raise the 
+                // but only after sending response, so lets raise the
                 // vars.swap_data.should_exit flag and check it on timer later
                 vars.swap_data.alreadySignedInputs++;
                 if (vars.swap_data.alreadySignedInputs >= vars.swap_data.totalNumberOfInputs) {

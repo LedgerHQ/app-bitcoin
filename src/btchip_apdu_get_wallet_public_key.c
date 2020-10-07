@@ -49,7 +49,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
     uint32_t request_token;
     unsigned char chainCode[32];
     uint8_t is_derivation_path_unusual;
-    
+
     bool display = (G_io_apdu_buffer[ISO_OFFSET_P1] == P1_DISPLAY);
     bool display_request_token = N_btchip.pubKeyRequestRestriction && (G_io_apdu_buffer[ISO_OFFSET_P1] == P1_REQUEST_TOKEN) && G_io_apdu_media == IO_APDU_MEDIA_U2F;
     bool require_user_approval = N_btchip.pubKeyRequestRestriction && !(display_request_token || display) && G_io_apdu_media == IO_APDU_MEDIA_U2F;
@@ -170,7 +170,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
                sizeof(chainCode));
     btchip_context_D.outLength = 1 + 65 + 1 + keyLength + sizeof(chainCode);
 
-    // privacy : force display the address if the path isn't standard 
+    // privacy : force display the address if the path isn't standard
     // and could reveal another fork holdings according to BIP 44 rules
     if (!display && !bip44_enforced) {
         display = true;

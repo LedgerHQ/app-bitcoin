@@ -26,10 +26,10 @@
 // Check if fOverwintered flag is set and if nVersion is >= 0x03
 #define TRUSTED_INPUT_OVERWINTER ( (G_coin_config->kind == COIN_KIND_ZCASH || \
                                     G_coin_config->kind == COIN_KIND_ZCLASSIC || \
-                                    G_coin_config->kind == COIN_KIND_KOMODO) && \ 
+                                    G_coin_config->kind == COIN_KIND_KOMODO) && \
                                     (btchip_read_u32(btchip_context_D.transactionVersion, 0, 0) & (1<<31)) && \
                                     (btchip_read_u32(btchip_context_D.transactionVersion, 0, 0) ^ (1<<31)) >= 0x03 \
-                                ) 
+                                )
 
 #define DEBUG_LONG "%d"
 
@@ -269,8 +269,8 @@ void transaction_parse(unsigned char parseMode) {
 
                     if (G_coin_config->flags & FLAG_PEERCOIN_SUPPORT) {
                         if ((G_coin_config->family ==
-                            BTCHIP_FAMILY_PEERCOIN) || 
-                            ((G_coin_config->family == BTCHIP_FAMILY_STEALTH) && 
+                            BTCHIP_FAMILY_PEERCOIN) ||
+                            ((G_coin_config->family == BTCHIP_FAMILY_STEALTH) &&
                             (btchip_context_D.transactionVersion[0] < 2))) {
                             // Timestamp
                             check_transaction_available(4);
@@ -289,7 +289,7 @@ void transaction_parse(unsigned char parseMode) {
                         // As there are a lot of different states in which we can have different number of input
                         // (when for ex. we sign segregated witness)
                         if (vars.swap_data.totalNumberOfInputs == 0) {
-                            vars.swap_data.totalNumberOfInputs = 
+                            vars.swap_data.totalNumberOfInputs =
                                 btchip_context_D.transactionContext.transactionRemainingInputsOutputs;
                         }
                         // Reseting the flag, because we should check address ones for each input
@@ -397,20 +397,20 @@ void transaction_parse(unsigned char parseMode) {
                             // transaction_offset_increase() here as it could update the hash being computed.
                             if (btchip_context_D.usingSegwit) {
                                 // Overwrite the no longer needed HMAC's 1st byte w/ the input script length byte.
-                                *(btchip_context_D.transactionBufferPointer + 1 + TRUSTED_INPUT_SIZE + 1) = 
+                                *(btchip_context_D.transactionBufferPointer + 1 + TRUSTED_INPUT_SIZE + 1) =
                                     *(btchip_context_D.transactionBufferPointer + 1 + TRUSTED_INPUT_TOTAL_SIZE + 1);
-                                // Set tx data pointer on TI header's (i.e. 0x38||0x32||0x00||Nonce (2B)) last byte 
+                                // Set tx data pointer on TI header's (i.e. 0x38||0x32||0x00||Nonce (2B)) last byte
                                 // before prevout tx hash. Also remove HMAC size from remaining data length.
                                 btchip_context_D.transactionBufferPointer += 5;
                                 btchip_context_D.transactionDataRemaining -= (5+8);
                             }
                         }
-                        // Handle pure segwit inputs, whether trusted or not (i.e. InputHashStart 1st APDU's P2==02 
+                        // Handle pure segwit inputs, whether trusted or not (i.e. InputHashStart 1st APDU's P2==02
                         // & data[0]=={0x01, 0x02})
                         if (btchip_context_D.usingSegwit) {
                             transaction_offset_increase(1);     // Set tx pointer on 1st byte of hash
                             check_transaction_available(
-                                36); // prevout : 32 hash + 4 index 
+                                36); // prevout : 32 hash + 4 index
                             if (!btchip_context_D.segwitParsedOnce) {
                                 if (btchip_context_D.usingOverwinter) {
                                     cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.transactionBufferPointer, 36, NULL, 0);
@@ -455,7 +455,7 @@ void transaction_parse(unsigned char parseMode) {
                                 btchip_context_D.transactionHashOption =
                                     TRANSACTION_HASH_FULL;
                             }
-                        } 
+                        }
                         // Handle non-segwit inputs (i.e. InputHashStart 1st APDU's P2==00 && data[0]==0x00)
                         else if (!trustedInputFlag) {
                             // Only authorized in relaxed wallet and server
@@ -486,7 +486,7 @@ void transaction_parse(unsigned char parseMode) {
                             PRINTF("Clearing P2SH consumption\n");
                             btchip_context_D.transactionContext.consumeP2SH = 0;
                             */
-                        } 
+                        }
                         // Handle non-segwit TrustedInput (i.e. InputHashStart 1st APDU's P2==00 & data[0]==0x01)
                         else if (trustedInputFlag && !btchip_context_D.usingSegwit) {
                             os_memmove(
@@ -746,7 +746,7 @@ void transaction_parse(unsigned char parseMode) {
                         transaction_get_varint();
                     btchip_context_D.transactionContext
                         .transactionCurrentInputOutput = 0;
-                    PRINTF("Number of outputs : " DEBUG_LONG "\n", 
+                    PRINTF("Number of outputs : " DEBUG_LONG "\n",
                         btchip_context_D.transactionContext.transactionRemainingInputsOutputs);
                     // Ready to proceed
                     btchip_context_D.transactionContext.transactionState =

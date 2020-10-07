@@ -1465,7 +1465,7 @@ unsigned int ui_request_sign_path_approval_nanos_button(unsigned int button_mask
 unsigned int ui_request_segwit_input_approval_nanos_button(unsigned int button_mask,
                                              unsigned int button_mask_counter)
 {
-    // Both buttons must be pressed to validate either "Cancel" or "Continue" 
+    // Both buttons must be pressed to validate either "Cancel" or "Continue"
     // as they are on separate screens
     if (button_mask == BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT) {
         switch (ux_step)
@@ -1621,8 +1621,8 @@ void settings_submenu_selector(unsigned int idx) {
 
 //////////////////////////////////////////////////////////////////////
 UX_STEP_NOCB(
-    ux_idle_flow_1_step, 
-    nn, 
+    ux_idle_flow_1_step,
+    nn,
     {
       "Application",
       "is ready",
@@ -1636,8 +1636,8 @@ UX_STEP_VALID(
       "Settings",
     });
 UX_STEP_NOCB(
-    ux_idle_flow_3_step, 
-    bn, 
+    ux_idle_flow_3_step,
+    bn,
     {
       "Version",
       APPVERSION,
@@ -1660,16 +1660,16 @@ UX_FLOW(ux_idle_flow,
 
 //////////////////////////////////////////////////////////////////////
 UX_STEP_NOCB(
-    ux_sign_flow_1_step, 
-    pnn, 
+    ux_sign_flow_1_step,
+    pnn,
     {
       &C_icon_certificate,
       "Sign",
       "message",
     });
 UX_STEP_NOCB(
-    ux_sign_flow_2_step, 
-    bnnn_paging, 
+    ux_sign_flow_2_step,
+    bnnn_paging,
     {
       .title = "Message hash",
       .text = vars.tmp.fullAddress,
@@ -1702,37 +1702,37 @@ UX_FLOW(ux_sign_flow,
 
 //////////////////////////////////////////////////////////////////////
 
-UX_STEP_NOCB(ux_confirm_full_flow_1_step, 
-    pnn, 
+UX_STEP_NOCB(ux_confirm_full_flow_1_step,
+    pnn,
     {
       &C_icon_eye,
       "Review",
       "transaction",
     });
 UX_STEP_NOCB(
-    ux_confirm_full_flow_2_step, 
-    bnnn_paging, 
+    ux_confirm_full_flow_2_step,
+    bnnn_paging,
     {
       .title = "Amount",
       .text = vars.tmp.fullAmount
     });
 UX_STEP_NOCB(
-    ux_confirm_full_flow_3_step, 
-    bnnn_paging, 
+    ux_confirm_full_flow_3_step,
+    bnnn_paging,
     {
       .title = "Address",
       .text = vars.tmp.fullAddress,
     });
 UX_STEP_NOCB(
-    ux_confirm_full_flow_4_step, 
-    bnnn_paging, 
+    ux_confirm_full_flow_4_step,
+    bnnn_paging,
     {
       .title = "Fees",
       .text = vars.tmp.feesAmount,
     });
 UX_STEP_VALID(
-    ux_confirm_full_flow_5_step, 
-    pbb, 
+    ux_confirm_full_flow_5_step,
+    pbb,
     io_seproxyhal_touch_verify_ok(NULL),
     {
       &C_icon_validate_14,
@@ -1740,8 +1740,8 @@ UX_STEP_VALID(
       "and send",
     });
 UX_STEP_VALID(
-    ux_confirm_full_flow_6_step, 
-    pb, 
+    ux_confirm_full_flow_6_step,
+    pb,
     io_seproxyhal_touch_verify_cancel(NULL),
     {
       &C_icon_crossmark,
@@ -1760,38 +1760,38 @@ UX_FLOW(ux_confirm_full_flow,
 //////////////////////////////////////////////////////////////////////
 
 UX_STEP_NOCB(
-    ux_confirm_single_flow_1_step, 
-    pnn, 
+    ux_confirm_single_flow_1_step,
+    pnn,
     {
       &C_icon_eye,
       "Review",
       vars.tmp.feesAmount, // output #
     });
 UX_STEP_NOCB(
-    ux_confirm_single_flow_2_step, 
-    bnnn_paging, 
+    ux_confirm_single_flow_2_step,
+    bnnn_paging,
     {
       .title = "Amount",
       .text = vars.tmp.fullAmount,
     });
 UX_STEP_NOCB(
-    ux_confirm_single_flow_3_step, 
-    bnnn_paging, 
+    ux_confirm_single_flow_3_step,
+    bnnn_paging,
     {
       .title = "Address",
       .text = vars.tmp.fullAddress,
     });
 UX_STEP_VALID(
-    ux_confirm_single_flow_5_step, 
+    ux_confirm_single_flow_5_step,
     pb,
-    io_seproxyhal_touch_verify_ok(NULL), 
+    io_seproxyhal_touch_verify_ok(NULL),
     {
       &C_icon_validate_14,
       "Accept",
     });
 UX_STEP_VALID(
-    ux_confirm_single_flow_6_step, 
-    pb, 
+    ux_confirm_single_flow_6_step,
+    pb,
     io_seproxyhal_touch_verify_cancel(NULL),
     {
       &C_icon_crossmark,
@@ -1809,23 +1809,23 @@ UX_FLOW(ux_confirm_single_flow,
 //////////////////////////////////////////////////////////////////////
 
 UX_STEP_NOCB(
-    ux_finalize_flow_1_step, 
-    pnn, 
+    ux_finalize_flow_1_step,
+    pnn,
     {
       &C_icon_eye,
       "Confirm",
       "transaction"
     });
 UX_STEP_NOCB(
-    ux_finalize_flow_4_step, 
-    bnnn_paging, 
+    ux_finalize_flow_4_step,
+    bnnn_paging,
     {
       .title = "Fees",
       .text = vars.tmp.feesAmount,
     });
 UX_STEP_VALID(
-    ux_finalize_flow_5_step, 
-    pbb, 
+    ux_finalize_flow_5_step,
+    pbb,
     io_seproxyhal_touch_verify_ok(NULL),
     {
       &C_icon_validate_14,
@@ -1833,8 +1833,8 @@ UX_STEP_VALID(
       "and send"
     });
 UX_STEP_VALID(
-    ux_finalize_flow_6_step, 
-    pb, 
+    ux_finalize_flow_6_step,
+    pb,
     io_seproxyhal_touch_verify_cancel(NULL),
     {
       &C_icon_crossmark,
@@ -1850,22 +1850,22 @@ UX_FLOW(ux_finalize_flow,
 
 //////////////////////////////////////////////////////////////////////
 UX_STEP_NOCB(
-    ux_display_public_flow_1_step, 
-    pnn, 
+    ux_display_public_flow_1_step,
+    pnn,
     {
       &C_icon_warning,
       "The derivation",
       "path is unusual!",
     });
 UX_STEP_NOCB(
-    ux_display_public_flow_2_step, 
-    bnnn_paging, 
+    ux_display_public_flow_2_step,
+    bnnn_paging,
     {
       .title = "Derivation path",
       .text = vars.tmp_warning.derivation_path,
     });
 UX_STEP_VALID(
-    ux_display_public_flow_3_step, 
+    ux_display_public_flow_3_step,
     pnn,
     io_seproxyhal_touch_display_cancel(NULL),
     {
@@ -1874,31 +1874,31 @@ UX_STEP_VALID(
       "not sure",
     });
 UX_STEP_NOCB(
-    ux_display_public_flow_4_step, 
-    pnn, 
+    ux_display_public_flow_4_step,
+    pnn,
     {
       &C_icon_validate_14,
       "Approve derivation",
       "path",
     });
 UX_STEP_NOCB(
-    ux_display_public_flow_5_step, 
-    bnnn_paging, 
+    ux_display_public_flow_5_step,
+    bnnn_paging,
     {
       .title = "Address",
       .text = G_io_apdu_buffer+200,
     });
 UX_STEP_VALID(
-    ux_display_public_flow_6_step, 
-    pb, 
+    ux_display_public_flow_6_step,
+    pb,
     io_seproxyhal_touch_display_ok(NULL),
     {
       &C_icon_validate_14,
       "Approve",
     });
 UX_STEP_VALID(
-    ux_display_public_flow_7_step, 
-    pb, 
+    ux_display_public_flow_7_step,
+    pb,
     io_seproxyhal_touch_display_cancel(NULL),
     {
       &C_icon_crossmark,
@@ -1925,8 +1925,8 @@ UX_FLOW(ux_display_public_flow,
 
 //////////////////////////////////////////////////////////////////////
 UX_STEP_VALID(
-    ux_display_token_flow_1_step, 
-    pbb, 
+    ux_display_token_flow_1_step,
+    pbb,
     io_seproxyhal_touch_display_ok(NULL),
     {
       &C_icon_validate_14,
@@ -1934,8 +1934,8 @@ UX_STEP_VALID(
       G_io_apdu_buffer+200,
     });
 UX_STEP_VALID(
-    ux_display_token_flow_2_step, 
-    pb, 
+    ux_display_token_flow_2_step,
+    pb,
     io_seproxyhal_touch_display_cancel(NULL),
     {
       &C_icon_crossmark,
@@ -1949,8 +1949,8 @@ UX_FLOW(ux_display_token_flow,
 
 //////////////////////////////////////////////////////////////////////
 UX_STEP_VALID(
-    ux_request_pubkey_approval_flow_1_step, 
-    pbb, 
+    ux_request_pubkey_approval_flow_1_step,
+    pbb,
     io_seproxyhal_touch_display_ok(NULL),
     {
       &C_icon_validate_14,
@@ -1958,8 +1958,8 @@ UX_STEP_VALID(
       "public key?",
     });
 UX_STEP_VALID(
-    ux_request_pubkey_approval_flow_2_step, 
-    pb, 
+    ux_request_pubkey_approval_flow_2_step,
+    pb,
     io_seproxyhal_touch_display_cancel(NULL),
     {
       &C_icon_crossmark,
@@ -1973,23 +1973,23 @@ UX_FLOW(ux_request_pubkey_approval_flow,
 
 //////////////////////////////////////////////////////////////////////
 UX_STEP_NOCB(
-    ux_request_change_path_approval_flow_1_step, 
-    pbb, 
+    ux_request_change_path_approval_flow_1_step,
+    pbb,
     {
       &C_icon_eye,
       "The change path",
       "is unusual",
     });
 UX_STEP_NOCB(
-    ux_request_change_path_approval_flow_2_step, 
-    bnnn_paging, 
+    ux_request_change_path_approval_flow_2_step,
+    bnnn_paging,
     {
       .title = "Change path",
       .text = vars.tmp_warning.derivation_path,
     });
 UX_STEP_VALID(
-    ux_request_change_path_approval_flow_3_step, 
-    pbb, 
+    ux_request_change_path_approval_flow_3_step,
+    pbb,
     io_seproxyhal_touch_display_cancel(NULL),
     {
       &C_icon_crossmark,
@@ -1997,8 +1997,8 @@ UX_STEP_VALID(
       "not sure",
     });
 UX_STEP_VALID(
-    ux_request_change_path_approval_flow_4_step, 
-    pb, 
+    ux_request_change_path_approval_flow_4_step,
+    pb,
     io_seproxyhal_touch_display_ok(NULL),
     {
       &C_icon_validate_14,
@@ -2014,23 +2014,23 @@ UX_FLOW(ux_request_change_path_approval_flow,
 
 //////////////////////////////////////////////////////////////////////
 UX_STEP_NOCB(
-    ux_request_sign_path_approval_flow_1_step, 
-    pbb, 
+    ux_request_sign_path_approval_flow_1_step,
+    pbb,
     {
       &C_icon_eye,
       "The sign path",
       "is unusual",
     });
 UX_STEP_NOCB(
-    ux_request_sign_path_approval_flow_2_step, 
-    bnnn_paging, 
+    ux_request_sign_path_approval_flow_2_step,
+    bnnn_paging,
     {
       .title = "Sign path",
       .text = vars.tmp_warning.derivation_path,
     });
 UX_STEP_VALID(
-    ux_request_sign_path_approval_flow_3_step, 
-    pbb, 
+    ux_request_sign_path_approval_flow_3_step,
+    pbb,
     io_seproxyhal_touch_sign_cancel(NULL),
     {
       &C_icon_crossmark,
@@ -2038,8 +2038,8 @@ UX_STEP_VALID(
       "not sure",
     });
 UX_STEP_VALID(
-    ux_request_sign_path_approval_flow_4_step, 
-    pb, 
+    ux_request_sign_path_approval_flow_4_step,
+    pb,
     io_seproxyhal_touch_sign_ok(NULL),
     {
       &C_icon_validate_14,
@@ -2056,38 +2056,38 @@ UX_FLOW(ux_request_sign_path_approval_flow,
 
 //////////////////////////////////////////////////////////////////////
 UX_STEP_NOCB(
-    ux_request_segwit_input_approval_flow_1_step, 
-    pb, 
+    ux_request_segwit_input_approval_flow_1_step,
+    pb,
     {
       .icon = &C_icon_warning,
       .line1 = "Unverified inputs"
     });
 UX_STEP_NOCB(
-    ux_request_segwit_input_approval_flow_2_step, 
-    nn, 
-    {           
+    ux_request_segwit_input_approval_flow_2_step,
+    nn,
+    {
       .line1 = "Update",
       .line2 = " Ledger Live"
     });
 UX_STEP_NOCB(
-    ux_request_segwit_input_approval_flow_3_step, 
+    ux_request_segwit_input_approval_flow_3_step,
     nn
-    , 
-    {           
+    ,
+    {
       .line1 = "or third party",
       .line2 = "wallet software"
     });
 UX_STEP_VALID(
-    ux_request_segwit_input_approval_flow_4_step, 
-    pb, 
+    ux_request_segwit_input_approval_flow_4_step,
+    pb,
     io_seproxyhal_touch_display_cancel(NULL),
     {
       .icon = &C_icon_crossmark,
       .line1 = "Cancel"
     });
 UX_STEP_VALID(
-    ux_request_segwit_input_approval_flow_5_step, 
-    pb, 
+    ux_request_segwit_input_approval_flow_5_step,
+    pb,
     io_seproxyhal_touch_display_ok(NULL),
     {
       &C_icon_validate_14,
@@ -2117,7 +2117,7 @@ void ui_idle(void) {
     }
     ux_flow_init(0, ux_idle_flow, NULL);
 #elif defined(TARGET_NANOS)
-    UX_MENU_DISPLAY(0, menu_main, NULL);    
+    UX_MENU_DISPLAY(0, menu_main, NULL);
 #endif // #if TARGET_ID
 }
 
@@ -2285,7 +2285,7 @@ error:
 void get_address_from_output_script(unsigned char* script, int script_size, char* out, int out_size) {
     if (btchip_output_script_is_op_return(script)) {
         strcpy(out, "OP_RETURN");
-        return;    
+        return;
     }
     if ((G_coin_config->kind == COIN_KIND_QTUM) &&
         btchip_output_script_is_op_create(script, script_size)) {
@@ -2316,7 +2316,7 @@ void get_address_from_output_script(unsigned char* script, int script_size, char
         addressOffset = 4;
         version = G_coin_config->p2pkh_version;
     }
-    
+
     if (version > 255) {
         versionSize = 2;
         address[0] = (version >> 8);
@@ -2348,10 +2348,10 @@ uint8_t prepare_single_output() {
     unsigned int offset = 0;
     unsigned short textSize;
     char tmp[80] = {0};
-    
+
     btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset, 8);
     offset += 8;
-    
+
     get_address_from_output_script(btchip_context_D.currentOutput + offset,  sizeof(btchip_context_D.currentOutput) - offset, tmp, sizeof(tmp));
     strncpy(vars.tmp.fullAddress, tmp, sizeof(vars.tmp.fullAddress) - 1);
 
@@ -2658,7 +2658,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
             offset += 1 + btchip_context_D.currentOutput[offset];
             currentPos++;
         }
-    }    
+    }
     btchip_context_D.tmp = NULL;
     return 1;
 error:
@@ -2720,7 +2720,7 @@ unsigned int btchip_silent_confirm_single_output() {
             PRINTF("Address not matched\n");
             return 0;
         }
-    
+
         // Check if all inputs have been confirmed
 
         if (btchip_context_D.outputParsingState ==
@@ -2729,7 +2729,7 @@ unsigned int btchip_silent_confirm_single_output() {
             if (btchip_context_D.remainingOutputs == 0)
                 break;
         }
-        
+
         os_memmove(btchip_context_D.currentOutput,
                     btchip_context_D.currentOutput +
                         btchip_context_D.discardSize,
@@ -2760,7 +2760,7 @@ unsigned int btchip_silent_confirm_single_output() {
             return 0;
         }
     }
-    
+
     if (btchip_context_D.outputParsingState == BTCHIP_OUTPUT_FINALIZE_TX) {
         btchip_context_D.transactionContext.firstSigned = 0;
 
@@ -2882,7 +2882,7 @@ void btchip_bagl_display_public_key(uint8_t is_derivation_path_unusual) {
     UX_DISPLAY(ui_display_address_nanos, ui_display_address_nanos_prepro);
 
 #endif // TARGET_
-    
+
 }
 
 void btchip_bagl_display_token()
@@ -3142,7 +3142,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
             if (coin_config == NULL)
                 app_exit();
             else
-                coin_main_with_config((btchip_altcoin_config_t *)((unsigned int *)arg0)[2]);    
+                coin_main_with_config((btchip_altcoin_config_t *)((unsigned int *)arg0)[2]);
         break;
         default:
             if (coin_config == NULL)

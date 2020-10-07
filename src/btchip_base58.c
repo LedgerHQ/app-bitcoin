@@ -119,9 +119,9 @@ int btchip_encode_base58(const unsigned char *in, size_t length,
   while (j < outputSize && out[j] == 0) {
     j += 1;
   }
-  
+
   if (*outlen < zeroCount + outputSize - j) {
-    *outlen = zeroCount + outputSize - j;  
+    *outlen = zeroCount + outputSize - j;
     return -1;
   }
   *outlen = zeroCount + outputSize - j;

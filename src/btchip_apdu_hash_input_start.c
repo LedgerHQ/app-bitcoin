@@ -113,7 +113,7 @@ unsigned short btchip_apdu_hash_input_start() {
             os_memset(&btchip_context_D.tmpCtx.output, 0,
                       sizeof(btchip_context_D.tmpCtx.output));
             btchip_context_D.tmpCtx.output.changeAccepted = 1;
-            // Reset segwitWarningSeen flag to prevent displaying the warning for each 
+            // Reset segwitWarningSeen flag to prevent displaying the warning for each
             // segwit input when coontinuing from a previous session (P2=0x80)
             btchip_context_D.segwitWarningSeen = 0;
         }
@@ -122,12 +122,12 @@ unsigned short btchip_apdu_hash_input_start() {
     }
 
     // In segwit mode, warn user one time only to update its client wallet...
-    if (btchip_context_D.usingSegwit 
+    if (btchip_context_D.usingSegwit
         && !btchip_context_D.segwitWarningSeen
         &&(G_io_apdu_buffer[ISO_OFFSET_P1] == P1_NEXT)
         && (G_io_apdu_buffer[ISO_OFFSET_P2] != P2_CONTINUE)
         // ...if input is not passed as a TrustedInput
-        && IS_INPUT() 
+        && IS_INPUT()
         && !IS_INPUT_TRUSTED())
     {
         if(btchip_context_D.called_from_swap){

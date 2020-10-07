@@ -28,7 +28,7 @@ bool derive_compressed_public_key(
     if (!derive_private_key(serialized_path, serialized_path_length, &privKey))
         return false;
     cx_ecfp_public_key_t pubKey;
-      
+
     cx_ecfp_generate_pair(BTCHIP_CURVE, &pubKey, &privKey, 1);
     btchip_compress_public_key_value(pubKey.W);
     os_memcpy(public_key, pubKey.W, 33);
@@ -111,7 +111,7 @@ void handle_check_address(check_address_parameters_t* params, btchip_altcoin_con
         sizeof(compressed_public_key))) {
         return;
     }
-    
+
     char address[51];
     if (!get_address_from_compressed_public_key(
         params->address_parameters[0],
