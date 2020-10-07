@@ -230,7 +230,7 @@ unsigned short btchip_public_key_to_encoded_base58(
     unsigned short outlen, unsigned short version,
     unsigned char alreadyHashed) {
     unsigned char tmpBuffer[34];
-    
+
     unsigned char versionSize = (version > 255 ? 2 : 1);
     size_t outputLen;
 
@@ -316,7 +316,7 @@ void btchip_private_derive_keypair(unsigned char *bip32Path,
     io_seproxyhal_io_heartbeat();
 #endif
     os_perso_derive_node_bip32(CX_CURVE_256K1, u.bip32PathInt, bip32PathLength,
-                               u.privateComponent, out_chainCode); 
+                               u.privateComponent, out_chainCode);
 
     cx_ecdsa_init_private_key(BTCHIP_CURVE, u.privateComponent, 32,
                                 private_key);
@@ -364,7 +364,7 @@ unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_pa
         (((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) != G_coin_config->bip44_coin_type) &&
           ((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) != G_coin_config->bip44_coin_type2))) {
         return 1;
-    }    
+    }
 
     // If the account or address index is very high or if the change isn't 1, return a warning
     if((bip32PathInt[BIP44_ACCOUNT_OFFSET]^0x80000000) > MAX_BIP44_ACCOUNT_RECOMMENDED ||
@@ -376,7 +376,7 @@ unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_pa
     return 0;
 }
 
-/* 
+/*
 Only enforce the structure or coin type for consumed UTXOs or a public address
 Returns 0 if the path is non compliant, or 1 if compliant
 */
@@ -391,7 +391,7 @@ unsigned char enforce_bip44_coin_type(unsigned char *bip32Path, bool for_pubkey)
     if (bip32Path[0] < 2) {
         return for_pubkey;
     }
-    
+
     path_len = bip32Path[0];
     bip32Path++;
     if (path_len > MAX_BIP32_PATH) {
