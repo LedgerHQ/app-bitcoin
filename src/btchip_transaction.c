@@ -17,6 +17,7 @@
 
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
+#include "btchip_display_variables.h"
 
 #define CONSENSUS_BRANCH_ID_OVERWINTER 0x5ba81b19
 #define CONSENSUS_BRANCH_ID_SAPLING 0x76b809bb
@@ -267,9 +268,9 @@ void transaction_parse(unsigned char parseMode) {
                     }
 
                     if (G_coin_config->flags & FLAG_PEERCOIN_SUPPORT) {
-                        if ((btchip_context_D.coinFamily ==
+                        if ((G_coin_config->family ==
                             BTCHIP_FAMILY_PEERCOIN) || 
-                            ((btchip_context_D.coinFamily == BTCHIP_FAMILY_STEALTH) && 
+                            ((G_coin_config->family == BTCHIP_FAMILY_STEALTH) && 
                             (btchip_context_D.transactionVersion[0] < 2))) {
                             // Timestamp
                             check_transaction_available(4);
@@ -282,6 +283,18 @@ void transaction_parse(unsigned char parseMode) {
                         .transactionRemainingInputsOutputs =
                         transaction_get_varint();
                     PRINTF("Number of inputs : " DEBUG_LONG "\n",btchip_context_D.transactionContext.transactionRemainingInputsOutputs);
+                    if (btchip_context_D.called_from_swap && parseMode == PARSE_MODE_SIGNATURE) {
+                        // remember number of inputs to know when to exit from library
+                        // we will count number of already signed inputs and compare with this value
+                        // As there are a lot of different states in which we can have different number of input
+                        // (when for ex. we sign segregated witness)
+                        if (vars.swap_data.totalNumberOfInputs == 0) {
+                            vars.swap_data.totalNumberOfInputs = 
+                                btchip_context_D.transactionContext.transactionRemainingInputsOutputs;
+                        }
+                        // Reseting the flag, because we should check address ones for each input
+                        vars.swap_data.was_address_checked = 0;
+                    }
                     // Ready to proceed
                     btchip_context_D.transactionContext.transactionState =
                         BTCHIP_TRANSACTION_DEFINED_WAIT_INPUT;
