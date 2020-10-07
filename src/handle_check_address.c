@@ -126,7 +126,6 @@ void handle_check_address(check_address_parameters_t* params, btchip_altcoin_con
     }
     if ((strlen(address) != strlen(params->address_to_check)) ||
         os_memcmp(address, params->address_to_check, strlen(address)) != 0) {
-        strcpy(params->address_to_check, address);
         PRINTF("Addresses doesn't match\n");
         return;
     }
