@@ -1,4 +1,5 @@
 #include "handle_swap_sign_transaction.h"
+#include "os_io_seproxyhal.h"
 #include "btchip_public_ram_variables.h"
 #include "btchip_display_variables.h"
 #include "btchip_context.h"
