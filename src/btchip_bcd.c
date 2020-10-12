@@ -20,10 +20,10 @@
 #define SCRATCH_SIZE 21
 
 unsigned char
-btchip_convert_hex_amount_to_displayable(unsigned char *amount) {
+btchip_convert_hex_amount_to_displayable_no_globals(unsigned char *amount, unsigned int config_flag, unsigned char* out) {
     unsigned char LOOP1;
     unsigned char LOOP2;
-    if (!(G_coin_config->flags & FLAG_PEERCOIN_UNITS)) {
+    if (!(config_flag & FLAG_PEERCOIN_UNITS)) {
         LOOP1 = 13;
         LOOP2 = 8;
     } else {
@@ -70,11 +70,11 @@ btchip_convert_hex_amount_to_displayable(unsigned char *amount) {
             offset++;
         } else {
             nonZero = 1;
-            btchip_context_D.tmp[targetOffset++] = scratch[offset++] + '0';
+            out[targetOffset++] = scratch[offset++] + '0';
         }
     }
     if (targetOffset == 0) {
-        btchip_context_D.tmp[targetOffset++] = '0';
+        out[targetOffset++] = '0';
     }
     workOffset = offset;
     for (i = 0; i < LOOP2; i++) {
@@ -90,10 +90,15 @@ btchip_convert_hex_amount_to_displayable(unsigned char *amount) {
             break;
         }
         if (!comma) {
-            btchip_context_D.tmp[targetOffset++] = '.';
+            out[targetOffset++] = '.';
             comma = 1;
         }
-        btchip_context_D.tmp[targetOffset++] = scratch[offset++] + '0';
+        out[targetOffset++] = scratch[offset++] + '0';
     }
     return targetOffset;
+}
+
+unsigned char
+btchip_convert_hex_amount_to_displayable(unsigned char *amount) {
+    return btchip_convert_hex_amount_to_displayable_no_globals(amount, G_coin_config->flags, btchip_context_D.tmp);
 }
