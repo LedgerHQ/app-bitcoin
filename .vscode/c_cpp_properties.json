@@ -1,0 +1,35 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${env:BOLOS_SDK}/**"
+            ],
+            "defines": [
+                "HAVE_UX_FLOW",
+                "TARGET_NANOS",
+                "OS_IO_SEPROXYHAL",
+                "HAVE_BAGL",
+                "HAVE_SPRINTF",
+                "HAVE_IO_USB",
+                "HAVE_L4_USBLIB",
+                "IO_USB_MAX_ENDPOINTS=6",
+                "IO_HID_EP_LENGTH=64",
+                "HAVE_USB_APDU",
+                "IO_SEPROXYHAL_BUFFER_SIZE_B=128",
+                "HAVE_PRINTF",
+                "PRINTF=screen_printf",
+                "LEDGER_MAJOR_VERSION=0",
+                "LEDGER_MINOR_VERSION=1",
+                "LEDGER_PATCH_VERSION=0",
+                "TEST_PUBLIC_KEY"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "clang-x64"
+        }
+    ],
+    "version": 4
+}

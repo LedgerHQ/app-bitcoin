@@ -78,7 +78,6 @@ int btchip_decode_base58(const char *in, size_t length,
 
 int btchip_encode_base58(const unsigned char *in, size_t length,
                          unsigned char *out, size_t *outlen) {
-  unsigned char buffer[MAX_ENC_INPUT_SIZE * 138 / 100 + 1] = {0};
   size_t i = 0, j;
   size_t startAt, stopAt;
   size_t zeroCount = 0;
@@ -96,12 +95,17 @@ int btchip_encode_base58(const unsigned char *in, size_t length,
   }
 
   outputSize = (length - zeroCount) * 138 / 100 + 1;
+  if (*outlen < outputSize) {
+    *outlen = outputSize;
+    return -1;
+  }
+  os_memset(out, 0, outputSize);
   stopAt = outputSize - 1;
   for (startAt = zeroCount; startAt < length; startAt++) {
     int carry = in[startAt];
     for (j = outputSize - 1; (int)j >= 0; j--) {
-      carry += 256 * buffer[j];
-      buffer[j] = carry % 58;
+      carry += 256 * out[j];
+      out[j] = carry % 58;
       carry /= 58;
 
       if (j <= stopAt - 1 && carry == 0) {
@@ -112,7 +116,7 @@ int btchip_encode_base58(const unsigned char *in, size_t length,
   }
 
   j = 0;
-  while (j < outputSize && buffer[j] == 0) {
+  while (j < outputSize && out[j] == 0) {
     j += 1;
   }
 
@@ -120,15 +124,18 @@ int btchip_encode_base58(const unsigned char *in, size_t length,
     *outlen = zeroCount + outputSize - j;
     return -1;
   }
-
-  os_memset(out, BASE58ALPHABET[0], zeroCount);
-
-  i = zeroCount;
-  while (j < outputSize) {
-    out[i++] = BASE58ALPHABET[buffer[j++]];
+  *outlen = zeroCount + outputSize - j;
+  int distance = zeroCount - j;
+  if (distance < 0) {
+      for (i = zeroCount; i < *outlen; ++i)
+        out[i] = BASE58ALPHABET[out[i - distance]];
   }
-  *outlen = i;
-  PRINTF("Length encoded %d\n", i);
-  PRINTF("Encoded\n%.*H\n",i,out);
+  else {
+    for (i = *outlen - 1; (int)i >= 0; --i)
+        out[i] = BASE58ALPHABET[out[i - distance]];
+  }
+  os_memset(out, BASE58ALPHABET[0], zeroCount);
+  // PRINTF("Length encoded %d\n", i);
+  // PRINTF("Encoded\n%.*H\n",i,out);
   return 0;
 }
