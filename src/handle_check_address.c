@@ -98,7 +98,7 @@ void handle_check_address(check_address_parameters_t* params, btchip_altcoin_con
     unsigned char compressed_public_key[33];
     PRINTF("Params on the address %d\n",(unsigned int)params);
     PRINTF("Address to check %s\n",params->address_to_check);
-    PRINTF("Insied handle_check_address\n");
+    PRINTF("Inside handle_check_address\n");
     params->result = 0;
     if (params->address_to_check == 0) {
         PRINTF("Address to check == 0\n");
@@ -126,9 +126,9 @@ void handle_check_address(check_address_parameters_t* params, btchip_altcoin_con
     }
     if ((strlen(address) != strlen(params->address_to_check)) ||
         os_memcmp(address, params->address_to_check, strlen(address)) != 0) {
-        PRINTF("Addresses doesn't match\n");
+        PRINTF("Addresses don't match\n");
         return;
     }
-    PRINTF("Addresses  match\n");
+    PRINTF("Addresses match\n");
     params->result = 1;
 }

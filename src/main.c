@@ -2515,13 +2515,13 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
     }
     if (btchip_context_D.tmpCtx.output.changeInitialized && !changeFound) {
         if (!checkOnly) {
-            PRINTF("Error : change output not found");
+            PRINTF("Error : Change output not found");
         }
         goto error;
     }
     if ((numberOutputs > 1) && (!changeFound || !specialOpFound)) {
         if (!checkOnly) {
-            PRINTF("Error : too many inputs");
+            PRINTF("Error : Too many inputs");
         }
         goto error;
     }
