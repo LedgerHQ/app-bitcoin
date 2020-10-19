@@ -665,7 +665,7 @@ const bagl_element_t ui_display_address_blue[] = {
     UI_BLUE_TEXT(0x10, 30, 126, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0, COLOR_BLACK, COLOR_BG_1),
     UI_BLUE_TEXT(0x11, 30, 139, 260, vars.tmp.addressSummary, BAGL_FONT_OPEN_SANS_REGULAR_10_13PX, 0, COLOR_BLACK, COLOR_BG_1),
 
-    {{BAGL_RECTANGLE, 0x02, 320 / 2 - 0x1D * 8 / 2, 150, 8, 8, 0, 0, BAGL_FILL,COLOR_WHITE, COLOR_BLACK, 0, 0}, NULL, 0, 0, 0, NULL, NULL, NULL},
+    {{BAGL_ICON, 0x02, 320 / 2 - 0x1D * 8 / 2, 150, 8, 8, 0, 0, BAGL_FILL,COLOR_WHITE, COLOR_BLACK, 0, 0}, NULL, 0, 0, 0, NULL, NULL, NULL},
 
     UI_BLUE_BUTTONS_REJECT_OR_CONFIRM("REJECT", "CONFIRM", io_seproxyhal_touch_display_cancel, io_seproxyhal_touch_display_ok)
 };
@@ -737,6 +737,56 @@ const bagl_element_t ui_request_segwit_input_approval_blue[] = {
     UI_BLUE_BUTTONS_REJECT_OR_CONFIRM("CANCEL", "CONTINUE", io_seproxyhal_touch_display_cancel, io_seproxyhal_touch_display_ok)
 };
 
+// QR codes related definition
+#define QR_ZONE_ABS_TOP 139
+#define QR_ZONE_ABS_BOTTOM 414
+#define QR_PIXEL_SIZE 6
+#define QR_LINE_SIZE 29
+#define QR_PIXELS_IN_SQUARE (QR_PIXEL_SIZE * QR_PIXEL_SIZE)
+#define QR_PIXELS_IN_COLUMN (QR_PIXELS_IN_SQUARE * QR_LINE_SIZE)
+#define SCREEN_WIDTH 320
+
+/** @brief Add QR code square
+ *
+ * @param buffer[in, out] Buffer that contains the QR code
+ * @param pixel_pos Pixel position
+ * TODO: Improve comments of that function
+ */
+void
+add_qr_square(uint8_t* buffer, uint32_t pixel_pos)
+{
+    uint8_t trailing_bits = pixel_pos == 0 ? 0 : pixel_pos % 8;
+    uint8_t byte_pos = pixel_pos / 8;
+    uint8_t current_square_pixels_remaining = QR_PIXELS_IN_SQUARE;
+
+    // FILL THE LAST BYTE IN THE BUFFER
+    if(trailing_bits){
+        for(uint8_t j=0; j<trailing_bits; ++j){
+            buffer[byte_pos] |=  1 <<  (8-trailing_bits+j);
+        }
+
+        byte_pos++;
+        pixel_pos += trailing_bits;
+        current_square_pixels_remaining -= trailing_bits;
+    }
+
+    // COPY MOST OF THE NEW SQUARE
+    memset(buffer+byte_pos, 0xFF, current_square_pixels_remaining/8);
+
+    byte_pos += current_square_pixels_remaining/8;
+    pixel_pos += 8*(current_square_pixels_remaining/8);
+    current_square_pixels_remaining -= 8*(current_square_pixels_remaining/8);
+
+    // COPY REMAINING BITS
+    if(current_square_pixels_remaining){
+        for(uint8_t j=0; j<current_square_pixels_remaining; ++j){
+            buffer[byte_pos] |= 1 << j;
+        }
+
+        pixel_pos += current_square_pixels_remaining;
+    }
+}
+
 unsigned int ui_display_address_blue_prepro(const bagl_element_t *element) {
     bagl_icon_details_t *icon_details = &vars.tmpqr.icon_details;
     bagl_element_t *icon_component = element;
@@ -747,45 +797,49 @@ unsigned int ui_display_address_blue_prepro(const bagl_element_t *element) {
         // qrcode, need magnifying
         case 0x02: {
             unsigned int x, y, x_off, y_off, bit;
-#define PIXEL_SIZE 5
             os_memmove(&tmp_element, element, sizeof(bagl_element_t));
-            tmp_element.component.width = PIXEL_SIZE;
-            tmp_element.component.height = PIXEL_SIZE;
-            x_off = 320 / 2 - vars.tmpqr.qrcode[0] * PIXEL_SIZE / 2;
-            y_off =
-                139 + (414 - 139) / 2 - vars.tmpqr.qrcode[0] * PIXEL_SIZE / 2;
-            bit = 0;
+            tmp_element.component.width = QR_PIXEL_SIZE;
+            tmp_element.component.height = QR_LINE_SIZE * QR_PIXEL_SIZE;
+            // center x (compute center then move to start)
+            // x_off = screen width/2 - qrcodewidth in px / 2
+            x_off = SCREEN_WIDTH / 2 - vars.tmpqr.qrcode[0] * QR_PIXEL_SIZE / 2;
+            // center y, 139 is abs top QR_ZONE_ABS_BOTTOM is abs bottom, then we center it
+            y_off = QR_ZONE_ABS_TOP + (QR_ZONE_ABS_BOTTOM - QR_ZONE_ABS_TOP) / 2 - vars.tmpqr.qrcode[0] * QR_PIXEL_SIZE / 2;
+            bit = 1;
 
-            y = 0;
-            x = 0;
-            tmp_element.component.fgcolor =
-                vars.tmpqr.qrcode[1 + (bit >> 3)] & (1 << (bit & 0x7))
-                    ? COLOR_BLACK
-                    : COLOR_WHITE;
-            tmp_element.component.x = x_off + x * PIXEL_SIZE;
-            tmp_element.component.y = y_off + y * PIXEL_SIZE;
-            bit++;
-            x = 1;
-            goto send_and_next;
+            unsigned int const C_qr_column_colors[] = {COLOR_BLACK, COLOR_WHITE};
+            unsigned char C_qr_column_bitmap[QR_PIXELS_IN_COLUMN / 8 + (QR_PIXELS_IN_COLUMN % 8 ? 1 : 0)];
+            bagl_icon_details_t C_qr_column = {QR_PIXEL_SIZE, QR_LINE_SIZE * QR_PIXEL_SIZE, 1, C_qr_column_colors, C_qr_column_bitmap};
+            tmp_element.text = (char *)&C_qr_column;
+            tmp_element.component.y = y_off;
 
-            for (y = 0; y < vars.tmpqr.qrcode[0]; y++) {
-                for (x = 0; x < vars.tmpqr.qrcode[0]; x++) {
-                send_and_next:
-                    io_seproxyhal_display(&tmp_element);
-                    // tmp_element.component.fgcolor =
-                    // vars.tmpqr.qrcode[1+((y*0x1D+x)>>3)]&(1<<((y*0x1D+x)&0x7))
-                    // ? COLOR_BLACK: COLOR_WHITE;
-                    tmp_element.component.fgcolor =
-                        vars.tmpqr.qrcode[1 + (bit >> 3)] & (1 << (bit & 0x7))
-                            ? COLOR_BLACK
-                            : COLOR_WHITE;
-                    tmp_element.component.x = x_off + x * PIXEL_SIZE;
-                    tmp_element.component.y = y_off + y * PIXEL_SIZE;
-                    bit++;
-                    io_seproxyhal_spi_recv(G_io_seproxyhal_spi_buffer,
-                                           sizeof(G_io_seproxyhal_spi_buffer),
-                                           0);
+            for (x = 0; x < vars.tmpqr.qrcode[0]; x++)
+            {
+                memset(C_qr_column_bitmap, 0, sizeof(C_qr_column_bitmap));
+
+                uint32_t pixel_pos = 0;
+                tmp_element.component.x = x_off + x * QR_PIXEL_SIZE;
+
+                for (y = 0; y < vars.tmpqr.qrcode[0]; y++)
+                {
+
+                    bit = x + (QR_LINE_SIZE * y);
+                    uint8_t is_white = !(vars.tmpqr.qrcode[1 + (bit >> 3)] & (1 << (bit & 0x7)));
+
+                    // append a square at the bottom of the column
+                    if (is_white)
+                    {
+                        add_qr_square(C_qr_column_bitmap, pixel_pos);
+                    }
+                    else{
+                    }
+
+                    pixel_pos += QR_PIXELS_IN_SQUARE;
                 }
+
+                // draw column
+                io_seproxyhal_display(&tmp_element);
+                io_seproxyhal_spi_recv(G_io_seproxyhal_spi_buffer, sizeof(G_io_seproxyhal_spi_buffer), 0);
             }
             // don't use the common draw method, we've already drawn the
             // component
