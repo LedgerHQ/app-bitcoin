@@ -5,38 +5,6 @@
 #define MAX_DERIV_PATH_ASCII_LENGTH 1 + 10*(10+2) + 1
 #define MAX_CHAR_PER_LINE 25
 
-#if defined(TARGET_BLUE)
-#include "qrcodegen.h"
-#include "bagl.h"
-
-union display_variables {
-    struct {
-        char addressSummary[40]; // beginning of the output address ... end of
-        char fullAmount[65];     // full amount
-        char fullAddress[65];
-        // the address
-        char feesAmount[40]; // fees
-        char output_numbering[10];
-    } tmp;
-
-    struct {
-        char addressSummary[MAX_CHAR_PER_LINE + 1];
-        bagl_icon_details_t icon_details;
-        unsigned int colors[2];
-        unsigned char qrcode[qrcodegen_BUFFER_LEN_FOR_VERSION(3)];
-    } tmpqr;
-
-    struct {
-        // A bip44 path contains 5 elements, which max length in ascii is 10 char + optional quote "'" + "/" + \0"
-        char derivation_path [MAX_DERIV_PATH_ASCII_LENGTH];
-    } tmp_warning;
-
-    unsigned int dummy; // ensure the whole vars is aligned for the CM0 to
-                        // operate correctly
-};
-
-#else
-
 typedef struct swap_data_s {
         int was_address_checked;
         // total number of inputs to be signed
@@ -66,7 +34,6 @@ union display_variables {
 
     swap_data_t swap_data;
 };
-#endif
 
 extern union display_variables vars;
 

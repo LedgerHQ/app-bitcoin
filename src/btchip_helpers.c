@@ -312,9 +312,9 @@ void btchip_private_derive_keypair(unsigned char *bip32Path,
         u.bip32PathInt[i] = btchip_read_u32(bip32Path, 1, 0);
         bip32Path += 4;
     }
-#ifndef TARGET_BLUE
+
     io_seproxyhal_io_heartbeat();
-#endif
+
     os_perso_derive_node_bip32(CX_CURVE_256K1, u.bip32PathInt, bip32PathLength,
                                u.privateComponent, out_chainCode);
 
@@ -325,9 +325,9 @@ void btchip_private_derive_keypair(unsigned char *bip32Path,
         cx_ecfp_generate_pair(BTCHIP_CURVE, public_key,
                                 private_key, 1);
     }
-#ifndef TARGET_BLUE
+
     io_seproxyhal_io_heartbeat();
-#endif
+
     os_memset(u.privateComponent, 0, sizeof(u.privateComponent));
 }
 
@@ -454,22 +454,6 @@ unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned cha
     // remove last '/'
     out[offset-1] = '\0';
 
-#if defined(TARGET_BLUE)
-    // if the path is longer than 30 char, split the string in multiple strings of length 30
-    uint8_t len=strnlen(out, max_out_len);
-    uint8_t num_split = len/30;
-
-    // account for the '\0' line delimiters appended
-    if(len + num_split > max_out_len){
-        THROW(EXCEPTION);
-    }
-
-    for(i = 1; i<= num_split; i++) {
-        os_memmove(out+30*i, out+(30*i-1), len-29*i);
-        out[30*i-1] = '\0';
-    }
-#endif
-
     return offset -1;
 }
 
@@ -500,9 +484,8 @@ void btchip_sign_finalhash(void *keyContext,
                                  unsigned char *in, unsigned short inlen,
                                  unsigned char *out, unsigned short outlen,
                                  unsigned char rfc6979) {
-#ifndef TARGET_BLUE
     io_seproxyhal_io_heartbeat();
-#endif
+
     unsigned int info = 0;
     cx_ecdsa_sign((cx_ecfp_private_key_t *)keyContext,
                     CX_LAST | (rfc6979 ? CX_RND_RFC6979 : CX_RND_TRNG),
@@ -510,7 +493,6 @@ void btchip_sign_finalhash(void *keyContext,
     if (info & CX_ECCINFO_PARITY_ODD) {
         out[0] |= 0x01;
     }
-#ifndef TARGET_BLUE
+
     io_seproxyhal_io_heartbeat();
-#endif
 }

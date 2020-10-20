@@ -293,11 +293,6 @@ typedef struct btchip_altcoin_config_s {
     unsigned short p2sh_version;
     unsigned char family;
     //unsigned char* iconsuffix;// will use the icon provided on the stack (maybe)
-#ifdef TARGET_BLUE
-    char header_text[16];
-    unsigned int color_header;
-    unsigned int color_dashboard;
-#endif // TARGET_BLUE
     char coinid[14]; // used coind id for message signature prefix
     char name[16]; // for ux displays
     char name_short[6]; // for unit in ux displays
