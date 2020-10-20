@@ -192,12 +192,12 @@ APP_LOAD_PARAMS += $(APP_LOAD_FLAGS)
 DEFINES += $(DEFINES_LIB)
 
 ifeq ($(TARGET_NAME),TARGET_BLUE)
-ICONNAME=blue_app_$(COIN).gif
+ICONNAME=icons/blue_app_$(COIN).gif
 else
 	ifeq ($(TARGET_NAME),TARGET_NANOX)
-ICONNAME=nanox_app_$(COIN).gif
+ICONNAME=icons/nanox_app_$(COIN).gif
 	else
-ICONNAME=nanos_app_$(COIN).gif
+ICONNAME=icons/nanos_app_$(COIN).gif
 	endif
 endif
 
