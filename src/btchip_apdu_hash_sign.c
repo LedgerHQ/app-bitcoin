@@ -18,6 +18,7 @@
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
 #include "btchip_bagl_extensions.h"
+#include "btchip_display_variables.h"
 
 #define SIGHASH_ALL 0x01
 
@@ -99,7 +100,7 @@ unsigned short btchip_apdu_hash_sign() {
                 CLOSE_TRY;
                 goto catch_discardTransaction;
             }
-            os_memmove(btchip_context_D.transactionSummary.summarydata.keyPath, 
+            os_memmove(btchip_context_D.transactionSummary.keyPath,
                 G_io_apdu_buffer + ISO_OFFSET_CDATA,
                 MAX_BIP32_PATH_LENGTH);
             parameters += (4 * G_io_apdu_buffer[ISO_OFFSET_CDATA]) + 1;
@@ -108,7 +109,7 @@ unsigned short btchip_apdu_hash_sign() {
             lockTime = btchip_read_u32(parameters, 1, 0);
             parameters += 4;
             sighashType = *(parameters++);
-            btchip_context_D.transactionSummary.summarydata.sighashType = sighashType;
+            btchip_context_D.transactionSummary.sighashType = sighashType;
 
             if (((N_btchip.bkp.config.options &
                   BTCHIP_OPTION_FREE_SIGHASHTYPE) == 0)) {
@@ -148,15 +149,26 @@ unsigned short btchip_apdu_hash_sign() {
             }
 
             // Check if the path needs to be enforced
-            if (!enforce_bip44_coin_type(btchip_context_D.transactionSummary.summarydata.keyPath)) {
+            if (!enforce_bip44_coin_type(btchip_context_D.transactionSummary.keyPath, false)) {
                 btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
-                btchip_bagl_request_sign_path_approval(btchip_context_D.transactionSummary.summarydata.keyPath);
+                btchip_bagl_request_sign_path_approval(btchip_context_D.transactionSummary.keyPath);
             }
             else {
                 // Sign immediately
                 btchip_bagl_user_action_signtx(1, 1);
             }
             sw = BTCHIP_SW_OK;
+            if (btchip_context_D.called_from_swap) {
+                // if we signed all outputs we should exit,
+                // but only after sending response, so lets raise the
+                // vars.swap_data.should_exit flag and check it on timer later
+                vars.swap_data.alreadySignedInputs++;
+                if (vars.swap_data.alreadySignedInputs >= vars.swap_data.totalNumberOfInputs) {
+                    vars.swap_data.should_exit = 1;
+                }
+            }
+
+            // Then discard the transaction and reply
         }
         CATCH_ALL {
             sw = SW_TECHNICAL_DETAILS(0xF);
@@ -173,12 +185,13 @@ unsigned short btchip_apdu_hash_sign() {
 }
 
 void btchip_bagl_user_action_signtx(unsigned char confirming, unsigned char direct) {
+    cx_ecfp_private_key_t private_key;
     unsigned short sw = BTCHIP_SW_OK;
     // confirm and finish the apdu exchange //spaghetti
     if (confirming) {
         unsigned char hash[32];
         // Fetch the private key
-        btchip_private_derive_keypair(btchip_context_D.transactionSummary.summarydata.keyPath, 0, NULL);
+        btchip_private_derive_keypair(btchip_context_D.transactionSummary.keyPath, 0, NULL, &private_key, NULL);
         #ifndef USE_NO_OVERWINTER
         if (btchip_context_D.usingOverwinter) {
             cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hash, 0, hash, 32);
@@ -207,14 +220,14 @@ void btchip_bagl_user_action_signtx(unsigned char confirming, unsigned char dire
         }
         PRINTF("Hash2\n%.*H\n", sizeof(hash), hash);
         // Sign
-        btchip_signverify_finalhash(
-            &btchip_private_key_D, 1, hash, sizeof(hash),
+        btchip_sign_finalhash(
+            &private_key, hash, sizeof(hash),
             G_io_apdu_buffer, sizeof(G_io_apdu_buffer),
             ((N_btchip.bkp.config.options &
                 BTCHIP_OPTION_DETERMINISTIC_SIGNATURE) != 0));
 
         btchip_context_D.outLength = G_io_apdu_buffer[1] + 2;
-        G_io_apdu_buffer[btchip_context_D.outLength++] = btchip_context_D.transactionSummary.summarydata.sighashType;
+        G_io_apdu_buffer[btchip_context_D.outLength++] = btchip_context_D.transactionSummary.sighashType;
     } else {
         sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
         btchip_context_D.outLength = 0;

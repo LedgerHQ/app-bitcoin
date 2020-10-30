@@ -33,7 +33,7 @@
 
 extern uint8_t prepare_full_output(uint8_t checkOnly);
 
-static void btchip_apdu_hash_input_finalize_full_reset(void) {
+void btchip_apdu_hash_input_finalize_full_reset(void) {
     btchip_context_D.currentOutputOffset = 0;
     btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS;
     os_memset(btchip_context_D.totalOutputAmount, 0,
@@ -113,7 +113,7 @@ static bool check_output_displayable() {
                                      : OUTPUT_SCRIPT_REGULAR_PRE_LENGTH);
         if (!isP2sh && !isOpSender &&
             os_memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
-                      btchip_context_D.tmpCtx.output.changeAddress + 1,
+                      btchip_context_D.tmpCtx.output.changeAddress,
                       20) == 0) {
             changeFound = true;
         } else if (isP2sh && btchip_context_D.usingSegwit) {
@@ -121,7 +121,7 @@ static bool check_output_displayable() {
             changeSegwit[0] = 0x00;
             changeSegwit[1] = 0x14;
             os_memmove(changeSegwit + 2,
-                       btchip_context_D.tmpCtx.output.changeAddress + 1, 20);
+                       btchip_context_D.tmpCtx.output.changeAddress, 20);
             btchip_public_key_hash160(changeSegwit, 22, changeSegwit);
             if (os_memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
                           changeSegwit, 20) == 0) {
@@ -147,7 +147,7 @@ static bool check_output_displayable() {
     return displayable;
 }
 
-static bool handle_output_state() {
+bool handle_output_state() {
     uint32_t discardSize = 0;
     btchip_context_D.discardSize = 0;
     bool processed = false;
@@ -246,6 +246,30 @@ static bool handle_output_state() {
     return processed;
 }
 
+void get_public_key(unsigned char* keyPath, cx_ecfp_public_key_t* public_key) {
+    cx_ecfp_private_key_t private_key;
+    btchip_private_derive_keypair(keyPath, 1, NULL, &private_key, public_key);
+}
+
+// out should be 32 bytes, even only 20 bytes is significant for output
+void get_pubkey_hash160(unsigned char* keyPath, unsigned char* out) {
+    cx_ecfp_public_key_t public_key;
+    int keyLength;
+    get_public_key(keyPath, &public_key);
+    if (((N_btchip.bkp.config.options &
+            BTCHIP_OPTION_UNCOMPRESSED_KEYS) != 0)) {
+        keyLength = 65;
+    } else {
+        btchip_compress_public_key_value(public_key.W);
+        keyLength = 33;
+    }
+    btchip_public_key_hash160(
+        public_key.W,   // IN
+        keyLength,      // INLEN
+        out             // OUT
+    );
+}
+
 unsigned short btchip_apdu_hash_input_finalize_full_internal(
     btchip_transaction_summary_t *transactionSummary) {
     unsigned char authorizationHash[32];
@@ -253,10 +277,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
     unsigned short sw = BTCHIP_SW_OK;
     unsigned char *target = G_io_apdu_buffer;
     unsigned char keycardActivated = 0;
-    unsigned char screenPaired = 0;
-    unsigned char deepControl = 0;
     unsigned char p1 = G_io_apdu_buffer[ISO_OFFSET_P1];
-    unsigned char persistentCommit = 0;
     unsigned char hashOffset = 0;
     unsigned char numOutputs = 0;
 
@@ -291,7 +312,6 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             }
 
             if (p1 == FINALIZE_P1_CHANGEINFO) {
-                unsigned char keyLength;
                 if (!btchip_context_D.transactionContext.firstSigned) {
                 // Already validated, should be prevented on the client side
                 return_OK:
@@ -309,35 +329,26 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     // the client side
                     goto return_OK;
                 }
-                os_memmove(transactionSummary->summarydata.keyPath,
+                os_memmove(transactionSummary->keyPath,
                            G_io_apdu_buffer + ISO_OFFSET_CDATA,
                            MAX_BIP32_PATH_LENGTH);
-                btchip_private_derive_keypair(
-                    transactionSummary->summarydata.keyPath, 1, NULL);
-                if (((N_btchip.bkp.config.options &
-                      BTCHIP_OPTION_UNCOMPRESSED_KEYS) != 0)) {
-                    keyLength = 65;
-                } else {
-                    btchip_compress_public_key_value(btchip_public_key_D.W);
-                    keyLength = 33;
-                }
-                btchip_public_key_hash160(
-                    btchip_public_key_D.W,                            // IN
-                    keyLength,                                        // INLEN
-                    transactionSummary->summarydata.changeAddress + 1 // OUT
-                    );
-                os_memmove(
-                    btchip_context_D.tmpCtx.output.changeAddress,
-                    transactionSummary->summarydata.changeAddress,
-                    sizeof(transactionSummary->summarydata.changeAddress));
+
+                get_pubkey_hash160(transactionSummary->keyPath, btchip_context_D.tmpCtx.output.changeAddress);
+                PRINTF("Change address = %.*H\n", 20, btchip_context_D.tmpCtx.output.changeAddress);
+
                 btchip_context_D.tmpCtx.output.changeInitialized = 1;
                 btchip_context_D.tmpCtx.output.changeAccepted = 0;
 
                 // if the bip44 change path provided is not canonical or its index are unsual, ask for user approval
-                if(bip44_derivation_guard(transactionSummary->summarydata.keyPath, true)) {
+                if(bip44_derivation_guard(transactionSummary->keyPath, true)) {
+                    if (btchip_context_D.called_from_swap) {
+                        PRINTF("In swap mode only standart path is allowed\n");
+                        sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
+                        goto discardTransaction;
+                    }
                     btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
                     btchip_context_D.outputParsingState = BTCHIP_BIP44_CHANGE_PATH_VALIDATION;
-                    btchip_bagl_request_change_path_approval(transactionSummary->summarydata.keyPath);
+                    btchip_bagl_request_change_path_approval(transactionSummary->keyPath);
                 }
 
                 goto return_OK;
@@ -455,13 +466,13 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                 }
 
                 transactionSummary->payToAddressVersion =
-                    btchip_context_D.payToAddressVersion;
+                    G_coin_config->p2pkh_version;
                 transactionSummary->payToScriptHashVersion =
-                    btchip_context_D.payToScriptHashVersion;
+                    G_coin_config->p2sh_version;
 
                 // Generate new nonce
 
-                cx_rng(transactionSummary->summarydata.transactionNonce, 8);
+                cx_rng(transactionSummary->transactionNonce, 8);
             }
 
             G_io_apdu_buffer[0] = 0x00;
@@ -561,6 +572,7 @@ unsigned short btchip_apdu_hash_input_finalize_full() {
 
 unsigned char btchip_bagl_user_action(unsigned char confirming) {
     unsigned short sw = BTCHIP_SW_OK;
+
     // confirm and finish the apdu exchange //spaghetti
 
     if (confirming) {
