@@ -313,10 +313,10 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                 btchip_context_D.tmpCtx.output.changeInitialized = 1;
                 btchip_context_D.tmpCtx.output.changeAccepted = 0;
 
-                // if the bip44 change path provided is not canonical or its index are unsual, ask for user approval
+                // if the bip44 change path provided is not canonical or its index are unusual, ask for user approval
                 if(bip44_derivation_guard(transactionSummary->keyPath, true)) {
                     if (btchip_context_D.called_from_swap) {
-                        PRINTF("In swap mode only standart path is allowed\n");
+                        PRINTF("In swap mode only standard path is allowed\n");
                         sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
                         goto discardTransaction;
                     }
