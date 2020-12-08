@@ -1,11 +1,11 @@
 #include "handle_get_printable_amount.h"
 #include "btchip_bcd.h"
 
-void handle_get_printable_amount( get_printable_amount_parameters_t* params, btchip_altcoin_config_t *config) {
+int handle_get_printable_amount( get_printable_amount_parameters_t* params, btchip_altcoin_config_t *config) {
     params->printable_amount[0] = 0;
     if (params->amount_length > 8) {
         PRINTF("Amount is too big");
-        return;
+        return 0;
     }
     unsigned char amount[8];
     os_memset(amount, 0, 8);
@@ -15,4 +15,6 @@ void handle_get_printable_amount( get_printable_amount_parameters_t* params, btc
     params->printable_amount[coin_name_length] = ' ';
     int res_length = btchip_convert_hex_amount_to_displayable_no_globals(amount, config->flags, params->printable_amount + coin_name_length + 1);
     params->printable_amount[res_length + coin_name_length + 1] = '\0';
+
+    return 1;
 }

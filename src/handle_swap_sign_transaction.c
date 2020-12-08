@@ -7,7 +7,7 @@
 #include "ux.h"
 
 
-void copy_transaction_parameters(create_transaction_parameters_t* sign_transaction_params) {
+bool copy_transaction_parameters(create_transaction_parameters_t* sign_transaction_params) {
     // first copy parameters to stack, and then to global data.
     // We need this "trick" as the input data position can overlap with btc-app globals
     swap_data_t stack_data;
@@ -16,17 +16,17 @@ void copy_transaction_parameters(create_transaction_parameters_t* sign_transacti
     if ((stack_data.destination_address[sizeof(stack_data.destination_address) - 1] != '\0') ||
         (sign_transaction_params->amount_length > 8) ||
         (sign_transaction_params->fee_amount_length > 8)) {
-        os_lib_end();
+        return false;
     }
     // store amount as big endian in 8 bytes, so the passed data should be alligned to right
     // input {0xEE, 0x00, 0xFF} should be stored like {0x00, 0x00, 0x00, 0x00, 0x00, 0xEE, 0x00, 0xFF}
     memcpy(stack_data.amount + 8 - sign_transaction_params->amount_length, sign_transaction_params->amount, sign_transaction_params->amount_length);
     memcpy(stack_data.fees + 8 - sign_transaction_params->fee_amount_length, sign_transaction_params->fee_amount, sign_transaction_params->fee_amount_length);
     memcpy(&vars.swap_data, &stack_data, sizeof(stack_data));
+    return true;
 }
 
-void handle_swap_sign_transaction(create_transaction_parameters_t* sign_transaction_params, btchip_altcoin_config_t *config) {
-    copy_transaction_parameters(sign_transaction_params);
+void handle_swap_sign_transaction(btchip_altcoin_config_t *config) {
     G_coin_config = config;
     btchip_context_init();
     btchip_context_D.called_from_swap = 1;

@@ -94,22 +94,21 @@ bool get_address_from_compressed_public_key(
     return true;
 }
 
-void handle_check_address(check_address_parameters_t* params, btchip_altcoin_config_t* coin_config) {
+int handle_check_address(check_address_parameters_t* params, btchip_altcoin_config_t* coin_config) {
     unsigned char compressed_public_key[33];
     PRINTF("Params on the address %d\n",(unsigned int)params);
     PRINTF("Address to check %s\n",params->address_to_check);
-    PRINTF("Insied handle_check_address\n");
-    params->result = 0;
+    PRINTF("Inside handle_check_address\n");
     if (params->address_to_check == 0) {
         PRINTF("Address to check == 0\n");
-        return;
+        return 0;
     }
     if (!derive_compressed_public_key(
         params->address_parameters + 1,
         params->address_parameters_length - 1,
         compressed_public_key,
         sizeof(compressed_public_key))) {
-        return;
+        return 0;
     }
 
     char address[51];
@@ -122,13 +121,13 @@ void handle_check_address(check_address_parameters_t* params, btchip_altcoin_con
         address,
         sizeof(address))) {
         PRINTF("Can't create address from given public key\n");
-        return;
+        return 0;
     }
     if ((strlen(address) != strlen(params->address_to_check)) ||
         os_memcmp(address, params->address_to_check, strlen(address)) != 0) {
         PRINTF("Addresses doesn't match\n");
-        return;
+        return 0;
     }
     PRINTF("Addresses  match\n");
-    params->result = 1;
+    return 1;
 }
