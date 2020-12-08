@@ -32,6 +32,10 @@
 #include "btchip_display_variables.h"
 #include "swap_lib_calls.h"
 
+#include "swap_lib_calls.h"
+#include "handle_swap_sign_transaction.h"
+#include "handle_get_printable_amount.h"
+#include "handle_check_address.h"
 
 #define __NAME3(a, b, c) a##b##c
 #define NAME3(a, b, c) __NAME3(a, b, c)
@@ -1421,8 +1425,43 @@ void app_exit(void) {
     END_TRY_L(exit);
 }
 
-void coin_main_with_config(btchip_altcoin_config_t *config) {
-    G_coin_config = config;
+void init_coin_config(btchip_altcoin_config_t *coin_config) {
+    os_memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
+    coin_config->bip44_coin_type = BIP44_COIN_TYPE;
+    coin_config->bip44_coin_type2 = BIP44_COIN_TYPE_2;
+    coin_config->p2pkh_version = COIN_P2PKH_VERSION;
+    coin_config->p2sh_version = COIN_P2SH_VERSION;
+    coin_config->family = COIN_FAMILY;
+    strcpy(coin_config->coinid, COIN_COINID);
+    strcpy(coin_config->name, COIN_COINID_NAME);
+    strcpy(coin_config->name_short, COIN_COINID_SHORT);
+#ifdef COIN_NATIVE_SEGWIT_PREFIX
+    strcpy(coin_config->native_segwit_prefix_val, COIN_NATIVE_SEGWIT_PREFIX);
+    coin_config->native_segwit_prefix = coin_config->native_segwit_prefix_val;
+#else
+    coin_config->native_segwit_prefix = 0;
+#endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
+#ifdef COIN_FORKID
+    coin_config->forkid = COIN_FORKID;
+#endif // COIN_FORKID
+#ifdef COIN_CONSENSUS_BRANCH_ID
+    coin_config->zcash_consensus_branch_id = COIN_CONSENSUS_BRANCH_ID;
+#endif // COIN_CONSENSUS_BRANCH_ID
+#ifdef COIN_FLAGS
+    coin_config->flags = COIN_FLAGS;
+#endif // COIN_FLAGS
+    coin_config->kind = COIN_KIND;
+}
+
+void coin_main(btchip_altcoin_config_t *coin_config) {
+    btchip_altcoin_config_t config;
+    if (coin_config == NULL) {
+        init_coin_config(&config);
+        G_coin_config = &config;
+    } else {
+        G_coin_config = coin_config;
+    }
+
     for (;;) {
         UX_INIT();
         BEGIN_TRY {
@@ -1465,67 +1504,67 @@ void coin_main_with_config(btchip_altcoin_config_t *config) {
     app_exit();
 }
 
-void init_coin_config(btchip_altcoin_config_t *coin_config) {
-    os_memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
-    coin_config->bip44_coin_type = BIP44_COIN_TYPE;
-    coin_config->bip44_coin_type2 = BIP44_COIN_TYPE_2;
-    coin_config->p2pkh_version = COIN_P2PKH_VERSION;
-    coin_config->p2sh_version = COIN_P2SH_VERSION;
-    coin_config->family = COIN_FAMILY;
-    strcpy(coin_config->coinid, COIN_COINID);
-    strcpy(coin_config->name, COIN_COINID_NAME);
-    strcpy(coin_config->name_short, COIN_COINID_SHORT);
-#ifdef COIN_NATIVE_SEGWIT_PREFIX
-    strcpy(coin_config->native_segwit_prefix_val, COIN_NATIVE_SEGWIT_PREFIX);
-    coin_config->native_segwit_prefix = coin_config->native_segwit_prefix_val;
-#else
-    coin_config->native_segwit_prefix = 0;
-#endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
-#ifdef COIN_FORKID
-    coin_config->forkid = COIN_FORKID;
-#endif // COIN_FORKID
-#ifdef COIN_CONSENSUS_BRANCH_ID
-    coin_config->zcash_consensus_branch_id = COIN_CONSENSUS_BRANCH_ID;
-#endif // COIN_CONSENSUS_BRANCH_ID
-#ifdef COIN_FLAGS
-    coin_config->flags = COIN_FLAGS;
-#endif // COIN_FLAGS
-    coin_config->kind = COIN_KIND;
-}
+struct libargs_s {
+    unsigned int id;
+    unsigned int command;
+    btchip_altcoin_config_t *coin_config;
+    union {
+        check_address_parameters_t *check_address;
+        create_transaction_parameters_t *create_transaction;
+        get_printable_amount_parameters_t *get_printable_amount;
+    };
+};
 
-void coin_main() {
-    btchip_altcoin_config_t coin_config;
-    init_coin_config(&coin_config);
-    coin_main_with_config(&coin_config);
-}
-
-void library_main_with_config(btchip_altcoin_config_t *config, unsigned int command, unsigned int* call_parameters) {
-    BEGIN_TRY {
-        TRY {
-            check_api_level(CX_COMPAT_APILEVEL);
-            PRINTF("Inside a library \n");
-            switch (command) {
-                case CHECK_ADDRESS:
-                    handle_check_address((check_address_parameters_t*)call_parameters, config);
-                break;
-                case SIGN_TRANSACTION:
-                    handle_swap_sign_transaction((create_transaction_parameters_t*)call_parameters, config);
-                break;
-                case GET_PRINTABLE_AMOUNT:
-                    handle_get_printable_amount((get_printable_amount_parameters_t*)call_parameters, config);
-                break;
+static void library_main_helper(struct libargs_s *args) {
+    check_api_level(CX_COMPAT_APILEVEL);
+    PRINTF("Inside a library \n");
+    switch (args->command) {
+        case CHECK_ADDRESS:
+            // ensure result is zero if an exception is thrown
+            args->check_address->result = 0;
+            args->check_address->result =
+                handle_check_address(args->check_address, args->coin_config);
+            break;
+        case SIGN_TRANSACTION:
+            if (copy_transaction_parameters(args->create_transaction)) {
+                // never returns
+                handle_swap_sign_transaction(args->coin_config);
             }
-            os_lib_end();
-        }
-        FINALLY {}
+            break;
+        case GET_PRINTABLE_AMOUNT:
+            // ensure result is zero if an exception is thrown
+            args->get_printable_amount->result = 0;
+            args->get_printable_amount->result =
+                handle_get_printable_amount(args->get_printable_amount, args->coin_config);
+            break;
+        default:
+            break;
     }
-    END_TRY;
 }
 
-void library_main(unsigned int call_id, unsigned int* call_parameters) {
+void library_main(struct libargs_s *args) {
     btchip_altcoin_config_t coin_config;
-    init_coin_config(&coin_config);
-    library_main_with_config(&coin_config, call_id, call_parameters);
+    if (args->coin_config == NULL) {
+        init_coin_config(&coin_config);
+        args->coin_config = &coin_config;
+    }
+    bool end = false;
+    /* This loop ensures that library_main_helper and os_lib_end are called
+     * within a try context, even if an exception is thrown */
+    while (1) {
+        BEGIN_TRY {
+            TRY {
+                if (!end) {
+                    library_main_helper(args);
+                }
+                os_lib_end();
+            }
+            FINALLY {
+                end = true;
+            }
+        }
+        END_TRY;
+    }
 }
 
 __attribute__((section(".boot"))) int main(int arg0) {
@@ -1569,29 +1608,25 @@ __attribute__((section(".boot"))) int main(int arg0) {
 
     if (!arg0) {
         // Bitcoin application launched from dashboard
-        coin_main();
+        coin_main(NULL);
         return 0;
     }
-    if (((unsigned int *)arg0)[0] != 0x100) {
+    struct libargs_s *args = (struct libargs_s *) arg0;
+    if (args->id != 0x100) {
         app_exit();
         return 0;
     }
-    unsigned int command = ((unsigned int *)arg0)[1];
-    btchip_altcoin_config_t * coin_config = ((unsigned int *)arg0)[2];
-    switch (command) {
+    switch (args->command) {
         case RUN_APPLICATION:
             // coin application launched from dashboard
-            if (coin_config == NULL)
+            if (args->coin_config == NULL)
                 app_exit();
             else
-                coin_main_with_config((btchip_altcoin_config_t *)((unsigned int *)arg0)[2]);
-        break;
+                coin_main(args->coin_config);
+            break;
         default:
-            if (coin_config == NULL)
-                library_main(command, ((unsigned int *)arg0)[3]);// called as bitcoin library
-            else
-                library_main_with_config(coin_config, command, ((unsigned int *)arg0)[3]);// called as coin library
-        break;
+            // called as bitcoin or altcoin library
+            library_main(args);
     }
 #endif // USE_LIB_BITCOIN
     return 0;
