@@ -468,7 +468,7 @@ UX_STEP_NOCB(
     bnnn_paging,
     {
       .title = "Address",
-      .text = G_io_apdu_buffer+200,
+      .text = (char *)G_io_apdu_buffer+200,
     });
 UX_STEP_CB(
     ux_display_public_flow_6_step,
@@ -513,7 +513,7 @@ UX_STEP_CB(
     {
       &C_icon_validate_14,
       "Confirm token",
-      G_io_apdu_buffer+200,
+      (char *)G_io_apdu_buffer+200,
     });
 UX_STEP_CB(
     ux_display_token_flow_2_step,
@@ -861,7 +861,7 @@ void get_address_from_output_script(unsigned char* script, int script_size, char
     if (btchip_output_script_is_native_witness(script)) {
         if (G_coin_config->native_segwit_prefix) {
             segwit_addr_encode(
-                out, PIC(G_coin_config->native_segwit_prefix), 0,
+                out, (char *)PIC(G_coin_config->native_segwit_prefix), 0,
                 script + OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET,
                 script[OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET - 1]);
         }
@@ -891,7 +891,7 @@ void get_address_from_output_script(unsigned char* script, int script_size, char
     // Prepare address
     if (btchip_context_D.usingCashAddr) {
         cashaddr_encode(
-            address + versionSize, 20, out, out_size,
+            address + versionSize, 20, (uint8_t *)out, out_size,
             (version == G_coin_config->p2sh_version
                     ? CASHADDR_P2SH
                     : CASHADDR_P2PKH));
@@ -939,7 +939,7 @@ uint8_t prepare_single_output() {
                     break;
             }
             headerLength = strlen(vars.tmp.fullAmount);
-            btchip_context_D.tmp = vars.tmp.fullAmount + headerLength;
+            btchip_context_D.tmp = (uint8_t *)vars.tmp.fullAmount + headerLength;
             textSize = btchip_convert_hex_amount_to_displayable(btchip_context_D.currentOutput + offset + 3 + 4 + 4 + 4);
             vars.tmp.fullAmount[textSize + headerLength] = '\0';
     }
@@ -1105,9 +1105,9 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                  !btchip_output_script_is_op_return(
                      btchip_context_D.currentOutput + offset + 8) &&
                  !btchip_output_script_is_op_create(
-                     btchip_context_D.currentOutput + offset + 8, sieof(btchip_context_D.currentOutput) - offset - 8) &&
+                     btchip_context_D.currentOutput + offset + 8, sizeof(btchip_context_D.currentOutput) - offset - 8) &&
                  !btchip_output_script_is_op_call(
-                     btchip_context_D.currentOutput + offset + 8, sieof(btchip_context_D.currentOutput) - offset - 8)) ||
+                     btchip_context_D.currentOutput + offset + 8, sizeof(btchip_context_D.currentOutput) - offset - 8)) ||
                 (!(G_coin_config->kind == COIN_KIND_QTUM) &&
                  !btchip_output_script_is_op_return(
                      btchip_context_D.currentOutput + offset + 8))) {
@@ -1148,7 +1148,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                         // Prepare address
                         if (btchip_context_D.usingCashAddr) {
                             cashaddr_encode(
-                                address + versionSize, 20, tmp, sizeof(tmp),
+                                address + versionSize, 20, (uint8_t *)tmp, sizeof(tmp),
                                 (version ==
                                          G_coin_config->p2sh_version
                                      ? CASHADDR_P2SH
@@ -1161,7 +1161,7 @@ uint8_t prepare_full_output(uint8_t checkOnly) {
                         }
                     } else if (G_coin_config->native_segwit_prefix) {
                         segwit_addr_encode(
-                            tmp, PIC(G_coin_config->native_segwit_prefix), 0,
+                            tmp, (char *)PIC(G_coin_config->native_segwit_prefix), 0,
                             btchip_context_D.currentOutput + offset +
                                 OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET,
                             btchip_context_D.currentOutput
@@ -1231,7 +1231,7 @@ uint8_t prepare_message_signature() {
     uint8_t buffer[32];
 
     cx_hash(&btchip_context_D.transactionHashAuthorization.header, CX_LAST,
-            vars.tmp.fullAmount, 0, buffer, 32);
+            (uint8_t*)vars.tmp.fullAmount, 0, buffer, 32);
 
     snprintf(vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress), "%.*H...%.*H",
              8, buffer, 8, buffer + 32 - 8);
@@ -1380,7 +1380,7 @@ uint8_t set_key_path_to_display(unsigned char* keyPath) {
 
 void btchip_bagl_display_public_key(uint8_t is_derivation_path_unusual) {
     // append a white space at the end of the address to avoid glitch on nano S
-    strcat(G_io_apdu_buffer + 200, " ");
+    strcat((char *)G_io_apdu_buffer + 200, " ");
 
     ux_flow_init(0, is_derivation_path_unusual?ux_display_public_with_warning_flow:ux_display_public_flow, NULL);
 }

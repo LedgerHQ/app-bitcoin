@@ -187,8 +187,8 @@ void transaction_parse(unsigned char parseMode) {
                         btchip_context_D.transactionHashOption = 0;
                         if (!btchip_context_D.segwitParsedOnce) {
                             if (btchip_context_D.usingOverwinter) {
-                                cx_blake2b_init2(&btchip_context_D.segwit.hash.hashPrevouts.blake2b, 256, NULL, 0, OVERWINTER_PARAM_PREVOUTS, 16);
-                                cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, OVERWINTER_PARAM_SEQUENCE, 16);
+                                cx_blake2b_init2(&btchip_context_D.segwit.hash.hashPrevouts.blake2b, 256, NULL, 0, (uint8_t *)OVERWINTER_PARAM_PREVOUTS, 16);
+                                cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, (uint8_t *)OVERWINTER_PARAM_SEQUENCE, 16);
                             }
                             else {
                                 cx_sha256_init(
@@ -377,7 +377,7 @@ void transaction_parse(unsigned char parseMode) {
                             check_transaction_available(2 + trustedInputLength);
                             // Check TrustedInput Hmac
                             cx_hmac_sha256(
-                                N_btchip.bkp.trustedinput_key,
+                                (uint8_t *)N_btchip.bkp.trustedinput_key,
                                 sizeof(N_btchip.bkp.trustedinput_key),
                                 btchip_context_D.transactionBufferPointer + 2,
                                 trustedInputLength - 8, trustedInput, trustedInputLength);
@@ -727,7 +727,7 @@ void transaction_parse(unsigned char parseMode) {
                                 .transactionState =
                                 BTCHIP_TRANSACTION_PRESIGN_READY;
                             if (btchip_context_D.usingOverwinter) {
-                                cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, OVERWINTER_PARAM_OUTPUTS, 16);
+                                cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, (uint8_t *)OVERWINTER_PARAM_OUTPUTS, 16);
                             }
                             else
                             if (btchip_context_D.usingSegwit) {

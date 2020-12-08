@@ -128,7 +128,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                     cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
                             &chunkLength, 1, NULL, 0);
                     cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
-                            G_coin_config->coinid,
+                            (uint8_t *)G_coin_config->coinid,
                             strlen(G_coin_config->coinid), NULL, 0);
                     cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
                             (unsigned char *)SIGNMAGIC, SIGNMAGIC_LENGTH, NULL, 0);
