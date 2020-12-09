@@ -18,9 +18,6 @@
 #ifndef _BTCHIP_BAGL_H_
 #define _BTCHIP_BAGL_H_
 
-// btchip asking the legacy grouped UI
-unsigned int btchip_bagl_confirm_full_output(void);
-
 // btchip asking the per-output UI
 unsigned int btchip_bagl_confirm_single_output(void);
 

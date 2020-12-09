@@ -31,8 +31,6 @@
 #define FLAG_SIGNATURE 0x01
 #define FLAG_CHANGE_VALIDATED 0x80
 
-extern uint8_t prepare_full_output(uint8_t checkOnly);
-
 void btchip_apdu_hash_input_finalize_full_reset(void) {
     btchip_context_D.currentOutputOffset = 0;
     btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS;
