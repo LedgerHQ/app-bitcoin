@@ -1,0 +1,4 @@
+typing-extensions>=3.7.4.3
+pytest>=6.2.1
+ledgercomm>=1.1.0
+ecdsa>=0.16.1,<0.17.0
