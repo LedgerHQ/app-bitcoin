@@ -151,7 +151,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
             if (G_coin_config->native_segwit_prefix) {
                 keyLength = segwit_addr_encode(
                     (char *)(G_io_apdu_buffer + 67),
-                    PIC(G_coin_config->native_segwit_prefix), 0, tmp + 2, 20);
+                    (char *)PIC(G_coin_config->native_segwit_prefix), 0, tmp + 2, 20);
                 if (keyLength == 1) {
                     keyLength = strlen((char *)(G_io_apdu_buffer + 67));
                 }
@@ -194,7 +194,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         btchip_context_D.has_valid_token = false;
         os_memcpy(btchip_context_D.last_token, &request_token, 4);
         // Hax, avoid wasting space
-        snprintf(G_io_apdu_buffer + 200, 9, "%08X", request_token);
+        snprintf((char *)G_io_apdu_buffer + 200, 9, "%08X", request_token);
         G_io_apdu_buffer[200 + 8] = '\0';
         btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
         btchip_bagl_display_token();

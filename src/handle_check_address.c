@@ -6,6 +6,7 @@
 #include "btchip_apdu_get_wallet_public_key.h"
 #include "cashaddr.h"
 #include "segwit_addr.h"
+#include <string.h>
 
 bool derive_private_key(unsigned char* serialized_path, unsigned char serialized_path_length, cx_ecfp_private_key_t* privKey) {
     unsigned char privateComponent[32];
@@ -53,7 +54,7 @@ bool get_address_from_compressed_public_key(
         btchip_public_key_hash160(compressed_pub_key,   // IN
                                   33,                   // INLEN
                                   tmp);
-        if (!cashaddr_encode(tmp, 20, address, max_address_length, CASHADDR_P2PKH))
+        if (!cashaddr_encode(tmp, 20, (uint8_t *)address, max_address_length, CASHADDR_P2PKH))
             return false;
     } else if (!(segwit || nativeSegwit)) {
         // btchip_public_key_to_encoded_base58 doesn't add terminating 0,
@@ -61,7 +62,7 @@ bool get_address_from_compressed_public_key(
         address_length = btchip_public_key_to_encoded_base58(
             compressed_pub_key,     // IN
             33,                     // INLEN
-            address,                // OUT
+            (uint8_t *)address,                // OUT
             max_address_length - 1, // MAXOUTLEN
             payToAddressVersion, 0);
         address[address_length] = 0;
@@ -77,7 +78,7 @@ bool get_address_from_compressed_public_key(
             address_length = btchip_public_key_to_encoded_base58(
                 tmp,                   // IN
                 22,                    // INLEN
-                address,               // OUT
+                (uint8_t *)address,    // OUT
                 150,                   // MAXOUTLEN
                 payToScriptHashVersion, 0);
             address[address_length] = 0;
@@ -94,22 +95,26 @@ bool get_address_from_compressed_public_key(
     return true;
 }
 
-void handle_check_address(check_address_parameters_t* params, btchip_altcoin_config_t* coin_config) {
+static int os_strcmp(const char* s1, const char* s2) {
+    size_t size = strlen(s1) + 1;
+    return memcmp(s1, s2, size);
+}
+
+int handle_check_address(check_address_parameters_t* params, btchip_altcoin_config_t* coin_config) {
     unsigned char compressed_public_key[33];
     PRINTF("Params on the address %d\n",(unsigned int)params);
     PRINTF("Address to check %s\n",params->address_to_check);
-    PRINTF("Insied handle_check_address\n");
-    params->result = 0;
+    PRINTF("Inside handle_check_address\n");
     if (params->address_to_check == 0) {
         PRINTF("Address to check == 0\n");
-        return;
+        return 0;
     }
     if (!derive_compressed_public_key(
         params->address_parameters + 1,
         params->address_parameters_length - 1,
         compressed_public_key,
         sizeof(compressed_public_key))) {
-        return;
+        return 0;
     }
 
     char address[51];
@@ -122,13 +127,12 @@ void handle_check_address(check_address_parameters_t* params, btchip_altcoin_con
         address,
         sizeof(address))) {
         PRINTF("Can't create address from given public key\n");
-        return;
+        return 0;
     }
-    if ((strlen(address) != strlen(params->address_to_check)) ||
-        os_memcmp(address, params->address_to_check, strlen(address)) != 0) {
-        PRINTF("Addresses doesn't match\n");
-        return;
+    if (os_strcmp(address,params->address_to_check) != 0) {
+        PRINTF("Addresses don't match\n");
+        return 0;
     }
-    PRINTF("Addresses  match\n");
-    params->result = 1;
+    PRINTF("Addresses match\n");
+    return 1;
 }

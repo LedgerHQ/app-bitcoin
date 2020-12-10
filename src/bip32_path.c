@@ -1,4 +1,5 @@
 #include "bip32_path.h"
+#include "btchip_helpers.h"
 
 bool parse_serialized_path(bip32_path_t* path, unsigned char* serialized_path, unsigned char serialized_path_length) {
     if (serialized_path_length < 1 ||

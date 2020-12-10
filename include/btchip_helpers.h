@@ -19,6 +19,8 @@
 
 #define BTCHIP_HELPERS_H
 
+#include "os.h"
+#include "cx.h"
 #include "stdbool.h"
 
 #define OUTPUT_SCRIPT_REGULAR_PRE_LENGTH 4

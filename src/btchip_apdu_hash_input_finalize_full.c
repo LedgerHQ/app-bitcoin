@@ -31,8 +31,6 @@
 #define FLAG_SIGNATURE 0x01
 #define FLAG_CHANGE_VALIDATED 0x80
 
-extern uint8_t prepare_full_output(uint8_t checkOnly);
-
 void btchip_apdu_hash_input_finalize_full_reset(void) {
     btchip_context_D.currentOutputOffset = 0;
     btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS;
@@ -250,10 +248,8 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
     unsigned char apduLength;
     unsigned short sw = BTCHIP_SW_OK;
     unsigned char *target = G_io_apdu_buffer;
-    unsigned char keycardActivated = 0;
     unsigned char p1 = G_io_apdu_buffer[ISO_OFFSET_P1];
     unsigned char hashOffset = 0;
-    unsigned char numOutputs = 0;
 
     apduLength = G_io_apdu_buffer[ISO_OFFSET_LC];
 

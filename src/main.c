@@ -32,6 +32,10 @@
 #include "btchip_display_variables.h"
 #include "swap_lib_calls.h"
 
+#include "swap_lib_calls.h"
+#include "handle_swap_sign_transaction.h"
+#include "handle_get_printable_amount.h"
+#include "handle_check_address.h"
 
 #define __NAME3(a, b, c) a##b##c
 #define NAME3(a, b, c) __NAME3(a, b, c)
@@ -464,7 +468,7 @@ UX_STEP_NOCB(
     bnnn_paging,
     {
       .title = "Address",
-      .text = G_io_apdu_buffer+200,
+      .text = (char *)G_io_apdu_buffer+200,
     });
 UX_STEP_CB(
     ux_display_public_flow_6_step,
@@ -509,7 +513,7 @@ UX_STEP_CB(
     {
       &C_icon_validate_14,
       "Confirm token",
-      G_io_apdu_buffer+200,
+      (char *)G_io_apdu_buffer+200,
     });
 UX_STEP_CB(
     ux_display_token_flow_2_step,
@@ -857,7 +861,7 @@ void get_address_from_output_script(unsigned char* script, int script_size, char
     if (btchip_output_script_is_native_witness(script)) {
         if (G_coin_config->native_segwit_prefix) {
             segwit_addr_encode(
-                out, PIC(G_coin_config->native_segwit_prefix), 0,
+                out, (char *)PIC(G_coin_config->native_segwit_prefix), 0,
                 script + OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET,
                 script[OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET - 1]);
         }
@@ -887,7 +891,7 @@ void get_address_from_output_script(unsigned char* script, int script_size, char
     // Prepare address
     if (btchip_context_D.usingCashAddr) {
         cashaddr_encode(
-            address + versionSize, 20, out, out_size,
+            address + versionSize, 20, (uint8_t *)out, out_size,
             (version == G_coin_config->p2sh_version
                     ? CASHADDR_P2SH
                     : CASHADDR_P2PKH));
@@ -935,7 +939,7 @@ uint8_t prepare_single_output() {
                     break;
             }
             headerLength = strlen(vars.tmp.fullAmount);
-            btchip_context_D.tmp = vars.tmp.fullAmount + headerLength;
+            btchip_context_D.tmp = (uint8_t *)vars.tmp.fullAmount + headerLength;
             textSize = btchip_convert_hex_amount_to_displayable(btchip_context_D.currentOutput + offset + 3 + 4 + 4 + 4);
             vars.tmp.fullAmount[textSize + headerLength] = '\0';
     }
@@ -954,293 +958,18 @@ uint8_t prepare_single_output() {
     return 1;
 }
 
-uint8_t prepare_full_output(uint8_t checkOnly) {
-    unsigned int offset = 0;
-    int numberOutputs;
-    int i;
-    unsigned int currentPos = 0;
-    unsigned char amount[8], totalOutputAmount[8], fees[8];
-    char tmp[80];
-    unsigned char outputPos = 0, changeFound = 0, specialOpFound = 0;
-    unsigned char borrow;
-    if (btchip_context_D.transactionContext.relaxed &&
-        !btchip_context_D.transactionContext.consumeP2SH) {
-        if (!checkOnly) {
-            PRINTF("Error : Mixed inputs");
-        }
-        goto error;
-    }
-    if (btchip_context_D.transactionContext.consumeP2SH) {
-        if (checkOnly) {
-            goto error;
-        }
-        vars.tmp.fullAmount[0] = '\0';
-        vars.tmp.feesAmount[0] = '\0';
-        strcpy(vars.tmp.fullAddress, "P2SH");
-        return 1;
-    }
-    // Parse output, locate the change output location
-    os_memset(totalOutputAmount, 0, sizeof(totalOutputAmount));
-    numberOutputs = btchip_context_D.currentOutput[offset++];
-    if (numberOutputs > 3) {
-        if (!checkOnly) {
-            PRINTF("Error : Too many outputs");
-        }
-        goto error;
-    }
-    for (i = 0; i < numberOutputs; i++) {
-        unsigned char nullAmount = 1;
-        unsigned int j;
-        unsigned char isOpReturn, isP2sh, isNativeSegwit;
-        unsigned char isOpCreate, isOpCall;
-
-        for (j = 0; j < 8; j++) {
-            if (btchip_context_D.currentOutput[offset + j] != 0) {
-                nullAmount = 0;
-                break;
-            }
-        }
-        btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset, 8);
-        transaction_amount_add_be(totalOutputAmount, totalOutputAmount, amount);
-        offset += 8; // skip amount
-        isOpReturn = btchip_output_script_is_op_return(
-            btchip_context_D.currentOutput + offset);
-        isP2sh = btchip_output_script_is_p2sh(btchip_context_D.currentOutput +
-                                              offset);
-        isNativeSegwit = btchip_output_script_is_native_witness(
-            btchip_context_D.currentOutput + offset);
-        isOpCreate = btchip_output_script_is_op_create(
-            btchip_context_D.currentOutput + offset,
-            sizeof(btchip_context_D.currentOutput) - offset);
-        isOpCall = btchip_output_script_is_op_call(
-            btchip_context_D.currentOutput + offset,
-            sizeof(btchip_context_D.currentOutput) - offset);
-        // Always notify OP_RETURN to the user
-        if (nullAmount && isOpReturn) {
-            if (!checkOnly) {
-                PRINTF("Error : Unexpected OP_RETURN");
-            }
-            goto error;
-        }
-        if ((nullAmount && isOpReturn) ||
-             ((G_coin_config->kind == COIN_KIND_QTUM) && (isOpCall || isOpCreate))) {
-            specialOpFound = 1;
-        }
-        if (!btchip_output_script_is_regular(btchip_context_D.currentOutput +
-                                             offset) &&
-            !isP2sh && !(nullAmount && isOpReturn) &&
-            (!(G_coin_config->kind == COIN_KIND_QTUM) ||
-             (!isOpCreate && !isOpCall))) {
-            if (!checkOnly) {
-                PRINTF("Error : Unrecognized input script");
-            }
-            goto error;
-        } else if (!btchip_output_script_is_regular(
-                       btchip_context_D.currentOutput + offset) &&
-                   !isP2sh && !(nullAmount && isOpReturn)) {
-            if (!checkOnly) {
-                PRINTF("Error : Unrecognized input script");
-            }
-            goto error;
-        }
-        if (((G_coin_config->kind == COIN_KIND_QTUM) &&
-             btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn &&
-             !isOpCreate && !isOpCall) ||
-            (!(G_coin_config->kind == COIN_KIND_QTUM) &&
-             btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn)) {
-            unsigned char addressOffset =
-                (isNativeSegwit ? OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET
-                                : isP2sh ? OUTPUT_SCRIPT_P2SH_PRE_LENGTH
-                                         : OUTPUT_SCRIPT_REGULAR_PRE_LENGTH);
-            if (os_memcmp(btchip_context_D.currentOutput + offset +
-                              addressOffset,
-                          btchip_context_D.tmpCtx.output.changeAddress,
-                          20) == 0) {
-                if (changeFound) {
-                    if (!checkOnly) {
-                        PRINTF("Error : Multiple change output found");
-                    }
-                    goto error;
-                }
-                changeFound = 1;
-            } else {
-                outputPos = currentPos;
-            }
-        }
-        offset += 1 + btchip_context_D.currentOutput[offset];
-        currentPos++;
-    }
-    if (btchip_context_D.tmpCtx.output.changeInitialized && !changeFound) {
-        if (!checkOnly) {
-            PRINTF("Error : change output not found");
-        }
-        goto error;
-    }
-    if ((numberOutputs > 1) && (!changeFound || !specialOpFound)) {
-        if (!checkOnly) {
-            PRINTF("Error : too many inputs");
-        }
-        goto error;
-    }
-    borrow = transaction_amount_sub_be(
-            fees, btchip_context_D.transactionContext.transactionAmount,
-            totalOutputAmount);
-    if (borrow && G_coin_config->kind != COIN_KIND_KOMODO) {
-        if (!checkOnly) {
-            PRINTF("Error : Fees not consistent");
-        }
-        goto error;
-    }
-    if (!checkOnly) {
-        // Format validation message
-        currentPos = 0;
-        offset = 1;
-        btchip_context_D.tmp = (unsigned char *)tmp;
-        for (i = 0; i < numberOutputs; i++) {
-            if (((G_coin_config->kind == COIN_KIND_QTUM) &&
-                 !btchip_output_script_is_op_return(
-                     btchip_context_D.currentOutput + offset + 8) &&
-                 !btchip_output_script_is_op_create(
-                     btchip_context_D.currentOutput + offset + 8, sieof(btchip_context_D.currentOutput) - offset - 8) &&
-                 !btchip_output_script_is_op_call(
-                     btchip_context_D.currentOutput + offset + 8, sieof(btchip_context_D.currentOutput) - offset - 8)) ||
-                (!(G_coin_config->kind == COIN_KIND_QTUM) &&
-                 !btchip_output_script_is_op_return(
-                     btchip_context_D.currentOutput + offset + 8))) {
-                unsigned char versionSize;
-                int addressOffset;
-                unsigned char address[22];
-                unsigned short version;
-                unsigned char isNativeSegwit;
-                btchip_swap_bytes(amount,
-                                  btchip_context_D.currentOutput + offset, 8);
-                offset += 8;
-                isNativeSegwit = btchip_output_script_is_native_witness(
-                    btchip_context_D.currentOutput + offset);
-                if (!isNativeSegwit) {
-                    if (btchip_output_script_is_regular(
-                            btchip_context_D.currentOutput + offset)) {
-                        addressOffset = offset + 4;
-                        version = G_coin_config->p2pkh_version;
-                    } else {
-                        addressOffset = offset + 3;
-                        version = G_coin_config->p2sh_version;
-                    }
-                    if (version > 255) {
-                        versionSize = 2;
-                        address[0] = (version >> 8);
-                        address[1] = version;
-                    } else {
-                        versionSize = 1;
-                        address[0] = version;
-                    }
-                    os_memmove(address + versionSize,
-                               btchip_context_D.currentOutput + addressOffset,
-                               20);
-                }
-                if (currentPos == outputPos) {
-                    unsigned short textSize = 0;
-                    if (!isNativeSegwit) {
-                        // Prepare address
-                        if (btchip_context_D.usingCashAddr) {
-                            cashaddr_encode(
-                                address + versionSize, 20, tmp, sizeof(tmp),
-                                (version ==
-                                         G_coin_config->p2sh_version
-                                     ? CASHADDR_P2SH
-                                     : CASHADDR_P2PKH));
-                        } else {
-                            textSize = btchip_public_key_to_encoded_base58(
-                                address, 20 + versionSize, (unsigned char *)tmp,
-                                sizeof(tmp), version, 1);
-                            tmp[textSize] = '\0';
-                        }
-                    } else if (G_coin_config->native_segwit_prefix) {
-                        segwit_addr_encode(
-                            tmp, PIC(G_coin_config->native_segwit_prefix), 0,
-                            btchip_context_D.currentOutput + offset +
-                                OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET,
-                            btchip_context_D.currentOutput
-                                [offset +
-                                 OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET -
-                                 1]);
-                    }
-
-                    strncpy(vars.tmp.fullAddress, tmp, sizeof(vars.tmp.fullAddress));
-                    vars.tmp.fullAddress[sizeof(vars.tmp.fullAddress) - 1] = '\0';
-
-                    // Prepare amount
-
-                    os_memmove(vars.tmp.fullAmount,
-                               G_coin_config->name_short,
-                               strlen(G_coin_config->name_short));
-                    vars.tmp.fullAmount[strlen(G_coin_config->name_short)] =
-                        ' ';
-                    btchip_context_D.tmp =
-                        (unsigned char *)(vars.tmp.fullAmount +
-                                          strlen(G_coin_config->name_short) +
-                                          1);
-                    textSize = btchip_convert_hex_amount_to_displayable(amount);
-                    vars.tmp
-                        .fullAmount[textSize +
-                                    strlen(G_coin_config->name_short) + 1] =
-                        '\0';
-
-                    // prepare fee display
-                    if (borrow) {
-                        os_memmove(vars.tmp.feesAmount, "REWARD", 6);
-                        vars.tmp.feesAmount[6] = '\0';
-                    }
-                    else {
-                        os_memmove(vars.tmp.feesAmount,
-                               G_coin_config->name_short,
-                               strlen(G_coin_config->name_short));
-                        vars.tmp.feesAmount[strlen(G_coin_config->name_short)] =
-                            ' ';
-                        btchip_context_D.tmp =
-                            (unsigned char *)(vars.tmp.feesAmount +
-                                          strlen(G_coin_config->name_short) +
-                                          1);
-                        textSize = btchip_convert_hex_amount_to_displayable(fees);
-                        vars.tmp
-                            .feesAmount[textSize +
-                                    strlen(G_coin_config->name_short) + 1] =
-                            '\0';
-                    }
-                    break;
-                }
-            } else {
-                offset += 8;
-            }
-            offset += 1 + btchip_context_D.currentOutput[offset];
-            currentPos++;
-        }
-    }
-    btchip_context_D.tmp = NULL;
-    return 1;
-error:
-    return 0;
-}
-
 #define HASH_LENGTH 4
 uint8_t prepare_message_signature() {
     uint8_t buffer[32];
 
     cx_hash(&btchip_context_D.transactionHashAuthorization.header, CX_LAST,
-            vars.tmp.fullAmount, 0, buffer, 32);
+            (uint8_t*)vars.tmp.fullAmount, 0, buffer, 32);
 
     snprintf(vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress), "%.*H...%.*H",
              8, buffer, 8, buffer + 32 - 8);
     return 1;
 }
 
-unsigned int btchip_bagl_confirm_full_output() {
-    if (!prepare_full_output(0)) {
-        return 0;
-    }
-    ux_flow_init(0, ux_confirm_full_flow, NULL);
-    return 1;
-}
 
 extern bool handle_output_state();
 extern void btchip_apdu_hash_input_finalize_full_reset(void);
@@ -1376,7 +1105,7 @@ uint8_t set_key_path_to_display(unsigned char* keyPath) {
 
 void btchip_bagl_display_public_key(uint8_t is_derivation_path_unusual) {
     // append a white space at the end of the address to avoid glitch on nano S
-    strcat(G_io_apdu_buffer + 200, " ");
+    strcat((char *)G_io_apdu_buffer + 200, " ");
 
     ux_flow_init(0, is_derivation_path_unusual?ux_display_public_with_warning_flow:ux_display_public_flow, NULL);
 }
@@ -1421,8 +1150,43 @@ void app_exit(void) {
     END_TRY_L(exit);
 }
 
-void coin_main_with_config(btchip_altcoin_config_t *config) {
-    G_coin_config = config;
+void init_coin_config(btchip_altcoin_config_t *coin_config) {
+    os_memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
+    coin_config->bip44_coin_type = BIP44_COIN_TYPE;
+    coin_config->bip44_coin_type2 = BIP44_COIN_TYPE_2;
+    coin_config->p2pkh_version = COIN_P2PKH_VERSION;
+    coin_config->p2sh_version = COIN_P2SH_VERSION;
+    coin_config->family = COIN_FAMILY;
+    strcpy(coin_config->coinid, COIN_COINID);
+    strcpy(coin_config->name, COIN_COINID_NAME);
+    strcpy(coin_config->name_short, COIN_COINID_SHORT);
+#ifdef COIN_NATIVE_SEGWIT_PREFIX
+    strcpy(coin_config->native_segwit_prefix_val, COIN_NATIVE_SEGWIT_PREFIX);
+    coin_config->native_segwit_prefix = coin_config->native_segwit_prefix_val;
+#else
+    coin_config->native_segwit_prefix = 0;
+#endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
+#ifdef COIN_FORKID
+    coin_config->forkid = COIN_FORKID;
+#endif // COIN_FORKID
+#ifdef COIN_CONSENSUS_BRANCH_ID
+    coin_config->zcash_consensus_branch_id = COIN_CONSENSUS_BRANCH_ID;
+#endif // COIN_CONSENSUS_BRANCH_ID
+#ifdef COIN_FLAGS
+    coin_config->flags = COIN_FLAGS;
+#endif // COIN_FLAGS
+    coin_config->kind = COIN_KIND;
+}
+
+void coin_main(btchip_altcoin_config_t *coin_config) {
+    btchip_altcoin_config_t config;
+    if (coin_config == NULL) {
+        init_coin_config(&config);
+        G_coin_config = &config;
+    } else {
+        G_coin_config = coin_config;
+    }
+
     for (;;) {
         UX_INIT();
         BEGIN_TRY {
@@ -1465,67 +1229,67 @@ void coin_main_with_config(btchip_altcoin_config_t *config) {
     app_exit();
 }
 
-void init_coin_config(btchip_altcoin_config_t *coin_config) {
-    os_memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
-    coin_config->bip44_coin_type = BIP44_COIN_TYPE;
-    coin_config->bip44_coin_type2 = BIP44_COIN_TYPE_2;
-    coin_config->p2pkh_version = COIN_P2PKH_VERSION;
-    coin_config->p2sh_version = COIN_P2SH_VERSION;
-    coin_config->family = COIN_FAMILY;
-    strcpy(coin_config->coinid, COIN_COINID);
-    strcpy(coin_config->name, COIN_COINID_NAME);
-    strcpy(coin_config->name_short, COIN_COINID_SHORT);
-#ifdef COIN_NATIVE_SEGWIT_PREFIX
-    strcpy(coin_config->native_segwit_prefix_val, COIN_NATIVE_SEGWIT_PREFIX);
-    coin_config->native_segwit_prefix = coin_config->native_segwit_prefix_val;
-#else
-    coin_config->native_segwit_prefix = 0;
-#endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
-#ifdef COIN_FORKID
-    coin_config->forkid = COIN_FORKID;
-#endif // COIN_FORKID
-#ifdef COIN_CONSENSUS_BRANCH_ID
-    coin_config->zcash_consensus_branch_id = COIN_CONSENSUS_BRANCH_ID;
-#endif // COIN_CONSENSUS_BRANCH_ID
-#ifdef COIN_FLAGS
-    coin_config->flags = COIN_FLAGS;
-#endif // COIN_FLAGS
-    coin_config->kind = COIN_KIND;
-}
+struct libargs_s {
+    unsigned int id;
+    unsigned int command;
+    btchip_altcoin_config_t *coin_config;
+    union {
+        check_address_parameters_t *check_address;
+        create_transaction_parameters_t *create_transaction;
+        get_printable_amount_parameters_t *get_printable_amount;
+    };
+};
 
-void coin_main() {
-    btchip_altcoin_config_t coin_config;
-    init_coin_config(&coin_config);
-    coin_main_with_config(&coin_config);
-}
-
-void library_main_with_config(btchip_altcoin_config_t *config, unsigned int command, unsigned int* call_parameters) {
-    BEGIN_TRY {
-        TRY {
-            check_api_level(CX_COMPAT_APILEVEL);
-            PRINTF("Inside a library \n");
-            switch (command) {
-                case CHECK_ADDRESS:
-                    handle_check_address((check_address_parameters_t*)call_parameters, config);
-                break;
-                case SIGN_TRANSACTION:
-                    handle_swap_sign_transaction((create_transaction_parameters_t*)call_parameters, config);
-                break;
-                case GET_PRINTABLE_AMOUNT:
-                    handle_get_printable_amount((get_printable_amount_parameters_t*)call_parameters, config);
-                break;
+static void library_main_helper(struct libargs_s *args) {
+    check_api_level(CX_COMPAT_APILEVEL);
+    PRINTF("Inside a library \n");
+    switch (args->command) {
+        case CHECK_ADDRESS:
+            // ensure result is zero if an exception is thrown
+            args->check_address->result = 0;
+            args->check_address->result =
+                handle_check_address(args->check_address, args->coin_config);
+            break;
+        case SIGN_TRANSACTION:
+            if (copy_transaction_parameters(args->create_transaction)) {
+                // never returns
+                handle_swap_sign_transaction(args->coin_config);
             }
-            os_lib_end();
-        }
-        FINALLY {}
+            break;
+        case GET_PRINTABLE_AMOUNT:
+            // ensure result is zero if an exception is thrown
+            args->get_printable_amount->result = 0;
+            args->get_printable_amount->result =
+                handle_get_printable_amount(args->get_printable_amount, args->coin_config);
+            break;
+        default:
+            break;
     }
-    END_TRY;
 }
 
-void library_main(unsigned int call_id, unsigned int* call_parameters) {
+void library_main(struct libargs_s *args) {
     btchip_altcoin_config_t coin_config;
-    init_coin_config(&coin_config);
-    library_main_with_config(&coin_config, call_id, call_parameters);
+    if (args->coin_config == NULL) {
+        init_coin_config(&coin_config);
+        args->coin_config = &coin_config;
+    }
+    bool end = false;
+    /* This loop ensures that library_main_helper and os_lib_end are called
+     * within a try context, even if an exception is thrown */
+    while (1) {
+        BEGIN_TRY {
+            TRY {
+                if (!end) {
+                    library_main_helper(args);
+                }
+                os_lib_end();
+            }
+            FINALLY {
+                end = true;
+            }
+        }
+        END_TRY;
+    }
 }
 
 __attribute__((section(".boot"))) int main(int arg0) {
@@ -1569,29 +1333,25 @@ __attribute__((section(".boot"))) int main(int arg0) {
 
     if (!arg0) {
         // Bitcoin application launched from dashboard
-        coin_main();
+        coin_main(NULL);
         return 0;
     }
-    if (((unsigned int *)arg0)[0] != 0x100) {
+    struct libargs_s *args = (struct libargs_s *) arg0;
+    if (args->id != 0x100) {
         app_exit();
         return 0;
     }
-    unsigned int command = ((unsigned int *)arg0)[1];
-    btchip_altcoin_config_t * coin_config = ((unsigned int *)arg0)[2];
-    switch (command) {
+    switch (args->command) {
         case RUN_APPLICATION:
             // coin application launched from dashboard
-            if (coin_config == NULL)
+            if (args->coin_config == NULL)
                 app_exit();
             else
-                coin_main_with_config((btchip_altcoin_config_t *)((unsigned int *)arg0)[2]);
-        break;
+                coin_main(args->coin_config);
+            break;
         default:
-            if (coin_config == NULL)
-                library_main(command, ((unsigned int *)arg0)[3]);// called as bitcoin library
-            else
-                library_main_with_config(coin_config, command, ((unsigned int *)arg0)[3]);// called as coin library
-        break;
+            // called as bitcoin or altcoin library
+            library_main(args);
     }
 #endif // USE_LIB_BITCOIN
     return 0;
