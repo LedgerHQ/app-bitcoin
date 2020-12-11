@@ -75,7 +75,7 @@ unsigned short btchip_apdu_sign_message_internal() {
         }
     }
 
-    if (os_global_pin_is_validated() != BOLOS_TRUE) {
+    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
         return BTCHIP_SW_SECURITY_STATUS_NOT_SATISFIED;
     }
 

@@ -107,7 +107,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         return BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
     }
 
-    if (os_global_pin_is_validated() != BOLOS_TRUE) {
+    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
         return BTCHIP_SW_SECURITY_STATUS_NOT_SATISFIED;
     }
 

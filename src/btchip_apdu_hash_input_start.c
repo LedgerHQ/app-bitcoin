@@ -85,7 +85,7 @@ unsigned short btchip_apdu_hash_input_start() {
             // background without
             // requiring to disable autolock/autopoweroff
             if (!btchip_context_D.transactionContext.firstSigned &&
-                os_global_pin_is_validated() != BOLOS_TRUE) {
+                os_global_pin_is_validated() != BOLOS_UX_OK) {
                 return BTCHIP_SW_SECURITY_STATUS_NOT_SATISFIED;
             }
             // Master transaction reset
