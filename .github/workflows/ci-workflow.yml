@@ -1,0 +1,33 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  job_build_debug:
+    name: Compilation
+    runs-on: ubuntu-latest
+
+    container:
+      image: docker://ledgerhq/ledger-app-builder:1.6.1-2
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v2
+
+      - name: Build
+        run: |
+          make DEBUG=1 && mv bin/ bitcoin-bin/
+          make clean
+          make DEBUG=1 COIN=bitcoin_testnet && mv bin/ bitcoin-testnet-bin/
+
+      - name: Upload Bitcoin app binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: bitcoin-app-debug
+          path: bitcoin-bin
+
+      - name: Upload Bitcoin Testnet app binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: bitcoin-testnet-app-debug
+          path: bitcoin-testnet-bin
