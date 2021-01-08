@@ -3035,7 +3035,8 @@ __attribute__((section(".boot"))) int main(int arg0) {
     if (arg0) {
         // is ID 1 ?
         if (((unsigned int *)arg0)[0] != 0x100) {
-            os_lib_throw(INVALID_PARAMETER);
+            app_exit();
+            return 0;
         }
         // grab the coin config structure from the first parameter
         G_coin_config = (btchip_altcoin_config_t *)((unsigned int *)arg0)[1];
