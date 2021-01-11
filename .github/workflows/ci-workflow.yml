@@ -31,3 +31,46 @@ jobs:
         with:
           name: bitcoin-testnet-app-debug
           path: bitcoin-testnet-bin
+
+  job_test:
+    name: Tests
+    needs: job_build_debug
+    runs-on: ubuntu-latest
+
+    container:
+      image: docker://ledgerhq/speculos:latest
+      ports:
+        - 1234:1234
+        - 9999:9999
+        - 40000:40000
+        - 41000:41000
+        - 42000:42000
+        - 43000:43000
+      options: --entrypoint /bin/bash
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v2
+
+      - name: Download Bitcoin app binary
+        uses: actions/download-artifact@v2
+        with:
+          name: bitcoin-app-debug
+          path: bitcoin-bin
+
+      - name: Download Bitcoin Testnet app binary
+        uses: actions/download-artifact@v2
+        with:
+          name: bitcoin-testnet-app-debug
+          path: bitcoin-testnet-bin
+
+      - name: Run tests
+        run: |
+          nohup bash -c "python /speculos/speculos.py bitcoin-testnet-bin/app.elf -l Bitcoin:bitcoin-bin/app.elf --sdk 1.6 --apdu-port 9999 --button-port 42000 --automation-port 43000 --display headless --automation file:tests/automation.json" > speculos.log 2<&1 &
+          cd tests && pip install -r requirements.txt && pytest
+
+      - name: Upload Speculos log
+        uses: actions/upload-artifact@v2
+        with:
+          name: speculos-log
+          path: speculos.log
