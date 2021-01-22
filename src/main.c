@@ -18,7 +18,6 @@
 #include "os.h"
 #include "cx.h"
 
-#include "os_io_seproxyhal.h"
 #include "string.h"
 
 #include "btchip_internal.h"
@@ -28,7 +27,7 @@
 #include "segwit_addr.h"
 #include "cashaddr.h"
 
-#include "glyphs.h"
+#include "ux.h"
 #include "btchip_display_variables.h"
 #include "swap_lib_calls.h"
 
@@ -46,7 +45,6 @@ unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 
 void ui_idle(void);
 
-#include "ux.h"
 ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
 
