@@ -18,7 +18,6 @@
 #include "os.h"
 #include "cx.h"
 
-#include "os_io_seproxyhal.h"
 #include "string.h"
 
 #include "btchip_internal.h"
@@ -28,7 +27,7 @@
 #include "segwit_addr.h"
 #include "cashaddr.h"
 
-#include "glyphs.h"
+#include "ux.h"
 
 #define __NAME3(a, b, c) a##b##c
 #define NAME3(a, b, c) __NAME3(a, b, c)
