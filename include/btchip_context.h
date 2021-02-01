@@ -20,6 +20,7 @@
 #define BTCHIP_CONTEXT_H
 
 #include "os.h"
+#include "cx.h"
 #include "btchip_secure_value.h"
 #include "btchip_filesystem_tx.h"
 
