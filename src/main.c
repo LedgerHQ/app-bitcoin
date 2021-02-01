@@ -29,7 +29,7 @@
 #include "segwit_addr.h"
 #include "cashaddr.h"
 
-#include "glyphs.h"
+#include "ux.h"
 
 #ifdef HAVE_LIQUID_HEADLESS
 
