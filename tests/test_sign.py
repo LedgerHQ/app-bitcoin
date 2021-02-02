@@ -8,7 +8,7 @@ from ecdsa.keys import VerifyingKey
 from ecdsa.util import sigdecode_der
 
 from bitcoin_client.hwi.serialization import CTransaction
-
+from utils import automation
 
 def sign_from_json(cmd, filepath: Path):
     tx_dct: Dict[str, Any] = json.load(open(filepath, "r"))
@@ -46,16 +46,19 @@ def sign_from_json(cmd, filepath: Path):
                                 sigdecode=sigdecode_der) is True
 
 
+@automation("automations/accept.json")
 def test_sign_p2wpkh(cmd):
     for filepath in Path("data").rglob("p2wpkh/tx.json"):
         sign_from_json(cmd, filepath)
 
 
+@automation("automations/accept.json")
 def test_sign_p2sh_p2wpkh(cmd):
     for filepath in Path("data").rglob("p2sh-p2wpkh/tx.json"):
         sign_from_json(cmd, filepath)
 
 
+@automation("automations/accept.json")
 def test_sign_p2pkh(cmd):
     for filepath in Path("data").rglob("p2pkh/tx.json"):
         sign_from_json(cmd, filepath)
