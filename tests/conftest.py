@@ -68,14 +68,15 @@ def device(request, hid):
 
 
 @pytest.fixture
-def cmd(device, hid):
+def transport(device, hid):
     transport = (Transport(interface="hid", debug=True)
                  if hid else Transport(interface="tcp",
                                        server="127.0.0.1",
                                        port=9999,
                                        debug=True))
-    command = BitcoinCommand(transport=transport, debug=False)
+    yield transport
+    transport.close()
 
-    yield command
-
-    command.transport.close()
+@pytest.fixture
+def cmd(transport):
+    return BitcoinCommand(transport=transport, debug=False)
