@@ -40,7 +40,7 @@ unsigned short btchip_apdu_hash_sign() {
         return BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
     }
 
-    if ((G_io_apdu_buffer[ISO_OFFSET_P1] != 0) &&
+    if ((G_io_apdu_buffer[ISO_OFFSET_P1] != 0) ||
         (G_io_apdu_buffer[ISO_OFFSET_P2] != 0)) {
         return BTCHIP_SW_INCORRECT_P1_P2;
     }
