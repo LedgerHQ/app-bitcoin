@@ -1,5 +1,6 @@
 import subprocess
 import os
+import socket
 import time
 import logging
 import pytest
@@ -27,7 +28,7 @@ def device(request, hid):
         yield
         return
 
-    # Gets the speculos executable from the SPECULOS environtment variable,
+    # Gets the speculos executable from the SPECULOS environment variable,
     # or hopes that "speculos.py" is in the $PATH if not set
     speculos_executable = os.environ.get("SPECULOS", "speculos.py")
 
@@ -46,8 +47,19 @@ def device(request, hid):
 
     speculos_proc = subprocess.Popen([*base_args, *automation_args])
 
-    # TODO: find a better way to make sure speculos is ready
-    time.sleep(1)
+
+    # Attempts to connect to speculos to make sure that it's ready when the test starts
+    for _ in range(100):
+        try:
+            socket.create_connection(("127.0.0.1", 9999), timeout=1.0)
+            connected = True
+            break
+        except ConnectionRefusedError:
+            time.sleep(0.1)
+            connected = False
+
+    if not connected:
+        raise RuntimeError("Unable to connect to speculos.")
 
     yield
 

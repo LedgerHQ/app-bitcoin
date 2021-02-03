@@ -2,7 +2,7 @@
 
 These tests are implemented in Python and can be executed either using the [Speculos](https://github.com/LedgerHQ/speculos) emulator or a Ledger Nano S/X.
 
-All the commands in this folder are meant to be run from the `tests` folder, not from the root.
+All the commands in this folder are meant to be ran from the `tests` folder, not from the root.
 
 Python dependencies are listed in [requirements.txt](requirements.txt), install them using [pip](https://pypi.org/project/pip/)
 
