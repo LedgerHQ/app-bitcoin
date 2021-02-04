@@ -956,15 +956,13 @@ uint8_t prepare_single_output() {
     return 1;
 }
 
-#define HASH_LENGTH 4
 uint8_t prepare_message_signature() {
     uint8_t buffer[32];
 
     cx_hash(&btchip_context_D.transactionHashAuthorization.header, CX_LAST,
             (uint8_t*)vars.tmp.fullAmount, 0, buffer, 32);
 
-    snprintf(vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress), "%.*H...%.*H",
-             8, buffer, 8, buffer + 32 - 8);
+    snprintf(vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress), "%.*H", buffer);
     return 1;
 }
 
