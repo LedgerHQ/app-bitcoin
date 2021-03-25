@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.5.6](https://github.com/ledgerhq/app-bitcoin/compare/1.5.5...1.5.6) - 2021-03-25
+
+### Added
+
+- Compatibility with Nano S 2.0.0 firmware
+- Message signing displays the whole message hash instead of truncating it
+
 ## [1.5.5](https://github.com/ledgerhq/app-bitcoin/compare/1.5.4...1.5.5) - 2021-01-06
 
 ### Added
