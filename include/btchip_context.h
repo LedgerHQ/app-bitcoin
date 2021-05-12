@@ -283,6 +283,7 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_NIX,
     COIN_KIND_LBRY,
     COIN_KIND_RESISTANCE,
+    COIN_KIND_ECC,
     COIN_KIND_RAVENCOIN
 } btchip_coin_kind_t;
 

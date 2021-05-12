@@ -182,9 +182,14 @@ else ifeq ($(COIN),ravencoin)
 DEFINES   += BIP44_COIN_TYPE=175  BIP44_COIN_TYPE_2=175 COIN_P2PKH_VERSION=60 COIN_P2SH_VERSION=122 COIN_FAMILY=1 COIN_COINID=\"Ravencoin\" COIN_COINID_HEADER=\"RAVENCOIN\" COIN_COLOR_HDR=0x2E4A80 COIN_COLOR_DB=0x74829E COIN_COINID_NAME=\"Ravencoin\" COIN_COINID_SHORT=\"RVN\" COIN_KIND=COIN_KIND_RAVENCOIN
 APPNAME ="Ravencoin"
 APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),eccoin)
+# ECCoin
+DEFINES   += BIP44_COIN_TYPE=319 BIP44_COIN_TYPE_2=319 COIN_P2PKH_VERSION=33 COIN_P2SH_VERSION=8 COIN_FAMILY=2 COIN_COINID=\"ECCoin\" COIN_COINID_HEADER=\"ECCOIN\" COIN_COLOR_HDR=0x1685e8 COIN_COLOR_DB=0xffffff COIN_COINID_NAME=\"ECCoin\" COIN_COINID_SHORT=\"ECC\" COIN_KIND=COIN_KIND_ECC COIN_FLAGS=FLAG_PEERCOIN_UNITS\|FLAG_PEERCOIN_SUPPORT
+APPNAME ="ECCoin"
+APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, pivx, viacoin, vertcoin, stealth, digibyte, qtum, bitcoin_private, zcoin, gamecredits, zclassic, xsn, nix, lbry, resistance, ravencoin)
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, pivx, viacoin, vertcoin, stealth, digibyte, qtum, bitcoin_private, zcoin, gamecredits, zclassic, xsn, nix, lbry, resistance, ravencoin, eccoin)
 endif
 endif
 
@@ -311,11 +316,11 @@ dep/%.d: %.c Makefile
 ifeq ($(TARGET_NAME),TARGET_NANOX)
 
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry ravencoin
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry ravencoin eccoin
 
 else
 
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry ravencoin resistance
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry ravencoin resistance eccoin
 
 endif
