@@ -75,7 +75,7 @@ unsigned short btchip_apdu_sign_message_internal() {
         }
     }
 
-    if (!os_global_pin_is_validated()) {
+    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
         return BTCHIP_SW_SECURITY_STATUS_NOT_SATISFIED;
     }
 
@@ -95,11 +95,11 @@ unsigned short btchip_apdu_sign_message_internal() {
                         goto discard;
                     }
                     btchip_context_D.transactionSummary.payToAddressVersion =
-                        btchip_context_D.payToAddressVersion;
+                        G_coin_config->p2pkh_version;
                     btchip_context_D.transactionSummary.payToScriptHashVersion =
-                        btchip_context_D.payToScriptHashVersion;
+                        G_coin_config->p2sh_version;
                     os_memmove(
-                        btchip_context_D.transactionSummary.summarydata.keyPath,
+                        btchip_context_D.transactionSummary.keyPath,
                         G_io_apdu_buffer + offset, MAX_BIP32_PATH_LENGTH);
                     offset += (4 * G_io_apdu_buffer[offset]) + 1;
                     if (p2 == P2_LEGACY) {
@@ -124,12 +124,12 @@ unsigned short btchip_apdu_sign_message_internal() {
                     cx_sha256_init(
                         &btchip_context_D.transactionHashAuthorization);
                     chunkLength =
-                        btchip_context_D.coinIdLength + SIGNMAGIC_LENGTH;
+                        strlen(G_coin_config->coinid) + SIGNMAGIC_LENGTH;
                     cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
                             &chunkLength, 1, NULL, 0);
                     cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
-                            btchip_context_D.coinId,
-                            btchip_context_D.coinIdLength, NULL, 0);
+                            (uint8_t *)G_coin_config->coinid,
+                            strlen(G_coin_config->coinid), NULL, 0);
                     cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
                             (unsigned char *)SIGNMAGIC, SIGNMAGIC_LENGTH, NULL, 0);
                     if (btchip_context_D.transactionSummary.messageLength <
@@ -204,8 +204,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                     CLOSE_TRY;
                     goto discard;
                 }
-                if (checkBitId(btchip_context_D.transactionSummary.summarydata
-                                   .keyPath) != BITID_NONE) {
+                if (checkBitId(btchip_context_D.transactionSummary.keyPath) != BITID_NONE) {
                     sw = btchip_compute_hash();
                 } else {
                     btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
@@ -229,6 +228,9 @@ unsigned short btchip_apdu_sign_message_internal() {
 }
 
 unsigned short btchip_apdu_sign_message() {
+    if (btchip_context_D.called_from_swap) {
+        return BTCHIP_SW_SECURITY_STATUS_NOT_SATISFIED;
+    }
     unsigned short sw = btchip_apdu_sign_message_internal();
     if (btchip_context_D.io_flags & IO_ASYNCH_REPLY) {
         btchip_bagl_confirm_message_signature();
@@ -239,6 +241,8 @@ unsigned short btchip_apdu_sign_message() {
 unsigned short btchip_compute_hash() {
     unsigned char hash[32];
     unsigned short sw = BTCHIP_SW_OK;
+    cx_ecfp_private_key_t private_key;
+
     btchip_context_D.outLength = 0;
     BEGIN_TRY {
         TRY {
@@ -248,10 +252,10 @@ unsigned short btchip_compute_hash() {
             cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST, hash,
                     32, hash, 32);
             btchip_private_derive_keypair(
-                btchip_context_D.transactionSummary.summarydata.keyPath, 0,
-                NULL);
-            btchip_signverify_finalhash(
-                &btchip_private_key_D, 1, hash, sizeof(hash), // IN
+                btchip_context_D.transactionSummary.keyPath, 0,
+                NULL, &private_key, NULL);
+            btchip_sign_finalhash(
+                &private_key, hash, sizeof(hash), // IN
                 G_io_apdu_buffer, 100,                        // OUT
                 ((N_btchip.bkp.config.options &
                   BTCHIP_OPTION_DETERMINISTIC_SIGNATURE) != 0));

@@ -22,30 +22,43 @@
 
 #include "segwit_addr.h"
 #include "cashaddr.h"
+#include "btchip_apdu_get_wallet_public_key.h"
 
-#define P1_NO_DISPLAY 0x00
-#define P1_DISPLAY 0x01
-#define P1_REQUEST_TOKEN 0x02
+int get_public_key_chain_code(unsigned char* keyPath, bool uncompressedPublicKeys, unsigned char* publicKey, unsigned char* chainCode) {
+    cx_ecfp_private_key_t private_key;
+    cx_ecfp_public_key_t public_key;
+    int keyLength = 0;
+    btchip_private_derive_keypair(keyPath, 1, chainCode, &private_key, &public_key);
+    // Then encode it
+    if (uncompressedPublicKeys) {
+        keyLength = 65;
+    } else {
+        btchip_compress_public_key_value(public_key.W);
+        keyLength = 33;
+    }
 
-#define P2_LEGACY 0x00
-#define P2_SEGWIT 0x01
-#define P2_NATIVE_SEGWIT 0x02
-#define P2_CASHADDR 0x03
+    os_memmove(publicKey, public_key.W,
+               sizeof(public_key.W));
+    return keyLength;
+}
 
 unsigned short btchip_apdu_get_wallet_public_key() {
     unsigned char keyLength;
     unsigned char uncompressedPublicKeys =
         ((N_btchip.bkp.config.options & BTCHIP_OPTION_UNCOMPRESSED_KEYS) != 0);
-    unsigned char keyPath[MAX_BIP32_PATH_LENGTH];
     uint32_t request_token;
     unsigned char chainCode[32];
+    uint8_t is_derivation_path_unusual;
+
     bool display = (G_io_apdu_buffer[ISO_OFFSET_P1] == P1_DISPLAY);
     bool display_request_token = N_btchip.pubKeyRequestRestriction && (G_io_apdu_buffer[ISO_OFFSET_P1] == P1_REQUEST_TOKEN) && G_io_apdu_media == IO_APDU_MEDIA_U2F;
     bool require_user_approval = N_btchip.pubKeyRequestRestriction && !(display_request_token || display) && G_io_apdu_media == IO_APDU_MEDIA_U2F;
     bool segwit = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_SEGWIT);
     bool nativeSegwit = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NATIVE_SEGWIT);
     bool cashAddr = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_CASHADDR);
-
+    if (display && btchip_context_D.called_from_swap) {
+        return BTCHIP_SW_INCORRECT_DATA;
+    }
     switch (G_io_apdu_buffer[ISO_OFFSET_P1]) {
     case P1_NO_DISPLAY:
     case P1_DISPLAY:
@@ -75,8 +88,9 @@ unsigned short btchip_apdu_get_wallet_public_key() {
     if (G_io_apdu_buffer[ISO_OFFSET_LC] < 0x01) {
         return BTCHIP_SW_INCORRECT_LENGTH;
     }
-    os_memmove(keyPath, G_io_apdu_buffer + ISO_OFFSET_CDATA,
-               MAX_BIP32_PATH_LENGTH);
+    if (display) {
+        is_derivation_path_unusual = set_key_path_to_display(G_io_apdu_buffer + ISO_OFFSET_CDATA);
+    }
 
     if(display_request_token){
         uint8_t request_token_offset = ISO_OFFSET_CDATA + G_io_apdu_buffer[ISO_OFFSET_CDATA]*4 + 1;
@@ -93,27 +107,17 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         return BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
     }
 
-    if (!os_global_pin_is_validated()) {
+    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
         return BTCHIP_SW_SECURITY_STATUS_NOT_SATISFIED;
     }
 
     PRINTF("pin ok\n");
 
-    btchip_private_derive_keypair(keyPath, 1, chainCode);
-
+    unsigned char bip44_enforced = enforce_bip44_coin_type(G_io_apdu_buffer + ISO_OFFSET_CDATA, true);
 
     G_io_apdu_buffer[0] = 65;
+    keyLength = get_public_key_chain_code(G_io_apdu_buffer + ISO_OFFSET_CDATA, uncompressedPublicKeys, G_io_apdu_buffer + 1, chainCode);
 
-    // Then encode it
-    if (uncompressedPublicKeys) {
-        keyLength = 65;
-    } else {
-        btchip_compress_public_key_value(btchip_public_key_D.W);
-        keyLength = 33;
-    }
-
-    os_memmove(G_io_apdu_buffer + 1, btchip_public_key_D.W,
-               sizeof(btchip_public_key_D.W));
     if (cashAddr) {
         uint8_t tmp[20];
         btchip_public_key_hash160(G_io_apdu_buffer + 1, // IN
@@ -127,7 +131,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
             keyLength,             // INLEN
             G_io_apdu_buffer + 67, // OUT
             150,                   // MAXOUTLEN
-            btchip_context_D.payToAddressVersion, 0);
+            G_coin_config->p2pkh_version, 0);
     } else {
         uint8_t tmp[22];
         tmp[0] = 0x00;
@@ -142,12 +146,12 @@ unsigned short btchip_apdu_get_wallet_public_key() {
                 22,                    // INLEN
                 G_io_apdu_buffer + 67, // OUT
                 150,                   // MAXOUTLEN
-                btchip_context_D.payToScriptHashVersion, 0);
+                G_coin_config->p2sh_version, 0);
         } else {
             if (G_coin_config->native_segwit_prefix) {
                 keyLength = segwit_addr_encode(
                     (char *)(G_io_apdu_buffer + 67),
-                    PIC(G_coin_config->native_segwit_prefix), 0, tmp + 2, 20);
+                    (char *)PIC(G_coin_config->native_segwit_prefix), 0, tmp + 2, 20);
                 if (keyLength == 1) {
                     keyLength = strlen((char *)(G_io_apdu_buffer + 67));
                 }
@@ -166,6 +170,12 @@ unsigned short btchip_apdu_get_wallet_public_key() {
                sizeof(chainCode));
     btchip_context_D.outLength = 1 + 65 + 1 + keyLength + sizeof(chainCode);
 
+    // privacy : force display the address if the path isn't standard
+    // and could reveal another fork holdings according to BIP 44 rules
+    if (!display && !bip44_enforced) {
+        display = true;
+    }
+
     if (display) {
         if (keyLength > 50) {
             return BTCHIP_SW_INCORRECT_DATA;
@@ -174,7 +184,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         os_memmove(G_io_apdu_buffer + 200, G_io_apdu_buffer + 67, keyLength);
         G_io_apdu_buffer[200 + keyLength] = '\0';
         btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
-        btchip_bagl_display_public_key(keyPath);
+        btchip_bagl_display_public_key(is_derivation_path_unusual);
     }
     // If the token requested has already been approved in a previous call, the source is trusted so don't ask for approval again
     else if(display_request_token &&
@@ -184,7 +194,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         btchip_context_D.has_valid_token = false;
         os_memcpy(btchip_context_D.last_token, &request_token, 4);
         // Hax, avoid wasting space
-        snprintf(G_io_apdu_buffer + 200, 9, "%08X", request_token);
+        snprintf((char *)G_io_apdu_buffer + 200, 9, "%08X", request_token);
         G_io_apdu_buffer[200 + 8] = '\0';
         btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
         btchip_bagl_display_token();
