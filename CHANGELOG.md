@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.6.1](https://github.com/ledgerhq/app-bitcoin/compare/1.6.0...1.6.1) - 2021-05-31
+
+### Modified
+
+- Zcoin becomes Firo
+## [1.6.0](https://github.com/ledgerhq/app-bitcoin/compare/1.5.6...1.6.0) - 2021-04-30
+
+### Added
+
+- Better python tests
+- Add wallet ID feature on Nano X
 ## [1.5.6](https://github.com/ledgerhq/app-bitcoin/compare/1.5.5...1.5.6) - 2021-03-25
 
 ### Added
