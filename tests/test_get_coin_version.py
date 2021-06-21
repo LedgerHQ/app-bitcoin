@@ -6,4 +6,4 @@ def test_get_coin_version(cmd):
             p2sh_prefix,
             coin_family,
             coin_name,
-            coin_ticker) == (0x6F, 0xC4, 0x01, "Bitcoin", "TEST")
+            coin_ticker) == (60, 122, 0x01, "Raven", "RVN")

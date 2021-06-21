@@ -75,7 +75,7 @@ class BitcoinCommand(BitcoinBaseCommand):
         sign_pub_keys: List[bytes] = []
         for sign_path in sign_paths:
             sign_pub_key, _, _ = self.get_public_key(
-                addr_type=AddrType.BECH32,
+                addr_type=AddrType.Legacy,
                 bip32_path=sign_path,
                 display=False
             )
@@ -120,9 +120,9 @@ class BitcoinCommand(BitcoinBaseCommand):
                                 scriptSig=script_pub_key,
                                 nSequence=0xfffffffd))
 
-        if amount_available - fees > amount:
+        if False and amount_available - fees > amount:
             change_pub_key, _, _ = self.get_public_key(
-                addr_type=AddrType.BECH32,
+                addr_type=AddrType.Legacy,
                 bip32_path=change_path,
                 display=False
             )

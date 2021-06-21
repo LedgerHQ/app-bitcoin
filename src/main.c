@@ -966,13 +966,14 @@ uint8_t prepare_single_output() {
              &ravencoin_asset_ptr))) {
             unsigned char type;
             unsigned char asset_len;
+            unsigned char one_in_sats[8] = {0x00, 0xE1, 0xF5, 0x05, 0x00, 0x00, 0x00, 0x00};
             type = (btchip_context_D.currentOutput + offset)[ravencoin_asset_ptr++];
             asset_len = (btchip_context_D.currentOutput + offset)[ravencoin_asset_ptr++];
             btchip_swap_bytes(vars.tmp.fullAmount, btchip_context_D.currentOutput + offset + ravencoin_asset_ptr, asset_len);
             ravencoin_asset_ptr += asset_len;
             if (type == 0x6F) {
                 // Ownership amounts do not have an associated amount; give it 100,000,000 virtual sats
-                btchip_swap_bytes(amount, {0x00, 0xE1, 0xF5, 0x05, 0x00, 0x00 0x00 0x00}, 8);
+                btchip_swap_bytes(amount, one_in_sats, 8);
             }
             else {
                 btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset + ravencoin_asset_ptr, 8);
