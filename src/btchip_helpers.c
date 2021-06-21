@@ -149,12 +149,51 @@ unsigned char btchip_output_script_is_op_call(unsigned char *buffer,
     return output_script_is_op_create_or_call(buffer, size, 0xC2);
 }
 
-unsigned char btchip_output_script_is_ravencoin_asset_tag(unsigned char *buffer,
-                                              size_t size) {
-    return (!btchip_output_script_is_regular(buffer) &&
-            !btchip_output_script_is_p2sh(buffer) &&
-            !btchip_output_script_is_op_return(buffer) && (buffer[0] <= 0xEA) &&
-            (buffer[0] == 0xC0));
+unsigned char btchip_output_script_try_get_ravencoin_asset_tag_type(unsigned char *buffer) {
+    if (btchip_output_script_is_regular(buffer) ||
+            btchip_output_script_is_p2sh(buffer) ||
+            btchip_output_script_is_op_return(buffer) ||
+            (buffer[1] != 0xC0)) {
+        return -1;
+    }
+    if (buffer[2] == 0x50) {
+        if (buffer[3] == 0x50) {
+            return 2;
+        }
+        return 1;
+    }
+    return 0;
+}
+
+unsigned char btchip_output_script_get_ravencoin_asset_ptr(unsigned char *buffer, size_t size, int *ptr) {
+    unsigned int script_ptr = 0;
+    unsigned int op = -1;
+    if (buffer[size - 1] != 0x75) {
+        return 0;
+    }
+    while (script_ptr < size - 5) {
+        op = buffer[script_ptr++];
+        if (op == 0xC0) {
+            if ((buffer[script_ptr+1] == 0x72) &&
+                (buffer[script_ptr+2] == 0x76) &&
+                (buffer[script_ptr+3] == 0x6E)) {
+                *ptr = script_ptr + 4;
+            } else {
+                *ptr = script_ptr + 5;
+            }
+            return 1;
+        }
+        else if (op <= 0x4E) {
+            if (op < 0x4C) {
+                script_ptr += op;
+            }
+            else {
+                script_ptr += (buffer[script_ptr] + 1);
+            }
+            //There shouldn't be anything pushed larger than 256 bytes in an asset transfer script
+        }
+    }
+    return 0;
 }
 
 unsigned char btchip_rng_u8_modulo(unsigned char modulo) {

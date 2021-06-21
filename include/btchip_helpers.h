@@ -40,6 +40,9 @@ unsigned char btchip_output_script_is_op_create(unsigned char *buffer,
 unsigned char btchip_output_script_is_op_call(unsigned char *buffer,
                                                 size_t size);
 
+unsigned char btchip_output_script_try_get_ravencoin_asset_tag_type(unsigned char *buffer);
+unsigned char btchip_output_script_get_ravencoin_asset_ptr(unsigned char *buffer, size_t size, int *ptr);
+
 void btchip_sleep16(unsigned short delay);
 void btchip_sleep32(unsigned long int delayEach, unsigned long int delayRepeat);
 
