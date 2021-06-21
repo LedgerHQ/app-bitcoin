@@ -154,7 +154,7 @@ unsigned char btchip_output_script_is_ravencoin_asset_tag(unsigned char *buffer,
     return (!btchip_output_script_is_regular(buffer) &&
             !btchip_output_script_is_p2sh(buffer) &&
             !btchip_output_script_is_op_return(buffer) && (buffer[0] <= 0xEA) &&
-            (buffer[0] == 0xC0);
+            (buffer[0] == 0xC0));
 }
 
 unsigned char btchip_rng_u8_modulo(unsigned char modulo) {
