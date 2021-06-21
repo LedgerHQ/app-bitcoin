@@ -149,6 +149,14 @@ unsigned char btchip_output_script_is_op_call(unsigned char *buffer,
     return output_script_is_op_create_or_call(buffer, size, 0xC2);
 }
 
+unsigned char btchip_output_script_is_ravencoin_asset_tag(unsigned char *buffer,
+                                              size_t size) {
+    return (!btchip_output_script_is_regular(buffer) &&
+            !btchip_output_script_is_p2sh(buffer) &&
+            !btchip_output_script_is_op_return(buffer) && (buffer[0] <= 0xEA) &&
+            (buffer[0] == 0xC0);
+}
+
 unsigned char btchip_rng_u8_modulo(unsigned char modulo) {
     unsigned int rng_max = 256 % modulo;
     unsigned int rng_limit = 256 - rng_max;

@@ -856,6 +856,11 @@ void get_address_from_output_script(unsigned char* script, int script_size, char
         strcpy(out, "OP_CALL");
         return;
     }
+    if ((G_coin_config->kind == COIN_KIND_RAVENCOIN) &&
+        btchip_output_script_is_ravencoin_asset_tag(script, script_size)) {
+        strcpy(out, "ASSET TAG");
+        return;
+    }
     if (btchip_output_script_is_native_witness(script)) {
         if (G_coin_config->native_segwit_prefix) {
             segwit_addr_encode(
