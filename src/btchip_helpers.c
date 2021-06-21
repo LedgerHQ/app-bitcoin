@@ -18,6 +18,8 @@
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
 
+const unsigned char TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE[] = {0x76, 0xA9, 0x14};
+
 const unsigned char TRANSACTION_OUTPUT_SCRIPT_PRE[] = {
     0x19, 0x76, 0xA9,
     0x14}; // script length, OP_DUP, OP_HASH160, address length
@@ -59,6 +61,7 @@ const unsigned char ZEN_OUTPUT_SCRIPT_POST[] = {
 };                    // BIP0115 Replay Protection
 
 unsigned char btchip_output_script_is_regular(unsigned char *buffer) {
+    int i;
     if (G_coin_config->native_segwit_prefix) {
         if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE)) == 0) ||
@@ -75,7 +78,17 @@ unsigned char btchip_output_script_is_regular(unsigned char *buffer) {
                        sizeof(ZEN_OUTPUT_SCRIPT_POST)) == 0)) {
             return 1;
         }
-    } else {
+    }
+    else if (G_coin_config->kind == COIN_KIND_RAVENCOIN) {
+        if ((os_memcmp(buffer + 1, TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE,
+                       sizeof(TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE)) == 0) &&
+            (os_memcmp(buffer + 1 + sizeof(TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE) + 20,
+                       TRANSACTION_OUTPUT_SCRIPT_POST,
+                       sizeof(TRANSACTION_OUTPUT_SCRIPT_POST)) == 0)) {
+            return 1;
+        }
+    }
+    else {
         if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE)) == 0) &&
             (os_memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE) + 20,
@@ -166,12 +179,14 @@ unsigned char btchip_output_script_try_get_ravencoin_asset_tag_type(unsigned cha
 }
 
 unsigned char btchip_output_script_get_ravencoin_asset_ptr(unsigned char *buffer, size_t size, int *ptr) {
-    unsigned int script_ptr = 0;
+    unsigned int script_ptr = 1; //Skip the first pushdata op
     unsigned int op = -1;
-    if (buffer[size - 1] != 0x75) {
+    unsigned int final_op = buffer[0];
+
+    if (final_op >= size || buffer[final_op] != 0x75) {
         return 0;
     }
-    while (script_ptr < size - 5) {
+    while (script_ptr < final_op) {
         op = buffer[script_ptr++];
         if (op == 0xC0) {
             if ((buffer[script_ptr+1] == 0x72) &&
@@ -309,6 +324,14 @@ void btchip_swap_bytes(unsigned char *target, unsigned char *source,
     unsigned char i;
     for (i = 0; i < size; i++) {
         target[i] = source[size - 1 - i];
+    }
+}
+
+void btchip_swap_bytes_reversed(unsigned char *target, unsigned char *source,
+                                unsigned char size) {
+    unsigned char i;
+    for (i = 0; i < size; i++) {
+        target[i] = source[i];
     }
 }
 

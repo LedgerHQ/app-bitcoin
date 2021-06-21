@@ -87,3 +87,6 @@ def sign_from_json(cmd, filepath: Path):
 #def test_sign_fail_p2pkh_reject(cmd):
 #    with pytest.raises(ConditionOfUseNotSatisfiedError):
 #        sign_from_json(cmd, "./data/one-to-one/p2pkh/tx.json")
+
+def test_sign(cmd):
+    sign_from_json(cmd, "./data/one-to-one/p2pkh/tx.json")

@@ -42,9 +42,12 @@ void btchip_apdu_hash_input_finalize_full_reset(void) {
 
 static bool check_output_displayable() {
     bool displayable = true;
+    bool invalid_script = false;
+    int dummy;
     unsigned char amount[8], isOpReturn, isP2sh, isNativeSegwit, j,
         nullAmount = 1;
     unsigned char isOpCreate, isOpCall;
+    unsigned char isRavencoinAsset;
 
     for (j = 0; j < 8; j++) {
         if (btchip_context_D.currentOutput[j] != 0) {
@@ -52,11 +55,13 @@ static bool check_output_displayable() {
             break;
         }
     }
+
     if (!nullAmount) {
         btchip_swap_bytes(amount, btchip_context_D.currentOutput, 8);
         transaction_amount_add_be(btchip_context_D.totalOutputAmount,
                                   btchip_context_D.totalOutputAmount, amount);
     }
+
     isOpReturn =
         btchip_output_script_is_op_return(btchip_context_D.currentOutput + 8);
     isP2sh = btchip_output_script_is_p2sh(btchip_context_D.currentOutput + 8);
@@ -68,13 +73,28 @@ static bool check_output_displayable() {
     isOpCall =
         btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8,
           sizeof(btchip_context_D.currentOutput) - 8);
-    if (((G_coin_config->kind == COIN_KIND_QTUM) &&
-         !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
-         !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate && !isOpCall) ||
-        (!(G_coin_config->kind == COIN_KIND_QTUM) &&
-         !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
-         !isP2sh && !(nullAmount && isOpReturn))) {
-        PRINTF("Error : Unrecognized output script");
+    isRavencoinAsset =
+            ((-1 != btchip_output_script_try_get_ravencoin_asset_tag_type(btchip_context_D.currentOutput + 8)) ||
+            (btchip_output_script_get_ravencoin_asset_ptr(btchip_context_D.currentOutput + 8,
+                                                          sizeof(btchip_context_D.currentOutput) - 8,
+                                                          &dummy)));
+    if (G_coin_config->kind == COIN_KIND_QTUM) {
+        invalid_script =
+                !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
+                !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate && !isOpCall;
+    }
+    else if (G_coin_config->kind == COIN_KIND_RAVENCOIN) {
+        invalid_script =
+                !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
+                !isP2sh && !(nullAmount && isOpReturn) && !(nullAmount && isRavencoinAsset);
+    }
+    else {
+        invalid_script =
+                !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
+                !isP2sh && !(nullAmount && isOpReturn);
+    }
+    if (invalid_script) {
+        PRINTF("Error : Unrecognized output script\n");
         THROW(EXCEPTION);
     }
     if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {

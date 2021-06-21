@@ -19,4 +19,4 @@ def test_verify(cmd):
     txVersion = 2
 
     while inputIndex < len(redeemScripts):
-        cmd
+        inputIndex += 1

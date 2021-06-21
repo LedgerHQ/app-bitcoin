@@ -846,6 +846,7 @@ error:
 #define RAVENCOIN_NULL_ASSET_RESTRICTED 2
 
 void get_address_from_output_script(unsigned char* script, int script_size, char* out, int out_size) {
+
     if (btchip_output_script_is_op_return(script)) {
         strcpy(out, "OP_RETURN");
         return;
@@ -925,6 +926,7 @@ uint8_t prepare_single_output() {
     unsigned short textSize;
     char tmp[80] = {0};
     int ravencoin_asset_ptr = -1;
+    unsigned char str_len;
 
     btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset, 8);
     offset += 8;
@@ -965,12 +967,15 @@ uint8_t prepare_single_output() {
              sizeof(btchip_context_D.currentOutput) - offset, \
              &ravencoin_asset_ptr))) {
             unsigned char type;
-            unsigned char asset_len;
             unsigned char one_in_sats[8] = {0x00, 0xE1, 0xF5, 0x05, 0x00, 0x00, 0x00, 0x00};
             type = (btchip_context_D.currentOutput + offset)[ravencoin_asset_ptr++];
-            asset_len = (btchip_context_D.currentOutput + offset)[ravencoin_asset_ptr++];
-            btchip_swap_bytes(vars.tmp.fullAmount, btchip_context_D.currentOutput + offset + ravencoin_asset_ptr, asset_len);
-            ravencoin_asset_ptr += asset_len;
+            str_len = (btchip_context_D.currentOutput + offset)[ravencoin_asset_ptr++];
+            btchip_swap_bytes_reversed(vars.tmp.fullAmount, btchip_context_D.currentOutput + offset + ravencoin_asset_ptr, str_len);
+            ravencoin_asset_ptr += str_len;
+            vars.tmp.fullAmount[str_len] = ' ';
+            btchip_context_D.tmp =
+                    (unsigned char *)(vars.tmp.fullAmount +
+                                      str_len + 1);
             if (type == 0x6F) {
                 // Ownership amounts do not have an associated amount; give it 100,000,000 virtual sats
                 btchip_swap_bytes(amount, one_in_sats, 8);
@@ -980,15 +985,16 @@ uint8_t prepare_single_output() {
             }
         }
         else {
+            str_len = strlen(G_coin_config->name_short);
             os_memmove(vars.tmp.fullAmount, G_coin_config->name_short,
-                       strlen(G_coin_config->name_short));
-            vars.tmp.fullAmount[strlen(G_coin_config->name_short)] = ' ';
+                       str_len);
+            vars.tmp.fullAmount[str_len] = ' ';
             btchip_context_D.tmp =
                     (unsigned char *)(vars.tmp.fullAmount +
-                                      strlen(G_coin_config->name_short) + 1);
+                                      str_len + 1);
         }
         textSize = btchip_convert_hex_amount_to_displayable(amount);
-        vars.tmp.fullAmount[textSize + strlen(G_coin_config->name_short) + 1] =
+        vars.tmp.fullAmount[textSize + str_len + 1] =
             '\0';
     }
 

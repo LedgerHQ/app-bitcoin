@@ -83,6 +83,8 @@ unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned cha
 #define btchip_set_check_internal_structure_integrity(x)
 void btchip_swap_bytes(unsigned char *target, unsigned char *source,
                        unsigned char size);
+void btchip_swap_bytes_reversed(unsigned char *target, unsigned char *source,
+                       unsigned char size);
 
 void btchip_sign_finalhash(void *keyContext,
                            unsigned char *in, unsigned short inlen,
