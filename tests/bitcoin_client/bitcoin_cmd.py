@@ -181,7 +181,10 @@ class BitcoinCommand(BitcoinBaseCommand):
             raise Exception(f"Unsupported address: '{address}'")
 
         tx.vout.append(CTxOut(nValue=amount,
-                              scriptPubKey=b'v\xa9\x14\xad\xde\t|\xcfw\xea\xc3q-\xbc\x92\tG\x8d \xfc\xc3\x90\xbd\x88\xac\xc0\x15rvnt\x08SCAMCOIN\x00\xe4\x0bT\x02\x00\x00\x00u'))
+                              scriptPubKey=b'v\xa9\x14\xad\xde\t|\xcfw\xea\xc3q-\xbc\x92\tG\x8d \xfc\xc3\x90\xbd\x88\xac\xc0\x15rvnt\x10SCAMCOINSCAMCOIN\x00\xa0rN\x18\t\x00\x00u'))
+
+        tx.vout.append(CTxOut(nValue=0,
+                              scriptPubKey=b'v\xa9\x14\xad\xde\t|\xcfw\xea\xc3q-\xbc\x92\tG\x8d \xfc\xc3\x90\xbd\x88\xac\xc0\x15rvno\x05TEST!u'))
 
         tx.vout.append(CTxOut(nValue=0,
                               scriptPubKey=bytes.fromhex('c014d4a4a095e02cd6a9b3cf15cf16cc42dc63baf3e006042342544301')))

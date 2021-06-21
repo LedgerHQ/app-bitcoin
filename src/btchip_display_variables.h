@@ -22,9 +22,9 @@ union display_variables {
     struct {
         // char addressSummary[40]; // beginning of the output address ... end
         // of
-
         char fullAddress[65]; // the address
-        char fullAmount[20];  // full amount
+        char fullAmount[32+1+17]; // Ravencoin: max asset length + space + max amt w/ decimal
+        //char fullAmount[20];  // full amount
         char feesAmount[20];  // fees
     } tmp;
 
