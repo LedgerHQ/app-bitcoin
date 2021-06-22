@@ -997,9 +997,6 @@ uint8_t prepare_single_output() {
         vars.tmp.fullAmount[textSize + str_len + 1] =
             '\0';
 
-        PRINTF("%d\n", sizeof(vars.tmp.fullAmount));
-        PRINTF("%s\n", vars.tmp.fullAmount);
-        PRINTF("%d\n", BIP44_COIN_TYPE);
     }
 
     return 1;
