@@ -23,7 +23,8 @@ union display_variables {
         // char addressSummary[40]; // beginning of the output address ... end
         // of
         char fullAddress[65]; // the address
-        char fullAmount[50]; // Ravencoin: max asset length (32) + space (1) + max amt w/ decimal (17)
+        //Ravencoin: max asset length (32) + space (1) + max amt whole (11) + decimal (1) + max amt decimal (8) + \0 (1)
+        char fullAmount[54];
         //char fullAmount[20];  // full amount
         char feesAmount[20];  // fees
     } tmp;
