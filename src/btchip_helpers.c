@@ -186,7 +186,7 @@ unsigned char btchip_output_script_get_ravencoin_asset_ptr(unsigned char *buffer
     if (final_op >= size || buffer[final_op] != 0x75) {
         return 0;
     }
-    while (script_ptr < final_op) {
+    while (script_ptr < final_op-6) {
         op = buffer[script_ptr++];
         if (op == 0xC0) {
             if ((buffer[script_ptr+1] == 0x72) &&
