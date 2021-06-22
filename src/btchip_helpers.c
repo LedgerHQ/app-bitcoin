@@ -18,7 +18,8 @@
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
 
-const unsigned char TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE[] = {0x76, 0xA9, 0x14};
+const unsigned char TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE[] = {0x76, 0xA9, 0x14}; // w/o length
+const unsigned char TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_P2SH_PRE_POST_ONE[] = {0xA9, 0x14}; // w/o length
 
 const unsigned char TRANSACTION_OUTPUT_SCRIPT_PRE[] = {
     0x19, 0x76, 0xA9,
@@ -79,19 +80,23 @@ unsigned char btchip_output_script_is_regular(unsigned char *buffer) {
             return 1;
         }
     }
-    else if (G_coin_config->kind == COIN_KIND_RAVENCOIN) {
-        if ((os_memcmp(buffer + 1, TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE,
-                       sizeof(TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE)) == 0) &&
-            (os_memcmp(buffer + 1 + sizeof(TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE) + 20,
+    else {
+        if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_PRE,
+                       sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE)) == 0) &&
+            (os_memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE) + 20,
                        TRANSACTION_OUTPUT_SCRIPT_POST,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_POST)) == 0)) {
             return 1;
         }
     }
-    else {
-        if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_PRE,
-                       sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE)) == 0) &&
-            (os_memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE) + 20,
+    return 0;
+}
+
+unsigned char btchip_output_script_is_regular_ravencoin_asset(unsigned char *buffer) {
+    if (G_coin_config->kind == COIN_KIND_RAVENCOIN) {
+        if ((os_memcmp(buffer + 1, TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE,
+                       sizeof(TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE)) == 0) &&
+            (os_memcmp(buffer + 1 + sizeof(TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE) + 20,
                        TRANSACTION_OUTPUT_SCRIPT_POST,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_POST)) == 0)) {
             return 1;
@@ -113,6 +118,19 @@ unsigned char btchip_output_script_is_p2sh(unsigned char *buffer) {
         if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE)) == 0) &&
             (os_memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE) + 20,
+                       TRANSACTION_OUTPUT_SCRIPT_P2SH_POST,
+                       sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_POST)) == 0)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+unsigned char btchip_output_script_is_p2sh_ravencoin_asset(unsigned char *buffer) {
+    if (G_coin_config->kind == COIN_KIND_RAVENCOIN) {
+        if ((os_memcmp(buffer + 1, TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_P2SH_PRE_POST_ONE,
+                       sizeof(TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_P2SH_PRE_POST_ONE)) == 0) &&
+            (os_memcmp(buffer + 1 + sizeof(TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_P2SH_PRE_POST_ONE) + 20,
                        TRANSACTION_OUTPUT_SCRIPT_P2SH_POST,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_POST)) == 0)) {
             return 1;
@@ -179,21 +197,54 @@ unsigned char btchip_output_script_try_get_ravencoin_asset_tag_type(unsigned cha
 }
 
 unsigned char btchip_output_script_get_ravencoin_asset_ptr(unsigned char *buffer, size_t size, int *ptr) {
-    unsigned int script_ptr = 1; //Skip the first pushdata op
+    // This method is also used in check_output_displayable and needs to ensure no overflows happen from bad scripts
+    unsigned int script_ptr = 1; // Skip the first pushdata op
     unsigned int op = -1;
     unsigned int final_op = buffer[0];
+    unsigned char asset_len;
 
     if (final_op >= size || buffer[final_op] != 0x75) {
         return 0;
     }
-    while (script_ptr < final_op-6) {
+    while (script_ptr < final_op - 13) { // Definitely a bad asset script; too short
         op = buffer[script_ptr++];
         if (op == 0xC0) {
+            // Verifying script
             if ((buffer[script_ptr+1] == 0x72) &&
                 (buffer[script_ptr+2] == 0x76) &&
                 (buffer[script_ptr+3] == 0x6E)) {
+                asset_len = buffer[script_ptr+5];
+                if (asset_len > 32) { // Invalid script
+                    return 0;
+                }
+                if (buffer[script_ptr+4] == 0x6F) {
+                    // Ownership assets will not have an amount
+                    if (script_ptr+5+asset_len >= final_op) {
+                        return 0; // Too small
+                    }
+                }
+                else {
+                    if (script_ptr+5+asset_len+8 >= final_op) {
+                        return 0; // Too small
+                    }
+                }
                 *ptr = script_ptr + 4;
             } else {
+                asset_len = buffer[script_ptr+6];
+                if (asset_len > 32) { // Invalid script
+                    return 0;
+                }
+                if (buffer[script_ptr+5] == 0x6F) {
+                    // Ownership assets will not have an amount
+                    if (script_ptr+6+asset_len >= final_op) {
+                        return 0; // Too small
+                    }
+                }
+                else {
+                    if (script_ptr+6+asset_len+8 >= final_op) {
+                        return 0; // Too small
+                    }
+                }
                 *ptr = script_ptr + 5;
             }
             return 1;

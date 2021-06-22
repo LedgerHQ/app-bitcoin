@@ -31,7 +31,9 @@
 #define OUTPUT_SCRIPT_NATIVE_WITNESS_PROGRAM_OFFSET 3
 
 unsigned char btchip_output_script_is_regular(unsigned char *buffer);
+unsigned char btchip_output_script_is_regular_ravencoin_asset(unsigned char *buffer);
 unsigned char btchip_output_script_is_p2sh(unsigned char *buffer);
+unsigned char btchip_output_script_is_p2sh_ravencoin_asset(unsigned char *buffer);
 unsigned char btchip_output_script_is_op_return(unsigned char *buffer);
 unsigned char btchip_output_script_is_native_witness(unsigned char *buffer);
 

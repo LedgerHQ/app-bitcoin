@@ -64,7 +64,14 @@ static bool check_output_displayable() {
 
     isOpReturn =
         btchip_output_script_is_op_return(btchip_context_D.currentOutput + 8);
-    isP2sh = btchip_output_script_is_p2sh(btchip_context_D.currentOutput + 8);
+
+    if (nullAmount && G_coin_config->kind==COIN_KIND_RAVENCOIN){
+        isP2sh = btchip_output_script_is_p2sh_ravencoin_asset(btchip_context_D.currentOutput + 8);
+    }
+    else {
+        isP2sh = btchip_output_script_is_p2sh(btchip_context_D.currentOutput + 8);
+    }
+
     isNativeSegwit = btchip_output_script_is_native_witness(
         btchip_context_D.currentOutput + 8);
     isOpCreate =
@@ -74,6 +81,7 @@ static bool check_output_displayable() {
         btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8,
           sizeof(btchip_context_D.currentOutput) - 8);
     isRavencoinAsset =
+            nullAmount &&
             ((-1 != btchip_output_script_try_get_ravencoin_asset_tag_type(btchip_context_D.currentOutput + 8)) ||
             (btchip_output_script_get_ravencoin_asset_ptr(btchip_context_D.currentOutput + 8,
                                                           sizeof(btchip_context_D.currentOutput) - 8,
@@ -83,10 +91,12 @@ static bool check_output_displayable() {
                 !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
                 !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate && !isOpCall;
     }
-    else if (G_coin_config->kind == COIN_KIND_RAVENCOIN) {
+    else if (nullAmount && G_coin_config->kind == COIN_KIND_RAVENCOIN) {
+        // Ravencoin assets only come into play when there is a null amount
         invalid_script =
-                !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
-                !isP2sh && !(nullAmount && isOpReturn) && !(nullAmount && isRavencoinAsset);
+                !isRavencoinAsset &&
+                !btchip_output_script_is_regular_ravencoin_asset(btchip_context_D.currentOutput + 8) &&
+                !isP2sh && !isOpReturn;
     }
     else {
         invalid_script =
