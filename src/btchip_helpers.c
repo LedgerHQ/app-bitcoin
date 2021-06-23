@@ -206,7 +206,7 @@ unsigned char btchip_output_script_get_ravencoin_asset_ptr(unsigned char *buffer
     if (final_op >= size || buffer[final_op] != 0x75) {
         return 0;
     }
-    while (script_ptr < final_op - 13) { // Definitely a bad asset script; too short
+    while (script_ptr < final_op - 7) { // Definitely a bad asset script; too short
         op = buffer[script_ptr++];
         if (op == 0xC0) {
             // Verifying script
