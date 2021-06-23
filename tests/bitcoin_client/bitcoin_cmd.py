@@ -116,12 +116,11 @@ class BitcoinCommand(BitcoinBaseCommand):
                                   hash160(sign_pub_keys[i]) +  # hash160(pubkey)
                                   b"\x88" +  # OP_EQUALVERIFY
                                   b"\xac")  # OP_CHECKSIG
-            print(script_pub_key)
             tx.vin.append(CTxIn(outpoint=COutPoint(h=utxo.sha256, n=output_index),
                                 scriptSig=script_pub_key,
                                 nSequence=0xfffffffd))
 
-        if False and amount_available - fees > amount:
+        if amount_available - fees > amount:
             change_pub_key, _, _ = self.get_public_key(
                 addr_type=AddrType.Legacy,
                 bip32_path=change_path,
@@ -170,7 +169,7 @@ class BitcoinCommand(BitcoinBaseCommand):
                               base58_decode(address)[1:-4] +  # hash160(redeem_script)
                               b"\x87")  # OP_EQUAL
         # P2PKH address (mainnet and testnet)
-        elif address.startswith("1") or (address.startswith("m") or address.startswith("n")):
+        elif address.startswith("R") or (address.startswith("m") or address.startswith("n")):
             script_pub_key = (b"\x76" +  # OP_DUP
                               b"\xa9" +  # OP_HASH160
                               b"\x14" +  # bytes to push (20)
@@ -181,14 +180,7 @@ class BitcoinCommand(BitcoinBaseCommand):
             raise Exception(f"Unsupported address: '{address}'")
 
         tx.vout.append(CTxOut(nValue=amount,
-                              scriptPubKey=b'v\xa9\x14\xad\xde\t|\xcfw\xea\xc3q-\xbc\x92\tG\x8d \xfc\xc3\x90\xbd\x88\xac\xc0\x15rvnt\x10SCAMCOINSCAMCOIN\x00\xa0rN\x18\t\x00\x00u'))
-
-        tx.vout.append(CTxOut(nValue=0,
-                              scriptPubKey=b'v\xa9\x14\xad\xde\t|\xcfw\xea\xc3q-\xbc\x92\tG\x8d \xfc\xc3\x90\xbd\x88\xac\xc0\x15rvno\x05TEST!u'))
-
-        tx.vout.append(CTxOut(nValue=0,
-                              scriptPubKey=bytes.fromhex('c014d4a4a095e02cd6a9b3cf15cf16cc42dc63baf3e006042342544301')))
-
+                              scriptPubKey=script_pub_key))
 
         for i in range(len(tx.vin)):
             self.untrusted_hash_tx_input_start(tx=tx,

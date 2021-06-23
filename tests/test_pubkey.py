@@ -1,4 +1,5 @@
 from bitcoin_client.bitcoin_base_cmd import AddrType
+from bitcoin_client.hwi.base58 import decode as base58_decode
 
 
 def test_get_public_key(cmd):
@@ -25,7 +26,7 @@ def test_get_public_key(cmd):
             bip32_path=path,
             display=False
         )
-        addrs.append(addr)
+        addrs.append((addr, base58_decode(addr)[1:21].hex()))
 
     print("ADDRESSES:")
     print(addrs)
