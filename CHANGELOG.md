@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.6.2](https://github.com/ledgerhq/app-bitcoin/compare/1.6.1...1.6.2) - 2021-06-24
+
+### Fixed
+
+- Fixed Qtum derivation for Native Segwit accounts
+- Revert Firo's COINID to zcoin
 ## [1.6.1](https://github.com/ledgerhq/app-bitcoin/compare/1.6.0...1.6.1) - 2021-05-31
 
 ### Modified
