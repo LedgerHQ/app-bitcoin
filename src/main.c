@@ -888,8 +888,14 @@ void get_address_from_output_script(unsigned char* script, int script_size, char
     unsigned short textSize;
     int addressOffset = 3;
     unsigned short version = G_coin_config->p2sh_version;
+    unsigned int dummy;
 
-    if (btchip_output_script_is_regular(script)) {
+    if (G_coin_config->kind == COIN_KIND_RAVENCOIN
+        && btchip_output_script_get_ravencoin_asset_ptr(script, script_size, &dummy)
+        && btchip_output_script_is_regular_ravencoin_asset(script)) {
+        addressOffset = 4;
+        version = G_coin_config->p2pkh_version;
+    } else if (btchip_output_script_is_regular(script)) {
         addressOffset = 4;
         version = G_coin_config->p2pkh_version;
     }
