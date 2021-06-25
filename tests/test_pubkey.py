@@ -26,7 +26,7 @@ def test_get_public_key(cmd):
             bip32_path=path,
             display=False
         )
-        addrs.append((addr, base58_decode(addr)[1:21].hex()))
+        addrs.append((pub_key, addr, base58_decode(addr)[1:21].hex()))
 
     print("ADDRESSES:")
     print(addrs)
