@@ -985,6 +985,7 @@ uint8_t prepare_single_output() {
             }
         }
         else {
+            PRINTF("Normal out parsing\n");
             str_len = strlen(G_coin_config->name_short);
             os_memmove(vars.tmp.fullAmount, G_coin_config->name_short,
                        str_len);

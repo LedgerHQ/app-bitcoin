@@ -180,7 +180,7 @@ unsigned char btchip_output_script_is_op_call(unsigned char *buffer,
     return output_script_is_op_create_or_call(buffer, size, 0xC2);
 }
 
-unsigned char btchip_output_script_try_get_ravencoin_asset_tag_type(unsigned char *buffer) {
+signed char btchip_output_script_try_get_ravencoin_asset_tag_type(unsigned char *buffer) {
     if (btchip_output_script_is_regular(buffer) ||
             btchip_output_script_is_p2sh(buffer) ||
             btchip_output_script_is_op_return(buffer) ||
@@ -204,6 +204,7 @@ unsigned char btchip_output_script_get_ravencoin_asset_ptr(unsigned char *buffer
     unsigned char asset_len;
 
     if (final_op >= size || buffer[final_op] != 0x75) {
+        PRINTF("Ravencoin pointer quick return\n");
         return 0;
     }
     while (script_ptr < final_op - 7) { // Definitely a bad asset script; too short
@@ -259,6 +260,7 @@ unsigned char btchip_output_script_get_ravencoin_asset_ptr(unsigned char *buffer
             //There shouldn't be anything pushed larger than 256 bytes in an asset transfer script
         }
     }
+    PRINTF("Ravencoin pointer end\n");
     return 0;
 }
 

@@ -97,7 +97,7 @@ def test_sign_p2pkh_accept(cmd):
         vin
     ]
 
-    vout = transaction.PartialTxOutput(value=0, scriptpubkey=bytes.fromhex('76a9149730c97deaedf77d8d9c707a506bca4babadaf6988acc01572766e74085343414d434f494e00a3e1110000000075'))
+    vout = transaction.PartialTxOutput(value=1, scriptpubkey=b'v\xa9\x14\x970\xc9}\xea\xed\xf7}\x8d\x9cpzPk\xcaK\xab\xad\xafi\x88\xac\xc0\x15rvnt\x08SCAMCOIN\x00\xa3\xe1\x11\x00\x00\x00\x00u')
 
     outputs = [
         vout
@@ -114,9 +114,6 @@ def test_sign_p2pkh_accept(cmd):
     inputsPaths = ["44'/175'/0'/0/0"]
 
     sign_transaction(cmd, tx, pubkeys, inputsPaths, changePath)
-
-    print(tx.is_complete())
-    print(tx.serialize())
 
 #@automation("automations/reject.json")
 #def test_sign_fail_p2pkh_reject(cmd):
