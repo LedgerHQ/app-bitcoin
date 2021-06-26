@@ -13,20 +13,12 @@ def sign_transaction(cmd, tx, pubkeys, inputsPaths, changePath):
     segwitTransaction = False
     pin = ""
 
-    print("SIGNING")
-
     # Fetch inputs of the transaction to sign
     for i, txin in enumerate(tx.inputs()):
         redeemScript = Transaction.get_preimage_script(txin)
+        print("REDEEM SCRIPT: {}".format(redeemScript))
         txin_prev_tx = txin.utxo
         txin_prev_tx_raw = txin_prev_tx.serialize() if txin_prev_tx else None
-        print((txin_prev_tx_raw,
-              txin.prevout.out_idx,
-              redeemScript,
-              txin.prevout.txid.hex(),
-              pubkeys[i],
-              txin.nsequence,
-              txin.value_sats()))
         inputs.append([txin_prev_tx_raw,
                        txin.prevout.out_idx,
                        redeemScript,
@@ -50,10 +42,12 @@ def sign_transaction(cmd, tx, pubkeys, inputsPaths, changePath):
         txtmp = bitcoinTransaction(bfh(utxo[0]))
         trustedInput = btchip.getTrustedInput(cmd, txtmp, utxo[1])
         trustedInput['sequence'] = sequence
-        if segwitTransaction:
-            trustedInput['witness'] = True
+
         chipInputs.append(trustedInput)
+        print("REDEEM SCRIPT 2: {}".format(txtmp.outputs[utxo[1]].script))
         redeemScripts.append(txtmp.outputs[utxo[1]].script)
+
+    print("INPUTS: {}".format(inputs))
 
     # Sign all inputs
     firstTransaction = True
@@ -63,6 +57,7 @@ def sign_transaction(cmd, tx, pubkeys, inputsPaths, changePath):
     btchip.enableAlternate2fa(cmd, False)
 
     while inputIndex < len(inputs):
+        print('SIGNING: {}'.format(redeemScripts[inputIndex]))
         btchip.startUntrustedTransaction(cmd, firstTransaction, inputIndex,
                                                 chipInputs, redeemScripts[inputIndex], version=tx.version)
         # we don't set meaningful outputAddress, amount and fees
