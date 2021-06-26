@@ -4,8 +4,8 @@
   "amount": 500000,
   "fees": 400,
   "to": "mz5vLWdM1wHVGSmXUkhKVvZbJ2g4epMXSm",
-  "sign_paths": ["m/44'/175'/0'/1/0", "m/44'/175'/0'/0/3"],
-  "change_path": "m/44'/175'/0'/1/2",
+  "sign_paths": ["m/84'/1'/0'/1/0", "m/84'/1'/0'/0/3"],
+  "change_path": "m/84'/1'/0'/1/2",
   "lock_time": 1901785,
   "utxos": [
     {

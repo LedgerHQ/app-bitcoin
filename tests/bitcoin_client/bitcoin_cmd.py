@@ -75,7 +75,7 @@ class BitcoinCommand(BitcoinBaseCommand):
         sign_pub_keys: List[bytes] = []
         for sign_path in sign_paths:
             sign_pub_key, _, _ = self.get_public_key(
-                addr_type=AddrType.Legacy,
+                addr_type=AddrType.BECH32,
                 bip32_path=sign_path,
                 display=False
             )
@@ -122,7 +122,7 @@ class BitcoinCommand(BitcoinBaseCommand):
 
         if amount_available - fees > amount:
             change_pub_key, _, _ = self.get_public_key(
-                addr_type=AddrType.Legacy,
+                addr_type=AddrType.BECH32,
                 bip32_path=change_path,
                 display=False
             )
@@ -169,7 +169,7 @@ class BitcoinCommand(BitcoinBaseCommand):
                               base58_decode(address)[1:-4] +  # hash160(redeem_script)
                               b"\x87")  # OP_EQUAL
         # P2PKH address (mainnet and testnet)
-        elif address.startswith("R") or (address.startswith("m") or address.startswith("n")):
+        elif address.startswith("1") or (address.startswith("m") or address.startswith("n")):
             script_pub_key = (b"\x76" +  # OP_DUP
                               b"\xa9" +  # OP_HASH160
                               b"\x14" +  # bytes to push (20)

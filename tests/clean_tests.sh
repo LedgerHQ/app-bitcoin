@@ -1,4 +1,4 @@
 #!/bin/bash
 
 rm -rf bitcoin-bin
-rm -rf ravencoin-bin
+rm -rf bitcoin-testnet-bin
