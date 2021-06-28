@@ -18,9 +18,6 @@
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
 
-const unsigned char TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE[] = {0x76, 0xA9, 0x14}; // w/o length
-const unsigned char TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_P2SH_PRE_POST_ONE[] = {0xA9, 0x14}; // w/o length
-
 const unsigned char TRANSACTION_OUTPUT_SCRIPT_PRE[] = {
     0x19, 0x76, 0xA9,
     0x14}; // script length, OP_DUP, OP_HASH160, address length
@@ -94,9 +91,9 @@ unsigned char btchip_output_script_is_regular(unsigned char *buffer) {
 
 unsigned char btchip_output_script_is_regular_ravencoin_asset(unsigned char *buffer) {
     if (G_coin_config->kind == COIN_KIND_RAVENCOIN) {
-        if ((os_memcmp(buffer + 1, TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE,
-                       sizeof(TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE)) == 0) &&
-            (os_memcmp(buffer + 1 + sizeof(TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_PRE_POST_ONE) + 20,
+        if ((os_memcmp(buffer + 1, TRANSACTION_OUTPUT_SCRIPT_PRE + 1,
+                       sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE) - 1) == 0) &&
+            (os_memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE) + 20,
                        TRANSACTION_OUTPUT_SCRIPT_POST,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_POST)) == 0)) {
             return 1;
@@ -128,9 +125,9 @@ unsigned char btchip_output_script_is_p2sh(unsigned char *buffer) {
 
 unsigned char btchip_output_script_is_p2sh_ravencoin_asset(unsigned char *buffer) {
     if (G_coin_config->kind == COIN_KIND_RAVENCOIN) {
-        if ((os_memcmp(buffer + 1, TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_P2SH_PRE_POST_ONE,
-                       sizeof(TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_P2SH_PRE_POST_ONE)) == 0) &&
-            (os_memcmp(buffer + 1 + sizeof(TRANSACTION_RAVENCOIN_OUTPUT_SCRIPT_P2SH_PRE_POST_ONE) + 20,
+        if ((os_memcmp(buffer + 1, TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE + 1,
+                       sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE) - 1) == 0) &&
+            (os_memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE) + 20,
                        TRANSACTION_OUTPUT_SCRIPT_P2SH_POST,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_POST)) == 0)) {
             return 1;

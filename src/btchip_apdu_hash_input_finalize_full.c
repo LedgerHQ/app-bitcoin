@@ -47,7 +47,6 @@ static bool check_output_displayable() {
     unsigned char amount[8], isOpReturn, isP2sh, isNativeSegwit, j,
         nullAmount = 1;
     unsigned char isOpCreate, isOpCall;
-    unsigned char isRavencoinAsset;
 
     for (j = 0; j < 8; j++) {
         if (btchip_context_D.currentOutput[j] != 0) {
@@ -80,15 +79,6 @@ static bool check_output_displayable() {
     isOpCall =
         btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8,
           sizeof(btchip_context_D.currentOutput) - 8);
-    isRavencoinAsset =
-            nullAmount &&
-                    ((-1 != btchip_output_script_try_get_ravencoin_asset_tag_type(btchip_context_D.currentOutput + 8))
-                    ||
-                    (btchip_output_script_get_ravencoin_asset_ptr(
-                            btchip_context_D.currentOutput + 8,
-                            sizeof(btchip_context_D.currentOutput) - 8,
-                            &dummy
-                            )));
 
     if (G_coin_config->kind == COIN_KIND_RAVENCOIN) {
         PRINTF("Asset script value: %d\n", btchip_output_script_get_ravencoin_asset_ptr(
@@ -98,7 +88,6 @@ static bool check_output_displayable() {
         ));
         PRINTF("Null asset script value: %d\n", btchip_output_script_try_get_ravencoin_asset_tag_type(btchip_context_D.currentOutput + 8));
         PRINTF("Null amount: %d\n", nullAmount);
-        PRINTF("isAsset: %d\n", isRavencoinAsset);
     }
 
     if (G_coin_config->kind == COIN_KIND_QTUM) {
@@ -109,9 +98,18 @@ static bool check_output_displayable() {
     else if (nullAmount && G_coin_config->kind == COIN_KIND_RAVENCOIN) {
         // Ravencoin assets only come into play when there is a null amount
         invalid_script =
-                !isRavencoinAsset || (
-                !btchip_output_script_is_regular_ravencoin_asset(btchip_context_D.currentOutput + 8) &&
-                !isP2sh && !isOpReturn);
+                (!btchip_output_script_get_ravencoin_asset_ptr(
+                        btchip_context_D.currentOutput + 8,
+                        sizeof(btchip_context_D.currentOutput) - 8,
+                        &dummy)
+                    ||
+                        (!btchip_output_script_is_regular_ravencoin_asset(btchip_context_D.currentOutput + 8)
+                        &&
+                        !isP2sh
+                        )
+                )
+                && !isOpReturn
+                && -1 == btchip_output_script_try_get_ravencoin_asset_tag_type(btchip_context_D.currentOutput + 8);
     }
     else {
         invalid_script =
