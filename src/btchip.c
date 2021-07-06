@@ -29,12 +29,12 @@
 #define COMMON_CLA               0xB0
 #define COMMON_INS_GET_WALLET_ID 0x04
 
+#ifndef HAVE_WALLET_ID_SDK
+
 unsigned int const U_os_perso_seed_cookie[] = {
   0xda7aba5e,
   0xc1a551c5,
 };
-
-#ifndef HAVE_WALLET_ID_SDK
 
 void handleGetWalletId(volatile unsigned short *tx) {
   unsigned char t[64];
@@ -48,12 +48,12 @@ void handleGetWalletId(volatile unsigned short *tx) {
   // pubkey -> sha512
   cx_hash_sha512(pub.W, sizeof(pub.W), t, sizeof(t));
   // ! cookie !
-  os_memmove(G_io_apdu_buffer, t, 64);  
+  os_memmove(G_io_apdu_buffer, t, 64);
   btchip_context_D.sw = 0x9000;
   *tx = 64;
 }
 
-#endif
+#endif // HAVE_WALLET_ID_SDK
 
 void app_dispatch(void) {
     unsigned char cla;
