@@ -3,7 +3,7 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  job_build_debug:
+  job_build:
     name: Compilation
     runs-on: ubuntu-latest
 
@@ -16,25 +16,25 @@ jobs:
 
       - name: Build
         run: |
-          make DEBUG=1 && mv bin/ bitcoin-bin/
+          make && mv bin/ bitcoin-bin/
           make clean
-          make DEBUG=1 COIN=bitcoin_testnet && mv bin/ bitcoin-testnet-bin/
+          make COIN=bitcoin_testnet && mv bin/ bitcoin-testnet-bin/
 
       - name: Upload Bitcoin app binary
         uses: actions/upload-artifact@v2
         with:
-          name: bitcoin-app-debug
+          name: bitcoin-app
           path: bitcoin-bin
 
       - name: Upload Bitcoin Testnet app binary
         uses: actions/upload-artifact@v2
         with:
-          name: bitcoin-testnet-app-debug
+          name: bitcoin-testnet-app
           path: bitcoin-testnet-bin
 
   job_test:
     name: Tests
-    needs: job_build_debug
+    needs: job_build
     runs-on: ubuntu-latest
 
     container:
@@ -55,13 +55,13 @@ jobs:
       - name: Download Bitcoin app binary
         uses: actions/download-artifact@v2
         with:
-          name: bitcoin-app-debug
+          name: bitcoin-app
           path: tests/bitcoin-bin
 
       - name: Download Bitcoin Testnet app binary
         uses: actions/download-artifact@v2
         with:
-          name: bitcoin-testnet-app-debug
+          name: bitcoin-testnet-app
           path: tests/bitcoin-testnet-bin
 
       - name: Run tests
