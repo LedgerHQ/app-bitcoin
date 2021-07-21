@@ -981,7 +981,10 @@ uint8_t prepare_message_signature() {
     cx_hash(&btchip_context_D.transactionHashAuthorization.header, CX_LAST,
             (uint8_t*)vars.tmp.fullAmount, 0, buffer, 32);
 
-    snprintf(vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress), "%.*H", buffer);
+    for (size_t i = 0; i < sizeof(buffer); i++) {
+        snprintf(vars.tmp.fullAddress + 2 * i, sizeof(vars.tmp.fullAddress) - 2 * i,
+                 "%02X", buffer[i]);
+    }
     return 1;
 }
 
