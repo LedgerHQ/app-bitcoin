@@ -49,6 +49,8 @@ ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
 
 unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e) {
+    UNUSED(e);
+
     // user denied the transaction, tell the USB side
     if (!btchip_bagl_user_action(0)) {
         // redraw ui
@@ -58,6 +60,8 @@ unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e) {
 }
 
 unsigned int io_seproxyhal_touch_verify_ok(const bagl_element_t *e) {
+    UNUSED(e);
+
     // user accepted the transaction, tell the USB side
     if (!btchip_bagl_user_action(1)) {
         // redraw ui
@@ -68,6 +72,8 @@ unsigned int io_seproxyhal_touch_verify_ok(const bagl_element_t *e) {
 
 unsigned int
 io_seproxyhal_touch_message_signature_verify_cancel(const bagl_element_t *e) {
+    UNUSED(e);
+
     // user denied the transaction, tell the USB side
     btchip_bagl_user_action_message_signing(0);
     // redraw ui
@@ -77,6 +83,8 @@ io_seproxyhal_touch_message_signature_verify_cancel(const bagl_element_t *e) {
 
 unsigned int
 io_seproxyhal_touch_message_signature_verify_ok(const bagl_element_t *e) {
+    UNUSED(e);
+
     // user accepted the transaction, tell the USB side
     btchip_bagl_user_action_message_signing(1);
     // redraw ui
@@ -85,6 +93,8 @@ io_seproxyhal_touch_message_signature_verify_ok(const bagl_element_t *e) {
 }
 
 unsigned int io_seproxyhal_touch_display_cancel(const bagl_element_t *e) {
+    UNUSED(e);
+
     // user denied the transaction, tell the USB side
     btchip_bagl_user_action_display(0);
     // redraw ui
@@ -93,6 +103,8 @@ unsigned int io_seproxyhal_touch_display_cancel(const bagl_element_t *e) {
 }
 
 unsigned int io_seproxyhal_touch_display_ok(const bagl_element_t *e) {
+    UNUSED(e);
+
     // user accepted the transaction, tell the USB side
     btchip_bagl_user_action_display(1);
     // redraw ui
@@ -101,6 +113,8 @@ unsigned int io_seproxyhal_touch_display_ok(const bagl_element_t *e) {
 }
 
 unsigned int io_seproxyhal_touch_sign_cancel(const bagl_element_t *e) {
+    UNUSED(e);
+
     // user denied the transaction, tell the USB side
     btchip_bagl_user_action_signtx(0, 0);
     // redraw ui
@@ -109,6 +123,8 @@ unsigned int io_seproxyhal_touch_sign_cancel(const bagl_element_t *e) {
 }
 
 unsigned int io_seproxyhal_touch_sign_ok(const bagl_element_t *e) {
+    UNUSED(e);
+
     // user accepted the transaction, tell the USB side
     btchip_bagl_user_action_signtx(1, 0);
     // redraw ui
@@ -116,8 +132,9 @@ unsigned int io_seproxyhal_touch_sign_ok(const bagl_element_t *e) {
     return 0; // DO NOT REDRAW THE BUTTON
 }
 
-
 unsigned int io_seproxyhal_touch_display_token_cancel(const bagl_element_t *e) {
+    UNUSED(e);
+
     // revoke previous valid token if there was one
     btchip_context_D.has_valid_token = false;
     // user denied the token, tell the USB side
@@ -128,6 +145,8 @@ unsigned int io_seproxyhal_touch_display_token_cancel(const bagl_element_t *e) {
 }
 
 unsigned int io_seproxyhal_touch_display_token_ok(const bagl_element_t *e) {
+    UNUSED(e);
+
     // Set the valid token flag
     btchip_context_D.has_valid_token = true;
     // user approved the token, tell the USB side
@@ -725,6 +744,8 @@ unsigned short io_exchange_al(unsigned char channel, unsigned short tx_len) {
 }
 
 unsigned char io_event(unsigned char channel) {
+    UNUSED(channel);
+
     // nothing done with the event, throw an error on the transport layer if
     // needed
 
@@ -802,8 +823,7 @@ uint8_t check_fee_swap() {
 
 uint8_t prepare_fees() {
     if (btchip_context_D.transactionContext.relaxed) {
-        os_memmove(vars.tmp.feesAmount, "UNKNOWN", 7);
-        vars.tmp.feesAmount[7] = '\0';
+        strcpy(vars.tmp.feesAmount, "UNKNOWN");
     } else {
         unsigned char fees[8];
         unsigned short textSize;
@@ -813,15 +833,14 @@ uint8_t prepare_fees() {
                 fees, btchip_context_D.transactionContext.transactionAmount,
                 btchip_context_D.totalOutputAmount);
         if (borrow && G_coin_config->kind == COIN_KIND_KOMODO) {
-            os_memmove(vars.tmp.feesAmount, "REWARD", 6);
-            vars.tmp.feesAmount[6] = '\0';
+            strcpy(vars.tmp.feesAmount, "REWARD");
         }
         else {
             if (borrow) {
                 PRINTF("Error : Fees not consistent");
                 goto error;
             }
-            os_memmove(vars.tmp.feesAmount, G_coin_config->name_short,
+            memcpy(vars.tmp.feesAmount, G_coin_config->name_short,
                        strlen(G_coin_config->name_short));
             vars.tmp.feesAmount[strlen(G_coin_config->name_short)] = ' ';
             btchip_context_D.tmp =
@@ -884,7 +903,7 @@ void get_address_from_output_script(unsigned char* script, int script_size, char
         versionSize = 1;
         address[0] = version;
     }
-    os_memmove(address + versionSize, script + addressOffset, 20);
+    memcpy(address + versionSize, script + addressOffset, 20);
 
     // Prepare address
     if (btchip_context_D.usingCashAddr) {
@@ -918,8 +937,8 @@ uint8_t prepare_single_output() {
 
     // Handle Omni simple send
     if ((btchip_context_D.currentOutput[offset + 2] == 0x14) &&
-        (os_memcmp(btchip_context_D.currentOutput + offset + 3, "omni", 4) == 0) &&
-        (os_memcmp(btchip_context_D.currentOutput + offset + 3 + 4, "\0\0\0\0", 4) == 0)) {
+        (memcmp(btchip_context_D.currentOutput + offset + 3, "omni", 4) == 0) &&
+        (memcmp(btchip_context_D.currentOutput + offset + 3 + 4, "\0\0\0\0", 4) == 0)) {
             uint8_t headerLength;
             uint32_t omniAssetId = btchip_read_u32(btchip_context_D.currentOutput + offset + 3 + 4 + 4, 1, 0);
             switch(omniAssetId) {
@@ -942,7 +961,7 @@ uint8_t prepare_single_output() {
             vars.tmp.fullAmount[textSize + headerLength] = '\0';
     }
     else {
-        os_memmove(vars.tmp.fullAmount, G_coin_config->name_short,
+        memcpy(vars.tmp.fullAmount, G_coin_config->name_short,
                strlen(G_coin_config->name_short));
         vars.tmp.fullAmount[strlen(G_coin_config->name_short)] = ' ';
         btchip_context_D.tmp =
@@ -1003,7 +1022,7 @@ unsigned int btchip_silent_confirm_single_output() {
                 break;
         }
 
-        os_memmove(btchip_context_D.currentOutput,
+        memmove(btchip_context_D.currentOutput,
                     btchip_context_D.currentOutput +
                         btchip_context_D.discardSize,
                     btchip_context_D.currentOutputOffset -
@@ -1147,7 +1166,7 @@ void app_exit(void) {
 }
 
 void init_coin_config(btchip_altcoin_config_t *coin_config) {
-    os_memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
+    memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
     coin_config->bip44_coin_type = BIP44_COIN_TYPE;
     coin_config->bip44_coin_type2 = BIP44_COIN_TYPE_2;
     coin_config->p2pkh_version = COIN_P2PKH_VERSION;

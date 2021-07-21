@@ -48,7 +48,7 @@ void handleGetWalletId(volatile unsigned short *tx) {
   // pubkey -> sha512
   cx_hash_sha512(pub.W, sizeof(pub.W), t, sizeof(t));
   // ! cookie !
-  os_memmove(G_io_apdu_buffer, t, 64);
+  memcpy(G_io_apdu_buffer, t, 64);
   btchip_context_D.sw = 0x9000;
   *tx = 64;
 }
@@ -145,7 +145,7 @@ void app_dispatch(void) {
 }
 
 void app_main(void) {
-    os_memset(G_io_apdu_buffer, 0, 255); // paranoia
+    memset(G_io_apdu_buffer, 0, 255); // paranoia
 
     // Process the incoming APDUs
 

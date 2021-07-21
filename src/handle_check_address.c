@@ -24,7 +24,7 @@ bool derive_private_key(unsigned char* serialized_path, unsigned char serialized
 
 bool derive_compressed_public_key(
     unsigned char* serialized_path, unsigned char serialized_path_length,
-    unsigned char* public_key, unsigned char public_key_length) {
+    unsigned char* public_key, unsigned char public_key_length __attribute__((unused))) {
     cx_ecfp_private_key_t privKey;
     if (!derive_private_key(serialized_path, serialized_path_length, &privKey))
         return false;
@@ -32,7 +32,7 @@ bool derive_compressed_public_key(
 
     cx_ecfp_generate_pair(BTCHIP_CURVE, &pubKey, &privKey, 1);
     btchip_compress_public_key_value(pubKey.W);
-    os_memcpy(public_key, pubKey.W, 33);
+    memcpy(public_key, pubKey.W, 33);
     return true;
 }
 

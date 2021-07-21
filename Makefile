@@ -274,7 +274,7 @@ endif
 CC       := $(CLANGPATH)clang
 
 #CFLAGS   += -O0
-CFLAGS   += -O3 -Os
+CFLAGS   += -O3 -Os -Wno-format-invalid-specifier
 AS     := $(GCCPATH)arm-none-eabi-gcc
 
 LD       := $(GCCPATH)arm-none-eabi-gcc

@@ -96,7 +96,7 @@ unsigned short btchip_apdu_hash_sign() {
                 CLOSE_TRY;
                 goto catch_discardTransaction;
             }
-            os_memmove(btchip_context_D.transactionSummary.keyPath,
+            memcpy(btchip_context_D.transactionSummary.keyPath,
                 G_io_apdu_buffer + ISO_OFFSET_CDATA,
                 MAX_BIP32_PATH_LENGTH);
             parameters += (4 * G_io_apdu_buffer[ISO_OFFSET_CDATA]) + 1;

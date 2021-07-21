@@ -31,7 +31,7 @@ int btchip_decode_base58(const char *in, size_t length,
   if ((length > MAX_DEC_INPUT_SIZE) || (length < 2)) {
     return -1;
   }
-  os_memmove(tmp, in, length);
+  memcpy(tmp, in, length);
   PRINTF("To decode\n%.*H\n",length,tmp);
   for (i = 0; i < length; i++) {
     if (in[i] >= sizeof(BASE58TABLE)) {
@@ -70,7 +70,7 @@ int btchip_decode_base58(const char *in, size_t length,
     return -1;
   }
 
-  os_memmove(out, buffer + j - zeroCount, length);
+  memcpy(out, buffer + j - zeroCount, length);
   PRINTF("Decoded\n%.*H\n",length,out);
   *outlen = length;
   return 0;
@@ -99,7 +99,7 @@ int btchip_encode_base58(const unsigned char *in, size_t length,
     *outlen = outputSize;
     return -1;
   }
-  os_memset(out, 0, outputSize);
+  memset(out, 0, outputSize);
   stopAt = outputSize - 1;
   for (startAt = zeroCount; startAt < length; startAt++) {
     int carry = in[startAt];
@@ -134,7 +134,7 @@ int btchip_encode_base58(const unsigned char *in, size_t length,
     for (i = *outlen - 1; (int)i >= 0; --i)
         out[i] = BASE58ALPHABET[out[i - distance]];
   }
-  os_memset(out, BASE58ALPHABET[0], zeroCount);
+  memset(out, BASE58ALPHABET[0], zeroCount);
   // PRINTF("Length encoded %d\n", i);
   // PRINTF("Encoded\n%.*H\n",i,out);
   return 0;
