@@ -21,7 +21,7 @@
 
 #include "os.h"
 #include "cx.h"
-#include "stdbool.h"
+#include <stdbool.h>
 
 #define OUTPUT_SCRIPT_REGULAR_PRE_LENGTH 4
 #define OUTPUT_SCRIPT_REGULAR_POST_LENGTH 2
@@ -43,7 +43,7 @@ unsigned char btchip_output_script_is_op_call(unsigned char *buffer,
 void btchip_sleep16(unsigned short delay);
 void btchip_sleep32(unsigned long int delayEach, unsigned long int delayRepeat);
 
-unsigned long int btchip_read_u32(unsigned char *buffer, unsigned char be,
+unsigned long int btchip_read_u32(const uint8_t *buffer, unsigned char be,
                                   unsigned char skipSign);
 
 void btchip_write_u32_be(unsigned char *buffer, unsigned long int value);
@@ -71,8 +71,8 @@ void btchip_private_derive_keypair(unsigned char *bip32Path,
                                    cx_ecfp_private_key_t * private_key,
                                    cx_ecfp_public_key_t* public_key);
 
-unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_path);
-unsigned char enforce_bip44_coin_type(unsigned char *bip32Path, bool for_pubkey);
+bool bip44_derivation_guard(const uint8_t *bip32Path, bool is_change_path);
+bool enforce_bip44_coin_type(const uint8_t *bip32Path, bool for_pubkey);
 unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned char max_out_len);
 
 // void btchip_set_check_internal_structure_integrity(unsigned char
