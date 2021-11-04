@@ -285,7 +285,7 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_LBRY,
     COIN_KIND_RESISTANCE,
     COIN_KIND_RAVENCOIN,
-    COIN_KIND_HYDRA
+    COIN_KIND_HYDRA,
     COIN_KIND_ELECTRIC_CASH
 } btchip_coin_kind_t;
 
