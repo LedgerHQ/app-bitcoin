@@ -1,5 +1,8 @@
 # ledger-app-btc
-Bitcoin wallet application for Ledger Nano S and Nano X
+Bitcoin wallet application for Ledger Nano S and Nano X, up to version 1.6.5.
+
+Versions starting from 2.0.0 are at https://github.com/LedgerHQ/app-bitcoin-new.
+
 Ledger Blue is not maintained anymore, but the app can still be compiled for this target using the branch `blue-final-release`.
 
 This follows the beta specification at https://ledgerhq.github.io/btchip-doc/bitcoin-technical-beta.html - with the regular set of APDUs for standard wallet operations enabled.
