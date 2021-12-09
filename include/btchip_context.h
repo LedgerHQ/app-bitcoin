@@ -25,6 +25,11 @@
 #include "btchip_filesystem_tx.h"
 
 #define MAX_OUTPUT_TO_CHECK 200
+
+#ifdef HAVE_LIQUID
+#define MAX_OP_RETURN_OUTPUT 8290
+#endif
+
 #define MAX_COIN_ID 13
 #define MAX_SHORT_COIN_ID 5 
 
@@ -101,6 +106,7 @@ enum btchip_output_parsing_state_e {
     BTCHIP_OUTPUT_LIQUID_PARSING_COMMITMENTS = 0x06,
     BTCHIP_OUTPUT_LIQUID_PARSING_NONCE = 0x07,
     BTCHIP_OUTPUT_LIQUID_PARSING_PUBLIC_BLINDING_KEY = 0x08,
+    BTCHIP_OUTPUT_LIQUID_PARSING_LARGE_OP_RETURN_OUTPUT = 0x09,
     BTCHIP_OUTPUT_HANDLE_LEGACY = 0xFF
 };
 typedef enum btchip_output_parsing_state_e btchip_output_parsing_state_t;
@@ -286,6 +292,9 @@ struct btchip_context_s {
     unsigned char liquidValue[8];
     unsigned char liquidFee[8];
     unsigned char liquidBlindingKey[33];
+    /* split OP_RETURN output */
+    unsigned short liquidOpReturnScriptSize;
+    unsigned short liquidReadScriptSize;
 #endif    
 };
 typedef struct btchip_context_s btchip_context_t;
