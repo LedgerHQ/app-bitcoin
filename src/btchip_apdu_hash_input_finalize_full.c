@@ -395,10 +395,14 @@ static bool handle_output_state() {
     } break;
 
     case BTCHIP_OUTPUT_PARSING_OUTPUT: {
-        unsigned int scriptSize;
+        unsigned int scriptSize, scriptOffset;
+#ifdef HAVE_LIQUID_HEADLESS
+        unsigned char isOpReturn;
+#endif
         if (btchip_context_D.currentOutputOffset < 9) {
             break;
         }
+        // '8' is amount size.
         if (btchip_context_D.currentOutput[8] < 0xFD) {
             scriptSize = btchip_context_D.currentOutput[8];
             discardSize = 1;
@@ -413,10 +417,23 @@ static bool handle_output_state() {
             // Unrealistically large script
             THROW(EXCEPTION);
         }
+        scriptOffset = discardSize + 8;
         if (btchip_context_D.currentOutputOffset <
             8 + discardSize + scriptSize) {
-            discardSize = 0;
-            break;
+#ifdef HAVE_LIQUID_HEADLESS
+            if (btchip_context_D.usingLiquid && !btchip_context_D.liquidBlindOutput &&
+                    (discardSize + scriptSize + 8) >= sizeof(btchip_context_D.currentOutput) &&
+                    btchip_output_script_is_op_return(btchip_context_D.currentOutput + scriptOffset - 1) != 0) {
+                // do nothing
+            }
+            else {
+#endif
+                discardSize = 0;
+                break;
+
+#ifdef HAVE_LIQUID_HEADLESS
+            }
+#endif
         }
 
         processed = true;
@@ -428,7 +445,7 @@ static bool handle_output_state() {
 #ifdef HAVE_LIQUID_HEADLESS            
             if (!btchip_context_D.liquidBlindOutput) {
 #endif                
-              cx_hash(&btchip_context_D.transactionHashAuthorization.header,
+                cx_hash(&btchip_context_D.transactionHashAuthorization.header,
                         0, btchip_context_D.liquidAssetTag,
                         32, NULL, 0);            
                 PRINTF("Adding to authorization hash\n%.*H\n", 32, btchip_context_D.liquidAssetTag);
@@ -437,6 +454,15 @@ static bool handle_output_state() {
                         8, NULL, 0);            
                 PRINTF("Adding to authorization hash\n%.*H\n", 8, btchip_context_D.liquidValue);            
 #ifdef HAVE_LIQUID_HEADLESS                
+                isOpReturn =
+                    btchip_output_script_is_op_return(btchip_context_D.currentOutput + scriptOffset - 1);
+                if (isOpReturn && discardSize >= sizeof(btchip_context_D.currentOutput)) {
+                    btchip_context_D.outputParsingState = BTCHIP_OUTPUT_LIQUID_PARSING_LARGE_OP_RETURN_OUTPUT;
+                    btchip_context_D.liquidOpReturnScriptSize = scriptSize;
+                    btchip_context_D.liquidReadScriptSize =
+                        btchip_context_D.currentOutputOffset - (discardSize - scriptSize);
+                    discardSize = btchip_context_D.currentOutputOffset;
+                }
             }              
 #endif              
             cx_hash(&btchip_context_D.transactionHashAuthorization.header,
@@ -454,6 +480,12 @@ static bool handle_output_state() {
 
 #endif        
 
+#ifdef HAVE_LIQUID_HEADLESS
+        if (btchip_context_D.outputParsingState == BTCHIP_OUTPUT_LIQUID_PARSING_LARGE_OP_RETURN_OUTPUT) {
+            break;
+        }
+#endif
+
         if (check_output_displayable()) {
             btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
 
@@ -470,6 +502,34 @@ static bool handle_output_state() {
 #endif            
         }
     } break;
+
+#ifdef HAVE_LIQUID_HEADLESS
+    case BTCHIP_OUTPUT_LIQUID_PARSING_LARGE_OP_RETURN_OUTPUT: {
+        if (!btchip_context_D.usingLiquid) {
+            THROW(EXCEPTION);
+        }
+        if (btchip_context_D.currentOutputOffset == 0) {
+            break;  // for processed=false
+        }
+        discardSize = btchip_context_D.currentOutputOffset;
+        if (btchip_context_D.liquidReadScriptSize + discardSize > btchip_context_D.liquidOpReturnScriptSize) {
+            discardSize = btchip_context_D.liquidOpReturnScriptSize - btchip_context_D.liquidReadScriptSize;
+        }
+        processed = true;
+
+        cx_hash(&btchip_context_D.transactionHashAuthorization.header,
+                0, btchip_context_D.currentOutput, discardSize, NULL, 0);
+        PRINTF("Adding to authorization hash\n%.*H\n", discardSize, btchip_context_D.currentOutput);
+
+        btchip_context_D.liquidReadScriptSize += discardSize;
+        if (btchip_context_D.liquidReadScriptSize >= btchip_context_D.liquidOpReturnScriptSize) {
+            btchip_context_D.remainingOutputs--;
+            btchip_context_D.outputParsingState = BTCHIP_OUTPUT_LIQUID_PARSING_COMMITMENTS;
+            btchip_context_D.liquidOpReturnScriptSize = 0;
+            btchip_context_D.liquidReadScriptSize = 0;
+        }
+    } break;
+#endif
 
     default:
         THROW(EXCEPTION);
@@ -614,9 +674,19 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                         (!(btchip_context_D.io_flags & IO_ASYNCH_REPLY)))
                     ;
 
+#ifdef HAVE_LIQUID                
+                if ((btchip_context_D.outputParsingState == BTCHIP_OUTPUT_LIQUID_PARSING_LARGE_OP_RETURN_OUTPUT) &&
+                    (btchip_context_D.liquidOpReturnScriptSize > MAX_OP_RETURN_OUTPUT)) {
+                    PRINTF("OP_RETURN Output is too long to be checked\n");
+                    sw = BTCHIP_SW_INCORRECT_DATA;
+                    goto discardTransaction;
+                }
+#endif
+
                 // Finalize the TX if necessary
 
-                if ((btchip_context_D.remainingOutputs == 0) &&
+                if ((btchip_context_D.outputParsingState != BTCHIP_OUTPUT_LIQUID_PARSING_LARGE_OP_RETURN_OUTPUT) &&
+                    (btchip_context_D.remainingOutputs == 0) &&
                     (!(btchip_context_D.io_flags & IO_ASYNCH_REPLY))) {
                      btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
                     btchip_context_D.outputParsingState =
