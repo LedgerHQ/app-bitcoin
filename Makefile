@@ -27,7 +27,7 @@ APP_LOAD_PARAMS= --curve secp256k1 $(COMMON_LOAD_PARAMS)
 
 APPVERSION_M=1
 APPVERSION_N=4
-APPVERSION_P=8
+APPVERSION_P=9
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 APP_LOAD_FLAGS=--appFlags 0x250 --dep Bitcoin:$(APPVERSION)
 
@@ -349,7 +349,7 @@ dep/%.d: %.c Makefile
 ifeq ($(TARGET_NAME),TARGET_NANOX)
 
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry
+#	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private zcoin gamecredits zclassic xsn nix lbry
 
 else
 
