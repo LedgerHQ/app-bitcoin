@@ -268,8 +268,9 @@ void transaction_parse(unsigned char parseMode) {
                     }
 
                     if (G_coin_config->flags & FLAG_PEERCOIN_SUPPORT) {
-                        if ((G_coin_config->family ==
-                            BTCHIP_FAMILY_PEERCOIN) ||
+                        if (((G_coin_config->family ==
+                            BTCHIP_FAMILY_PEERCOIN) &&
+                            (btchip_context_D.transactionVersion[0] < 3)) ||
                             ((G_coin_config->family == BTCHIP_FAMILY_STEALTH) &&
                             (btchip_context_D.transactionVersion[0] < 2))) {
                             // Timestamp
