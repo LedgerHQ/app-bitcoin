@@ -60,25 +60,25 @@ const unsigned char ZEN_OUTPUT_SCRIPT_POST[] = {
 
 unsigned char btchip_output_script_is_regular(unsigned char *buffer) {
     if (G_coin_config->native_segwit_prefix) {
-        if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
+        if ((memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE)) == 0) ||
-            (os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
+            (memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE)) == 0)) {
             return 1;
         }
     }
     if (G_coin_config->kind == COIN_KIND_HORIZEN) {
-        if ((os_memcmp(buffer, ZEN_OUTPUT_SCRIPT_PRE,
+        if ((memcmp(buffer, ZEN_OUTPUT_SCRIPT_PRE,
                        sizeof(ZEN_OUTPUT_SCRIPT_PRE)) == 0) &&
-            (os_memcmp(buffer + sizeof(ZEN_OUTPUT_SCRIPT_PRE) + 20,
+            (memcmp(buffer + sizeof(ZEN_OUTPUT_SCRIPT_PRE) + 20,
                        ZEN_OUTPUT_SCRIPT_POST,
                        sizeof(ZEN_OUTPUT_SCRIPT_POST)) == 0)) {
             return 1;
         }
     } else {
-        if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_PRE,
+        if ((memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE)) == 0) &&
-            (os_memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE) + 20,
+            (memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE) + 20,
                        TRANSACTION_OUTPUT_SCRIPT_POST,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_POST)) == 0)) {
             return 1;
@@ -89,17 +89,17 @@ unsigned char btchip_output_script_is_regular(unsigned char *buffer) {
 
 unsigned char btchip_output_script_is_p2sh(unsigned char *buffer) {
     if (G_coin_config->kind == COIN_KIND_HORIZEN) {
-        if ((os_memcmp(buffer, ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE,
+        if ((memcmp(buffer, ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE,
                        sizeof(ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE)) == 0) &&
-            (os_memcmp(buffer + sizeof(ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE) + 20,
+            (memcmp(buffer + sizeof(ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE) + 20,
                        ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_POST,
                        sizeof(ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_POST)) == 0)) {
             return 1;
         }
     } else {
-        if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE,
+        if ((memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE)) == 0) &&
-            (os_memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE) + 20,
+            (memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE) + 20,
                        TRANSACTION_OUTPUT_SCRIPT_P2SH_POST,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_POST)) == 0)) {
             return 1;
@@ -110,9 +110,9 @@ unsigned char btchip_output_script_is_p2sh(unsigned char *buffer) {
 
 unsigned char btchip_output_script_is_native_witness(unsigned char *buffer) {
     if (G_coin_config->native_segwit_prefix) {
-        if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
+        if ((memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE)) == 0) ||
-            (os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
+            (memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE)) == 0)) {
             return 1;
         }
@@ -171,7 +171,7 @@ unsigned char btchip_secure_memcmp(const void *buf1, const void *buf2,
     return error;
 }
 
-unsigned long int btchip_read_u32(unsigned char *buffer, unsigned char be,
+unsigned long int btchip_read_u32(const uint8_t *buffer, unsigned char be,
                                   unsigned char skipSign) {
     unsigned char i;
     unsigned long int result = 0;
@@ -222,7 +222,7 @@ void btchip_compute_checksum(unsigned char* in, unsigned short inlen, unsigned c
     cx_hash_sha256(checksumBuffer, 32, checksumBuffer, 32);
 
     PRINTF("Checksum\n%.*H\n",4,checksumBuffer);
-    os_memmove(output, checksumBuffer, 4);
+    memcpy(output, checksumBuffer, 4);
 }
 
 unsigned short btchip_public_key_to_encoded_base58(
@@ -245,7 +245,7 @@ unsigned short btchip_public_key_to_encoded_base58(
             tmpBuffer[0] = version;
         }
     } else {
-        os_memmove(tmpBuffer, in, 20 + versionSize);
+        memcpy(tmpBuffer, in, 20 + versionSize);
     }
 
     btchip_compute_checksum(tmpBuffer, 20 + versionSize, tmpBuffer + 20 + versionSize);
@@ -283,7 +283,7 @@ unsigned short btchip_decode_base58_address(unsigned char *in,
     cx_sha256_init(&hash);
     cx_hash(&hash.header, CX_LAST, hashBuffer, 32, hashBuffer, 32);
 
-    if (os_memcmp(out + outlen - 4, hashBuffer, 4)) {
+    if (memcmp(out + outlen - 4, hashBuffer, 4)) {
         PRINTF("Hash checksum mismatch\n%.*H\n",sizeof(hashBuffer),hashBuffer);
         THROW(INVALID_CHECKSUM);
     }
@@ -328,14 +328,14 @@ void btchip_private_derive_keypair(unsigned char *bip32Path,
 
     io_seproxyhal_io_heartbeat();
 
-    os_memset(u.privateComponent, 0, sizeof(u.privateComponent));
+    explicit_bzero(u.privateComponent, sizeof(u.privateComponent));
 }
 
 /*
 Checks if the values of a derivation path are within "normal" (arbitrary) ranges:
 Account < 100, change == 1 or 0, address index < 50000
-Returns 1 if the path is unusual, or not compliant with BIP44*/
-unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_path) {
+Returns true if the path is unusual, or not compliant with BIP44*/
+bool bip44_derivation_guard(const uint8_t *bip32Path, bool is_change_path) {
 
     unsigned char i, path_len;
     unsigned int bip32PathInt[MAX_BIP32_PATH];
@@ -356,36 +356,36 @@ unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_pa
        ((bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 44 &&
        (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 49 &&
        (bip32PathInt[BIP44_PURPOSE_OFFSET]^0x80000000) != 84)) {
-        return 1;
+        return true;
     }
 
     // If the coin type doesn't match, return a warning
     if ((G_coin_config->bip44_coin_type != 0) &&
         (((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) != G_coin_config->bip44_coin_type) &&
           ((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) != G_coin_config->bip44_coin_type2))) {
-        return 1;
+        return true;
     }
 
     // If the account or address index is very high or if the change isn't 1, return a warning
     if((bip32PathInt[BIP44_ACCOUNT_OFFSET]^0x80000000) > MAX_BIP44_ACCOUNT_RECOMMENDED ||
        bip32PathInt[BIP44_CHANGE_OFFSET] != is_change_path?1:0 ||
        bip32PathInt[BIP44_ADDRESS_INDEX_OFFSET] > MAX_BIP44_ADDRESS_INDEX_RECOMMENDED) {
-        return 1;
+        return true;
     }
 
-    return 0;
+    return false;
 }
 
 /*
 Only enforce the structure or coin type for consumed UTXOs or a public address
-Returns 0 if the path is non compliant, or 1 if compliant
+Returns false if the path is non compliant, or true if compliant
 */
-unsigned char enforce_bip44_coin_type(unsigned char *bip32Path, bool for_pubkey) {
+bool enforce_bip44_coin_type(const uint8_t *bip32Path, bool for_pubkey) {
     unsigned char i, path_len;
     unsigned int bip32PathInt[MAX_BIP32_PATH];
     // No enforcement required
     if (G_coin_config->bip44_coin_type == 0) {
-        return 1;
+        return true;
     }
     // Path is too short - always require a user validation if signing
     if (bip32Path[0] < 2) {
@@ -413,10 +413,10 @@ unsigned char enforce_bip44_coin_type(unsigned char *bip32Path, bool for_pubkey)
     if  (((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) == G_coin_config->bip44_coin_type) ||
         ((bip32PathInt[BIP44_COIN_TYPE_OFFSET]^0x80000000) == G_coin_config->bip44_coin_type2)) {
         // Valid BIP 44 path
-        return 1;
+        return true;
     }
     // Everything else needs a user validation
-    return 0;
+    return false;
 }
 
 // Print a BIP32 path as an ascii string to display on the device screen
@@ -471,11 +471,11 @@ void btchip_transaction_add_output(unsigned char *hash160Address,
         btchip_swap_bytes(btchip_context_D.tmp, amount, 8);
         btchip_context_D.tmp += 8;
     }
-    os_memmove(btchip_context_D.tmp, (void *)pre, sizePre);
+    memcpy(btchip_context_D.tmp, pre, sizePre);
     btchip_context_D.tmp += sizePre;
-    os_memmove(btchip_context_D.tmp, hash160Address, 20);
+    memcpy(btchip_context_D.tmp, hash160Address, 20);
     btchip_context_D.tmp += 20;
-    os_memmove(btchip_context_D.tmp, (void *)post, sizePost);
+    memcpy(btchip_context_D.tmp, post, sizePost);
     btchip_context_D.tmp += sizePost;
 }
 
