@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 1.6.6 - 2022-05-11
+
+Technical release for the deployment of the legacy app.
+
 ## [1.6.2](https://github.com/ledgerhq/app-bitcoin/compare/1.6.1...1.6.2) - 2021-06-24
 
 ### Fixed
