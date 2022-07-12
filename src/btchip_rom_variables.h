@@ -34,6 +34,16 @@ extern unsigned char const OVERWINTER_PARAM_OUTPUTS[16];
 extern unsigned char const OVERWINTER_PARAM_SIGHASH[16];
 extern unsigned char const OVERWINTER_NO_JOINSPLITS[32];
 
+extern unsigned char const NU5_GROUP_ID[4];
+extern unsigned char const NU5_PARAM_TXID[16];
+extern unsigned char const NU5_PARAM_HEADERS[16];
+extern unsigned char const NU5_PARAM_TRANSPA[16];
+extern unsigned char const NU5_PARAM_PREVOUT[16];
+extern unsigned char const NU5_PARAM_SEQUENC[16];
+extern unsigned char const NU5_PARAM_OUTPUTS[16];
+extern unsigned char const NU5_PARAM_SAPLING[16];
+extern unsigned char const NU5_PARAM_ORCHARD[16];
+
 #define HDKEY_VERSION_LENGTH 4
 
 extern unsigned char const TWOPOWER[8];
