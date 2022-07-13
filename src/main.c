@@ -1290,66 +1290,37 @@ void library_main(struct libargs_s *args) {
 }
 
 __attribute__((section(".boot"))) int main(int arg0) {
-#ifdef USE_LIB_BITCOIN
-    BEGIN_TRY {
-        TRY {
-            unsigned int libcall_params[5];
-            btchip_altcoin_config_t coin_config;
-            init_coin_config(&coin_config);
-            PRINTF("Hello from litecoin\n");
-            check_api_level(CX_COMPAT_APILEVEL);
-            // delegate to bitcoin app/lib
-            libcall_params[0] = "Bitcoin";
-            libcall_params[1] = 0x100;
-            libcall_params[2] = RUN_APPLICATION;
-            libcall_params[3] = &coin_config;
-            libcall_params[4] = 0;
-            if (arg0) {
-                // call as a library
-                libcall_params[2] = ((unsigned int *)arg0)[1];
-                libcall_params[4] = ((unsigned int *)arg0)[3]; // library arguments
-                os_lib_call(&libcall_params);
-                ((unsigned int *)arg0)[0] = libcall_params[1];
-                os_lib_end();
-            }
-            else {
-                // launch coin application
-                os_lib_call(&libcall_params);
-            }
-        }
-        FINALLY {}
-    }
-    END_TRY;
-    // no return
-#else
+
     // exit critical section
     __asm volatile("cpsie i");
 
     // ensure exception will work as planned
     os_boot();
 
+
+    btchip_altcoin_config_t coin_config;
+    init_coin_config(&coin_config);
+
     if (!arg0) {
-        // Bitcoin application launched from dashboard
-        coin_main(NULL);
-        return 0;
+        coin_main(&coin_config);
     }
-    struct libargs_s *args = (struct libargs_s *) arg0;
-    if (args->id != 0x100) {
-        app_exit();
-        return 0;
-    }
-    switch (args->command) {
-        case RUN_APPLICATION:
-            // coin application launched from dashboard
-            if (args->coin_config == NULL)
-                app_exit();
-            else
-                coin_main(args->coin_config);
-            break;
-        default:
-            // called as bitcoin or altcoin library
+    else {
+        struct libargs_s *args = (struct libargs_s *) arg0;
+
+        if (args->id != 0x100) {
+            app_exit();
+            return 0;
+        }
+
+        // called as bitcoin or altcoin library
+        args->coin_config = &coin_config;
+
+        if (args->command == RUN_APPLICATION) {
+            coin_main(args->coin_config);
+        } else {
             library_main(args);
+        }
     }
-#endif // USE_LIB_BITCOIN
+
     return 0;
 }
