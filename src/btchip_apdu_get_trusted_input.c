@@ -49,6 +49,7 @@ unsigned short btchip_apdu_get_trusted_input() {
         btchip_context_D.transactionHashOption = TRANSACTION_HASH_FULL;
         btchip_context_D.usingSegwit = 0;
         btchip_context_D.usingOverwinter = 0;
+        btchip_context_D.NU5Transaction = 0;
     } else if (G_io_apdu_buffer[ISO_OFFSET_P1] != GET_TRUSTED_INPUT_P1_NEXT) {
         return BTCHIP_SW_INCORRECT_P1_P2;
     }
@@ -80,7 +81,12 @@ unsigned short btchip_apdu_get_trusted_input() {
         cx_rng(G_io_apdu_buffer, 8);
         G_io_apdu_buffer[0] = MAGIC_TRUSTED_INPUT;
         G_io_apdu_buffer[1] = 0x00;
-        cx_hash_sha256(G_io_apdu_buffer + TRUSTED_INPUT_SIZE, 32, G_io_apdu_buffer + 4, 32);
+
+        if (!btchip_context_D.NU5Transaction) {
+            cx_hash_sha256(G_io_apdu_buffer + TRUSTED_INPUT_SIZE, 32, G_io_apdu_buffer + 4, 32);
+        } else {
+            os_memmove(G_io_apdu_buffer + 4, G_io_apdu_buffer + TRUSTED_INPUT_SIZE, 32);
+        }
 
         btchip_write_u32_le(G_io_apdu_buffer + 4 + 32,
                             btchip_context_D.transactionTargetInput);

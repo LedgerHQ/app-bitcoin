@@ -233,6 +233,7 @@ struct btchip_context_s {
     /* Overwinter */
     unsigned char usingOverwinter;
     unsigned char overwinterSignReady;
+    unsigned char NU5Transaction;
     unsigned char nVersionGroupId[4];
     unsigned char nExpiryHeight[4];
     unsigned char nLockTime[4];
