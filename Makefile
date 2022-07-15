@@ -25,15 +25,16 @@ APP_PATH = ""
 DEFINES_LIB = USE_LIB_BITCOIN
 APP_LOAD_PARAMS= --curve secp256k1 $(COMMON_LOAD_PARAMS)
 
-APPVERSION_M=1
-APPVERSION_N=6
-APPVERSION_P=6
-APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
+APPVERSION_M=2
+APPVERSION_N=1
+APPVERSION_P=0
+APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)-beta
+
 APP_LOAD_FLAGS=--appFlags 0xa50 --dep Bitcoin:$(APPVERSION)
 
 # simplify for tests
 ifndef COIN
-COIN=bitcoin
+COIN=zcash
 endif
 
 ifeq ($(COIN),bitcoin_testnet)
@@ -324,15 +325,5 @@ include $(BOLOS_SDK)/Makefile.rules
 dep/%.d: %.c Makefile
 
 
-# Temporary restriction until we have a Resistance Nano X icon
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private firo gamecredits zclassic xsn nix lbry ravencoin resistance hydra hydra_testnet xrhodium
-
-else
-
-listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private firo gamecredits zclassic xsn nix lbry ravencoin hydra hydra_testnet xrhodium
-
-endif
+	@echo VARIANTS COIN zcash
