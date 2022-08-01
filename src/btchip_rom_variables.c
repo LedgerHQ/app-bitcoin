@@ -62,6 +62,9 @@ unsigned char const NU5_PARAM_SEQUENC[16] = { 'Z', 'T', 'x', 'I', 'd', 'S', 'e',
 unsigned char const NU5_PARAM_OUTPUTS[16] = { 'Z', 'T', 'x', 'I', 'd', 'O', 'u', 't', 'p', 'u', 't', 's', 'H', 'a', 's', 'h' };
 unsigned char const NU5_PARAM_SAPLING[16] = { 'Z', 'T', 'x', 'I', 'd', 'S', 'a', 'p', 'l', 'i', 'n', 'g', 'H', 'a', 's', 'h' };
 unsigned char const NU5_PARAM_ORCHARD[16] = { 'Z', 'T', 'x', 'I', 'd', 'O', 'r', 'c', 'h', 'a', 'r', 'd', 'H', 'a', 's', 'h' };
+unsigned char const NU5_PARAM_AMOUNTS[16] = { 'Z', 'T', 'x', 'T', 'r', 'A', 'm', 'o', 'u', 'n', 't', 's', 'H', 'a', 's', 'h' };
+unsigned char const NU5_PARAM_SCRIPTS[16] = { 'Z', 'T', 'x', 'T', 'r', 'S', 'c', 'r', 'i', 'p', 't', 's', 'H', 'a', 's', 'h' };
+unsigned char const NU5_PARAM_TX_IN[16] = { 'Z', 'c', 'a', 's', 'h', '_', '_', '_', 'T', 'x', 'I', 'n', 'H', 'a', 's', 'h' };
 
 
 unsigned char const DISPATCHER_CLA[] = {

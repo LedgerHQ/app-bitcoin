@@ -43,6 +43,9 @@ extern unsigned char const NU5_PARAM_SEQUENC[16];
 extern unsigned char const NU5_PARAM_OUTPUTS[16];
 extern unsigned char const NU5_PARAM_SAPLING[16];
 extern unsigned char const NU5_PARAM_ORCHARD[16];
+extern unsigned char const NU5_PARAM_AMOUNTS[16];
+extern unsigned char const NU5_PARAM_SCRIPTS[16];
+extern unsigned char const NU5_PARAM_TX_IN[16];
 
 #define HDKEY_VERSION_LENGTH 4
 
