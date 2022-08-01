@@ -33,9 +33,8 @@ def device(request, hid):
     speculos_executable = os.environ.get("SPECULOS", "speculos.py")
 
     base_args = [
-        speculos_executable, "./bitcoin-testnet-bin/app.elf",
-        "-l", "Bitcoin:./bitcoin-bin/app.elf",
-        "--sdk", "2.0",
+        speculos_executable, "./zcash-bin/app.elf",
+        "--sdk", "2.1",
         "--display", "headless"
     ]
 
