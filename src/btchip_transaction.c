@@ -199,26 +199,46 @@ void transaction_parse(unsigned char parseMode) {
                             PRINTF("SEGWIT Version\n%.*H\n",sizeof(btchip_context_D.transactionVersion),btchip_context_D.transactionVersion);
                             PRINTF("SEGWIT HashedPrevouts\n%.*H\n",sizeof(btchip_context_D.segwit.cache.hashedPrevouts),btchip_context_D.segwit.cache.hashedPrevouts);
                             PRINTF("SEGWIT HashedSequence\n%.*H\n",sizeof(btchip_context_D.segwit.cache.hashedSequence),btchip_context_D.segwit.cache.hashedSequence);
-                            if (btchip_context_D.usingOverwinter) {
-                                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.transactionVersion, sizeof(btchip_context_D.transactionVersion), NULL, 0);
-                                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.nVersionGroupId, sizeof(btchip_context_D.nVersionGroupId), NULL, 0);
-                                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.segwit.cache.hashedPrevouts, sizeof(btchip_context_D.segwit.cache.hashedPrevouts), NULL, 0);
-                                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.segwit.cache.hashedSequence, sizeof(btchip_context_D.segwit.cache.hashedSequence), NULL, 0);
-                                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.segwit.cache.hashedOutputs, sizeof(btchip_context_D.segwit.cache.hashedOutputs), NULL, 0);
-                                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, OVERWINTER_NO_JOINSPLITS, 32, NULL, 0);
-                                if (btchip_context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING) {
-                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, OVERWINTER_NO_JOINSPLITS, 32, NULL, 0); // sapling hashShieldedSpends
-                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, OVERWINTER_NO_JOINSPLITS, 32, NULL, 0); // sapling hashShieldedOutputs
+                            if (btchip_context_D.usingOverwinter) 
+                                if (btchip_context_D.NU5Transaction) {
+                                    uint8_t s1[32];
+                                    // Compute s1
+                                    cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, (uint8_t *)NU5_PARAM_HEADERS, 16);
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.transactionVersion, sizeof(btchip_context_D.transactionVersion), NULL, 0);
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.nVersionGroupId, sizeof(btchip_context_D.nVersionGroupId), NULL, 0);
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, (uint8_t *)NU5_GROUP_ID, 4, NULL, 0);
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.nLockTime, sizeof(btchip_context_D.nLockTime), NULL, 0);
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.nExpiryHeight, sizeof(btchip_context_D.nExpiryHeight), NULL, 0);
+
+                                    // Save s1
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b, CX_BLAKE2B, NULL, 0, s1, 32);
+                                    os_memmove(btchip_context_D.s1, s1, 32);
+                                    // Save headers hash in s2b
+                                    os_memmove(btchip_context_D.s2b, btchip_context_D.segwit.cache.hashedPrevouts, 32);
+                                    // Save seq hash in s2e
+                                    os_memmove(btchip_context_D.s2e, btchip_context_D.segwit.cache.hashedSequence, 32);
+                                    // Save outputs hash in s2f
+                                    os_memmove(btchip_context_D.s2f, btchip_context_D.segwit.cache.hashedOutputs, 32);
+                                } else {
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.transactionVersion, sizeof(btchip_context_D.transactionVersion), NULL, 0);
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.nVersionGroupId, sizeof(btchip_context_D.nVersionGroupId), NULL, 0);
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.segwit.cache.hashedPrevouts, sizeof(btchip_context_D.segwit.cache.hashedPrevouts), NULL, 0);
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.segwit.cache.hashedSequence, sizeof(btchip_context_D.segwit.cache.hashedSequence), NULL, 0);
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.segwit.cache.hashedOutputs, sizeof(btchip_context_D.segwit.cache.hashedOutputs), NULL, 0);
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, OVERWINTER_NO_JOINSPLITS, 32, NULL, 0);
+                                    if (btchip_context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING) {
+                                        cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, OVERWINTER_NO_JOINSPLITS, 32, NULL, 0); // sapling hashShieldedSpends
+                                        cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, OVERWINTER_NO_JOINSPLITS, 32, NULL, 0); // sapling hashShieldedOutputs
+                                    }
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.nLockTime, sizeof(btchip_context_D.nLockTime), NULL, 0);
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.nExpiryHeight, sizeof(btchip_context_D.nExpiryHeight), NULL, 0);
+                                    if (btchip_context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING) {
+                                        unsigned char valueBalance[8];
+                                        os_memset(valueBalance, 0, sizeof(valueBalance));
+                                        cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, valueBalance, sizeof(valueBalance), NULL, 0); // sapling valueBalance
+                                    }
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.sigHashType, sizeof(btchip_context_D.sigHashType), NULL, 0);
                                 }
-                                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.nLockTime, sizeof(btchip_context_D.nLockTime), NULL, 0);
-                                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.nExpiryHeight, sizeof(btchip_context_D.nExpiryHeight), NULL, 0);
-                                if (btchip_context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING) {
-                                    unsigned char valueBalance[8];
-                                    os_memset(valueBalance, 0, sizeof(valueBalance));
-                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, valueBalance, sizeof(valueBalance), NULL, 0); // sapling valueBalance
-                                }
-                                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.sigHashType, sizeof(btchip_context_D.sigHashType), NULL, 0);
-                            }
                             else {
                                 PRINTF("--- ADD TO HASH FULL:\n%.*H\n", sizeof(btchip_context_D.transactionVersion), btchip_context_D.transactionVersion);
                                 cx_hash(
@@ -459,6 +479,11 @@ void transaction_parse(unsigned char parseMode) {
                                 PRINTF("New amount\n%.*H\n",8,btchip_context_D.transactionContext.transactionAmount);
                                 transaction_offset_increase(8);
                             } else {
+                                // Add txid
+                                if (btchip_context_D.usingOverwinter && btchip_context_D.NU5Transaction) {
+                                    cx_blake2b_init2(&btchip_context_D.segwit.hash.hashPrevouts.blake2b, 256, NULL, 0, (uint8_t *)NU5_PARAM_TX_IN, 16);
+                                    cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.transactionBufferPointer, 36, NULL, 0);
+                                }
                                 btchip_context_D.transactionHashOption =
                                     TRANSACTION_HASH_FULL;
                                 transaction_offset_increase(36);
@@ -471,6 +496,19 @@ void transaction_parse(unsigned char parseMode) {
                                 transaction_offset_increase(8);
                                 btchip_context_D.transactionHashOption =
                                     TRANSACTION_HASH_FULL;
+                                // Append the saved value
+                                if (btchip_context_D.usingOverwinter && btchip_context_D.NU5Transaction) {
+                                    cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.inputValue, 8, NULL, 0);
+
+                                    // Compute s2c
+                                    cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, (uint8_t *)NU5_PARAM_AMOUNTS, 16);
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.inputValue, 8, NULL, 0); 
+
+                                    // Store s2c
+                                    uint8_t s2c[32];
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b, CX_BLAKE2B, NULL, 0, s2c, 32);
+                                    os_memmove(btchip_context_D.s2c, s2c, 32);
+                                }
                             }
                         }
                         // Handle non-segwit inputs (i.e. InputHashStart 1st APDU's P2==00 && data[0]==0x00)
@@ -608,6 +646,17 @@ void transaction_parse(unsigned char parseMode) {
                             PRINTF("Disabling P2SH consumption\n");
                             btchip_context_D.transactionContext.consumeP2SH = 0;
                         }
+                        if (btchip_context_D.usingSegwit && btchip_context_D.segwitParsedOnce && btchip_context_D.NU5Transaction) {
+                            cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.transactionBufferPointer, 1, NULL, 0);
+                           
+                            // Compute s2d
+                            cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.transactionBufferPointer, 1, NULL, 0);
+
+                            // Store s2d
+                            uint8_t s2d[32];
+                            cx_hash(&btchip_context_D.transactionHashFull.blake2b, CX_BLAKE2B, NULL, 0, s2d, 32);
+                            os_memmove(btchip_context_D.s2d, s2d, 32);
+                        }
                         transaction_offset_increase(1);
                         btchip_context_D.transactionContext.scriptRemaining--;
                     }
@@ -625,7 +674,9 @@ void transaction_parse(unsigned char parseMode) {
                                     // Append the saved value
                                     PRINTF("SEGWIT Add value\n%.*H\n",8,btchip_context_D.inputValue);
                                     if (btchip_context_D.usingOverwinter) {
-                                        cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.inputValue, 8, NULL, 0);
+                                        if (!btchip_context_D.NU5Transaction) {
+                                            cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.inputValue, 8, NULL, 0);
+                                        }
                                     }
                                     else {
                                         PRINTF("--- ADD TO HASH FULL:\n%.*H\n", sizeof(btchip_context_D.inputValue), btchip_context_D.inputValue);
@@ -647,7 +698,13 @@ void transaction_parse(unsigned char parseMode) {
                         if (btchip_context_D.usingSegwit &&
                             !btchip_context_D.segwitParsedOnce) {
                             if (btchip_context_D.usingOverwinter) {
-                                cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.transactionBufferPointer, 4, NULL, 0);
+                                if (btchip_context_D.NU5Transaction) {
+                                    cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, (uint8_t *)NU5_PARAM_SEQUENC, 16);
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.transactionBufferPointer, 4, NULL, 0);
+                                } else {
+                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.transactionBufferPointer, 4, NULL, 0);
+                                }
+
                             }
                             else {
                                 PRINTF("--- ADD TO HASH FULL:\n%.*H\n", 4, btchip_context_D.transactionBufferPointer);
@@ -658,7 +715,66 @@ void transaction_parse(unsigned char parseMode) {
                                     4, NULL, 0);
                             }
                         }
-                        transaction_offset_increase(4);
+                        if (btchip_context_D.usingSegwit && btchip_context_D.segwitParsedOnce && btchip_context_D.NU5Transaction) {
+                            cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.transactionBufferPointer, 4, NULL, 0);
+                            uint8_t hashS2g[32];
+                            cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b, CX_BLAKE2B, NULL, 0, hashS2g, 32);
+
+                            // Compute s2
+                            cx_blake2b_init2(&btchip_context_D.segwit.hash.hashPrevouts.blake2b, 256, NULL, 0, (uint8_t *)NU5_PARAM_TRANSPA, 16);
+
+                            // Add s2a
+                            cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.sigHashType, 1, NULL, 0);
+
+                            // Add s2b
+                            cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.s2b, sizeof(btchip_context_D.s2b), NULL, 0);
+                            // Add s2c
+                            cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.s2c, sizeof(btchip_context_D.s2c), NULL, 0);
+                            // Add s2d
+                            cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.s2d, sizeof(btchip_context_D.s2d), NULL, 0);
+                            // Add s2e
+                            cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.s2e, sizeof(btchip_context_D.s2e), NULL, 0);
+                            // Add s2f
+                            cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.s2f, sizeof(btchip_context_D.s2f), NULL, 0);
+                            // Add s2g
+                            cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, hashS2g, sizeof(hashS2g), NULL, 0);
+
+                            uint8_t hashS2[32];
+                            cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b, CX_BLAKE2B, NULL, 0, hashS2, 32);
+
+                            // Init S
+                            uint8_t parameters[16];
+                            os_memmove(parameters, NU5_PARAM_TXID, 12);
+                            os_memmove(parameters + 12, NU5_GROUP_ID, 4);
+                            cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, parameters, 16);
+
+                            // Add s1
+                            cx_hash(&btchip_context_D.transactionHashFull.blake2b, 0, btchip_context_D.s1, 32,  NULL, 0);
+                            // Add s2
+                            cx_hash(&btchip_context_D.transactionHashFull.blake2b, 0, hashS2, 32,  NULL, 0);
+
+                            // Compute s3
+                            cx_blake2b_init2(&btchip_context_D.segwit.hash.hashPrevouts.blake2b, 256, NULL, 0, (uint8_t *)NU5_PARAM_SAPLING, 16);
+                            // Store s3
+                            cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b, CX_BLAKE2B, NULL, 0, hashS2, 32);
+                            // Add s3
+                            cx_hash(&btchip_context_D.transactionHashFull.blake2b, 0, hashS2, 32,  NULL, 0);
+
+                            // Compute s4
+                            cx_blake2b_init2(&btchip_context_D.segwit.hash.hashPrevouts.blake2b, 256, NULL, 0, (uint8_t *)NU5_PARAM_ORCHARD, 16);
+                            // Store s4
+                            cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b, CX_BLAKE2B, NULL, 0, hashS2, 32);
+                            // Add s4
+                            cx_hash(&btchip_context_D.transactionHashFull.blake2b, 0, hashS2, 32,  NULL, 0);
+
+                            // We dont want to update transactionHashFull
+                            btchip_context_D.transactionBufferPointer += 4;
+                            btchip_context_D.transactionDataRemaining -= 4;
+                        } else {
+                            transaction_offset_increase(4);
+                        }
+
+
                         // Move to next input
                         btchip_context_D.transactionContext
                             .transactionRemainingInputsOutputs--;
@@ -681,7 +797,22 @@ void transaction_parse(unsigned char parseMode) {
                     if (dataAvailable == 0) {
                         goto ok;
                     }
-                    transaction_offset_increase(dataAvailable);
+                    if (btchip_context_D.usingSegwit && btchip_context_D.segwitParsedOnce && btchip_context_D.NU5Transaction) {
+                        uint8_t dataSize = dataAvailable + 1;
+                        cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, &dataSize, 1, NULL, 0);
+                        cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.transactionBufferPointer, dataAvailable, NULL, 0);
+
+                        // Compute s2d
+                        cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, (uint8_t *)NU5_PARAM_SCRIPTS, 16);
+                        cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, &dataSize, 1, NULL, 0);
+                        cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.transactionBufferPointer, dataAvailable, NULL, 0);
+
+                        // We dont want to update transactionHashFull
+                        btchip_context_D.transactionBufferPointer += dataAvailable;
+                        btchip_context_D.transactionDataRemaining -= dataAvailable;
+                    } else {
+                        transaction_offset_increase(dataAvailable);
+                    }
                     btchip_context_D.transactionContext.scriptRemaining -=
                         dataAvailable;
                     break;

@@ -239,6 +239,12 @@ struct btchip_context_s {
     unsigned char nLockTime[4];
     unsigned char sigHashType[4];
 
+    unsigned char s1[32];
+    unsigned char s2b[32];
+    unsigned char s2c[32];
+    unsigned char s2d[32];
+    unsigned char s2e[32];
+    unsigned char s2f[32];
     /*Is swap mode*/
     unsigned char called_from_swap;
 };

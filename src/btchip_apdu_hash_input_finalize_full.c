@@ -333,6 +333,9 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     goto discardTransaction;
                 }
                 if (btchip_context_D.usingOverwinter) {
+                    if (btchip_context_D.NU5Transaction) {
+                        cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, (uint8_t *)NU5_PARAM_OUTPUTS, 16);
+                    }
                     cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, G_io_apdu_buffer + ISO_OFFSET_CDATA + hashOffset, apduLength - hashOffset, NULL, 0);
                 }
                 else {
