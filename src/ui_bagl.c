@@ -25,11 +25,6 @@
 
 bagl_element_t tmp_element;
 
-void ui_idle(void) {
-  if (G_ux.stack_count == 0) {
-    ux_stack_push();
-  }
-}
 void settings_pubkey_export_change(unsigned int enabled) {
   nvm_write((void *)&N_btchip.pubKeyRequestRestriction, &enabled, 1);
   ui_idle_flow();
@@ -187,8 +182,6 @@ UX_STEP_CB(ux_idle_flow_4_step, pb, os_sched_exit(-1),
 UX_FLOW(ux_idle_flow, &ux_idle_flow_1_step, &ux_idle_flow_2_step,
         &ux_idle_flow_3_step, &ux_idle_flow_4_step, FLOW_LOOP);
 
-void ui_idle_flow(void) { ux_flow_init(0, ux_idle_flow, NULL); }
-
 //////////////////////////////////////////////////////////////////////
 UX_STEP_NOCB(ux_sign_flow_1_step, pnn,
              {
@@ -218,46 +211,6 @@ UX_STEP_CB(ux_sign_flow_4_step, pbb,
 
 UX_FLOW(ux_sign_flow, &ux_sign_flow_1_step, &ux_sign_flow_2_step,
         &ux_sign_flow_3_step, &ux_sign_flow_4_step);
-
-//////////////////////////////////////////////////////////////////////
-
-UX_STEP_NOCB(ux_confirm_full_flow_1_step, pnn,
-             {
-                 &C_icon_eye,
-                 "Review",
-                 "transaction",
-             });
-UX_STEP_NOCB(ux_confirm_full_flow_2_step, bnnn_paging,
-             {.title = "Amount", .text = vars.tmp.fullAmount});
-UX_STEP_NOCB(ux_confirm_full_flow_3_step, bnnn_paging,
-             {
-                 .title = "Address",
-                 .text = vars.tmp.fullAddress,
-             });
-UX_STEP_NOCB(ux_confirm_full_flow_4_step, bnnn_paging,
-             {
-                 .title = "Fees",
-                 .text = vars.tmp.feesAmount,
-             });
-UX_STEP_CB(ux_confirm_full_flow_5_step, pbb,
-           io_seproxyhal_touch_verify_ok(NULL),
-           {
-               &C_icon_validate_14,
-               "Accept",
-               "and send",
-           });
-UX_STEP_CB(ux_confirm_full_flow_6_step, pb,
-           io_seproxyhal_touch_verify_cancel(NULL),
-           {
-               &C_icon_crossmark,
-               "Reject",
-           });
-// confirm_full: confirm transaction / Amount: fullAmount / Address: fullAddress
-// / Fees: feesAmount
-UX_FLOW(ux_confirm_full_flow, &ux_confirm_full_flow_1_step,
-        &ux_confirm_full_flow_2_step, &ux_confirm_full_flow_3_step,
-        &ux_confirm_full_flow_4_step, &ux_confirm_full_flow_5_step,
-        &ux_confirm_full_flow_6_step);
 
 //////////////////////////////////////////////////////////////////////
 

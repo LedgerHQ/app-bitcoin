@@ -74,12 +74,16 @@ unsigned char io_event(unsigned char channel) {
 
     // can't have more than one tag in the reply, not supported yet.
     switch (G_io_seproxyhal_spi_buffer[0]) {
+#ifdef HAVE_NBGL
     case SEPROXYHAL_TAG_FINGER_EVENT:
         UX_FINGER_EVENT(G_io_seproxyhal_spi_buffer);
         break;
+#endif  // HAVE_NBGL
 
     case SEPROXYHAL_TAG_BUTTON_PUSH_EVENT:
+#ifdef HAVE_BAGL
         UX_BUTTON_PUSH_EVENT(G_io_seproxyhal_spi_buffer);
+#endif // HAVE_BAGL
         break;
 
     case SEPROXYHAL_TAG_STATUS_EVENT:
@@ -94,7 +98,12 @@ unsigned char io_event(unsigned char channel) {
         break;
 
     case SEPROXYHAL_TAG_DISPLAY_PROCESSED_EVENT:
+#ifdef HAVE_BAGL
         UX_DISPLAYED_EVENT({});
+#endif // HAVE_BAGL
+#ifdef HAVE_NBGL
+        UX_DEFAULT_EVENT();
+#endif // HAVE_NBGL
         break;
 
     case SEPROXYHAL_TAG_TICKER_EVENT:
@@ -529,7 +538,9 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
     }
 
     for (;;) {
+        // Initialize the UX system
         UX_INIT();
+
         BEGIN_TRY {
             TRY {
                 io_seproxyhal_init();
@@ -544,11 +555,11 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
                 USB_power(0);
                 USB_power(1);
 
-                ui_idle();
+                ui_idle_flow();
 
 #ifdef HAVE_BLE
                 BLE_power(0, NULL);
-                BLE_power(1, "Nano X");
+                BLE_power(1, NULL);
 #endif // HAVE_BLE
 
                 app_main();
