@@ -39,6 +39,7 @@ unsigned char btchip_output_script_is_op_create(unsigned char *buffer,
                                                 size_t size);
 unsigned char btchip_output_script_is_op_call(unsigned char *buffer,
                                                 size_t size);
+unsigned char btchip_output_script_is_empty(unsigned char *buffer);
 
 void btchip_sleep16(unsigned short delay);
 void btchip_sleep32(unsigned long int delayEach, unsigned long int delayRepeat);

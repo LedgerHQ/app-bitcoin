@@ -149,6 +149,10 @@ unsigned char btchip_output_script_is_op_call(unsigned char *buffer,
     return output_script_is_op_create_or_call(buffer, size, 0xC2);
 }
 
+unsigned char btchip_output_script_is_empty(unsigned char *buffer) {
+    return buffer[0] == 0;
+}
+
 unsigned char btchip_rng_u8_modulo(unsigned char modulo) {
     unsigned int rng_max = 256 % modulo;
     unsigned int rng_limit = 256 - rng_max;
