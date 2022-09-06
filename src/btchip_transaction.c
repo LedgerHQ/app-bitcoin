@@ -213,12 +213,6 @@ void transaction_parse(unsigned char parseMode) {
                                     // Save s1
                                     cx_hash(&btchip_context_D.transactionHashFull.blake2b, CX_BLAKE2B, NULL, 0, s1, 32);
                                     os_memmove(btchip_context_D.s1, s1, 32);
-                                    // Save headers hash in s2b
-                                    os_memmove(btchip_context_D.s2b, btchip_context_D.segwit.cache.hashedPrevouts, 32);
-                                    // Save seq hash in s2e
-                                    os_memmove(btchip_context_D.s2e, btchip_context_D.segwit.cache.hashedSequence, 32);
-                                    // Save outputs hash in s2f
-                                    os_memmove(btchip_context_D.s2f, btchip_context_D.segwit.cache.hashedOutputs, 32);
                                 } else {
                                     cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.transactionVersion, sizeof(btchip_context_D.transactionVersion), NULL, 0);
                                     cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.nVersionGroupId, sizeof(btchip_context_D.nVersionGroupId), NULL, 0);
