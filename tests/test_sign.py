@@ -50,7 +50,9 @@ def test_NU5_signature(cmd, transport):
 
     sw, _ = transport.exchange_raw("e044000509050000800a27a72601")
     assert sw == 0x9000
-    sw, _ = transport.exchange_raw("e04480053b0138" + txid + "00")
+    sw, _ = transport.exchange_raw("e04480053b0138" + txid + "19")
+    assert sw == 0x9000
+    sw, _ = transport.exchange_raw("e04480801d76a914ca3ba17907dde979bf4e88f5c1be0ddf0847b25d88ac00000000")
     assert sw == 0x9000
     sw, _ = transport.exchange_raw("e04480050400000000")
     assert sw == 0x9000
