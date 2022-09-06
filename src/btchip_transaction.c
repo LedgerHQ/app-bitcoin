@@ -1151,6 +1151,9 @@ void transaction_parse(unsigned char parseMode) {
 
                 case BTCHIP_TRANSACTION_PRESIGN_READY: {
                     PRINTF("Presign ready\n");
+                    if (btchip_context_D.NU5Transaction) {
+                        cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, (uint8_t *)NU5_PARAM_OUTPUTS, 16);
+                    }
                     goto ok;
                 }
 
