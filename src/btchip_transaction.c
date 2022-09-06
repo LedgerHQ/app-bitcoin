@@ -693,8 +693,6 @@ void transaction_parse(unsigned char parseMode) {
                             !btchip_context_D.segwitParsedOnce) {
                             if (btchip_context_D.usingOverwinter) {
                                 if (btchip_context_D.NU5Transaction) {
-                                    cx_blake2b_init2(&btchip_context_D.transactionHashFull.blake2b, 256, NULL, 0, (uint8_t *)NU5_PARAM_SEQUENC, 16);
-                                    cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.transactionBufferPointer, 4, NULL, 0);
                                 } else {
                                     cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.transactionBufferPointer, 4, NULL, 0);
                                 }
