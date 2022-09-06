@@ -376,7 +376,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                 if (!btchip_context_D.usingSegwit) {
                     PRINTF("--- ADD TO HASH AUTH:\n%.*H\n", apduLength, G_io_apdu_buffer + ISO_OFFSET_CDATA);
                     cx_hash(
-                        &btchip_context_D.transactionHashAuthorization.header,
+                        &btchip_context_D.transactionHashAuthorization.sha256.header,
                         0, G_io_apdu_buffer + ISO_OFFSET_CDATA, apduLength,
                         NULL, 0);
                 }
@@ -388,7 +388,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
 
             if (!btchip_context_D.usingSegwit) {
                 PRINTF("--- ADD TO HASH AUTH:\n%.*H\n", apduLength, G_io_apdu_buffer + ISO_OFFSET_CDATA);
-                cx_hash(&btchip_context_D.transactionHashAuthorization.header,
+                cx_hash(&btchip_context_D.transactionHashAuthorization.sha256.header,
                         CX_LAST, G_io_apdu_buffer + ISO_OFFSET_CDATA,
                         apduLength, authorizationHash, 32);
             }
@@ -412,12 +412,12 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     }
                     PRINTF("hashOutputs\n%.*H\n",32,btchip_context_D.segwit.cache.hashedOutputs);
                     cx_hash(
-                        &btchip_context_D.transactionHashAuthorization.header,
+                        &btchip_context_D.transactionHashAuthorization.sha256.header,
                         CX_LAST, G_io_apdu_buffer, 0, authorizationHash, 32);
                     PRINTF("Auth Hash:\n%.*H\n", 32, authorizationHash);
                 } else {
                     cx_hash(
-                        &btchip_context_D.transactionHashAuthorization.header,
+                        &btchip_context_D.transactionHashAuthorization.sha256.header,
                         CX_LAST,
                         (unsigned char *)&btchip_context_D.segwit.cache,
                         sizeof(btchip_context_D.segwit.cache),

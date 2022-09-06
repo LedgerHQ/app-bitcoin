@@ -97,7 +97,7 @@ void transaction_offset(unsigned char value) {
     if ((btchip_context_D.transactionHashOption &
          TRANSACTION_HASH_AUTHORIZATION) != 0) {
         PRINTF("--- ADD TO HASH AUTH:\n%.*H\n", value, btchip_context_D.transactionBufferPointer);
-        cx_hash(&btchip_context_D.transactionHashAuthorization.header, 0,
+        cx_hash(&btchip_context_D.transactionHashAuthorization.sha256.header, 0,
                 btchip_context_D.transactionBufferPointer, value, NULL, 0);
     }
 }
@@ -256,7 +256,7 @@ void transaction_parse(unsigned char parseMode) {
                                     NULL, 0);
                                 PRINTF("--- ADD TO HASH AUTH:\n%.*H\n", sizeof(btchip_context_D.segwit.cache), (unsigned char *)&btchip_context_D.segwit.cache);
                                 cx_hash(&btchip_context_D
-                                         .transactionHashAuthorization.header,
+                                         .transactionHashAuthorization.sha256.header,
                                     0,
                                     (unsigned char *)&btchip_context_D
                                         .segwit.cache,
