@@ -122,7 +122,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                     btchip_context_D.hashedMessageLength = 0;
                     cx_sha256_init(&btchip_context_D.transactionHashFull.sha256);
                     cx_sha256_init(
-                        &btchip_context_D.transactionHashAuthorization);
+                        &btchip_context_D.transactionHashAuthorization.sha256);
                     chunkLength =
                         strlen(G_coin_config->coinid) + SIGNMAGIC_LENGTH;
                     cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
@@ -161,7 +161,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                     cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
                             G_io_apdu_buffer + offset, chunkLength, NULL, 0);
                     cx_hash(
-                        &btchip_context_D.transactionHashAuthorization.header,
+                        &btchip_context_D.transactionHashAuthorization.sha256.header,
                         0, G_io_apdu_buffer + offset, chunkLength, NULL, 0);
                     btchip_context_D.hashedMessageLength += chunkLength;
                     G_io_apdu_buffer[0] = 0x00;
@@ -183,7 +183,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                     cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
                             G_io_apdu_buffer + offset, apduLength, NULL, 0);
                     cx_hash(
-                        &btchip_context_D.transactionHashAuthorization.header,
+                        &btchip_context_D.transactionHashAuthorization.sha256.header,
                         0, G_io_apdu_buffer + offset, apduLength, NULL, 0);
                     btchip_context_D.hashedMessageLength += apduLength;
                     G_io_apdu_buffer[0] = 0x00;

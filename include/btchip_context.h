@@ -167,8 +167,9 @@ struct btchip_context_s {
 
     /** Full transaction hash context */
     union multi_hash transactionHashFull;
+    union multi_hash hashAmount;
     /** Authorization transaction hash context */
-    cx_sha256_t transactionHashAuthorization;
+    union multi_hash transactionHashAuthorization;
     /** Current hash to perform (TRANSACTION_HASH_) */
     unsigned char transactionHashOption;
 

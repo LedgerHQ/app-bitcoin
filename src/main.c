@@ -959,7 +959,7 @@ uint8_t prepare_single_output() {
 uint8_t prepare_message_signature() {
     uint8_t buffer[32];
 
-    cx_hash(&btchip_context_D.transactionHashAuthorization.header, CX_LAST,
+    cx_hash(&btchip_context_D.transactionHashAuthorization.sha256.header, CX_LAST,
             (uint8_t*)vars.tmp.fullAmount, 0, buffer, 32);
 
     snprintf(vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress), "%.*H", buffer);
