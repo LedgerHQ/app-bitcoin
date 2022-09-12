@@ -23,6 +23,10 @@
 #include "cx.h"
 #include "btchip_secure_value.h"
 #include "btchip_filesystem_tx.h"
+#ifdef HAVE_NBGL
+#include "nbgl_types.h"
+#endif // HAVE_NBGL
+
 
 #define MAX_OUTPUT_TO_CHECK 100
 #define MAX_COIN_ID 13
@@ -294,7 +298,10 @@ typedef struct btchip_altcoin_config_s {
     unsigned short p2pkh_version;
     unsigned short p2sh_version;
     unsigned char family;
-    //unsigned char* iconsuffix;// will use the icon provided on the stack (maybe)
+#ifdef HAVE_NBGL
+    unsigned char img_raw[1024]; 
+    nbgl_icon_details_t img_nbgl;
+#endif // HAVE_NBGL
     char coinid[14]; // used coind id for message signature prefix
     char name[16]; // for ux displays
     char name_short[6]; // for unit in ux displays

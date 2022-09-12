@@ -510,6 +510,11 @@ void init_coin_config(btchip_altcoin_config_t *coin_config) {
     strcpy(coin_config->coinid, COIN_COINID);
     strcpy(coin_config->name, COIN_COINID_NAME);
     strcpy(coin_config->name_short, COIN_COINID_SHORT);
+#ifdef HAVE_NBGL
+    memcpy(coin_config->img_raw, &COIN_ICON_BITMAP, sizeof(coin_config->img_raw));
+    memcpy(&coin_config->img_nbgl, &COIN_ICON, sizeof(nbgl_icon_details_t));
+    coin_config->img_nbgl.bitmap = coin_config->img_raw;
+#endif // HAVE_NBGL
 #ifdef COIN_NATIVE_SEGWIT_PREFIX
     strcpy(coin_config->native_segwit_prefix_val, COIN_NATIVE_SEGWIT_PREFIX);
     coin_config->native_segwit_prefix = coin_config->native_segwit_prefix_val;
