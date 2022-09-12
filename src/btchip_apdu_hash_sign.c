@@ -202,6 +202,8 @@ void btchip_bagl_user_action_signtx(unsigned char confirming, unsigned char dire
 
         btchip_context_D.outLength = G_io_apdu_buffer[1] + 2;
         G_io_apdu_buffer[btchip_context_D.outLength++] = btchip_context_D.transactionSummary.sighashType;
+        ui_transaction_finish();
+
     } else {
         sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
         btchip_context_D.outLength = 0;

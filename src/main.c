@@ -41,6 +41,8 @@
 #define NAME3(a, b, c) __NAME3(a, b, c)
 
 unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
+bolos_ux_params_t G_ux_params;
+ux_state_t G_ux;
 
 unsigned short io_exchange_al(unsigned char channel, unsigned short tx_len) {
     switch (channel & ~(IO_FLAGS)) {
