@@ -598,11 +598,11 @@ unsigned char btchip_bagl_user_action(unsigned char confirming) {
                 PRINTF("Segwit parsed once\n");
                 if (btchip_context_D.NU5Transaction) {
                     // Save headers hash in s2b
-                    os_memmove(btchip_context_D.s2b, btchip_context_D.segwit.cache.hashedPrevouts, 32);
+                    os_memmove(btchip_context_D.nu5_ctx.prevouts_sig_digest, btchip_context_D.segwit.cache.hashedPrevouts, DIGEST_SIZE);
                     // Save seq hash in s2e
-                    os_memmove(btchip_context_D.s2e, btchip_context_D.segwit.cache.hashedSequence, 32);
+                    os_memmove(btchip_context_D.nu5_ctx.sequence_sig_digest, btchip_context_D.segwit.cache.hashedSequence, DIGEST_SIZE);
                     // Save outputs hash in s2f
-                    os_memmove(btchip_context_D.s2f, btchip_context_D.segwit.cache.hashedOutputs, 32);
+                    os_memmove(btchip_context_D.nu5_ctx.outputs_sig_digest, btchip_context_D.segwit.cache.hashedOutputs, 32);
                 }
                 btchip_context_D.transactionContext.transactionState =
                     BTCHIP_TRANSACTION_NONE;
