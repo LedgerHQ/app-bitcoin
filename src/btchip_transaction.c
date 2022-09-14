@@ -196,7 +196,7 @@ void transaction_parse(unsigned char parseMode) {
                         cx_sha256_init(&btchip_context_D.transactionHashFull.sha256);
                     }
                     cx_sha256_init(
-                        &btchip_context_D.transactionHashAuthorization);
+                        &btchip_context_D.transactionHashAuthorization.sha256);
                     if (btchip_context_D.usingSegwit) {
                         btchip_context_D.transactionHashOption = 0;
                         if (!btchip_context_D.segwitParsedOnce) {
