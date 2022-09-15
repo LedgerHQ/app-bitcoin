@@ -1,6 +1,8 @@
 # ledger-app-btc
 Bitcoin wallet application for Ledger Nano S and Nano X, up to version 1.6.5.
 
+This is currently only used in order to support and maintain altcoins cloned from Bitcoin. The last stable version of the app as it was used for Bitcoin is kept in the branch [legacy-1.6.6](https://github.com/LedgerHQ/app-bitcoin/tree/legacy-1.6.6) for future reference.
+
 Versions starting from 2.0.0 are at https://github.com/LedgerHQ/app-bitcoin-new.
 
 Ledger Blue is not maintained anymore, but the app can still be compiled for this target using the branch `blue-final-release`.
