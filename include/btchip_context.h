@@ -93,6 +93,7 @@ enum btchip_output_parsing_state_e {
 };
 typedef enum btchip_output_parsing_state_e btchip_output_parsing_state_t;
 
+#define DIGEST_SIZE 32
 
 typedef union multi_hash {
     cx_sha256_t sha256;
@@ -240,12 +241,15 @@ struct btchip_context_s {
     unsigned char nLockTime[4];
     unsigned char sigHashType[4];
 
-    unsigned char s1[32];
-    unsigned char s2b[32];
-    unsigned char s2c[32];
-    unsigned char s2d[32];
-    unsigned char s2e[32];
-    unsigned char s2f[32];
+    struct {
+        unsigned char header_digest[DIGEST_SIZE];
+        unsigned char prevouts_sig_digest[DIGEST_SIZE];
+        unsigned char amounts_sig_digest[DIGEST_SIZE];
+        unsigned char scriptpubkeys_sig_digest[DIGEST_SIZE];
+        unsigned char sequence_sig_digest[DIGEST_SIZE];
+        unsigned char outputs_sig_digest[DIGEST_SIZE];
+    } nu5_ctx;
+
     /*Is swap mode*/
     unsigned char called_from_swap;
 };
