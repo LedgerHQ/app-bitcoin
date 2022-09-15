@@ -1095,6 +1095,12 @@ void transaction_parse(unsigned char parseMode) {
                     }
 
                     if (btchip_context_D.NU5Transaction) { 
+                        // We don't support sapling or orchard actions 
+                        // Only expiryHeight should remain at this point
+                        if (btchip_context_D.transactionDataRemaining != 4) {
+                            PRINTF("expiryHeight expected");
+                            goto fail;
+                        }
                         // expiryHeight
                         blake2b_256_update(&btchip_context_D.transactionHashFull.blake2b, btchip_context_D.transactionBufferPointer, 4);
                     }
