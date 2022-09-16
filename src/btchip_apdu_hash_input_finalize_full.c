@@ -408,6 +408,11 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                             btchip_context_D.segwit.cache.hashedOutputs, 32);
                     }
                     PRINTF("hashOutputs\n%.*H\n",32,btchip_context_D.segwit.cache.hashedOutputs);
+                    if (btchip_context_D.NU5Transaction) {
+                        memcpy(btchip_context_D.nu5_ctx.prevouts_sig_digest, btchip_context_D.segwit.cache.hashedPrevouts, DIGEST_SIZE);
+                        memcpy(btchip_context_D.nu5_ctx.sequence_sig_digest, btchip_context_D.segwit.cache.hashedSequence, DIGEST_SIZE);
+                        memcpy(btchip_context_D.nu5_ctx.outputs_sig_digest, btchip_context_D.segwit.cache.hashedOutputs, DIGEST_SIZE);
+                    }
                     cx_hash(
                         &btchip_context_D.transactionHashAuthorization.sha256.header,
                         CX_LAST, G_io_apdu_buffer, 0, authorizationHash, 32);
@@ -596,11 +601,6 @@ unsigned char btchip_bagl_user_action(unsigned char confirming) {
                 // This input cannot be signed when using segwit - just restart.
                 btchip_context_D.segwitParsedOnce = 1;
                 PRINTF("Segwit parsed once\n");
-                if (btchip_context_D.NU5Transaction) {
-                    memcpy(btchip_context_D.nu5_ctx.prevouts_sig_digest, btchip_context_D.segwit.cache.hashedPrevouts, DIGEST_SIZE);
-                    memcpy(btchip_context_D.nu5_ctx.sequence_sig_digest, btchip_context_D.segwit.cache.hashedSequence, DIGEST_SIZE);
-                    memcpy(btchip_context_D.nu5_ctx.outputs_sig_digest, btchip_context_D.segwit.cache.hashedOutputs, DIGEST_SIZE);
-                }
                 btchip_context_D.transactionContext.transactionState =
                     BTCHIP_TRANSACTION_NONE;
             } else {
