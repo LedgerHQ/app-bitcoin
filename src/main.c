@@ -1299,7 +1299,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
             PRINTF("Hello from litecoin\n");
             check_api_level(CX_COMPAT_APILEVEL);
             // delegate to bitcoin app/lib
-            libcall_params[0] = "Bitcoin";
+            libcall_params[0] = "Bitcoin Legacy";
             libcall_params[1] = 0x100;
             libcall_params[2] = RUN_APPLICATION;
             libcall_params[3] = &coin_config;

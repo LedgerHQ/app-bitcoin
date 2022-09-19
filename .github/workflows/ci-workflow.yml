@@ -18,7 +18,7 @@ jobs:
         run: |
           make && mv bin/ bitcoin-bin/
           make clean
-          make COIN=bitcoin_testnet && mv bin/ bitcoin-testnet-bin/
+          make COIN=bitcoin_testnet_legacy && mv bin/ bitcoin-testnet-bin/
 
       - name: Upload Bitcoin app binary
         uses: actions/upload-artifact@v2
