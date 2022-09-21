@@ -68,15 +68,6 @@ static bool check_output_displayable() {
     isOpCall =
         btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8,
           sizeof(btchip_context_D.currentOutput) - 8);
-    if (((G_coin_config->kind == COIN_KIND_QTUM || G_coin_config->kind == COIN_KIND_HYDRA) &&
-         !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
-         !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate && !isOpCall) ||
-        (!(G_coin_config->kind == COIN_KIND_QTUM || G_coin_config->kind == COIN_KIND_HYDRA) &&
-         !btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) &&
-         !isP2sh && !(nullAmount && isOpReturn))) {
-        PRINTF("Error : Unrecognized output script");
-        THROW(EXCEPTION);
-    }
     if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {
         bool changeFound = false;
         unsigned char addressOffset =
@@ -97,13 +88,9 @@ static bool check_output_displayable() {
             btchip_public_key_hash160(changeSegwit, 22, changeSegwit);
             if (os_memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
                           changeSegwit, 20) == 0) {
-                if (G_coin_config->flags & FLAG_SEGWIT_CHANGE_SUPPORT) {
-                    changeFound = true;
-                } else {
-                    // Attempt to avoid fatal failures on Bitcoin Cash
-                    PRINTF("Error : Non spendable Segwit change");
-                    THROW(EXCEPTION);
-                }
+                // Attempt to avoid fatal failures on Bitcoin Cash
+                PRINTF("Error : Non spendable Segwit change");
+                THROW(EXCEPTION);
             }
         }
         if (changeFound) {
@@ -435,9 +422,9 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                 }
 
                 transactionSummary->payToAddressVersion =
-                    G_coin_config->p2pkh_version;
+                    COIN_P2PKH_VERSION;
                 transactionSummary->payToScriptHashVersion =
-                    G_coin_config->p2sh_version;
+                    COIN_P2SH_VERSION;
 
                 // Generate new nonce
 

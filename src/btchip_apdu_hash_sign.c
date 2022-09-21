@@ -109,20 +109,9 @@ unsigned short btchip_apdu_hash_sign() {
 
             if (((N_btchip.bkp.config.options &
                   BTCHIP_OPTION_FREE_SIGHASHTYPE) == 0)) {
-                // if bitcoin cash OR forkid is set, then use the fork id
-                if (G_coin_config->kind == COIN_KIND_BITCOIN_CASH ||
-                    (G_coin_config->forkid)) {
-#define SIGHASH_FORKID 0x40
-                    if (sighashType != (SIGHASH_ALL | SIGHASH_FORKID)) {
-                        sw = BTCHIP_SW_INCORRECT_DATA;
-                        goto discardTransaction;
-                    }
-                    sighashType |= (G_coin_config->forkid << 8);
-                } else {
-                    if (sighashType != SIGHASH_ALL) {
-                        sw = BTCHIP_SW_INCORRECT_DATA;
-                        goto discardTransaction;
-                    }
+                if (sighashType != SIGHASH_ALL) {
+                    sw = BTCHIP_SW_INCORRECT_DATA;
+                    goto discardTransaction;
                 }
             }
 
