@@ -817,13 +817,13 @@ uint8_t prepare_fees() {
             goto error;
         }
         os_memmove(vars.tmp.feesAmount, COIN_COINID_SHORT,
-                strlen(COIN_COINID_SHORT));
-        vars.tmp.feesAmount[strlen(COIN_COINID_SHORT)] = ' ';
+                sizeof(COIN_COINID_SHORT) - 1);
+        vars.tmp.feesAmount[sizeof(COIN_COINID_SHORT) - 1] = ' ';
         btchip_context_D.tmp =
             (unsigned char *)(vars.tmp.feesAmount +
-                    strlen(COIN_COINID_SHORT) + 1);
+                    sizeof(COIN_COINID_SHORT));
         textSize = btchip_convert_hex_amount_to_displayable(fees);
-        vars.tmp.feesAmount[textSize + strlen(COIN_COINID_SHORT) + 1] =
+        vars.tmp.feesAmount[textSize + sizeof(COIN_COINID_SHORT)] =
             '\0';
     }
     return 1;
@@ -921,13 +921,13 @@ uint8_t prepare_single_output() {
     }
     else {
         os_memmove(vars.tmp.fullAmount, COIN_COINID_SHORT,
-               strlen(COIN_COINID_SHORT));
-        vars.tmp.fullAmount[strlen(COIN_COINID_SHORT)] = ' ';
+               sizeof(COIN_COINID_SHORT) - 1);
+        vars.tmp.fullAmount[sizeof(COIN_COINID_SHORT) - 1] = ' ';
         btchip_context_D.tmp =
             (unsigned char *)(vars.tmp.fullAmount +
-                          strlen(COIN_COINID_SHORT) + 1);
+                          sizeof(COIN_COINID_SHORT));
         textSize = btchip_convert_hex_amount_to_displayable(amount);
-        vars.tmp.fullAmount[textSize + strlen(COIN_COINID_SHORT) + 1] =
+        vars.tmp.fullAmount[textSize + sizeof(COIN_COINID_SHORT)] =
             '\0';
     }
 

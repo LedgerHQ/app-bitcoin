@@ -36,14 +36,14 @@ unsigned short btchip_apdu_get_coin_version() {
     G_io_apdu_buffer[offset++] = COIN_P2SH_VERSION >> 8;
     G_io_apdu_buffer[offset++] = COIN_P2SH_VERSION;
     G_io_apdu_buffer[offset++] = COIN_FAMILY;
-    G_io_apdu_buffer[offset++] = strlen(COIN_COINID);
+    G_io_apdu_buffer[offset++] = sizeof(COIN_COINID) - 1;
     os_memmove(G_io_apdu_buffer + offset, COIN_COINID,
-               strlen(COIN_COINID));
-    offset += strlen(COIN_COINID);
-    G_io_apdu_buffer[offset++] = strlen(COIN_COINID_SHORT);
+               sizeof(COIN_COINID) - 1);
+    offset += sizeof(COIN_COINID) - 1;
+    G_io_apdu_buffer[offset++] = sizeof(COIN_COINID_SHORT) - 1;
     os_memmove(G_io_apdu_buffer + offset, COIN_COINID_SHORT,
-               strlen(COIN_COINID_SHORT));
-    offset += strlen(COIN_COINID_SHORT);
+               sizeof(COIN_COINID_SHORT) - 1);
+    offset += sizeof(COIN_COINID_SHORT) - 1;
     btchip_context_D.outLength = offset;
 
     return BTCHIP_SW_OK;
