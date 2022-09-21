@@ -26,8 +26,7 @@ bool copy_transaction_parameters(create_transaction_parameters_t* sign_transacti
     return true;
 }
 
-void handle_swap_sign_transaction(btchip_altcoin_config_t *config) {
-    G_coin_config = config;
+void handle_swap_sign_transaction(void) {
     btchip_context_init();
     btchip_context_D.called_from_swap = 1;
     io_seproxyhal_init();

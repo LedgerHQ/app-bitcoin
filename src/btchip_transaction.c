@@ -24,11 +24,8 @@
 #define CONSENSUS_BRANCH_ID_ZCLASSIC 0x930b540d
 
 // Check if fOverwintered flag is set and if nVersion is >= 0x03
-#define TRUSTED_INPUT_OVERWINTER ( (G_coin_config->kind == COIN_KIND_ZCASH || \
-                                    G_coin_config->kind == COIN_KIND_ZCLASSIC || \
-                                    G_coin_config->kind == COIN_KIND_KOMODO) && \
-                                    (btchip_read_u32(btchip_context_D.transactionVersion, 0, 0) & (1<<31)) && \
-                                    (btchip_read_u32(btchip_context_D.transactionVersion, 0, 0) ^ (1<<31)) >= 0x03 \
+#define TRUSTED_INPUT_OVERWINTER ((btchip_read_u32(btchip_context_D.transactionVersion, 0, 0) & (1<<31)) && \
+                                  (btchip_read_u32(btchip_context_D.transactionVersion, 0, 0) ^ (1<<31)) >= 0x03 \
                                 )
 
 #define DEBUG_LONG "%d"
@@ -179,14 +176,7 @@ void transaction_parse(unsigned char parseMode) {
                         if (btchip_context_D.segwitParsedOnce) {
                             uint8_t parameters[16];
                             memcpy(parameters, OVERWINTER_PARAM_SIGHASH, 16);
-                            if (G_coin_config->kind == COIN_KIND_ZCLASSIC) {
-                                btchip_write_u32_le(parameters + 12, CONSENSUS_BRANCH_ID_ZCLASSIC);
-                            }
-                            else {
-                                btchip_write_u32_le(parameters + 12,
-                                    btchip_context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING ?
-                                    (G_coin_config->zcash_consensus_branch_id != 0 ? G_coin_config->zcash_consensus_branch_id : CONSENSUS_BRANCH_ID_SAPLING) : CONSENSUS_BRANCH_ID_OVERWINTER);
-                            }
+                            btchip_write_u32_le(parameters + 12, (btchip_context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING ?  CONSENSUS_BRANCH_ID_SAPLING : CONSENSUS_BRANCH_ID_OVERWINTER));
                             blake2b_256_init(&btchip_context_D.transactionHashFull.blake2b, parameters);
                         }
                     }
@@ -307,18 +297,6 @@ void transaction_parse(unsigned char parseMode) {
                         memcpy(btchip_context_D.nVersionGroupId,
                                btchip_context_D.transactionBufferPointer, 4);
                         transaction_offset_increase(4);
-                    }
-
-                    if (G_coin_config->flags & FLAG_PEERCOIN_SUPPORT) {
-                        if (((G_coin_config->family ==
-                            BTCHIP_FAMILY_PEERCOIN &&
-                            (btchip_context_D.transactionVersion[0] < 3))) ||
-                            ((G_coin_config->family == BTCHIP_FAMILY_STEALTH) &&
-                            (btchip_context_D.transactionVersion[0] < 2))) {
-                            // Timestamp
-                            check_transaction_available(4);
-                            transaction_offset_increase(4);
-                        }
                     }
 
                     // Number of inputs

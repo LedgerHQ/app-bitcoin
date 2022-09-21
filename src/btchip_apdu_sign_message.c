@@ -95,9 +95,9 @@ unsigned short btchip_apdu_sign_message_internal() {
                         goto discard;
                     }
                     btchip_context_D.transactionSummary.payToAddressVersion =
-                        G_coin_config->p2pkh_version;
+                        COIN_P2PKH_VERSION;
                     btchip_context_D.transactionSummary.payToScriptHashVersion =
-                        G_coin_config->p2sh_version;
+                        COIN_P2SH_VERSION;
                     os_memmove(
                         btchip_context_D.transactionSummary.keyPath,
                         G_io_apdu_buffer + offset, MAX_BIP32_PATH_LENGTH);
@@ -124,12 +124,12 @@ unsigned short btchip_apdu_sign_message_internal() {
                     cx_sha256_init(
                         &btchip_context_D.transactionHashAuthorization.sha256);
                     chunkLength =
-                        strlen(G_coin_config->coinid) + SIGNMAGIC_LENGTH;
+                        sizeof(COIN_COINID) - 1 + SIGNMAGIC_LENGTH;
                     cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
                             &chunkLength, 1, NULL, 0);
                     cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
-                            (uint8_t *)G_coin_config->coinid,
-                            strlen(G_coin_config->coinid), NULL, 0);
+                            (uint8_t *)COIN_COINID,
+                            sizeof(COIN_COINID) - 1, NULL, 0);
                     cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
                             (unsigned char *)SIGNMAGIC, SIGNMAGIC_LENGTH, NULL, 0);
                     if (btchip_context_D.transactionSummary.messageLength <
