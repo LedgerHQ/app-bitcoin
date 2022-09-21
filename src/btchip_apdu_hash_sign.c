@@ -183,14 +183,14 @@ void btchip_bagl_user_action_signtx(unsigned char confirming, unsigned char dire
             cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hash, 0, hash, 32);
         }
         else {
-            cx_sha256_t localHash;
             cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
                 hash, 0, hash, 32);
             PRINTF("Hash1\n%.*H\n", sizeof(hash), hash);
 
             // Rehash
-            cx_sha256_init(&localHash);
-            cx_hash(&localHash.header, CX_LAST, hash, sizeof(hash), hash, 32);
+            // Use a global context already existing to save some ram
+            cx_sha256_init(&btchip_context_D.hashAmount.sha256);
+            cx_hash(&btchip_context_D.hashAmount.sha256.header, CX_LAST, hash, sizeof(hash), hash, 32);
         }
         PRINTF("Hash2\n%.*H\n", sizeof(hash), hash);
         // Sign
