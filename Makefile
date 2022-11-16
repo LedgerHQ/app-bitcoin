@@ -21,15 +21,13 @@ endif
 include $(BOLOS_SDK)/Makefile.defines
 
 APP_PATH = ""
-# All but bitcoin app use dependency onto the bitcoin app/lib
-DEFINES_LIB = USE_LIB_BITCOIN
 APP_LOAD_PARAMS= --curve secp256k1 $(COMMON_LOAD_PARAMS)
 
 APPVERSION_M=2
 APPVERSION_N=1
 APPVERSION_P=0
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
-APP_LOAD_FLAGS=--appFlags 0xa50 --dep "Bitcoin Legacy:$(APPVERSION)"
+APP_LOAD_FLAGS=--appFlags 0xa50
 
 # simplify for tests
 ifndef COIN
@@ -44,11 +42,9 @@ APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),bitcoin_legacy)
 # Bitcoin mainnet
 DEFINES   += BIP44_COIN_TYPE=0 BIP44_COIN_TYPE_2=0 COIN_P2PKH_VERSION=0 COIN_P2SH_VERSION=5 COIN_FAMILY=1 COIN_COINID=\"Bitcoin\" COIN_COINID_HEADER=\"BITCOIN\" COIN_COLOR_HDR=0xFCB653 COIN_COLOR_DB=0xFEDBA9 COIN_COINID_NAME=\"Bitcoin\" COIN_COINID_SHORT=\"BTC\" COIN_NATIVE_SEGWIT_PREFIX=\"bc\" COIN_KIND=COIN_KIND_BITCOIN COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
-DEFINES_LIB=# we're not using the lib :)
 APPNAME ="Bitcoin Legacy"
 APP_LOAD_PARAMS += --path $(APP_PATH)
 #LIB and global pin and
-APP_LOAD_FLAGS=--appFlags 0xa50
 else ifeq ($(COIN),bitcoin_cash)
 # Bitcoin cash
 # Initial fork from Bitcoin, public key access is authorized. Signature is different thanks to the forkId
@@ -205,7 +201,6 @@ endif
 endif
 
 APP_LOAD_PARAMS += $(APP_LOAD_FLAGS)
-DEFINES += $(DEFINES_LIB)
 
 ifeq ($(TARGET_NAME),TARGET_NANOS)
 ICONNAME=icons/nanos_app_$(COIN).gif
