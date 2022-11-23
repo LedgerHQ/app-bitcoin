@@ -21,16 +21,13 @@ endif
 include $(BOLOS_SDK)/Makefile.defines
 
 APP_PATH = ""
-# All but bitcoin app use dependency onto the bitcoin app/lib
-DEFINES_LIB = USE_LIB_BITCOIN
 APP_LOAD_PARAMS= --curve secp256k1 $(COMMON_LOAD_PARAMS)
 
 APPVERSION_M=2
 APPVERSION_N=1
 APPVERSION_P=3
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
-
-APP_LOAD_FLAGS=--appFlags 0xa50 --dep Bitcoin:$(APPVERSION)
+APP_LOAD_FLAGS=--appFlags 0xa50
 
 # simplify for tests
 ifndef COIN
@@ -53,7 +50,6 @@ endif
 endif
 
 APP_LOAD_PARAMS += $(APP_LOAD_FLAGS)
-DEFINES += $(DEFINES_LIB)
 
 ifeq ($(TARGET_NAME),TARGET_NANOS)
 ICONNAME=icons/nanos_app_$(COIN).gif
