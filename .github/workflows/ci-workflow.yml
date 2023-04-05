@@ -1,10 +1,30 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - master
+  pull_request:
+    branches:
+    - master
+
 
 jobs:
   job_build:
     name: Compilation
+    strategy:
+      matrix:
+        include:
+          - model: nanos
+            SDK: "$NANOS_SDK"
+          - model: nanox
+            SDK: "$NANOX_SDK"
+          - model: nanosp
+            SDK: "$NANOSP_SDK"
+          - model: stax
+            SDK: "$STAX_SDK"
+
     runs-on: ubuntu-latest
 
     container:
@@ -16,24 +36,32 @@ jobs:
 
       - name: Build
         run: |
-          make && mv bin/ bitcoin-bin/
+          make BOLOS_SDK=${{ matrix.SDK }} && mv bin/ bitcoin-bin/
           make clean
-          make COIN=bitcoin_testnet_legacy && mv bin/ bitcoin-testnet-bin/
+          make COIN=bitcoin_testnet_legacy BOLOS_SDK=${{ matrix.SDK }} && mv bin/ bitcoin-testnet-bin/
 
       - name: Upload Bitcoin app binary
         uses: actions/upload-artifact@v2
         with:
-          name: bitcoin-app
+          name: bitcoin-app-${{ matrix.model }}
           path: bitcoin-bin
 
       - name: Upload Bitcoin Testnet app binary
         uses: actions/upload-artifact@v2
         with:
-          name: bitcoin-testnet-app
+          name: bitcoin-testnet-app-${{ matrix.model }}
           path: bitcoin-testnet-bin
 
   job_test:
     name: Tests
+    strategy:
+      matrix:
+        include:
+          - model: nanos
+          - model: nanox
+          - model: nanosp
+          - model: stax
+
     needs: job_build
     runs-on: ubuntu-latest
 
@@ -55,15 +83,16 @@ jobs:
       - name: Download Bitcoin app binary
         uses: actions/download-artifact@v2
         with:
-          name: bitcoin-app
+          name: bitcoin-app-${{matrix.model}}
           path: tests/bitcoin-bin
 
       - name: Download Bitcoin Testnet app binary
         uses: actions/download-artifact@v2
         with:
-          name: bitcoin-testnet-app
+          name: bitcoin-testnet-app-${{ matrix.model }}
           path: tests/bitcoin-testnet-bin
 
       - name: Run tests
         run: |
-          cd tests && pip install -r requirements.txt && SPECULOS=/speculos/speculos.py pytest
+          cd tests && pip install -r requirements.txt && SPECULOS=/speculos/speculos.py pytest --model=${{ matrix.model }}
+
