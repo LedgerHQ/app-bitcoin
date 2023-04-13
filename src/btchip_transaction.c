@@ -300,7 +300,7 @@ void transaction_parse(unsigned char parseMode) {
                     btchip_context_D.transactionContext.transactionState =
                         BTCHIP_TRANSACTION_DEFINED_WAIT_INPUT;
 
-                    // no break is intentional
+                    __attribute__((fallthrough));
                 }
 
                 case BTCHIP_TRANSACTION_DEFINED_WAIT_INPUT: {
@@ -565,7 +565,7 @@ void transaction_parse(unsigned char parseMode) {
                     btchip_context_D.transactionContext.transactionState =
                         BTCHIP_TRANSACTION_INPUT_HASHING_IN_PROGRESS_INPUT_SCRIPT;
 
-                    // no break is intentional
+                    __attribute__((fallthrough));
                 }
                 case BTCHIP_TRANSACTION_INPUT_HASHING_IN_PROGRESS_INPUT_SCRIPT: {
                     unsigned char dataAvailable;
@@ -753,7 +753,7 @@ void transaction_parse(unsigned char parseMode) {
                     btchip_context_D.transactionContext.transactionState =
                         BTCHIP_TRANSACTION_DEFINED_WAIT_OUTPUT;
 
-                    // no break is intentional
+                    __attribute__((fallthrough));
                 }
                 case BTCHIP_TRANSACTION_DEFINED_WAIT_OUTPUT: {
                     if (btchip_context_D.transactionContext
@@ -790,7 +790,7 @@ void transaction_parse(unsigned char parseMode) {
                     btchip_context_D.transactionContext.transactionState =
                         BTCHIP_TRANSACTION_OUTPUT_HASHING_IN_PROGRESS_OUTPUT_SCRIPT;
 
-                    // no break is intentional
+                    __attribute__((fallthrough));
                 }
                 case BTCHIP_TRANSACTION_OUTPUT_HASHING_IN_PROGRESS_OUTPUT_SCRIPT: {
                     unsigned char dataAvailable;
