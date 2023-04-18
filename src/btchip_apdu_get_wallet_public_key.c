@@ -71,6 +71,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
     switch (G_io_apdu_buffer[ISO_OFFSET_P2]) {
     case P2_NATIVE_SEGWIT:
         return BTCHIP_SW_INCORRECT_P1_P2;
+        __attribute__((fallthrough));
     case P2_LEGACY:
     case P2_SEGWIT:
         break;

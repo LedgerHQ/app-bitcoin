@@ -477,6 +477,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
         CATCH_ALL {
             sw = SW_TECHNICAL_DETAILS(0x0F);
         catch_discardTransaction:
+            ui_transaction_error();
             btchip_context_D.transactionContext.transactionState =
                 BTCHIP_TRANSACTION_NONE;
             btchip_context_D.outLength = 0;
@@ -512,6 +513,7 @@ unsigned short btchip_apdu_hash_input_finalize_full() {
             status = btchip_bagl_confirm_single_output();
         }
         if (!status) {
+            ui_transaction_error();
             btchip_context_D.io_flags &= ~IO_ASYNCH_REPLY;
             btchip_context_D.transactionContext.transactionState =
                 BTCHIP_TRANSACTION_NONE;
@@ -609,6 +611,7 @@ unsigned char btchip_bagl_user_action(unsigned char confirming) {
 
     if ((btchip_context_D.outputParsingState == BTCHIP_OUTPUT_FINALIZE_TX) ||
         (sw != BTCHIP_SW_OK)) {
+
         // we've finished the processing of the input
         btchip_apdu_hash_input_finalize_full_reset();
     }

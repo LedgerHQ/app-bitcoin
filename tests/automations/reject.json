@@ -9,12 +9,26 @@
       ]
     },
     {
+      "regexp": "Tap to continue",
+      "actions": [
+        ["finger", 55, 550, true],
+        ["finger", 55, 550, false]
+      ]
+    },
+    {
       "text": "Reject",
       "actions": [
         [ "button", 1, true ],
         [ "button", 2, true ],
         [ "button", 2, false ],
         [ "button", 1, false ]
+      ]
+    },
+    {
+      "regexp": "Cancel",
+      "actions": [
+        ["finger", 55, 650, true],
+        ["finger", 55, 650, false]
       ]
     }
   ]
