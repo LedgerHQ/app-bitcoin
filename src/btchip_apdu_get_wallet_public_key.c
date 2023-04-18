@@ -73,6 +73,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
         if (!(G_coin_config->native_segwit_prefix)) {
             return BTCHIP_SW_INCORRECT_P1_P2;
         }
+        __attribute__((fallthrough));
     case P2_LEGACY:
     case P2_SEGWIT:
         break;
