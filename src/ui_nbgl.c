@@ -231,18 +231,15 @@ static void ui_message_start(void) {
 
 // Other callbacks
 static void display_pubkey_callback(void) {
-  uiContext.tagValueList.pairs = uiContext.tagValues;
-  uiContext.tagValueList.nbPairs = uiContext.nbPairs;
+  if (uiContext.nbPairs == 1) {
+      nbgl_useCaseAddressConfirmation(uiContext.tagValues[0].value, status_callback);
+  }
+  else {
+      uiContext.tagValueList.pairs = &uiContext.tagValues[1];
+      uiContext.tagValueList.nbPairs = 1;
 
-  uiContext.infoLongPress.icon = &G_coin_config->img_nbgl;
-  uiContext.infoLongPress.longPressText = "Approve";
-  uiContext.infoLongPress.longPressToken = 1;
-  uiContext.infoLongPress.tuneId = TUNE_TAP_CASUAL;
-  uiContext.infoLongPress.text = "Confirm\npublic key";
-
-  nbgl_useCaseStaticReviewLight(&uiContext.tagValueList,
-                                &uiContext.infoLongPress, "Cancel",
-                                status_callback);
+      nbgl_useCaseAddressConfirmationExt(uiContext.tagValues[0].value, status_callback, &uiContext.tagValueList.pairs);
+  }
 }
 
 // Flow entry point
