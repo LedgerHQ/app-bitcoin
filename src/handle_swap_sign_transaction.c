@@ -5,6 +5,7 @@
 #include "btchip_context.h"
 #include "usbd_core.h"
 #include "ux.h"
+#include "os.h"
 
 
 bool copy_transaction_parameters(create_transaction_parameters_t* sign_transaction_params) {
@@ -22,6 +23,8 @@ bool copy_transaction_parameters(create_transaction_parameters_t* sign_transacti
     // input {0xEE, 0x00, 0xFF} should be stored like {0x00, 0x00, 0x00, 0x00, 0x00, 0xEE, 0x00, 0xFF}
     memcpy(stack_data.amount + 8 - sign_transaction_params->amount_length, sign_transaction_params->amount, sign_transaction_params->amount_length);
     memcpy(stack_data.fees + 8 - sign_transaction_params->fee_amount_length, sign_transaction_params->fee_amount, sign_transaction_params->fee_amount_length);
+
+    os_explicit_zero_BSS_segment();
     memcpy(&vars.swap_data, &stack_data, sizeof(stack_data));
     return true;
 }
@@ -42,7 +45,7 @@ void handle_swap_sign_transaction(btchip_altcoin_config_t *config) {
 #endif // TARGET_NANOX
 #ifdef HAVE_BLE
     BLE_power(0, NULL);
-    BLE_power(1, "Nano X");
+    BLE_power(1, NULL);
 #endif // HAVE_BLE
     app_main();
 }
