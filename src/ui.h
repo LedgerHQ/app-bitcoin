@@ -3,7 +3,7 @@
 #include "ux.h"
 
 void ui_idle_flow(void);
-void ui_sign_message_flowflow(void);
+void ui_sign_message_flow(void);
 void ui_confirm_full_flow(void);
 void ui_confirm_single_flow(void);
 void ui_finalize_flow(void);

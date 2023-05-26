@@ -31,10 +31,10 @@ typedef enum {
 
 typedef struct {
   bool transaction_prompt_done;
-  char *prompt_cancel_message;
-  char *prompt;            // text displayed in last transaction page
-  char *approved_status;   // text displayed in confirmation page (after long press)
-  char *abandon_status;    // text displayed in rejection page (after reject confirmed)
+  const char *prompt_cancel_message;
+  const char *prompt;            // text displayed in last transaction page
+  const char *approved_status;   // text displayed in confirmation page (after long press)
+  const char *abandon_status;    // text displayed in rejection page (after reject confirmed)
   void (*approved_cb)(void);
   void (*abandon_cb)(void);
   nbgl_layoutTagValueList_t tagValueList;
@@ -240,7 +240,7 @@ static void display_pubkey_callback(void) {
       uiContext.tagValueList.pairs = &uiContext.tagValues[1];
       uiContext.tagValueList.nbPairs = 1;
 
-      nbgl_useCaseAddressConfirmationExt(uiContext.tagValues[0].value, status_callback, &uiContext.tagValueList.pairs);
+      nbgl_useCaseAddressConfirmationExt(uiContext.tagValues[0].value, status_callback, &uiContext.tagValueList);
   }
 }
 
