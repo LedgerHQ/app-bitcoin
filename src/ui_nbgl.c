@@ -43,6 +43,7 @@ typedef struct {
   uint8_t nbPairs;
 } UiContext_t;
 
+static char text[40];
 static nbgl_page_t *pageContext;
 static UiContext_t uiContext = {.transaction_prompt_done = 0};
 
@@ -207,7 +208,8 @@ static void ui_start(void (*cb)(void), flow_type_t type) {
           break;
 
       case TRANSACTION_TYPE:
-          nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, "Review\ntransaction", "",
+          snprintf(text, sizeof(text), "Review transaction\nto send %s", G_coin_config->name);
+          nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, text, "",
                   "Cancel", cb, prompt_cancel_transaction);
           break;
   }
@@ -400,20 +402,22 @@ static void warn_unusual_derivation_path(void) {
 }
 
 static void prompt_public_key(bool warning) {
+  snprintf(text, sizeof(text), "Verify %s\naddress", G_coin_config->name);
+
   if (warning) {
-    nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, "Confirm\npublic key", "",
+    nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, text, "",
                             "Cancel", warn_unusual_derivation_path,
                             abandon_status);
   } else {
-    nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, "Confirm\npublic key", "",
+    nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, text, "",
                             "Cancel", display_pubkey_callback, abandon_status);
   }
 }
 
 static void display_public_key(bool warning) {
-  uiContext.abandon_status = "Public key\nrejected";
-  uiContext.approved_status = "PUBLIC KEY\nCONFIRMED";
-  uiContext.prompt_cancel_message = "Reject\nPublic key?";
+  uiContext.abandon_status = "Address verification\ncancelled";
+  uiContext.approved_status = "ADDRESS\nVERIFIED";
+  uiContext.prompt_cancel_message = "Reject\nAddress?";
 
   uiContext.tagValues[0].item = "Address";
   uiContext.tagValues[0].value = (char *)G_io_apdu_buffer + 200;
