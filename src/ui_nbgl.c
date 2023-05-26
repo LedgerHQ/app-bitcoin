@@ -28,6 +28,12 @@ typedef enum {
     TRANSACTION_TYPE 
 } flow_type_t;
 
+enum {
+    CANCEL_TOKEN,
+    CONFIRM_TOKEN,
+    BACK_TOKEN,
+};
+
 
 typedef struct {
   bool transaction_prompt_done;
@@ -111,11 +117,13 @@ static void releaseContext(void) {
 // Status
 static void abandon_status(void) {
   nbgl_useCaseStatus(uiContext.abandon_status, false, uiContext.abandon_cb);
+  releaseContext();
   uiContext.transaction_prompt_done = false;
 }
 
 static void approved_status(void) {
   nbgl_useCaseStatus(uiContext.approved_status, true, uiContext.approved_cb);
+  releaseContext();
   uiContext.transaction_prompt_done = false;
 }
 
@@ -152,7 +160,52 @@ static void prompt_cancel_transaction(void) {
 
 static void transaction_review_callback(bool token) {
   if (token) {
+    releaseContext();
     uiContext.approved_cb();
+  } else {
+    prompt_cancel_transaction();
+  }
+}
+
+static void transaction_finish_callback(int token, uint8_t index) {
+  (void) index;
+  switch (token) {
+      case CANCEL_TOKEN:
+          prompt_cancel_transaction();
+          break;
+      case CONFIRM_TOKEN:
+          releaseContext();
+          uiContext.approved_cb();
+          break;
+      case BACK_TOKEN:
+          ui_finalize_flow();
+          break;
+  }
+}
+
+static void transaction_fee_callback(int token, uint8_t index) {
+  (void) index;
+  if (token) {
+        releaseContext();
+        nbgl_pageNavigationInfo_t info = {.activePage = 0,
+                                          .nbPages = 0,
+                                          .navType = NAV_WITH_TAP,
+                                          .progressIndicator = true,
+                                          .navWithTap.backButton = true,
+                                          .navWithTap.backToken = BACK_TOKEN,
+                                          .navWithTap.nextPageText = NULL,
+                                          .navWithTap.quitText = "Reject transaction",
+                                          .quitToken = CANCEL_TOKEN,
+                                          .tuneId = TUNE_TAP_CASUAL};
+
+        nbgl_pageContent_t content = {.type = INFO_LONG_PRESS,
+                                      .infoLongPress.icon = &G_coin_config->img_nbgl,
+                                      .infoLongPress.text = "Sign transaction\nto send Bitcoin?",
+                                      .infoLongPress.longPressText = "Hold to sign",
+                                      .infoLongPress.longPressToken = CONFIRM_TOKEN,
+                                      .infoLongPress.tuneId = TUNE_TAP_NEXT};
+
+        pageContext = nbgl_pageDrawGenericContent(&transaction_finish_callback, &info, &content);
   } else {
     prompt_cancel_transaction();
   }
@@ -192,10 +245,6 @@ static void continue_review(flow_type_t type) {
 
 static void continue_message_review(void) {
     continue_review(MESSAGE_TYPE);
-}
-
-static void continue_transaction_review(void) {
-  continue_review(TRANSACTION_TYPE);
 }
 
 // UI Start
@@ -275,9 +324,8 @@ void ui_confirm_single_flow(void) {
     uiContext.nbPairs = 3;
 
     nbgl_pageNavigationInfo_t info = {
-        .activePage =
-            btchip_context_D.totalOutputs - btchip_context_D.remainingOutputs,
-        .nbPages = btchip_context_D.totalOutputs - 1,
+        .activePage = 0,
+        .nbPages = 0,
         .navType = NAV_WITH_TAP,
         .progressIndicator = true,
         .navWithTap.backButton = false,
@@ -307,9 +355,25 @@ void ui_finalize_flow(void) {
 
   uiContext.nbPairs = 1;
 
-  nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, "Review fees", "", "Cancel",
-                          continue_transaction_review,
-                          prompt_cancel_transaction);
+  nbgl_pageNavigationInfo_t info = {.activePage = 0,
+                                    .nbPages = 0,
+                                    .navType = NAV_WITH_TAP,
+                                    .progressIndicator = true,
+                                    .navWithTap.backButton = false,
+                                    .navWithTap.nextPageText = "Tap to continue",
+                                    .navWithTap.nextPageToken = 1,
+                                    .navWithTap.quitText = "Reject transaction",
+                                    .quitToken = 0,
+                                    .tuneId = TUNE_TAP_CASUAL};
+
+  nbgl_pageContent_t content = {
+      .type = TAG_VALUE_LIST,
+      .tagValueList.nbPairs = uiContext.nbPairs,
+      .tagValueList.pairs = (nbgl_layoutTagValue_t *)uiContext.tagValues
+  };
+
+  pageContext = nbgl_pageDrawGenericContent(&transaction_fee_callback, &info, &content);
+  nbgl_refresh();
 }
 
 void ui_request_change_path_approval_flow(void) {
