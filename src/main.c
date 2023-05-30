@@ -36,7 +36,7 @@
 #include "handle_get_printable_amount.h"
 #include "handle_check_address.h"
 #include "ui.h"
-#include "format.h"
+#include "lib_standard_app/format.h"
 
 #define __NAME3(a, b, c) a##b##c
 #define NAME3(a, b, c) __NAME3(a, b, c)
