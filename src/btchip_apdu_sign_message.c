@@ -86,7 +86,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                     unsigned char chunkLength;
                     unsigned char messageLength[3];
                     unsigned char messageLengthSize;
-                    os_memset(&btchip_context_D.transactionSummary, 0,
+                    memset(&btchip_context_D.transactionSummary, 0,
                               sizeof(btchip_transaction_summary_t));
                     if (G_io_apdu_buffer[offset] > MAX_BIP32_PATH) {
                         PRINTF("Invalid path\n");
@@ -98,7 +98,7 @@ unsigned short btchip_apdu_sign_message_internal() {
                         COIN_P2PKH_VERSION;
                     btchip_context_D.transactionSummary.payToScriptHashVersion =
                         COIN_P2SH_VERSION;
-                    os_memmove(
+                    memmove(
                         btchip_context_D.transactionSummary.keyPath,
                         G_io_apdu_buffer + offset, MAX_BIP32_PATH_LENGTH);
                     offset += (4 * G_io_apdu_buffer[offset]) + 1;
@@ -217,7 +217,7 @@ unsigned short btchip_apdu_sign_message_internal() {
             sw = SW_TECHNICAL_DETAILS(0x0F);
         }
     discard : {
-        os_memset(&btchip_context_D.transactionSummary, 0,
+        memset(&btchip_context_D.transactionSummary, 0,
                   sizeof(btchip_transaction_summary_t));
     }
         FINALLY {
@@ -265,7 +265,7 @@ unsigned short btchip_compute_hash() {
             sw = SW_TECHNICAL_DETAILS(0x0F);
         }
         FINALLY {
-            os_memset(&btchip_context_D.transactionSummary, 0,
+            memset(&btchip_context_D.transactionSummary, 0,
                       sizeof(btchip_transaction_summary_t));
         }
     }

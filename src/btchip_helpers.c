@@ -59,9 +59,9 @@ const unsigned char ZEN_OUTPUT_SCRIPT_POST[] = {
 };                    // BIP0115 Replay Protection
 
 unsigned char btchip_output_script_is_regular(unsigned char *buffer) {
-    if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_PRE,
+    if ((memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_PRE,
                     sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE)) == 0) &&
-            (os_memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE) + 20,
+            (memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_PRE) + 20,
                        TRANSACTION_OUTPUT_SCRIPT_POST,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_POST)) == 0)) {
         return 1;
@@ -70,9 +70,9 @@ unsigned char btchip_output_script_is_regular(unsigned char *buffer) {
 }
 
 unsigned char btchip_output_script_is_p2sh(unsigned char *buffer) {
-    if ((os_memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE,
+    if ((memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE,
                     sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE)) == 0) &&
-            (os_memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE) + 20,
+            (memcmp(buffer + sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE) + 20,
                        TRANSACTION_OUTPUT_SCRIPT_P2SH_POST,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_POST)) == 0)) {
         return 1;
@@ -181,7 +181,7 @@ void btchip_compute_checksum(unsigned char* in, unsigned short inlen, unsigned c
     cx_hash_sha256(checksumBuffer, 32, checksumBuffer, 32);
 
     PRINTF("Checksum\n%.*H\n",4,checksumBuffer);
-    os_memmove(output, checksumBuffer, 4);
+    memmove(output, checksumBuffer, 4);
 }
 
 unsigned short btchip_public_key_to_encoded_base58(
@@ -204,7 +204,7 @@ unsigned short btchip_public_key_to_encoded_base58(
             tmpBuffer[0] = version;
         }
     } else {
-        os_memmove(tmpBuffer, in, 20 + versionSize);
+        memmove(tmpBuffer, in, 20 + versionSize);
     }
 
     btchip_compute_checksum(tmpBuffer, 20 + versionSize, tmpBuffer + 20 + versionSize);
@@ -242,7 +242,7 @@ unsigned short btchip_decode_base58_address(unsigned char *in,
     cx_sha256_init(&hash);
     cx_hash(&hash.header, CX_LAST, hashBuffer, 32, hashBuffer, 32);
 
-    if (os_memcmp(out + outlen - 4, hashBuffer, 4)) {
+    if (memcmp(out + outlen - 4, hashBuffer, 4)) {
         PRINTF("Hash checksum mismatch\n%.*H\n",sizeof(hashBuffer),hashBuffer);
         THROW(INVALID_CHECKSUM);
     }
@@ -287,7 +287,7 @@ void btchip_private_derive_keypair(unsigned char *bip32Path,
 
     io_seproxyhal_io_heartbeat();
 
-    os_memset(u.privateComponent, 0, sizeof(u.privateComponent));
+    memset(u.privateComponent, 0, sizeof(u.privateComponent));
 }
 
 /*
@@ -430,11 +430,11 @@ void btchip_transaction_add_output(unsigned char *hash160Address,
         btchip_swap_bytes(btchip_context_D.tmp, amount, 8);
         btchip_context_D.tmp += 8;
     }
-    os_memmove(btchip_context_D.tmp, (void *)pre, sizePre);
+    memmove(btchip_context_D.tmp, (void *)pre, sizePre);
     btchip_context_D.tmp += sizePre;
-    os_memmove(btchip_context_D.tmp, hash160Address, 20);
+    memmove(btchip_context_D.tmp, hash160Address, 20);
     btchip_context_D.tmp += 20;
-    os_memmove(btchip_context_D.tmp, (void *)post, sizePost);
+    memmove(btchip_context_D.tmp, (void *)post, sizePost);
     btchip_context_D.tmp += sizePost;
 }
 

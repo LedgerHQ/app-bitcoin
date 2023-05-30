@@ -31,6 +31,7 @@ void settings_pubkey_export_change(unsigned int enabled) {
 }
 
 static unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e) {
+  UNUSED(e);
   // user denied the transaction, tell the USB side
   if (!btchip_bagl_user_action(0)) {
     // redraw ui
@@ -40,6 +41,7 @@ static unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e) {
 }
 
 static unsigned int io_seproxyhal_touch_verify_ok(const bagl_element_t *e) {
+  UNUSED(e);
   // user accepted the transaction, tell the USB side
   if (!btchip_bagl_user_action(1)) {
     // redraw ui
@@ -50,6 +52,7 @@ static unsigned int io_seproxyhal_touch_verify_ok(const bagl_element_t *e) {
 
 static unsigned int
 io_seproxyhal_touch_message_signature_verify_cancel(const bagl_element_t *e) {
+  UNUSED(e);
   // user denied the transaction, tell the USB side
   btchip_bagl_user_action_message_signing(0);
   // redraw ui
@@ -59,6 +62,7 @@ io_seproxyhal_touch_message_signature_verify_cancel(const bagl_element_t *e) {
 
 static unsigned int
 io_seproxyhal_touch_message_signature_verify_ok(const bagl_element_t *e) {
+  UNUSED(e);
   // user accepted the transaction, tell the USB side
   btchip_bagl_user_action_message_signing(1);
   // redraw ui
@@ -68,6 +72,7 @@ io_seproxyhal_touch_message_signature_verify_ok(const bagl_element_t *e) {
 
 static unsigned int
 io_seproxyhal_touch_display_cancel(const bagl_element_t *e) {
+  UNUSED(e);
   // user denied the transaction, tell the USB side
   btchip_bagl_user_action_display(0);
   // redraw ui
@@ -76,6 +81,7 @@ io_seproxyhal_touch_display_cancel(const bagl_element_t *e) {
 }
 
 static unsigned int io_seproxyhal_touch_display_ok(const bagl_element_t *e) {
+  UNUSED(e);
   // user accepted the transaction, tell the USB side
   btchip_bagl_user_action_display(1);
   // redraw ui
@@ -84,6 +90,7 @@ static unsigned int io_seproxyhal_touch_display_ok(const bagl_element_t *e) {
 }
 
 static unsigned int io_seproxyhal_touch_sign_cancel(const bagl_element_t *e) {
+  UNUSED(e);
   // user denied the transaction, tell the USB side
   btchip_bagl_user_action_signtx(0, 0);
   // redraw ui
@@ -92,6 +99,7 @@ static unsigned int io_seproxyhal_touch_sign_cancel(const bagl_element_t *e) {
 }
 
 static unsigned int io_seproxyhal_touch_sign_ok(const bagl_element_t *e) {
+  UNUSED(e);
   // user accepted the transaction, tell the USB side
   btchip_bagl_user_action_signtx(1, 0);
   // redraw ui
