@@ -139,12 +139,12 @@ static void status_callback(bool confirm) {
 static void prompt_cancel(flow_type_t type) {
   switch (type) {
       case MESSAGE_TYPE: 
-          nbgl_useCaseConfirm("Reject message", "", "Yes, Reject",
+          nbgl_useCaseConfirm("Reject message", NULL, "Yes, Reject",
                   "Go back to message", abandon_status);
           break;
 
       case TRANSACTION_TYPE:
-          nbgl_useCaseConfirm("Reject transaction", "", "Yes, Reject",
+          nbgl_useCaseConfirm("Reject transaction", NULL, "Yes, Reject",
                   "Go back to transaction", abandon_status);
           break;
   }
@@ -251,14 +251,14 @@ static void continue_message_review(void) {
 static void ui_start(void (*cb)(void), flow_type_t type) {
   switch (type) {
       case MESSAGE_TYPE: 
-          nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, "Review\nmessage", "",
+          nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, "Review\nmessage", NULL,
                   "Cancel", continue_message_review,
                   prompt_cancel_message);
           break;
 
       case TRANSACTION_TYPE:
           snprintf(text, sizeof(text), "Review transaction\nto send %s", G_coin_config->name);
-          nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, text, "",
+          nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, text, NULL,
                   "Cancel", cb, prompt_cancel_transaction);
           break;
   }
@@ -416,7 +416,7 @@ void ui_request_pubkey_approval_flow(void) {
 
     ui_transaction_start(ui_request_pubkey_approval_flow);
   } else {
-    nbgl_useCaseChoice(&G_coin_config->img_nbgl, "Export public key", "",
+    nbgl_useCaseChoice(&G_coin_config->img_nbgl, "Export public key", NULL,
                        "Approve", "Reject", transaction_review_callback);
   }
 }
@@ -461,7 +461,7 @@ static void unusual_derivation_cb(bool status) {
   }
 }
 static void warn_unusual_derivation_path(void) {
-  nbgl_useCaseChoice(&C_round_warning_64px, "Unusual\nderivation path", "",
+  nbgl_useCaseChoice(&C_round_warning_64px, "Unusual\nderivation path", NULL,
                      "Continue", "Reject if not sure", unusual_derivation_cb);
 }
 
@@ -469,11 +469,11 @@ static void prompt_public_key(bool warning) {
   snprintf(text, sizeof(text), "Verify %s\naddress", G_coin_config->name);
 
   if (warning) {
-    nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, text, "",
+    nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, text, NULL,
                             "Cancel", warn_unusual_derivation_path,
                             abandon_status);
   } else {
-    nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, text, "",
+    nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, text, NULL,
                             "Cancel", display_pubkey_callback, abandon_status);
   }
 }
