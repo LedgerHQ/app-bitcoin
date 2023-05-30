@@ -28,13 +28,19 @@ typedef enum {
     TRANSACTION_TYPE 
 } flow_type_t;
 
+enum {
+    CANCEL_TOKEN,
+    CONFIRM_TOKEN,
+    BACK_TOKEN,
+};
+
 
 typedef struct {
   bool transaction_prompt_done;
-  char *prompt_cancel_message;
-  char *prompt;            // text displayed in last transaction page
-  char *approved_status;   // text displayed in confirmation page (after long press)
-  char *abandon_status;    // text displayed in rejection page (after reject confirmed)
+  const char *prompt_cancel_message;
+  const char *prompt;            // text displayed in last transaction page
+  const char *approved_status;   // text displayed in confirmation page (after long press)
+  const char *abandon_status;    // text displayed in rejection page (after reject confirmed)
   void (*approved_cb)(void);
   void (*abandon_cb)(void);
   nbgl_layoutTagValueList_t tagValueList;
@@ -43,6 +49,7 @@ typedef struct {
   uint8_t nbPairs;
 } UiContext_t;
 
+static char text[40];
 static nbgl_page_t *pageContext;
 static UiContext_t uiContext = {.transaction_prompt_done = 0};
 
@@ -110,11 +117,13 @@ static void releaseContext(void) {
 // Status
 static void abandon_status(void) {
   nbgl_useCaseStatus(uiContext.abandon_status, false, uiContext.abandon_cb);
+  releaseContext();
   uiContext.transaction_prompt_done = false;
 }
 
 static void approved_status(void) {
   nbgl_useCaseStatus(uiContext.approved_status, true, uiContext.approved_cb);
+  releaseContext();
   uiContext.transaction_prompt_done = false;
 }
 
@@ -130,12 +139,12 @@ static void status_callback(bool confirm) {
 static void prompt_cancel(flow_type_t type) {
   switch (type) {
       case MESSAGE_TYPE: 
-          nbgl_useCaseConfirm("Reject message", "", "Yes, Reject",
+          nbgl_useCaseConfirm("Reject message", NULL, "Yes, Reject",
                   "Go back to message", abandon_status);
           break;
 
       case TRANSACTION_TYPE:
-          nbgl_useCaseConfirm("Reject transaction", "", "Yes, Reject",
+          nbgl_useCaseConfirm("Reject transaction", NULL, "Yes, Reject",
                   "Go back to transaction", abandon_status);
           break;
   }
@@ -151,7 +160,52 @@ static void prompt_cancel_transaction(void) {
 
 static void transaction_review_callback(bool token) {
   if (token) {
+    releaseContext();
     uiContext.approved_cb();
+  } else {
+    prompt_cancel_transaction();
+  }
+}
+
+static void transaction_finish_callback(int token, uint8_t index) {
+  (void) index;
+  switch (token) {
+      case CANCEL_TOKEN:
+          prompt_cancel_transaction();
+          break;
+      case CONFIRM_TOKEN:
+          releaseContext();
+          uiContext.approved_cb();
+          break;
+      case BACK_TOKEN:
+          ui_finalize_flow();
+          break;
+  }
+}
+
+static void transaction_fee_callback(int token, uint8_t index) {
+  (void) index;
+  if (token) {
+        releaseContext();
+        nbgl_pageNavigationInfo_t info = {.activePage = 0,
+                                          .nbPages = 0,
+                                          .navType = NAV_WITH_TAP,
+                                          .progressIndicator = true,
+                                          .navWithTap.backButton = true,
+                                          .navWithTap.backToken = BACK_TOKEN,
+                                          .navWithTap.nextPageText = NULL,
+                                          .navWithTap.quitText = "Reject transaction",
+                                          .quitToken = CANCEL_TOKEN,
+                                          .tuneId = TUNE_TAP_CASUAL};
+
+        nbgl_pageContent_t content = {.type = INFO_LONG_PRESS,
+                                      .infoLongPress.icon = &G_coin_config->img_nbgl,
+                                      .infoLongPress.text = "Sign transaction\nto send Bitcoin?",
+                                      .infoLongPress.longPressText = "Hold to sign",
+                                      .infoLongPress.longPressToken = CONFIRM_TOKEN,
+                                      .infoLongPress.tuneId = TUNE_TAP_NEXT};
+
+        pageContext = nbgl_pageDrawGenericContent(&transaction_finish_callback, &info, &content);
   } else {
     prompt_cancel_transaction();
   }
@@ -193,21 +247,18 @@ static void continue_message_review(void) {
     continue_review(MESSAGE_TYPE);
 }
 
-static void continue_transaction_review(void) {
-  continue_review(TRANSACTION_TYPE);
-}
-
 // UI Start
 static void ui_start(void (*cb)(void), flow_type_t type) {
   switch (type) {
       case MESSAGE_TYPE: 
-          nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, "Review\nmessage", "",
+          nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, "Review\nmessage", NULL,
                   "Cancel", continue_message_review,
                   prompt_cancel_message);
           break;
 
       case TRANSACTION_TYPE:
-          nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, "Review\ntransaction", "",
+          snprintf(text, sizeof(text), "Review transaction\nto send %s", G_coin_config->name);
+          nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, text, NULL,
                   "Cancel", cb, prompt_cancel_transaction);
           break;
   }
@@ -238,7 +289,7 @@ static void display_pubkey_callback(void) {
       uiContext.tagValueList.pairs = &uiContext.tagValues[1];
       uiContext.tagValueList.nbPairs = 1;
 
-      nbgl_useCaseAddressConfirmationExt(uiContext.tagValues[0].value, status_callback, &uiContext.tagValueList.pairs);
+      nbgl_useCaseAddressConfirmationExt(uiContext.tagValues[0].value, status_callback, &uiContext.tagValueList);
   }
 }
 
@@ -273,9 +324,8 @@ void ui_confirm_single_flow(void) {
     uiContext.nbPairs = 3;
 
     nbgl_pageNavigationInfo_t info = {
-        .activePage =
-            btchip_context_D.totalOutputs - btchip_context_D.remainingOutputs,
-        .nbPages = btchip_context_D.totalOutputs - 1,
+        .activePage = 0,
+        .nbPages = 0,
         .navType = NAV_WITH_TAP,
         .progressIndicator = true,
         .navWithTap.backButton = false,
@@ -305,9 +355,25 @@ void ui_finalize_flow(void) {
 
   uiContext.nbPairs = 1;
 
-  nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, "Review fees", "", "Cancel",
-                          continue_transaction_review,
-                          prompt_cancel_transaction);
+  nbgl_pageNavigationInfo_t info = {.activePage = 0,
+                                    .nbPages = 0,
+                                    .navType = NAV_WITH_TAP,
+                                    .progressIndicator = true,
+                                    .navWithTap.backButton = false,
+                                    .navWithTap.nextPageText = "Tap to continue",
+                                    .navWithTap.nextPageToken = 1,
+                                    .navWithTap.quitText = "Reject transaction",
+                                    .quitToken = 0,
+                                    .tuneId = TUNE_TAP_CASUAL};
+
+  nbgl_pageContent_t content = {
+      .type = TAG_VALUE_LIST,
+      .tagValueList.nbPairs = uiContext.nbPairs,
+      .tagValueList.pairs = (nbgl_layoutTagValue_t *)uiContext.tagValues
+  };
+
+  pageContext = nbgl_pageDrawGenericContent(&transaction_fee_callback, &info, &content);
+  nbgl_refresh();
 }
 
 void ui_request_change_path_approval_flow(void) {
@@ -350,7 +416,7 @@ void ui_request_pubkey_approval_flow(void) {
 
     ui_transaction_start(ui_request_pubkey_approval_flow);
   } else {
-    nbgl_useCaseChoice(&G_coin_config->img_nbgl, "Export public key", "",
+    nbgl_useCaseChoice(&G_coin_config->img_nbgl, "Export public key", NULL,
                        "Approve", "Reject", transaction_review_callback);
   }
 }
@@ -395,25 +461,27 @@ static void unusual_derivation_cb(bool status) {
   }
 }
 static void warn_unusual_derivation_path(void) {
-  nbgl_useCaseChoice(&C_round_warning_64px, "Unusual\nderivation path", "",
+  nbgl_useCaseChoice(&C_round_warning_64px, "Unusual\nderivation path", NULL,
                      "Continue", "Reject if not sure", unusual_derivation_cb);
 }
 
 static void prompt_public_key(bool warning) {
+  snprintf(text, sizeof(text), "Verify %s\naddress", G_coin_config->name);
+
   if (warning) {
-    nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, "Confirm\npublic key", "",
+    nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, text, NULL,
                             "Cancel", warn_unusual_derivation_path,
                             abandon_status);
   } else {
-    nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, "Confirm\npublic key", "",
+    nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, text, NULL,
                             "Cancel", display_pubkey_callback, abandon_status);
   }
 }
 
 static void display_public_key(bool warning) {
-  uiContext.abandon_status = "Public key\nrejected";
-  uiContext.approved_status = "PUBLIC KEY\nCONFIRMED";
-  uiContext.prompt_cancel_message = "Reject\nPublic key?";
+  uiContext.abandon_status = "Address verification\ncancelled";
+  uiContext.approved_status = "ADDRESS\nVERIFIED";
+  uiContext.prompt_cancel_message = "Reject\nAddress?";
 
   uiContext.tagValues[0].item = "Address";
   uiContext.tagValues[0].value = (char *)G_io_apdu_buffer + 200;

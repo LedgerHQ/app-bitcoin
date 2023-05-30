@@ -36,6 +36,7 @@
 #include "handle_get_printable_amount.h"
 #include "handle_check_address.h"
 #include "ui.h"
+#include "lib_standard_app/format.h"
 
 #define __NAME3(a, b, c) a##b##c
 #define NAME3(a, b, c) __NAME3(a, b, c)
@@ -71,6 +72,7 @@ unsigned short io_exchange_al(unsigned char channel, unsigned short tx_len) {
 }
 
 unsigned char io_event(unsigned char channel) {
+    UNUSED(channel);
     // nothing done with the event, throw an error on the transport layer if
     // needed
 
@@ -157,7 +159,7 @@ uint8_t check_fee_swap() {
 
 uint8_t prepare_fees() {
     if (btchip_context_D.transactionContext.relaxed) {
-        os_memmove(vars.tmp.feesAmount, "UNKNOWN", 7);
+        memmove(vars.tmp.feesAmount, "UNKNOWN", 7);
         vars.tmp.feesAmount[7] = '\0';
     } else {
         unsigned char fees[8];
@@ -168,7 +170,7 @@ uint8_t prepare_fees() {
                 fees, btchip_context_D.transactionContext.transactionAmount,
                 btchip_context_D.totalOutputAmount);
         if (borrow && G_coin_config->kind == COIN_KIND_KOMODO) {
-            os_memmove(vars.tmp.feesAmount, "REWARD", 6);
+            memmove(vars.tmp.feesAmount, "REWARD", 6);
             vars.tmp.feesAmount[6] = '\0';
         }
         else {
@@ -176,7 +178,7 @@ uint8_t prepare_fees() {
                 PRINTF("Error : Fees not consistent");
                 goto error;
             }
-            os_memmove(vars.tmp.feesAmount, G_coin_config->name_short,
+            memmove(vars.tmp.feesAmount, G_coin_config->name_short,
                        strlen(G_coin_config->name_short));
             vars.tmp.feesAmount[strlen(G_coin_config->name_short)] = ' ';
             btchip_context_D.tmp =
@@ -198,17 +200,17 @@ error:
 
 void get_address_from_output_script(unsigned char* script, int script_size, char* out, int out_size) {
     if (btchip_output_script_is_op_return(script)) {
-        strcpy(out, "OP_RETURN");
+        strncpy(out, "OP_RETURN", out_size);
         return;
     }
     if ((G_coin_config->kind == COIN_KIND_QTUM || G_coin_config->kind == COIN_KIND_HYDRA) &&
         btchip_output_script_is_op_create(script, script_size)) {
-        strcpy(out, "OP_CREATE");
+        strncpy(out, "OP_CREATE", out_size);
         return;
     }
     if ((G_coin_config->kind == COIN_KIND_QTUM || G_coin_config->kind == COIN_KIND_HYDRA) &&
         btchip_output_script_is_op_call(script, script_size)) {
-        strcpy(out, "OP_CALL");
+        strncpy(out, "OP_CALL", out_size);
         return;
     }
     if (btchip_output_script_is_native_witness(script)) {
@@ -239,7 +241,7 @@ void get_address_from_output_script(unsigned char* script, int script_size, char
         versionSize = 1;
         address[0] = version;
     }
-    os_memmove(address + versionSize, script + addressOffset, 20);
+    memmove(address + versionSize, script + addressOffset, 20);
 
     // Prepare address
     if (btchip_context_D.usingCashAddr) {
@@ -273,8 +275,8 @@ uint8_t prepare_single_output() {
 
     // Handle Omni simple send
     if ((btchip_context_D.currentOutput[offset + 2] == 0x14) &&
-        (os_memcmp(btchip_context_D.currentOutput + offset + 3, "omni", 4) == 0) &&
-        (os_memcmp(btchip_context_D.currentOutput + offset + 3 + 4, "\0\0\0\0", 4) == 0)) {
+        (memcmp(btchip_context_D.currentOutput + offset + 3, "omni", 4) == 0) &&
+        (memcmp(btchip_context_D.currentOutput + offset + 3 + 4, "\0\0\0\0", 4) == 0)) {
             uint8_t headerLength;
             uint32_t omniAssetId = btchip_read_u32(btchip_context_D.currentOutput + offset + 3 + 4 + 4, 1, 0);
             switch(omniAssetId) {
@@ -297,7 +299,7 @@ uint8_t prepare_single_output() {
             vars.tmp.fullAmount[textSize + headerLength] = '\0';
     }
     else {
-        os_memmove(vars.tmp.fullAmount, G_coin_config->name_short,
+        memmove(vars.tmp.fullAmount, G_coin_config->name_short,
                strlen(G_coin_config->name_short));
         vars.tmp.fullAmount[strlen(G_coin_config->name_short)] = ' ';
         btchip_context_D.tmp =
@@ -317,7 +319,7 @@ uint8_t prepare_message_signature() {
     cx_hash(&btchip_context_D.transactionHashAuthorization.header, CX_LAST,
             (uint8_t*)vars.tmp.fullAmount, 0, buffer, 32);
 
-    snprintf(vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress), "%.*H", buffer);
+    format_hex((const uint8_t*) vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress), (char*) buffer, sizeof(buffer));
     return 1;
 }
 
@@ -358,7 +360,7 @@ unsigned int btchip_silent_confirm_single_output() {
                 break;
         }
 
-        os_memmove(btchip_context_D.currentOutput,
+        memmove(btchip_context_D.currentOutput,
                     btchip_context_D.currentOutput +
                         btchip_context_D.discardSize,
                     btchip_context_D.currentOutputOffset -
@@ -452,7 +454,7 @@ uint8_t set_key_path_to_display(unsigned char* keyPath) {
 
 void btchip_bagl_display_public_key(uint8_t is_derivation_path_unusual) {
     // append a white space at the end of the address to avoid glitch on nano S
-    strcat((char *)G_io_apdu_buffer + 200, " ");
+    strlcat((char *)G_io_apdu_buffer + 200, " ", sizeof(G_io_apdu_buffer) - 200);
 
     if (is_derivation_path_unusual) {
         ui_display_public_with_warning_flow();
@@ -503,7 +505,7 @@ void app_exit(void) {
 }
 
 void init_coin_config(btchip_altcoin_config_t *coin_config) {
-    os_memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
+    memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
     coin_config->bip44_coin_type = BIP44_COIN_TYPE;
     coin_config->bip44_coin_type2 = BIP44_COIN_TYPE_2;
     coin_config->p2pkh_version = COIN_P2PKH_VERSION;

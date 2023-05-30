@@ -27,7 +27,7 @@ void btchip_autosetup() {
     btchip_config_t config;
     unsigned char i;
     unsigned char tmp[32];
-    os_memset(&config, 0, sizeof(btchip_config_t));
+    memset(&config, 0, sizeof(btchip_config_t));
     config.options |= BTCHIP_OPTION_DETERMINISTIC_SIGNATURE;
     config.options |= BTCHIP_OPTION_SKIP_2FA_P2SH; // TODO : remove when
                                                    // supporting multi output
