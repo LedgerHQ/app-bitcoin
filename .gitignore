@@ -6,3 +6,4 @@ obj
 .idea
 .vscode
 build
+scan-build/
