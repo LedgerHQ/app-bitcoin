@@ -41,8 +41,11 @@ DEFINES   += BIP44_COIN_TYPE=133 BIP44_COIN_TYPE_2=133 COIN_P2PKH_VERSION=7352 C
 DEFINES   += COIN_CONSENSUS_BRANCH_ID=0XC2D6D0B4
 APPNAME ="Zcash"
 APP_LOAD_PARAMS += --path $(APP_PATH)
-DEFINES_LIB=# we're not using the lib :)
-APP_LOAD_FLAGS=--appFlags 0xa50
+ifeq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOX TARGET_STAX))
+APP_LOAD_PARAMS += --appFlags 0x200  # APPLICATION_FLAG_BOLOS_SETTINGS
+else
+APP_LOAD_PARAMS += --appFlags 0x000
+endif
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
 $(error Only Zcash is supported)
