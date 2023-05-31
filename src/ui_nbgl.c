@@ -187,6 +187,7 @@ static void transaction_fee_callback(int token, uint8_t index) {
   (void) index;
   if (token) {
         releaseContext();
+        snprintf(text, sizeof(text), "Sign transaction\nto send %s", G_coin_config->name);
         nbgl_pageNavigationInfo_t info = {.activePage = 0,
                                           .nbPages = 0,
                                           .navType = NAV_WITH_TAP,
@@ -200,7 +201,7 @@ static void transaction_fee_callback(int token, uint8_t index) {
 
         nbgl_pageContent_t content = {.type = INFO_LONG_PRESS,
                                       .infoLongPress.icon = &G_coin_config->img_nbgl,
-                                      .infoLongPress.text = "Sign transaction\nto send Bitcoin?",
+                                      .infoLongPress.text = text,
                                       .infoLongPress.longPressText = "Hold to sign",
                                       .infoLongPress.longPressToken = CONFIRM_TOKEN,
                                       .infoLongPress.tuneId = TUNE_TAP_NEXT};
