@@ -31,7 +31,6 @@
 #define NB_SETTINGS_SWITCHES 1
 #define SWITCH_PUBLIC_KEY_SET_TOKEN FIRST_USER_TOKEN
 
-static char text[20];
 static const char *const infoTypes[] = {"Version", "Developer"};
 static const char *const infoContents[] = {APPVERSION, "Ledger"};
 
@@ -84,15 +83,13 @@ static void settings_control_cb(int token, uint8_t index) {
 }
 
 static void display_settings_menu(void) {
-  snprintf(text, sizeof(text), "%s settings", G_coin_config->name);
-
-  nbgl_useCaseSettings(text, PAGE_START, NB_PAGE_SETTING, IS_TOUCHABLE,
+  nbgl_useCaseSettings("ZCash Settings", PAGE_START, NB_PAGE_SETTING, IS_TOUCHABLE,
                        ui_idle_flow, settings_navigation_cb,
                        settings_control_cb);
 }
 
 void ui_idle_flow(void) {
-  nbgl_useCaseHome(G_coin_config->name, &G_coin_config->img_nbgl, NULL, true,
+  nbgl_useCaseHome("ZCash", &C_zcash_64px, NULL, true,
                    display_settings_menu, quit_cb);
 }
 #endif // HAVE_NBGL

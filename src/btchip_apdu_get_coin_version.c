@@ -31,10 +31,12 @@ unsigned short btchip_apdu_get_coin_version() {
         return BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
     }
 
-    G_io_apdu_buffer[offset++] = COIN_P2PKH_VERSION >> 8;
-    G_io_apdu_buffer[offset++] = COIN_P2PKH_VERSION;
-    G_io_apdu_buffer[offset++] = COIN_P2SH_VERSION >> 8;
-    G_io_apdu_buffer[offset++] = COIN_P2SH_VERSION;
+    uint16_t p2pkh_version = COIN_P2PKH_VERSION;
+    uint16_t p2sh_version = COIN_P2SH_VERSION;
+    G_io_apdu_buffer[offset++] = p2pkh_version >> 8;
+    G_io_apdu_buffer[offset++] = p2pkh_version;
+    G_io_apdu_buffer[offset++] = p2sh_version >> 8;
+    G_io_apdu_buffer[offset++] = p2sh_version;
     G_io_apdu_buffer[offset++] = COIN_FAMILY;
     G_io_apdu_buffer[offset++] = strlen(COIN_COINID);
     memmove(G_io_apdu_buffer + offset, COIN_COINID, strlen(COIN_COINID));

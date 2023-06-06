@@ -81,6 +81,7 @@ unsigned char btchip_output_script_is_p2sh(unsigned char *buffer) {
 }
 
 unsigned char btchip_output_script_is_native_witness(unsigned char *buffer) {
+    UNUSED(buffer);
     return 0;
 }
 

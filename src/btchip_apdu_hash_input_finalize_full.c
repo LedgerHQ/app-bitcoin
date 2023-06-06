@@ -45,7 +45,6 @@ static bool check_output_displayable() {
     bool displayable = true;
     unsigned char amount[8], isOpReturn, isP2sh, isNativeSegwit, j,
         nullAmount = 1;
-    unsigned char isOpCreate, isOpCall;
 
     for (j = 0; j < 8; j++) {
         if (btchip_context_D.currentOutput[j] != 0) {
@@ -63,12 +62,6 @@ static bool check_output_displayable() {
     isP2sh = btchip_output_script_is_p2sh(btchip_context_D.currentOutput + 8);
     isNativeSegwit = btchip_output_script_is_native_witness(
         btchip_context_D.currentOutput + 8);
-    isOpCreate =
-        btchip_output_script_is_op_create(btchip_context_D.currentOutput + 8,
-          sizeof(btchip_context_D.currentOutput) - 8);
-    isOpCall =
-        btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8,
-          sizeof(btchip_context_D.currentOutput) - 8);
     if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {
         bool changeFound = false;
         unsigned char addressOffset =
@@ -422,10 +415,10 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                               sizeof(btchip_transaction_summary_t));
                 }
 
-                transactionSummary->payToAddressVersion =
-                    COIN_P2PKH_VERSION;
-                transactionSummary->payToScriptHashVersion =
-                    COIN_P2SH_VERSION;
+                uint16_t p2pkh_version = COIN_P2PKH_VERSION;
+                uint16_t p2sh_version = COIN_P2SH_VERSION;
+                transactionSummary->payToAddressVersion = p2pkh_version;
+                transactionSummary->payToScriptHashVersion = p2sh_version;
 
                 // Generate new nonce
 

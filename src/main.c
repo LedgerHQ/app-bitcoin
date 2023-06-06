@@ -173,7 +173,7 @@ uint8_t prepare_fees() {
             PRINTF("Error : Fees not consistent");
             goto error;
         }
-        os_memmove(vars.tmp.feesAmount, COIN_COINID_SHORT,
+        memmove(vars.tmp.feesAmount, COIN_COINID_SHORT,
                 sizeof(COIN_COINID_SHORT) - 1);
         vars.tmp.feesAmount[sizeof(COIN_COINID_SHORT) - 1] = ' ';
         btchip_context_D.tmp =
@@ -193,6 +193,7 @@ error:
 #define USDT_ASSETID 31
 
 void get_address_from_output_script(unsigned char* script, int script_size, char* out, int out_size) {
+    UNUSED(script_size);
     if (btchip_output_script_is_op_return(script)) {
         strncpy(out, "OP_RETURN", out_size);
         return;

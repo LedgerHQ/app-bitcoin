@@ -76,8 +76,6 @@ unsigned short btchip_apdu_hash_input_start() {
                 (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_CASHADDR) ||
                 (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_OVERWINTER) ||
                 (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_SAPLING);
-            unsigned char usingCashAddr =
-                (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_CASHADDR);
             // Request PIN validation
             // Only request PIN validation (user presence) to start a new
             // transaction signing flow.

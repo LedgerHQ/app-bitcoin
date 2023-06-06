@@ -94,10 +94,12 @@ unsigned short btchip_apdu_sign_message_internal() {
                         CLOSE_TRY;
                         goto discard;
                     }
-                    btchip_context_D.transactionSummary.payToAddressVersion =
-                        COIN_P2PKH_VERSION;
+                    uint16_t p2pkh_version = COIN_P2PKH_VERSION;
+                    uint16_t p2sh_version = COIN_P2SH_VERSION;
+                    btchip_context_D.transactionSummary.payToAddressVersion = 
+                        p2pkh_version;
                     btchip_context_D.transactionSummary.payToScriptHashVersion =
-                        COIN_P2SH_VERSION;
+                        p2sh_version;
                     memmove(
                         btchip_context_D.transactionSummary.keyPath,
                         G_io_apdu_buffer + offset, MAX_BIP32_PATH_LENGTH);

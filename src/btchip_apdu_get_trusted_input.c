@@ -85,7 +85,7 @@ unsigned short btchip_apdu_get_trusted_input() {
         if (!btchip_context_D.NU5Transaction) {
             cx_hash_sha256(G_io_apdu_buffer + TRUSTED_INPUT_SIZE, 32, G_io_apdu_buffer + 4, 32);
         } else {
-            os_memmove(G_io_apdu_buffer + 4, G_io_apdu_buffer + TRUSTED_INPUT_SIZE, 32);
+            memmove(G_io_apdu_buffer + 4, G_io_apdu_buffer + TRUSTED_INPUT_SIZE, 32);
         }
 
         btchip_write_u32_le(G_io_apdu_buffer + 4 + 32,
