@@ -16,13 +16,20 @@ logging.basicConfig(level=logging.INFO)
 def pytest_addoption(parser):
     parser.addoption("--hid",
                      action="store_true")
+    parser.addoption("--model", action="store", default="nanos")
+
+
+@pytest.fixture
+def model(pytestconfig):
+    return pytestconfig.getoption("model")
+
 
 @pytest.fixture
 def hid(pytestconfig):
     return pytestconfig.getoption("hid")
 
 @pytest.fixture
-def device(request, hid):
+def device(request, hid, model):
     # If running on real hardware, nothing to do here
     if hid:
         yield

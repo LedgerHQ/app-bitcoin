@@ -76,8 +76,6 @@ unsigned short btchip_apdu_hash_input_start() {
                 (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_CASHADDR) ||
                 (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_OVERWINTER) ||
                 (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_SAPLING);
-            unsigned char usingCashAddr =
-                (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_CASHADDR);
             // Request PIN validation
             // Only request PIN validation (user presence) to start a new
             // transaction signing flow.
@@ -106,7 +104,7 @@ unsigned short btchip_apdu_hash_input_start() {
             btchip_context_D.segwitParsedOnce = 0;
             btchip_set_check_internal_structure_integrity(1);
             // Initialize for screen pairing
-            os_memset(&btchip_context_D.tmpCtx.output, 0,
+            memset(&btchip_context_D.tmpCtx.output, 0,
                       sizeof(btchip_context_D.tmpCtx.output));
             btchip_context_D.tmpCtx.output.changeAccepted = 1;
             // Reset segwitWarningSeen flag to prevent displaying the warning for each

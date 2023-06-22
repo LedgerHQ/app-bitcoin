@@ -23,6 +23,10 @@
 #include "cx.h"
 #include "btchip_secure_value.h"
 #include "btchip_filesystem_tx.h"
+#ifdef HAVE_NBGL
+#include "nbgl_types.h"
+#endif // HAVE_NBGL
+
 
 #define MAX_OUTPUT_TO_CHECK 100
 #define MAX_COIN_ID 13
@@ -299,6 +303,27 @@ typedef enum btchip_coin_kind_e {
     COIN_KIND_RAVENCOIN,
     COIN_KIND_HYDRA
 } btchip_coin_kind_t;
+
+typedef struct btchip_altcoin_config_s {
+    unsigned short bip44_coin_type;
+    unsigned short bip44_coin_type2;
+    unsigned short p2pkh_version;
+    unsigned short p2sh_version;
+    unsigned char family;
+#ifdef HAVE_NBGL
+    unsigned char img_raw[1024]; 
+    nbgl_icon_details_t img_nbgl;
+#endif // HAVE_NBGL
+    char coinid[14]; // used coind id for message signature prefix
+    char name[16]; // for ux displays
+    char name_short[6]; // for unit in ux displays
+    char native_segwit_prefix_val[5];
+    const char* native_segwit_prefix; // null if no segwit prefix
+    unsigned int forkid;
+    unsigned int zcash_consensus_branch_id;
+    btchip_coin_kind_t kind;
+    unsigned int flags;
+} btchip_altcoin_config_t;
 
 void btchip_context_init(void);
 

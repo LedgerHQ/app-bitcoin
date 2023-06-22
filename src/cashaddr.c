@@ -117,7 +117,7 @@ int cashaddr_encode(uint8_t *hash, const size_t hash_length, uint8_t *addr,
     }
 
     tmp[0] = version_byte;
-    os_memmove(tmp + 1, hash, hash_length);
+    memmove(tmp + 1, hash, hash_length);
     convert_bits(payload, &payload_length, 5, tmp, hash_length + 1, 8, 1);
 
     create_checksum(payload, payload_length,

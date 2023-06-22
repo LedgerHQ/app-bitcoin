@@ -21,6 +21,7 @@
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
 #include "btchip_bagl_extensions.h"
+#include "ui.h"
 
 #define FINALIZE_P1_MORE 0x00
 #define FINALIZE_P1_LAST 0x80
@@ -34,7 +35,7 @@
 void btchip_apdu_hash_input_finalize_full_reset(void) {
     btchip_context_D.currentOutputOffset = 0;
     btchip_context_D.outputParsingState = BTCHIP_OUTPUT_PARSING_NUMBER_OUTPUTS;
-    os_memset(btchip_context_D.totalOutputAmount, 0,
+    memset(btchip_context_D.totalOutputAmount, 0,
               sizeof(btchip_context_D.totalOutputAmount));
     btchip_context_D.changeOutputFound = 0;
     btchip_set_check_internal_structure_integrity(1);
@@ -44,7 +45,6 @@ static bool check_output_displayable() {
     bool displayable = true;
     unsigned char amount[8], isOpReturn, isP2sh, isNativeSegwit, j,
         nullAmount = 1;
-    unsigned char isOpCreate, isOpCall;
 
     for (j = 0; j < 8; j++) {
         if (btchip_context_D.currentOutput[j] != 0) {
@@ -62,12 +62,6 @@ static bool check_output_displayable() {
     isP2sh = btchip_output_script_is_p2sh(btchip_context_D.currentOutput + 8);
     isNativeSegwit = btchip_output_script_is_native_witness(
         btchip_context_D.currentOutput + 8);
-    isOpCreate =
-        btchip_output_script_is_op_create(btchip_context_D.currentOutput + 8,
-          sizeof(btchip_context_D.currentOutput) - 8);
-    isOpCall =
-        btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8,
-          sizeof(btchip_context_D.currentOutput) - 8);
     if (btchip_context_D.tmpCtx.output.changeInitialized && !isOpReturn) {
         bool changeFound = false;
         unsigned char addressOffset =
@@ -75,7 +69,7 @@ static bool check_output_displayable() {
                             : isP2sh ? OUTPUT_SCRIPT_P2SH_PRE_LENGTH
                                      : OUTPUT_SCRIPT_REGULAR_PRE_LENGTH);
         if (!isP2sh &&
-            os_memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
+            memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
                       btchip_context_D.tmpCtx.output.changeAddress,
                       20) == 0) {
             changeFound = true;
@@ -83,10 +77,10 @@ static bool check_output_displayable() {
             unsigned char changeSegwit[22];
             changeSegwit[0] = 0x00;
             changeSegwit[1] = 0x14;
-            os_memmove(changeSegwit + 2,
+            memmove(changeSegwit + 2,
                        btchip_context_D.tmpCtx.output.changeAddress, 20);
             btchip_public_key_hash160(changeSegwit, 22, changeSegwit);
-            if (os_memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
+            if (memcmp(btchip_context_D.currentOutput + 8 + addressOffset,
                           changeSegwit, 20) == 0) {
                 // Attempt to avoid fatal failures on Bitcoin Cash
                 PRINTF("Error : Non spendable Segwit change");
@@ -196,7 +190,7 @@ bool handle_output_state() {
     }
 
     if (discardSize != 0) {
-        os_memmove(btchip_context_D.currentOutput,
+        memmove(btchip_context_D.currentOutput,
                    btchip_context_D.currentOutput + discardSize,
                    btchip_context_D.currentOutputOffset - discardSize);
         btchip_context_D.currentOutputOffset -= discardSize;
@@ -279,14 +273,14 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
                     goto discardTransaction;
                 }
-                os_memset(transactionSummary, 0,
+                memset(transactionSummary, 0,
                           sizeof(btchip_transaction_summary_t));
                 if (G_io_apdu_buffer[ISO_OFFSET_CDATA] == 0x00) {
                     // Called with no change path, abort, should be prevented on
                     // the client side
                     goto return_OK;
                 }
-                os_memmove(transactionSummary->keyPath,
+                memmove(transactionSummary->keyPath,
                            G_io_apdu_buffer + ISO_OFFSET_CDATA,
                            MAX_BIP32_PATH_LENGTH);
 
@@ -337,7 +331,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                     sw = BTCHIP_SW_INCORRECT_DATA;
                     goto discardTransaction;
                 }
-                os_memmove(btchip_context_D.currentOutput +
+                memmove(btchip_context_D.currentOutput +
                                btchip_context_D.currentOutputOffset,
                            G_io_apdu_buffer + ISO_OFFSET_CDATA, apduLength);
                 btchip_context_D.currentOutputOffset += apduLength;
@@ -417,14 +411,14 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
 
             if (btchip_context_D.transactionContext.firstSigned) {
                 if (!btchip_context_D.tmpCtx.output.changeInitialized) {
-                    os_memset(transactionSummary, 0,
+                    memset(transactionSummary, 0,
                               sizeof(btchip_transaction_summary_t));
                 }
 
-                transactionSummary->payToAddressVersion =
-                    COIN_P2PKH_VERSION;
-                transactionSummary->payToScriptHashVersion =
-                    COIN_P2SH_VERSION;
+                uint16_t p2pkh_version = COIN_P2PKH_VERSION;
+                uint16_t p2sh_version = COIN_P2SH_VERSION;
+                transactionSummary->payToAddressVersion = p2pkh_version;
+                transactionSummary->payToScriptHashVersion = p2sh_version;
 
                 // Generate new nonce
 
@@ -444,7 +438,7 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             // (this is done to keep the transaction counter limit per session
             // synchronized)
             if (btchip_context_D.transactionContext.firstSigned) {
-                os_memmove(transactionSummary->authorizationHash,
+                memmove(transactionSummary->authorizationHash,
                            authorizationHash,
                            sizeof(transactionSummary->authorizationHash));
                 goto return_OK;
@@ -477,11 +471,12 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
         CATCH_ALL {
             sw = SW_TECHNICAL_DETAILS(0x0F);
         catch_discardTransaction:
+            ui_transaction_error();
             btchip_context_D.transactionContext.transactionState =
                 BTCHIP_TRANSACTION_NONE;
             btchip_context_D.outLength = 0;
 
-            os_memmove(G_io_apdu_buffer, btchip_context_D.currentOutput,
+            memmove(G_io_apdu_buffer, btchip_context_D.currentOutput,
                        btchip_context_D.currentOutputOffset);
             btchip_context_D.outLength = btchip_context_D.currentOutputOffset;
         }
@@ -512,6 +507,7 @@ unsigned short btchip_apdu_hash_input_finalize_full() {
             status = btchip_bagl_confirm_single_output();
         }
         if (!status) {
+            ui_transaction_error();
             btchip_context_D.io_flags &= ~IO_ASYNCH_REPLY;
             btchip_context_D.transactionContext.transactionState =
                 BTCHIP_TRANSACTION_NONE;
@@ -536,7 +532,7 @@ unsigned char btchip_bagl_user_action(unsigned char confirming) {
         }
 
         while (btchip_context_D.remainingOutputs != 0) {
-            os_memmove(btchip_context_D.currentOutput,
+            memmove(btchip_context_D.currentOutput,
                        btchip_context_D.currentOutput +
                            btchip_context_D.discardSize,
                        btchip_context_D.currentOutputOffset -
@@ -609,6 +605,7 @@ unsigned char btchip_bagl_user_action(unsigned char confirming) {
 
     if ((btchip_context_D.outputParsingState == BTCHIP_OUTPUT_FINALIZE_TX) ||
         (sw != BTCHIP_SW_OK)) {
+
         // we've finished the processing of the input
         btchip_apdu_hash_input_finalize_full_reset();
     }

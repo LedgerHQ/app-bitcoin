@@ -1,10 +1,31 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - master
+  pull_request:
+    branches:
+    - master
+    - develop
+
 
 jobs:
   job_build:
     name: Compilation
+    strategy:
+      matrix:
+        include:
+          - model: nanos
+            SDK: "$NANOS_SDK"
+          - model: nanox
+            SDK: "$NANOX_SDK"
+          - model: nanosp
+            SDK: "$NANOSP_SDK"
+          - model: stax
+            SDK: "$STAX_SDK"
+
     runs-on: ubuntu-latest
 
     container:
@@ -26,6 +47,14 @@ jobs:
 
   job_test:
     name: Tests
+    strategy:
+      matrix:
+        include:
+          - model: nanos
+          - model: nanox
+          - model: nanosp
+          - model: stax
+
     needs: job_build
     runs-on: ubuntu-latest
 
@@ -58,4 +87,5 @@ jobs:
 
       - name: Run tests
         run: |
-          cd tests && pip install -r requirements.txt && SPECULOS=/speculos/speculos.py pytest
+          cd tests && pip install -r requirements.txt && SPECULOS=/speculos/speculos.py pytest --model=${{ matrix.model }}
+

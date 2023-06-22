@@ -19,6 +19,7 @@
 #include "btchip_apdu_constants.h"
 #include "btchip_bagl_extensions.h"
 #include "btchip_display_variables.h"
+#include "ui.h"
 
 #define SIGHASH_ALL 0x01
 
@@ -96,7 +97,7 @@ unsigned short btchip_apdu_hash_sign() {
                 CLOSE_TRY;
                 goto catch_discardTransaction;
             }
-            os_memmove(btchip_context_D.transactionSummary.keyPath,
+            memmove(btchip_context_D.transactionSummary.keyPath,
                 G_io_apdu_buffer + ISO_OFFSET_CDATA,
                 MAX_BIP32_PATH_LENGTH);
             parameters += (4 * G_io_apdu_buffer[ISO_OFFSET_CDATA]) + 1;
@@ -191,6 +192,8 @@ void btchip_bagl_user_action_signtx(unsigned char confirming, unsigned char dire
 
         btchip_context_D.outLength = G_io_apdu_buffer[1] + 2;
         G_io_apdu_buffer[btchip_context_D.outLength++] = btchip_context_D.transactionSummary.sighashType;
+        ui_transaction_finish();
+
     } else {
         sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
         btchip_context_D.outLength = 0;
