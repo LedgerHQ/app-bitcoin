@@ -22,6 +22,11 @@ bool copy_transaction_parameters(create_transaction_parameters_t* sign_transacti
     // input {0xEE, 0x00, 0xFF} should be stored like {0x00, 0x00, 0x00, 0x00, 0x00, 0xEE, 0x00, 0xFF}
     memcpy(stack_data.amount + 8 - sign_transaction_params->amount_length, sign_transaction_params->amount, sign_transaction_params->amount_length);
     memcpy(stack_data.fees + 8 - sign_transaction_params->fee_amount_length, sign_transaction_params->fee_amount, sign_transaction_params->fee_amount_length);
+
+    // Erase values inherited from Exchange app
+    os_explicit_zero_BSS_segment();
+
+    // Copy from stack back to global data segment
     memcpy(&vars.swap_data, &stack_data, sizeof(stack_data));
     return true;
 }
