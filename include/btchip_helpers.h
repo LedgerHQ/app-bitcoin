@@ -83,7 +83,7 @@ void btchip_swap_bytes(unsigned char *target, unsigned char *source,
 
 void btchip_sign_finalhash(void *keyContext,
                            unsigned char *in, unsigned short inlen,
-                           unsigned char *out, unsigned short outlen,
+                           unsigned char *out, size_t* outlen,
                            unsigned char rfc6979);
 
 void btchip_transaction_add_output(unsigned char *hash160Address,

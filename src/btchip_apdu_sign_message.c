@@ -251,11 +251,6 @@ unsigned short btchip_compute_hash() {
             cx_sha256_init(&btchip_context_D.transactionHashFull.sha256);
             cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST, hash,
                     32, hash, 32);
-            btchip_sign_finalhash(
-                &private_key, hash, sizeof(hash), // IN
-                G_io_apdu_buffer, 100,                        // OUT
-                ((N_btchip.bkp.config.options &
-                  BTCHIP_OPTION_DETERMINISTIC_SIGNATURE) != 0));
             btchip_context_D.outLength = G_io_apdu_buffer[1] + 2;
         }
         CATCH_ALL {
@@ -267,6 +262,12 @@ unsigned short btchip_compute_hash() {
             NULL, &private_key, NULL)) {
         goto discard;
     }
+    size_t out_len = 100;
+    btchip_sign_finalhash(
+            &private_key, hash, sizeof(hash), // IN
+            G_io_apdu_buffer, &out_len,                        // OUT
+            ((N_btchip.bkp.config.options &
+              BTCHIP_OPTION_DETERMINISTIC_SIGNATURE) != 0));
             memset(&btchip_context_D.transactionSummary, 0,
                       sizeof(btchip_transaction_summary_t));
         }

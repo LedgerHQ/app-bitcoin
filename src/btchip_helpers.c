@@ -485,12 +485,12 @@ void btchip_transaction_add_output(unsigned char *hash160Address,
 
 void btchip_sign_finalhash(void *keyContext,
                                  unsigned char *in, unsigned short inlen,
-                                 unsigned char *out, unsigned short outlen,
+                                 unsigned char *out, size_t* outlen,
                                  unsigned char rfc6979) {
     io_seproxyhal_io_heartbeat();
 
     unsigned int info = 0;
-    cx_ecdsa_sign((cx_ecfp_private_key_t *)keyContext,
+    cx_ecdsa_sign_no_throw((cx_ecfp_private_key_t *)keyContext,
                     CX_LAST | (rfc6979 ? CX_RND_RFC6979 : CX_RND_TRNG),
                     CX_SHA256, in, inlen, out, outlen, &info);
     if (info & CX_ECCINFO_PARITY_ODD) {

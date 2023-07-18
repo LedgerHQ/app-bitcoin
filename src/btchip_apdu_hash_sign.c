@@ -195,9 +195,10 @@ void btchip_bagl_user_action_signtx(unsigned char confirming, unsigned char dire
         }
         PRINTF("Hash2\n%.*H\n", sizeof(hash), hash);
         // Sign
+        size_t out_len = sizeof(G_io_apdu_buffer);
         btchip_sign_finalhash(
             &private_key, hash, sizeof(hash),
-            G_io_apdu_buffer, sizeof(G_io_apdu_buffer),
+            G_io_apdu_buffer, &out_len,
             ((N_btchip.bkp.config.options &
                 BTCHIP_OPTION_DETERMINISTIC_SIGNATURE) != 0));
 
