@@ -9,14 +9,16 @@
 #include <string.h>
 
 bool derive_private_key(unsigned char* serialized_path, unsigned char serialized_path_length, cx_ecfp_private_key_t* privKey) {
-    unsigned char privateComponent[32];
+    unsigned char privateComponent[64];
     bip32_path_t path;
     if (!parse_serialized_path(&path, serialized_path, serialized_path_length)) {
         PRINTF("Can't parse path\n");
         return false;
     }
-    os_perso_derive_node_bip32(CX_CURVE_256K1, path.path, path.length,
-                               privateComponent, NULL);
+    if (os_derive_bip32_no_throw(CX_CURVE_256K1, path.path, path.length,
+                               privateComponent, NULL)) {
+        return false;
+    }
     cx_ecdsa_init_private_key(BTCHIP_CURVE, privateComponent, 32, privKey);
     return true;
 }
@@ -31,7 +33,10 @@ bool derive_compressed_public_key(
         return false;
     cx_ecfp_public_key_t pubKey;
 
-    cx_ecfp_generate_pair(BTCHIP_CURVE, &pubKey, &privKey, 1);
+    if (cx_ecfp_generate_pair_no_throw(BTCHIP_CURVE, &pubKey, &privKey, 1)) {
+        return false;
+    }
+
     btchip_compress_public_key_value(pubKey.W);
     memcpy(public_key, pubKey.W, 33);
     return true;
