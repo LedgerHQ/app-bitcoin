@@ -213,7 +213,7 @@ void btchip_public_key_hash160(unsigned char *in, unsigned short inlen,
     unsigned char buffer[32];
     cx_hash_sha256(in, inlen, buffer, 32);
     cx_ripemd160_init(&riprip);
-    cx_hash(&riprip.header, CX_LAST, buffer, 32, out, 20);
+    cx_hash_no_throw(&riprip.header, CX_LAST, buffer, 32, out, 20);
 }
 
 void btchip_compute_checksum(unsigned char* in, unsigned short inlen, unsigned char * output) {
@@ -278,10 +278,10 @@ unsigned short btchip_decode_base58_address(unsigned char *in,
     outlen = outputLen;
 
     // Compute hash to verify address
-    cx_sha256_init(&hash);
-    cx_hash(&hash.header, CX_LAST, out, outlen - 4, hashBuffer, 32);
-    cx_sha256_init(&hash);
-    cx_hash(&hash.header, CX_LAST, hashBuffer, 32, hashBuffer, 32);
+    cx_sha256_init_no_throw(&hash);
+    cx_hash_no_throw(&hash.header, CX_LAST, out, outlen - 4, hashBuffer, 32);
+    cx_sha256_init_no_throw(&hash);
+    cx_hash_no_throw(&hash.header, CX_LAST, hashBuffer, 32, hashBuffer, 32);
 
     if (memcmp(out + outlen - 4, hashBuffer, 4)) {
         PRINTF("Hash checksum mismatch\n%.*H\n",sizeof(hashBuffer),hashBuffer);

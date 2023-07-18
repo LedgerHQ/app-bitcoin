@@ -172,17 +172,17 @@ void btchip_bagl_user_action_signtx(unsigned char confirming, unsigned char dire
         // Fetch the private key
         btchip_private_derive_keypair(btchip_context_D.transactionSummary.keyPath, 0, NULL, &private_key, NULL);
         if (btchip_context_D.usingOverwinter) {
-            cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hash, 0, hash, 32);
+            cx_hash_no_throw(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hash, 0, hash, 32);
         }
         else {
             cx_sha256_t localHash;
-            cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
+            cx_hash_no_throw(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
                 hash, 0, hash, 32);
             PRINTF("Hash1\n%.*H\n", sizeof(hash), hash);
 
             // Rehash
-            cx_sha256_init(&localHash);
-            cx_hash(&localHash.header, CX_LAST, hash, sizeof(hash), hash, 32);
+            cx_sha256_init_no_throw(&localHash);
+            cx_hash_no_throw(&localHash.header, CX_LAST, hash, sizeof(hash), hash, 32);
         }
         PRINTF("Hash2\n%.*H\n", sizeof(hash), hash);
         // Sign
