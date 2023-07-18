@@ -291,7 +291,7 @@ unsigned short btchip_decode_base58_address(unsigned char *in,
     return outlen;
 }
 
-void btchip_private_derive_keypair(unsigned char *bip32Path,
+int btchip_private_derive_keypair(unsigned char *bip32Path,
                                    unsigned char derivePublic,
                                    unsigned char *out_chainCode,
                                    cx_ecfp_private_key_t * private_key,
@@ -300,7 +300,7 @@ void btchip_private_derive_keypair(unsigned char *bip32Path,
     unsigned char i;
     union {
         unsigned int bip32PathInt[MAX_BIP32_PATH];
-        unsigned char privateComponent[32];
+        unsigned char privateComponent[64];
     } u;
 
     bip32PathLength = bip32Path[0];
@@ -315,20 +315,23 @@ void btchip_private_derive_keypair(unsigned char *bip32Path,
 
     io_seproxyhal_io_heartbeat();
 
-    os_perso_derive_node_bip32(CX_CURVE_256K1, u.bip32PathInt, bip32PathLength,
-                               u.privateComponent, out_chainCode);
+    if (os_derive_bip32_no_throw(CX_CURVE_256K1, u.bip32PathInt, bip32PathLength,
+                               u.privateComponent, out_chainCode)) {
+        return -1;
+    }
 
     cx_ecdsa_init_private_key(BTCHIP_CURVE, u.privateComponent, 32,
                                 private_key);
 
     if (derivePublic) {
-        cx_ecfp_generate_pair(BTCHIP_CURVE, public_key,
+        cx_ecfp_generate_pair_no_throw(BTCHIP_CURVE, public_key,
                                 private_key, 1);
     }
 
     io_seproxyhal_io_heartbeat();
 
     memset(u.privateComponent, 0, sizeof(u.privateComponent));
+    return 0;
 }
 
 /*

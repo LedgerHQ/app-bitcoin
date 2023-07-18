@@ -28,7 +28,9 @@ int get_public_key_chain_code(unsigned char* keyPath, bool uncompressedPublicKey
     cx_ecfp_private_key_t private_key;
     cx_ecfp_public_key_t public_key;
     int keyLength = 0;
-    btchip_private_derive_keypair(keyPath, 1, chainCode, &private_key, &public_key);
+    if (btchip_private_derive_keypair(keyPath, 1, chainCode, &private_key, &public_key)) {
+        return 0;
+    }
     // Then encode it
     if (uncompressedPublicKeys) {
         keyLength = 65;
@@ -118,6 +120,10 @@ unsigned short btchip_apdu_get_wallet_public_key() {
 
     G_io_apdu_buffer[0] = 65;
     keyLength = get_public_key_chain_code(G_io_apdu_buffer + ISO_OFFSET_CDATA, uncompressedPublicKeys, G_io_apdu_buffer + 1, chainCode);
+
+    if (keyLength == 0) {
+        return BTCHIP_SW_TECHNICAL_PROBLEM;
+    }
 
     if (cashAddr) {
         uint8_t tmp[20];

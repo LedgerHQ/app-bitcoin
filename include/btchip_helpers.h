@@ -65,7 +65,7 @@ unsigned short btchip_decode_base58_address(unsigned char *in,
                                             unsigned char *out,
                                             unsigned short outlen);
 
-void btchip_private_derive_keypair(unsigned char *bip32Path,
+int btchip_private_derive_keypair(unsigned char *bip32Path,
                                    unsigned char derivePublic,
                                    unsigned char *out_chainCode,
                                    cx_ecfp_private_key_t * private_key,
