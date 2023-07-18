@@ -219,18 +219,21 @@ bool handle_output_state() {
     return processed;
 }
 
-void get_public_key(unsigned char* keyPath, cx_ecfp_public_key_t* public_key) {
+int get_public_key(unsigned char* keyPath, cx_ecfp_public_key_t* public_key) {
     cx_ecfp_private_key_t private_key;
     if (btchip_private_derive_keypair(keyPath, 1, NULL, &private_key, public_key)) {
         return -1;
     }
+    return 0;
 }
 
 // out should be 32 bytes, even only 20 bytes is significant for output
-void get_pubkey_hash160(unsigned char* keyPath, unsigned char* out) {
+int get_pubkey_hash160(unsigned char* keyPath, unsigned char* out) {
     cx_ecfp_public_key_t public_key;
     int keyLength;
-    get_public_key(keyPath, &public_key);
+    if (get_public_key(keyPath, &public_key)) {
+        return -1;
+    }
     if (((N_btchip.bkp.config.options &
             BTCHIP_OPTION_UNCOMPRESSED_KEYS) != 0)) {
         keyLength = 65;
@@ -243,6 +246,7 @@ void get_pubkey_hash160(unsigned char* keyPath, unsigned char* out) {
         keyLength,      // INLEN
         out             // OUT
     );
+    return 0;
 }
 
 unsigned short btchip_apdu_hash_input_finalize_full_internal(
@@ -280,6 +284,10 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
             btchip_set_check_internal_structure_integrity(0);
             if (btchip_context_D.transactionContext.transactionState !=
                 BTCHIP_TRANSACTION_PRESIGN_READY) {
+        if (get_pubkey_hash160(transactionSummary->keyPath, btchip_context_D.tmpCtx.output.changeAddress)) {
+            sw = SW_TECHNICAL_DETAILS(0x0F);
+            goto discardTransaction;
+        }
                 sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
                 goto discardTransaction;
             }
@@ -306,7 +314,6 @@ unsigned short btchip_apdu_hash_input_finalize_full_internal(
                            G_io_apdu_buffer + ISO_OFFSET_CDATA,
                            MAX_BIP32_PATH_LENGTH);
 
-                get_pubkey_hash160(transactionSummary->keyPath, btchip_context_D.tmpCtx.output.changeAddress);
                 PRINTF("Change address = %.*H\n", 20, btchip_context_D.tmpCtx.output.changeAddress);
 
                 btchip_context_D.tmpCtx.output.changeInitialized = 1;
