@@ -69,86 +69,79 @@ void app_dispatch(void) {
     btchip_context_D.outLength = 0;
     btchip_context_D.io_flags = 0;
 
-    BEGIN_TRY {
-        TRY {
-
 #ifndef HAVE_WALLET_ID_SDK
 
-      if ((G_io_apdu_buffer[ISO_OFFSET_CLA] == COMMON_CLA) && (G_io_apdu_buffer[ISO_OFFSET_INS] == COMMON_INS_GET_WALLET_ID)) {
+    if ((G_io_apdu_buffer[ISO_OFFSET_CLA] == COMMON_CLA) && (G_io_apdu_buffer[ISO_OFFSET_INS] == COMMON_INS_GET_WALLET_ID)) {
         if (handleGetWalletId(&btchip_context_D.outLength)) {
             goto fail;
         }
         goto sendSW;
-      }
+    }
 
 #endif
 
-            // If halted, then notify
-            SB_CHECK(btchip_context_D.halted);
-            if (SB_GET(btchip_context_D.halted)) {
-                btchip_context_D.sw = BTCHIP_SW_HALTED;
-                goto sendSW;
-            }
+    // If halted, then notify
+    SB_CHECK(btchip_context_D.halted);
+    if (SB_GET(btchip_context_D.halted)) {
+        btchip_context_D.sw = BTCHIP_SW_TECHNICAL_PROBLEM;
+        goto sendSW;
+    }
 
-            cla = G_io_apdu_buffer[ISO_OFFSET_CLA];
-            ins = G_io_apdu_buffer[ISO_OFFSET_INS];
-            for (dispatched = 0; dispatched < DISPATCHER_APDUS; dispatched++) {
-                if ((cla == DISPATCHER_CLA[dispatched]) &&
-                    (ins == DISPATCHER_INS[dispatched])) {
-                    break;
-                }
-            }
-            if (dispatched == DISPATCHER_APDUS) {
-                btchip_context_D.sw = BTCHIP_SW_INS_NOT_SUPPORTED;
-                goto sendSW;
-            }
-            if (DISPATCHER_DATA_IN[dispatched]) {
-                if (G_io_apdu_buffer[ISO_OFFSET_LC] == 0x00 ||
-                    btchip_context_D.inLength - 5 == 0) {
-                    btchip_context_D.sw = BTCHIP_SW_INCORRECT_LENGTH;
-                    goto sendSW;
-                }
-                // notify we need to receive data
-                // io_exchange(CHANNEL_APDU | IO_RECEIVE_DATA, 0);
-            }
-            // call the apdu handler
-            btchip_context_D.sw = ((apduProcessingFunction)PIC(
+    cla = G_io_apdu_buffer[ISO_OFFSET_CLA];
+    ins = G_io_apdu_buffer[ISO_OFFSET_INS];
+    for (dispatched = 0; dispatched < DISPATCHER_APDUS; dispatched++) {
+        if ((cla == DISPATCHER_CLA[dispatched]) &&
+                (ins == DISPATCHER_INS[dispatched])) {
+            break;
+        }
+    }
+    if (dispatched == DISPATCHER_APDUS) {
+        btchip_context_D.sw = BTCHIP_SW_INS_NOT_SUPPORTED;
+        goto sendSW;
+    }
+    if (DISPATCHER_DATA_IN[dispatched]) {
+        if (G_io_apdu_buffer[ISO_OFFSET_LC] == 0x00 ||
+                btchip_context_D.inLength - 5 == 0) {
+            btchip_context_D.sw = BTCHIP_SW_INCORRECT_LENGTH;
+            goto sendSW;
+        }
+        // notify we need to receive data
+        // io_exchange(CHANNEL_APDU | IO_RECEIVE_DATA, 0);
+    }
+    // call the apdu handler
+    btchip_context_D.sw = ((apduProcessingFunction)PIC(
                 DISPATCHER_FUNCTIONS[dispatched]))();
 
-// an APDU has been replied. request for power off time extension from the
-// common ux
+    // an APDU has been replied. request for power off time extension from the
+    // common ux
 #ifdef IO_APP_ACTIVITY
-            IO_APP_ACTIVITY();
+    IO_APP_ACTIVITY();
 #endif // IO_APP_ACTIVITY
 
-        sendSW:
-            if (btchip_context_D.called_from_swap) {
-                btchip_context_D.io_flags &= ~IO_ASYNCH_REPLY;
-                if(btchip_context_D.sw != BTCHIP_SW_OK) {
-                    vars.swap_data.should_exit = 1;
-                }
-            }
-            // prepare SW after replied data
-            G_io_apdu_buffer[btchip_context_D.outLength] =
-                (btchip_context_D.sw >> 8);
-            G_io_apdu_buffer[btchip_context_D.outLength + 1] =
-                (btchip_context_D.sw & 0xff);
-            btchip_context_D.outLength += 2;
+sendSW:
+    if (btchip_context_D.called_from_swap) {
+        btchip_context_D.io_flags &= ~IO_ASYNCH_REPLY;
+        if(btchip_context_D.sw != BTCHIP_SW_OK) {
+            vars.swap_data.should_exit = 1;
         }
-        CATCH(EXCEPTION_IO_RESET) {
-            THROW(EXCEPTION_IO_RESET);
-        }
-        CATCH_OTHER(e) {
-            // uncaught exception detected
-            G_io_apdu_buffer[0] = 0x6F;
-            btchip_context_D.outLength = 2;
-            G_io_apdu_buffer[1] = e;
-            // we caught something suspicious
-            SB_SET(btchip_context_D.halted, 1);
-        }
-        FINALLY;
     }
-    END_TRY;
+    // prepare SW after replied data
+    G_io_apdu_buffer[btchip_context_D.outLength] =
+        (btchip_context_D.sw >> 8);
+    G_io_apdu_buffer[btchip_context_D.outLength + 1] =
+        (btchip_context_D.sw & 0xff);
+    btchip_context_D.outLength += 2;
+    return;
+
+#ifndef HAVE_WALLET_ID_SDK
+fail:
+    // uncaught exception detected
+    G_io_apdu_buffer[0] = 0x6F;
+    btchip_context_D.outLength = 2;
+    G_io_apdu_buffer[1] = 0x00;
+    // we caught something suspicious
+    SB_SET(btchip_context_D.halted, 1);
+#endif
 }
 
 void app_main(void) {
