@@ -254,10 +254,6 @@ else
     endif
 endif
 
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-DEFINES       += HAVE_WALLET_ID_SDK
-endif
-
 # Enabling debug PRINTF
 DEBUG ?= 0
 ifneq ($(DEBUG),0)

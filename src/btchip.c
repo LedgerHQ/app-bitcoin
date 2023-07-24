@@ -27,38 +27,6 @@
 #define BTCHIP_TECHNICAL_NOT_IMPLEMENTED 0x99
 
 #define COMMON_CLA               0xB0
-#define COMMON_INS_GET_WALLET_ID 0x04
-
-#ifndef HAVE_WALLET_ID_SDK
-
-unsigned int const U_os_perso_seed_cookie[] = {
-  0xda7aba5e,
-  0xc1a551c5,
-};
-
-int handleGetWalletId(volatile unsigned short *tx) {
-  unsigned char t[64];
-  cx_ecfp_256_private_key_t priv;
-  cx_ecfp_256_public_key_t pub;
-  // seed => priv key
-  if (os_derive_bip32_no_throw(CX_CURVE_256K1, U_os_perso_seed_cookie, 2, t, NULL)) {
-      return -1;
-  }
-  // priv key => pubkey
-  cx_ecdsa_init_private_key(CX_CURVE_256K1, t, 32, &priv);
-  if (cx_ecfp_generate_pair_no_throw(CX_CURVE_256K1, &pub, &priv, 1)) {
-      return -1;
-  }
-  // pubkey -> sha512
-  cx_hash_sha512(pub.W, sizeof(pub.W), t, sizeof(t));
-  // ! cookie !
-  memmove(G_io_apdu_buffer, t, 64);
-  btchip_context_D.sw = 0x9000;
-  *tx = 64;
-  return 0;
-}
-
-#endif // HAVE_WALLET_ID_SDK
 
 void app_dispatch(void) {
     unsigned char cla;
@@ -68,17 +36,6 @@ void app_dispatch(void) {
     // nothing to reply for now
     btchip_context_D.outLength = 0;
     btchip_context_D.io_flags = 0;
-
-#ifndef HAVE_WALLET_ID_SDK
-
-    if ((G_io_apdu_buffer[ISO_OFFSET_CLA] == COMMON_CLA) && (G_io_apdu_buffer[ISO_OFFSET_INS] == COMMON_INS_GET_WALLET_ID)) {
-        if (handleGetWalletId(&btchip_context_D.outLength)) {
-            goto fail;
-        }
-        goto sendSW;
-    }
-
-#endif
 
     // If halted, then notify
     SB_CHECK(btchip_context_D.halted);
@@ -132,16 +89,6 @@ sendSW:
         (btchip_context_D.sw & 0xff);
     btchip_context_D.outLength += 2;
     return;
-
-#ifndef HAVE_WALLET_ID_SDK
-fail:
-    // uncaught exception detected
-    G_io_apdu_buffer[0] = 0x6F;
-    btchip_context_D.outLength = 2;
-    G_io_apdu_buffer[1] = 0x00;
-    // we caught something suspicious
-    SB_SET(btchip_context_D.halted, 1);
-#endif
 }
 
 void app_main(void) {
