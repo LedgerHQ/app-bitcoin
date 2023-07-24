@@ -74,7 +74,7 @@ unsigned short btchip_apdu_get_trusted_input() {
         }
 
         if (cx_hash_no_throw(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
-                (unsigned char *)NULL, 0, G_io_apdu_buffer + TRUSTED_INPUT_SIZE, 32)) {
+                NULL, 0, G_io_apdu_buffer + TRUSTED_INPUT_SIZE, 32)) {
             return BTCHIP_SW_TECHNICAL_PROBLEM;
         }
 
