@@ -270,7 +270,6 @@ unsigned short btchip_decode_base58_address(unsigned char *in,
                                             unsigned char *out,
                                             unsigned short outlen) {
     unsigned char hashBuffer[32];
-    cx_sha256_t hash;
     size_t outputLen = outlen;
     if (btchip_decode_base58((char *)in, inlen, out, &outputLen) < 0) {
         THROW(EXCEPTION);
@@ -278,10 +277,9 @@ unsigned short btchip_decode_base58_address(unsigned char *in,
     outlen = outputLen;
 
     // Compute hash to verify address
-    cx_sha256_init_no_throw(&hash);
-    cx_hash_no_throw(&hash.header, CX_LAST, out, outlen - 4, hashBuffer, 32);
-    cx_sha256_init_no_throw(&hash);
-    cx_hash_no_throw(&hash.header, CX_LAST, hashBuffer, 32, hashBuffer, 32);
+    cx_hash_sha256(out, outlen - 4, hashBuffer, 32);
+
+    cx_hash_sha256(hashBuffer, 32, hashBuffer, 32);
 
     if (memcmp(out + outlen - 4, hashBuffer, 4)) {
         PRINTF("Hash checksum mismatch\n%.*H\n",sizeof(hashBuffer),hashBuffer);

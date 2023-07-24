@@ -262,13 +262,11 @@ unsigned short btchip_compute_hash() {
                 0, hash, 32)) {
         goto discard;
     }
-    if (cx_sha256_init_no_throw(&btchip_context_D.transactionHashFull.sha256)) {
+            
+    if (cx_hash_sha256(hash, sizeof(hash), hash, 32)) {
         goto discard;
     }
-    if (cx_hash_no_throw(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST, hash,
-                32, hash, 32)) {
-        goto discard;
-    }
+
     if (btchip_private_derive_keypair(
             btchip_context_D.transactionSummary.keyPath, 0,
             NULL, &private_key, NULL)) {

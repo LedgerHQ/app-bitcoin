@@ -175,14 +175,12 @@ void btchip_bagl_user_action_signtx(unsigned char confirming, unsigned char dire
             cx_hash_no_throw(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hash, 0, hash, 32);
         }
         else {
-            cx_sha256_t localHash;
             cx_hash_no_throw(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
                 hash, 0, hash, 32);
             PRINTF("Hash1\n%.*H\n", sizeof(hash), hash);
 
             // Rehash
-            cx_sha256_init_no_throw(&localHash);
-            cx_hash_no_throw(&localHash.header, CX_LAST, hash, sizeof(hash), hash, 32);
+            cx_hash_sha256(hash, sizeof(hash), hash, 32);
         }
         PRINTF("Hash2\n%.*H\n", sizeof(hash), hash);
         // Sign
