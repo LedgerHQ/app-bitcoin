@@ -22,6 +22,7 @@
 #include "btchip_apdu_constants.h"
 #include "btchip_bagl_extensions.h"
 #include "ui.h"
+#include "lib_standard_app/crypto_helpers.h"
 
 #define FINALIZE_P1_MORE 0x00
 #define FINALIZE_P1_LAST 0x80
@@ -228,7 +229,7 @@ int get_public_key(unsigned char* keyPath, cx_ecfp_public_key_t* public_key) {
 }
 
 // out should be 32 bytes, even only 20 bytes is significant for output
-int get_pubkey_hash160(unsigned char* keyPath, unsigned char* out) {
+int get_pubkey_hash160(unsigned char* keyPath, size_t keyPath_len, unsigned char* out) {
     cx_ecfp_public_key_t public_key;
     int keyLength;
     if (get_public_key(keyPath, &public_key)) {
@@ -307,7 +308,7 @@ return_OK:
                 G_io_apdu_buffer + ISO_OFFSET_CDATA,
                 MAX_BIP32_PATH_LENGTH);
 
-        if (get_pubkey_hash160(transactionSummary->keyPath, btchip_context_D.tmpCtx.output.changeAddress)) {
+        if (get_pubkey_hash160(transactionSummary->keyPath, sizeof(transactionSummary->keyPath), btchip_context_D.tmpCtx.output.changeAddress)) {
             sw = SW_TECHNICAL_DETAILS(0x0F);
             goto discardTransaction;
         }

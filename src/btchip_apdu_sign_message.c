@@ -274,7 +274,9 @@ unsigned short btchip_compute_hash() {
     }
     size_t out_len = 100;
     btchip_sign_finalhash(
-            &private_key, hash, sizeof(hash), // IN
+            btchip_context_D.transactionSummary.keyPath,
+            sizeof(btchip_context_D.transactionSummary.keyPath),
+            hash, sizeof(hash), // IN
             G_io_apdu_buffer, &out_len,                        // OUT
             ((N_btchip.bkp.config.options &
               BTCHIP_OPTION_DETERMINISTIC_SIGNATURE) != 0));

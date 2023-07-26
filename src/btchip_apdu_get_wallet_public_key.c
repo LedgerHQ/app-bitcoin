@@ -119,7 +119,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
     unsigned char bip44_enforced = enforce_bip44_coin_type(G_io_apdu_buffer + ISO_OFFSET_CDATA, true);
 
     G_io_apdu_buffer[0] = 65;
-    keyLength = get_public_key_chain_code(G_io_apdu_buffer + ISO_OFFSET_CDATA, uncompressedPublicKeys, G_io_apdu_buffer + 1, chainCode);
+    keyLength = get_public_key_chain_code(G_io_apdu_buffer + ISO_OFFSET_CDATA, MAX_BIP32_PATH_LENGTH, uncompressedPublicKeys, G_io_apdu_buffer + 1, chainCode);
 
     if (keyLength == 0) {
         return BTCHIP_SW_TECHNICAL_PROBLEM;

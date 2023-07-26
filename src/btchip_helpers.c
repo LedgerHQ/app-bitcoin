@@ -17,6 +17,7 @@
 
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
+#include "lib_standard_app/crypto_helpers.h"
 
 const unsigned char TRANSACTION_OUTPUT_SCRIPT_PRE[] = {
     0x19, 0x76, 0xA9,
@@ -481,19 +482,36 @@ void btchip_transaction_add_output(unsigned char *hash160Address,
 }
 
 
-void btchip_sign_finalhash(void *keyContext,
-                                 unsigned char *in, unsigned short inlen,
+int btchip_sign_finalhash(unsigned char* path, size_t path_len, unsigned char *in, unsigned short inlen,
                                  unsigned char *out, size_t* outlen,
                                  unsigned char rfc6979) {
-    io_seproxyhal_io_heartbeat();
 
     unsigned int info = 0;
-    cx_ecdsa_sign_no_throw((cx_ecfp_private_key_t *)keyContext,
-                    CX_LAST | (rfc6979 ? CX_RND_RFC6979 : CX_RND_TRNG),
-                    CX_SHA256, in, inlen, out, outlen, &info);
-    if (info & CX_ECCINFO_PARITY_ODD) {
-        out[0] |= 0x01;
+
+    io_seproxyhal_io_heartbeat();
+    
+    bip32_path_t bip32Path;
+    bip32Path.length = path[0];
+
+    if (!parse_serialized_path(&bip32Path, path, path_len)) {
+        return -1;
+    }
+
+    if (bip32_derive_ecdsa_sign_hash_256(
+            CX_CURVE_SECP256K1,
+            bip32Path.path, 
+            bip32Path.length,
+            CX_LAST | (rfc6979 ? CX_RND_RFC6979 : CX_RND_TRNG), 
+            CX_SHA256,
+            in, 
+            inlen, 
+            out, 
+            outlen,
+            &info) != CX_OK) {
+        return -1;
     }
 
     io_seproxyhal_io_heartbeat();
+    return 0;
 }
+

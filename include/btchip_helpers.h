@@ -81,7 +81,7 @@ unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned cha
 void btchip_swap_bytes(unsigned char *target, unsigned char *source,
                        unsigned char size);
 
-void btchip_sign_finalhash(void *keyContext,
+int btchip_sign_finalhash(unsigned char *path, size_t path_len,
                            unsigned char *in, unsigned short inlen,
                            unsigned char *out, size_t* outlen,
                            unsigned char rfc6979);
