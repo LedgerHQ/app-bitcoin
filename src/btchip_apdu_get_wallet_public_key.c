@@ -24,23 +24,23 @@
 #include "cashaddr.h"
 #include "btchip_apdu_get_wallet_public_key.h"
 
-int get_public_key_chain_code(unsigned char* keyPath, bool uncompressedPublicKeys, unsigned char* publicKey, unsigned char* chainCode) {
-    cx_ecfp_private_key_t private_key;
-    cx_ecfp_public_key_t public_key;
+int get_public_key_chain_code(unsigned char* keyPath, size_t keyPath_len, bool uncompressedPublicKeys, unsigned char* publicKey, unsigned char* chainCode) {
+    uint8_t public_key[65];
     int keyLength = 0;
-    if (btchip_private_derive_keypair(keyPath, 1, chainCode, &private_key, &public_key)) {
-        return 0;
+
+    if (btchip_get_public_key(keyPath, keyPath_len, public_key, chainCode)) {
+        return keyLength;
     }
     // Then encode it
     if (uncompressedPublicKeys) {
         keyLength = 65;
     } else {
-        btchip_compress_public_key_value(public_key.W);
+        btchip_compress_public_key_value(public_key);
         keyLength = 33;
     }
 
-    memmove(publicKey, public_key.W,
-               sizeof(public_key.W));
+    memmove(publicKey, public_key,
+               sizeof(public_key));
     return keyLength;
 }
 

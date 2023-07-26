@@ -8,37 +8,18 @@
 #include "segwit_addr.h"
 #include <string.h>
 
-bool derive_private_key(unsigned char* serialized_path, unsigned char serialized_path_length, cx_ecfp_private_key_t* privKey) {
-    unsigned char privateComponent[64];
-    bip32_path_t path;
-    if (!parse_serialized_path(&path, serialized_path, serialized_path_length)) {
-        PRINTF("Can't parse path\n");
-        return false;
-    }
-    if (os_derive_bip32_no_throw(CX_CURVE_256K1, path.path, path.length,
-                               privateComponent, NULL)) {
-        return false;
-    }
-    cx_ecdsa_init_private_key(BTCHIP_CURVE, privateComponent, 32, privKey);
-    return true;
-}
-
-
 bool derive_compressed_public_key(
     unsigned char* serialized_path, unsigned char serialized_path_length,
     unsigned char* public_key, unsigned char public_key_length) {
     UNUSED(public_key_length);
-    cx_ecfp_private_key_t privKey;
-    if (!derive_private_key(serialized_path, serialized_path_length, &privKey))
-        return false;
-    cx_ecfp_public_key_t pubKey;
+    uint8_t pubKey[65];
 
-    if (cx_ecfp_generate_pair_no_throw(BTCHIP_CURVE, &pubKey, &privKey, 1)) {
+    if (btchip_get_public_key(serialized_path, serialized_path_length, pubKey, NULL)){
         return false;
     }
 
-    btchip_compress_public_key_value(pubKey.W);
-    memcpy(public_key, pubKey.W, 33);
+    btchip_compress_public_key_value(pubKey);
+    memcpy(public_key, pubKey, 33);
     return true;
 }
 
