@@ -255,7 +255,6 @@ unsigned short btchip_apdu_sign_message() {
 unsigned short btchip_compute_hash() {
     unsigned char hash[32];
     unsigned short sw = BTCHIP_SW_OK;
-    cx_ecfp_private_key_t private_key;
 
     btchip_context_D.outLength = 0;
     if (cx_hash_no_throw(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST, hash,
@@ -267,11 +266,6 @@ unsigned short btchip_compute_hash() {
         goto discard;
     }
 
-    if (btchip_private_derive_keypair(
-            btchip_context_D.transactionSummary.keyPath, 0,
-            NULL, &private_key, NULL)) {
-        goto discard;
-    }
     size_t out_len = 100;
     btchip_sign_finalhash(
             btchip_context_D.transactionSummary.keyPath,

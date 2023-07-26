@@ -164,13 +164,10 @@ unsigned short btchip_apdu_hash_sign() {
 }
 
 void btchip_bagl_user_action_signtx(unsigned char confirming, unsigned char direct) {
-    cx_ecfp_private_key_t private_key;
     unsigned short sw = BTCHIP_SW_OK;
     // confirm and finish the apdu exchange //spaghetti
     if (confirming) {
         unsigned char hash[32];
-        // Fetch the private key
-        btchip_private_derive_keypair(btchip_context_D.transactionSummary.keyPath, 0, NULL, &private_key, NULL);
         if (btchip_context_D.usingOverwinter) {
             cx_hash_no_throw(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hash, 0, hash, 32);
         }
