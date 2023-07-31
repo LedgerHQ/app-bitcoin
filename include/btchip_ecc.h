@@ -21,8 +21,6 @@
 
 #include "os.h"
 
-#define BTCHIP_CURVE CX_CURVE_256K1
-
 void btchip_compress_public_key_value(unsigned char *value);
 
 #endif
