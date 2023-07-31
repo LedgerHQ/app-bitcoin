@@ -29,7 +29,7 @@ unsigned short btchip_apdu_hash_sign() {
     unsigned char dataBuffer[8];
     unsigned char authorizationLength;
     unsigned char *parameters = G_io_apdu_buffer + ISO_OFFSET_CDATA;
-    unsigned short sw;
+    unsigned short sw = SW_TECHNICAL_DETAILS(0xF);
 
     SB_CHECK(N_btchip.bkp.config.operationMode);
     switch (SB_GET(N_btchip.bkp.config.operationMode)) {
@@ -51,153 +51,142 @@ unsigned short btchip_apdu_hash_sign() {
     }
 
     // Check state
-    BEGIN_TRY {
-        TRY {
-            btchip_set_check_internal_structure_integrity(0);
+    btchip_set_check_internal_structure_integrity(0);
 
-            // Zcash special - store parameters for later
+    // Zcash special - store parameters for later
 
-            if ((btchip_context_D.usingOverwinter) &&
-                (!btchip_context_D.overwinterSignReady) &&
-                (btchip_context_D.segwitParsedOnce) &&
-                (btchip_context_D.transactionContext.transactionState == BTCHIP_TRANSACTION_NONE)) {
-                unsigned long int expiryHeight;
-                parameters += (4 * G_io_apdu_buffer[ISO_OFFSET_CDATA]) + 1;
-                authorizationLength = *(parameters++);
-                parameters += authorizationLength;
-                lockTime = btchip_read_u32(parameters, 1, 0);
-                parameters += 4;
-                sighashType = *(parameters++);
-                expiryHeight = btchip_read_u32(parameters, 1, 0);
-                btchip_write_u32_le(btchip_context_D.nLockTime, lockTime);
-                btchip_write_u32_le(btchip_context_D.sigHashType, sighashType);
-                btchip_write_u32_le(btchip_context_D.nExpiryHeight, expiryHeight);
-                btchip_context_D.overwinterSignReady = 1;
-                CLOSE_TRY;
-                return BTCHIP_SW_OK;
-            }
+    if ((btchip_context_D.usingOverwinter) &&
+            (!btchip_context_D.overwinterSignReady) &&
+            (btchip_context_D.segwitParsedOnce) &&
+            (btchip_context_D.transactionContext.transactionState == BTCHIP_TRANSACTION_NONE)) {
+        unsigned long int expiryHeight;
+        parameters += (4 * G_io_apdu_buffer[ISO_OFFSET_CDATA]) + 1;
+        authorizationLength = *(parameters++);
+        parameters += authorizationLength;
+        lockTime = btchip_read_u32(parameters, 1, 0);
+        parameters += 4;
+        sighashType = *(parameters++);
+        expiryHeight = btchip_read_u32(parameters, 1, 0);
+        btchip_write_u32_le(btchip_context_D.nLockTime, lockTime);
+        btchip_write_u32_le(btchip_context_D.sigHashType, sighashType);
+        btchip_write_u32_le(btchip_context_D.nExpiryHeight, expiryHeight);
+        btchip_context_D.overwinterSignReady = 1;
+        return BTCHIP_SW_OK;
+    }
 
-            if (btchip_context_D.transactionContext.transactionState !=
-                BTCHIP_TRANSACTION_SIGN_READY) {
-                PRINTF("Invalid transaction state %d\n", btchip_context_D.transactionContext.transactionState);
-                sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
-                goto discardTransaction;
-            }
+    if (btchip_context_D.transactionContext.transactionState !=
+            BTCHIP_TRANSACTION_SIGN_READY) {
+        PRINTF("Invalid transaction state %d\n", btchip_context_D.transactionContext.transactionState);
+        sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
+        goto discardTransaction;
+    }
 
-            if (btchip_context_D.usingOverwinter && !btchip_context_D.overwinterSignReady) {
-                PRINTF("Overwinter not ready to sign\n");
-                sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
-                goto discardTransaction;
-            }
+    if (btchip_context_D.usingOverwinter && !btchip_context_D.overwinterSignReady) {
+        PRINTF("Overwinter not ready to sign\n");
+        sw = BTCHIP_SW_CONDITIONS_OF_USE_NOT_SATISFIED;
+        goto discardTransaction;
+    }
 
-            // Read parameters
-            if (G_io_apdu_buffer[ISO_OFFSET_CDATA] > MAX_BIP32_PATH) {
-                sw = BTCHIP_SW_INCORRECT_DATA;
-            discardTransaction:
-                CLOSE_TRY;
-                goto catch_discardTransaction;
-            }
-            memmove(btchip_context_D.transactionSummary.keyPath,
-                G_io_apdu_buffer + ISO_OFFSET_CDATA,
-                MAX_BIP32_PATH_LENGTH);
-            parameters += (4 * G_io_apdu_buffer[ISO_OFFSET_CDATA]) + 1;
-            authorizationLength = *(parameters++);
-            parameters += authorizationLength;
-            lockTime = btchip_read_u32(parameters, 1, 0);
-            parameters += 4;
-            sighashType = *(parameters++);
-            btchip_context_D.transactionSummary.sighashType = sighashType;
+    // Read parameters
+    if (G_io_apdu_buffer[ISO_OFFSET_CDATA] > MAX_BIP32_PATH) {
+        sw = BTCHIP_SW_INCORRECT_DATA;
+        goto discardTransaction;
+    }
+    memmove(btchip_context_D.transactionSummary.keyPath,
+            G_io_apdu_buffer + ISO_OFFSET_CDATA,
+            MAX_BIP32_PATH_LENGTH);
+    parameters += (4 * G_io_apdu_buffer[ISO_OFFSET_CDATA]) + 1;
+    authorizationLength = *(parameters++);
+    parameters += authorizationLength;
+    lockTime = btchip_read_u32(parameters, 1, 0);
+    parameters += 4;
+    sighashType = *(parameters++);
+    btchip_context_D.transactionSummary.sighashType = sighashType;
 
-            if (((N_btchip.bkp.config.options &
-                  BTCHIP_OPTION_FREE_SIGHASHTYPE) == 0)) {
-                // if bitcoin cash OR forkid is set, then use the fork id
-                if (G_coin_config->kind == COIN_KIND_BITCOIN_CASH ||
-                    (G_coin_config->forkid)) {
+    if (((N_btchip.bkp.config.options &
+                    BTCHIP_OPTION_FREE_SIGHASHTYPE) == 0)) {
+        // if bitcoin cash OR forkid is set, then use the fork id
+        if (G_coin_config->kind == COIN_KIND_BITCOIN_CASH ||
+                (G_coin_config->forkid)) {
 #define SIGHASH_FORKID 0x40
-                    if (sighashType != (SIGHASH_ALL | SIGHASH_FORKID)) {
-                        sw = BTCHIP_SW_INCORRECT_DATA;
-                        goto discardTransaction;
-                    }
-                    sighashType |= (G_coin_config->forkid << 8);
-                } else {
-                    if (sighashType != SIGHASH_ALL) {
-                        sw = BTCHIP_SW_INCORRECT_DATA;
-                        goto discardTransaction;
-                    }
-                }
+            if (sighashType != (SIGHASH_ALL | SIGHASH_FORKID)) {
+                sw = BTCHIP_SW_INCORRECT_DATA;
+                goto discardTransaction;
             }
-
-            // Finalize the hash
-            if (!btchip_context_D.usingOverwinter) {
-                btchip_write_u32_le(dataBuffer, lockTime);
-                btchip_write_u32_le(dataBuffer + 4, sighashType);
-                PRINTF("--- ADD TO HASH FULL:\n%.*H\n", sizeof(dataBuffer), dataBuffer);
-                cx_hash(&btchip_context_D.transactionHashFull.sha256.header, 0,
-                    dataBuffer, sizeof(dataBuffer), NULL, 0);
+            sighashType |= (G_coin_config->forkid << 8);
+        } else {
+            if (sighashType != SIGHASH_ALL) {
+                sw = BTCHIP_SW_INCORRECT_DATA;
+                goto discardTransaction;
             }
-
-            // Check if the path needs to be enforced
-            if (!enforce_bip44_coin_type(btchip_context_D.transactionSummary.keyPath, false)) {
-                btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
-                btchip_bagl_request_sign_path_approval(btchip_context_D.transactionSummary.keyPath);
-            }
-            else {
-                // Sign immediately
-                btchip_bagl_user_action_signtx(1, 1);
-            }
-            sw = BTCHIP_SW_OK;
-            if (btchip_context_D.called_from_swap) {
-                // if we signed all outputs we should exit,
-                // but only after sending response, so lets raise the
-                // vars.swap_data.should_exit flag and check it on timer later
-                vars.swap_data.alreadySignedInputs++;
-                if (vars.swap_data.alreadySignedInputs >= vars.swap_data.totalNumberOfInputs) {
-                    vars.swap_data.should_exit = 1;
-                }
-            }
-
-            // Then discard the transaction and reply
-        }
-        CATCH_ALL {
-            sw = SW_TECHNICAL_DETAILS(0xF);
-        catch_discardTransaction:
-            btchip_context_D.transactionContext.transactionState =
-                BTCHIP_TRANSACTION_NONE;
-        }
-        FINALLY {
-            btchip_set_check_internal_structure_integrity(1);
-            return sw;
         }
     }
-    END_TRY;
+
+    // Finalize the hash
+    if (!btchip_context_D.usingOverwinter) {
+        btchip_write_u32_le(dataBuffer, lockTime);
+        btchip_write_u32_le(dataBuffer + 4, sighashType);
+        PRINTF("--- ADD TO HASH FULL:\n%.*H\n", sizeof(dataBuffer), dataBuffer);
+        if (cx_hash_no_throw(&btchip_context_D.transactionHashFull.sha256.header, 0,
+                dataBuffer, sizeof(dataBuffer), NULL, 0)) {
+            goto discardTransaction;
+        }
+    }
+
+    // Check if the path needs to be enforced
+    if (!enforce_bip44_coin_type(btchip_context_D.transactionSummary.keyPath, false)) {
+        btchip_context_D.io_flags |= IO_ASYNCH_REPLY;
+        btchip_bagl_request_sign_path_approval(btchip_context_D.transactionSummary.keyPath);
+    }
+    else {
+        // Sign immediately
+        btchip_bagl_user_action_signtx(1, 1);
+    }
+    sw = BTCHIP_SW_OK;
+    if (btchip_context_D.called_from_swap) {
+        // if we signed all outputs we should exit,
+        // but only after sending response, so lets raise the
+        // vars.swap_data.should_exit flag and check it on timer later
+        vars.swap_data.alreadySignedInputs++;
+        if (vars.swap_data.alreadySignedInputs >= vars.swap_data.totalNumberOfInputs) {
+            vars.swap_data.should_exit = 1;
+        }
+    }
+
+    // Then discard the transaction and reply
+    btchip_set_check_internal_structure_integrity(1);
+    return sw;
+
+    discardTransaction:
+        btchip_set_check_internal_structure_integrity(1);
+        btchip_context_D.transactionContext.transactionState = BTCHIP_TRANSACTION_NONE;
+        return sw;
 }
 
 void btchip_bagl_user_action_signtx(unsigned char confirming, unsigned char direct) {
-    cx_ecfp_private_key_t private_key;
     unsigned short sw = BTCHIP_SW_OK;
     // confirm and finish the apdu exchange //spaghetti
     if (confirming) {
         unsigned char hash[32];
-        // Fetch the private key
-        btchip_private_derive_keypair(btchip_context_D.transactionSummary.keyPath, 0, NULL, &private_key, NULL);
         if (btchip_context_D.usingOverwinter) {
-            cx_hash(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hash, 0, hash, 32);
+            cx_hash_no_throw(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hash, 0, hash, 32);
         }
         else {
-            cx_sha256_t localHash;
-            cx_hash(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
+            cx_hash_no_throw(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
                 hash, 0, hash, 32);
             PRINTF("Hash1\n%.*H\n", sizeof(hash), hash);
 
             // Rehash
-            cx_sha256_init(&localHash);
-            cx_hash(&localHash.header, CX_LAST, hash, sizeof(hash), hash, 32);
+            cx_hash_sha256(hash, sizeof(hash), hash, 32);
         }
         PRINTF("Hash2\n%.*H\n", sizeof(hash), hash);
         // Sign
+        size_t out_len = sizeof(G_io_apdu_buffer);
         btchip_sign_finalhash(
-            &private_key, hash, sizeof(hash),
-            G_io_apdu_buffer, sizeof(G_io_apdu_buffer),
+            btchip_context_D.transactionSummary.keyPath,
+            sizeof(btchip_context_D.transactionSummary.keyPath),
+            hash, sizeof(hash),
+            G_io_apdu_buffer, &out_len,
             ((N_btchip.bkp.config.options &
                 BTCHIP_OPTION_DETERMINISTIC_SIGNATURE) != 0));
 

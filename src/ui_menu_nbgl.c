@@ -26,7 +26,7 @@
 #define NB_INFO_FIELDS 2
 #define PAGE_START 0
 #define NB_PAGE_SETTING 2
-#define IS_TOUCHABLE true
+#define IS_TOUCHABLE false
 
 #define NB_SETTINGS_SWITCHES 1
 #define SWITCH_PUBLIC_KEY_SET_TOKEN FIRST_USER_TOKEN
@@ -48,6 +48,11 @@ static void switch_public_key(void) {
 
 static bool settings_navigation_cb(uint8_t page, nbgl_pageContent_t *content) {
   if (page == 0) {
+    content->type = INFOS_LIST;
+    content->infosList.nbInfos = NB_INFO_FIELDS;
+    content->infosList.infoTypes = (const char **)infoTypes;
+    content->infosList.infoContents = (const char **)infoContents;
+  } else if (page == 1) {
     switches[0].text = "Public key export";
     switches[0].subText = "Auto / manual export mode";
     switches[0].token = SWITCH_PUBLIC_KEY_SET_TOKEN;
@@ -57,11 +62,6 @@ static bool settings_navigation_cb(uint8_t page, nbgl_pageContent_t *content) {
     content->type = SWITCHES_LIST;
     content->switchesList.nbSwitches = NB_SETTINGS_SWITCHES;
     content->switchesList.switches = (nbgl_layoutSwitch_t *)switches;
-  } else if (page == 1) {
-    content->type = INFOS_LIST;
-    content->infosList.nbInfos = NB_INFO_FIELDS;
-    content->infosList.infoTypes = (const char **)infoTypes;
-    content->infosList.infoContents = (const char **)infoContents;
   } else {
     return false;
   }
