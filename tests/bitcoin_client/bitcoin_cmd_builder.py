@@ -19,6 +19,7 @@ class InsType(enum.IntEnum):
     UNTRUSTED_HASH_TRANSACTION_INPUT_START = 0x44
     UNTRUSTED_HASH_TRANSACTION_INPUT_FINALIZE = 0x4A
     UNTRUSTED_HASH_SIGN = 0x48
+    SIGN_MESSAGE = 0x4E
 
 
 class AddrType(enum.IntEnum):
@@ -385,3 +386,72 @@ class BitcoinCommandBuilder:
         ])
 
         return self.serialize(cla=self.CLA, ins=ins, p1=p1, p2=p2, cdata=cdata)
+
+
+    def sign_message(self,
+                     sign_path: str,
+                     message: str) -> Iterator[bytes]:
+        """Command builder for UNTRUSTED_HASH_SIGN.
+
+        Parameters
+        ----------
+        sign_path : str
+            BIP32 path to be used to sign.
+        lock_time : int
+            Block height or timestamp when transaction is final.
+        sig_hash : int
+            Either SIGHASH_ALL (0x01), SIGHASH_NONE (0x02) or SIGHASH_SINGLE (0x03).
+            Only SIGHASH_ALL (0x01) is supported.
+
+        Yields
+        -------
+        bytes
+            APDU command chunk for SIGN_MESSAGE.
+
+        """
+        ins: InsType = InsType.SIGN_MESSAGE
+        # P1:
+        # - 0x00, first transaction data chunk
+        # - 0x80, other transaction data chunk
+        p1: int
+        p2: int = 0x00
+
+        bip32_path: List[bytes] = bip32_path_from_string(sign_path)
+        cdata: bytes = b"".join([
+            len(bip32_path).to_bytes(1, byteorder="big"),
+            *bip32_path,
+            len(message).to_bytes(1, byteorder="big"),  # /!\ big instead of little
+            message.encode("utf-8")
+        ])
+
+        for i, (is_last, chunk) in enumerate(chunkify(cdata, MAX_APDU_LEN)):
+            p1 = 0x00 if i == 0 else 0x80
+            if is_last:
+                yield self.serialize(cla=self.CLA,
+                                     ins=ins,
+                                     p1=p1,
+                                     p2=p2,
+                                     cdata=chunk)
+                return
+            yield self.serialize(cla=self.CLA,
+                                 ins=ins,
+                                 p1=p1,
+                                 p2=p2,
+                                 cdata=chunk)
+
+    def sign_message_sign(self) -> bytes:
+        """Command builder for UNTRUSTED_HASH_SIGN.
+
+        Parameters
+        ----------
+        Returns
+        -------
+        bytes
+            APDU command for SIGN_MESSAGE.
+
+        """
+        ins: InsType = InsType.SIGN_MESSAGE
+        p1: int = 0x80
+        p2: int = 0x00
+
+        return self.serialize(cla=self.CLA, ins=ins, p1=p1, p2=p2, cdata=b"00")

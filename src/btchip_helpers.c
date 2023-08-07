@@ -415,6 +415,11 @@ int btchip_sign_finalhash(unsigned char* path, size_t path_len, unsigned char *i
         return -1;
     }
 
+    // Store information about the parity of the 'y' coordinate
+    if (info & CX_ECCINFO_PARITY_ODD) {
+        out[0] |= 0x01;
+    }
+
     io_seproxyhal_io_heartbeat();
     return 0;
 }

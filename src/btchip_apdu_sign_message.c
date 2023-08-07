@@ -264,7 +264,7 @@ unsigned short btchip_compute_hash() {
         goto discard;
     }
             
-    if (cx_hash_sha256(hash, sizeof(hash), hash, 32)) {
+    if (cx_hash_sha256(hash, sizeof(hash), hash, 32) == 0) {
         goto discard;
     }
 

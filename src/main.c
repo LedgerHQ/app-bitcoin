@@ -300,7 +300,8 @@ uint8_t prepare_message_signature() {
         return 0;
     }
 
-    format_hex((const uint8_t*) vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress), (char*) buffer, sizeof(buffer));
+    format_hex((const uint8_t*) buffer, sizeof(buffer), vars.tmp.fullAddress, sizeof(vars.tmp.fullAddress));
+
     return 1;
 }
 
