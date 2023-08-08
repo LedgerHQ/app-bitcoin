@@ -267,7 +267,7 @@ static void ui_start(void (*cb)(void), flow_type_t type) {
 
 static void ui_transaction_start(void (*cb)(void)) {
   uiContext.abandon_status = "Transaction\nrejected";
-  uiContext.approved_status = "TRANSACTION\nCONFIRMED";
+  uiContext.approved_status = "TRANSACTION\nSIGNED";
   uiContext.prompt_cancel_message = "Reject\nTransaction ?";
   uiContext.prompt = "Sign transaction";
   ui_start(cb, TRANSACTION_TYPE);
@@ -516,7 +516,7 @@ void ui_display_public_flow(void) {
 
 void ui_transaction_finish(void) {
   if (uiContext.transaction_prompt_done) {
-    uiContext.approved_status = "TRANSACTION\nCONFIRMED";
+    uiContext.approved_status = "TRANSACTION\nSIGNED";
     uiContext.approved_cb = ui_idle_flow;
     approved_status();
   }
