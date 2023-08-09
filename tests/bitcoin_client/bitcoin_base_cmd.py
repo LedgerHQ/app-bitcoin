@@ -6,6 +6,7 @@ from ledgercomm import Transport
 from bitcoin_client.hwi.serialization import CTransaction, hash256
 from bitcoin_client.exception.device_exception import DeviceException
 from bitcoin_client.bitcoin_cmd_builder import AddrType, InsType, BitcoinCommandBuilder
+import base64
 
 
 class BitcoinBaseCommand:
@@ -173,6 +174,45 @@ class BitcoinBaseCommand:
         assert len(response) == offset
 
         return pub_key, addr, bip32_chain_code
+
+    def sign_message(self,
+                     message: str,
+                     bip32_path: str,
+                     ) -> bytes:
+        """Sign message.
+
+        Parameters
+        ----------
+        bip32_path : str
+            BIP32 path to be used to sign.
+        message : str
+            Message to be signed
+
+        Returns
+        -------
+        bytes
+            Signature of the message
+
+        """
+        sw: int
+        response: bytes = b""
+
+        for chunk in self.builder.sign_message(bip32_path, message):
+            self.transport.send_raw(chunk)
+            sw, response = self.transport.recv()  # type: int, bytes
+
+            if sw != 0x9000:
+                raise DeviceException(error_code=sw, ins=InsType.SIGN_MESSAGE)
+
+        sw, response = self.transport.exchange_raw(
+            self.builder.sign_message_sign()
+        )
+
+        if sw != 0x9000:
+            raise DeviceException(error_code=sw, ins=InsType.SIGN_MESSAGE)
+
+        return base64.b64encode(response).decode('utf-8')
+
 
     def get_trusted_input(self,
                           utxo: CTransaction,

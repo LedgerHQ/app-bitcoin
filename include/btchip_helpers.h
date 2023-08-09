@@ -65,12 +65,6 @@ unsigned short btchip_decode_base58_address(unsigned char *in,
                                             unsigned char *out,
                                             unsigned short outlen);
 
-void btchip_private_derive_keypair(unsigned char *bip32Path,
-                                   unsigned char derivePublic,
-                                   unsigned char *out_chainCode,
-                                   cx_ecfp_private_key_t * private_key,
-                                   cx_ecfp_public_key_t* public_key);
-
 unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_path);
 unsigned char enforce_bip44_coin_type(unsigned char *bip32Path, bool for_pubkey);
 unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned char max_out_len);
@@ -81,9 +75,9 @@ unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned cha
 void btchip_swap_bytes(unsigned char *target, unsigned char *source,
                        unsigned char size);
 
-void btchip_sign_finalhash(void *keyContext,
+int btchip_sign_finalhash(unsigned char *path, size_t path_len,
                            unsigned char *in, unsigned short inlen,
-                           unsigned char *out, unsigned short outlen,
+                           unsigned char *out, size_t* outlen,
                            unsigned char rfc6979);
 
 void btchip_transaction_add_output(unsigned char *hash160Address,
@@ -94,5 +88,6 @@ unsigned char btchip_secure_memcmp(const void *buf1, const void *buf2,
 unsigned char btchip_decrease_2fa(void);
 void btchip_reset_2fa(void);
 void btchip_reset_token(void);
+int btchip_get_public_key(unsigned char* keyPath, size_t keyPath_len, uint8_t raw_pubkey[static 65], unsigned char* chainCode);
 
 #endif
