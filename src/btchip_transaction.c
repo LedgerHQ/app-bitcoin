@@ -42,15 +42,15 @@ void check_transaction_available(unsigned char x) {
 #define OP_CHECKMULTISIG 0xAE
 
 void blake2b_256_init(cx_blake2b_t *blake2b_ctx, const uint8_t perso[static 16]) {
-    cx_blake2b_init2(blake2b_ctx, 256, NULL, 0, (uint8_t *) perso, 16);
+    cx_blake2b_init2_no_throw(blake2b_ctx, 256, NULL, 0, (uint8_t *) perso, 16);
 }
 
 void blake2b_256_update(cx_blake2b_t *blake2b_ctx, const uint8_t *data, size_t len) {
-    cx_hash(&blake2b_ctx->header, 0, data, len, NULL, 0);
+    cx_hash_no_throw(&blake2b_ctx->header, 0, data, len, NULL, 0);
 }
 
 void blake2b_256_final(cx_blake2b_t *blake2b_ctx, uint8_t digest[static DIGEST_SIZE]) {
-    cx_hash(&blake2b_ctx->header, CX_LAST, NULL, 0, digest, DIGEST_SIZE);
+    cx_hash_no_throw(&blake2b_ctx->header, CX_LAST, NULL, 0, digest, DIGEST_SIZE);
 }
 
 unsigned char transaction_amount_add_be(unsigned char *target,
@@ -520,7 +520,7 @@ void transaction_parse(unsigned char parseMode) {
 
                                 if (btchip_context_D.NU5Transaction) {
                                     // Compute amounts_sig_digest
-                                    cx_hash(&btchip_context_D.hashAmount.blake2b.header, 0, btchip_context_D.transactionBufferPointer, 8, NULL, 0); 
+                                    cx_hash_no_throw(&btchip_context_D.hashAmount.blake2b.header, 0, btchip_context_D.transactionBufferPointer, 8, NULL, 0); 
                                 }
 
                                 transaction_offset_increase(8);
@@ -685,7 +685,7 @@ void transaction_parse(unsigned char parseMode) {
                             btchip_context_D.transactionContext.consumeP2SH = 0;
                         }
                         if (btchip_context_D.usingSegwit && btchip_context_D.segwitParsedOnce && btchip_context_D.NU5Transaction) {
-                            cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.transactionBufferPointer, 1, NULL, 0);
+                            cx_hash_no_throw(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.transactionBufferPointer, 1, NULL, 0);
                         }
                         transaction_offset_increase(1);
                         btchip_context_D.transactionContext.scriptRemaining--;
@@ -824,8 +824,8 @@ void transaction_parse(unsigned char parseMode) {
                     }
                     if (btchip_context_D.usingSegwit && btchip_context_D.segwitParsedOnce && btchip_context_D.NU5Transaction) {
                         uint8_t dataSize = dataAvailable + 1;
-                        cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, &dataSize, 1, NULL, 0);
-                        cx_hash(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.transactionBufferPointer, dataAvailable, NULL, 0);
+                        cx_hash_no_throw(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, &dataSize, 1, NULL, 0);
+                        cx_hash_no_throw(&btchip_context_D.segwit.hash.hashPrevouts.blake2b.header, 0, btchip_context_D.transactionBufferPointer, dataAvailable, NULL, 0);
 
 
                         // We dont want to update transactionHashFull
