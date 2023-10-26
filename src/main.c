@@ -203,12 +203,12 @@ void get_address_from_output_script(unsigned char* script, int script_size, char
         strncpy(out, "OP_RETURN", out_size);
         return;
     }
-    if ((G_coin_config->kind == COIN_KIND_QTUM || G_coin_config->kind == COIN_KIND_HYDRA) &&
+    if ((G_coin_config->kind == COIN_KIND_HYDRA) &&
         btchip_output_script_is_op_create(script, script_size)) {
         strncpy(out, "OP_CREATE", out_size);
         return;
     }
-    if ((G_coin_config->kind == COIN_KIND_QTUM || G_coin_config->kind == COIN_KIND_HYDRA) &&
+    if ((G_coin_config->kind == COIN_KIND_HYDRA) &&
         btchip_output_script_is_op_call(script, script_size)) {
         strncpy(out, "OP_CALL", out_size);
         return;
