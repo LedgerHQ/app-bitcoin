@@ -203,12 +203,12 @@ void get_address_from_output_script(unsigned char* script, int script_size, char
         strncpy(out, "OP_RETURN", out_size);
         return;
     }
-    if ((G_coin_config->kind == COIN_KIND_QTUM || G_coin_config->kind == COIN_KIND_HYDRA) &&
+    if ((G_coin_config->kind == COIN_KIND_HYDRA) &&
         btchip_output_script_is_op_create(script, script_size)) {
         strncpy(out, "OP_CREATE", out_size);
         return;
     }
-    if ((G_coin_config->kind == COIN_KIND_QTUM || G_coin_config->kind == COIN_KIND_HYDRA) &&
+    if ((G_coin_config->kind == COIN_KIND_HYDRA) &&
         btchip_output_script_is_op_call(script, script_size)) {
         strncpy(out, "OP_CALL", out_size);
         return;
@@ -605,7 +605,6 @@ struct libargs_s {
 };
 
 static void library_main_helper(struct libargs_s *args) {
-    check_api_level(CX_COMPAT_APILEVEL);
     PRINTF("Inside a library \n");
     switch (args->command) {
         case CHECK_ADDRESS:
@@ -665,7 +664,6 @@ __attribute__((section(".boot"))) int main(int arg0) {
             btchip_altcoin_config_t coin_config;
             init_coin_config(&coin_config);
             PRINTF("Hello from litecoin\n");
-            check_api_level(CX_COMPAT_APILEVEL);
             // delegate to bitcoin app/lib
             libcall_params[0] = "Bitcoin Legacy";
             libcall_params[1] = 0x100;
