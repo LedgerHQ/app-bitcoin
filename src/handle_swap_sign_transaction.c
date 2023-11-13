@@ -6,6 +6,12 @@
 #include "usbd_core.h"
 #include "ux.h"
 
+#ifdef HAVE_NBGL
+#include "nbgl_use_case.h"
+#endif
+
+// Save the BSS address where we will write the return value when finished
+static uint8_t *G_swap_sign_return_value_address;
 
 bool copy_transaction_parameters(create_transaction_parameters_t* sign_transaction_params) {
     // first copy parameters to stack, and then to global data.
@@ -26,6 +32,9 @@ bool copy_transaction_parameters(create_transaction_parameters_t* sign_transacti
     // Erase values inherited from Exchange app
     os_explicit_zero_BSS_segment();
 
+    // Keep the address at which we'll reply the signing status
+    G_swap_sign_return_value_address = &sign_transaction_params->result;
+
     // Copy from stack back to global data segment
     memcpy(&vars.swap_data, &stack_data, sizeof(stack_data));
     return true;
@@ -37,6 +46,9 @@ void handle_swap_sign_transaction(btchip_altcoin_config_t *config) {
     btchip_context_D.called_from_swap = 1;
     io_seproxyhal_init();
     UX_INIT();
+#ifdef HAVE_NBGL
+    nbgl_useCaseSpinner("Signing");
+#endif  // HAVE_BAGL
     USB_power(0);
     USB_power(1);
     //ui_idle();
@@ -50,4 +62,9 @@ void handle_swap_sign_transaction(btchip_altcoin_config_t *config) {
     BLE_power(1, "Nano X");
 #endif // HAVE_BLE
     app_main();
+}
+
+void __attribute__((noreturn)) finalize_exchange_sign_transaction(bool is_success) {
+    *G_swap_sign_return_value_address = is_success;
+    os_lib_end();
 }

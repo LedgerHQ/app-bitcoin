@@ -593,18 +593,7 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
     app_exit();
 }
 
-struct libargs_s {
-    unsigned int id;
-    unsigned int command;
-    btchip_altcoin_config_t *coin_config;
-    union {
-        check_address_parameters_t *check_address;
-        create_transaction_parameters_t *create_transaction;
-        get_printable_amount_parameters_t *get_printable_amount;
-    };
-};
-
-static void library_main_helper(struct libargs_s *args) {
+static void library_main_helper(libargs_t *args) {
     PRINTF("Inside a library \n");
     switch (args->command) {
         case CHECK_ADDRESS:
@@ -620,10 +609,6 @@ static void library_main_helper(struct libargs_s *args) {
             }
             break;
         case GET_PRINTABLE_AMOUNT:
-            // ensure result is zero if an exception is thrown (compatibility breaking, disabled
-            // until LL is ready)
-            // args->get_printable_amount->result = 0;
-            // args->get_printable_amount->result =
             handle_get_printable_amount(args->get_printable_amount, args->coin_config);
             break;
         default:
@@ -631,7 +616,7 @@ static void library_main_helper(struct libargs_s *args) {
     }
 }
 
-void library_main(struct libargs_s *args) {
+void library_main(libargs_t *args) {
     btchip_altcoin_config_t coin_config;
     if (args->coin_config == NULL) {
         init_coin_config(&coin_config);
@@ -699,7 +684,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
         coin_main(NULL);
         return 0;
     }
-    struct libargs_s *args = (struct libargs_s *) arg0;
+    libargs_t *args = (libargs_t *) arg0;
     if (args->id != 0x100) {
         app_exit();
         return 0;
