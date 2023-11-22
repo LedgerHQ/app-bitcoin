@@ -24,6 +24,8 @@
 #include "btchip_apdu_constants.h"
 #include "btchip_display_variables.h"
 
+#include "handle_swap_sign_transaction.h"
+
 #define BTCHIP_TECHNICAL_NOT_IMPLEMENTED 0x99
 
 #define COMMON_CLA               0xB0
@@ -167,7 +169,7 @@ void app_main(void) {
                         btchip_context_D.outLength);
 
         if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
-            os_sched_exit(0);
+            finalize_exchange_sign_transaction(btchip_context_D.sw == BTCHIP_SW_OK);
         }
 
         PRINTF("New APDU received:\n%.*H\n", btchip_context_D.inLength, G_io_apdu_buffer);
