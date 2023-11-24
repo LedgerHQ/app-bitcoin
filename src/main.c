@@ -812,7 +812,7 @@ uint8_t prepare_fees() {
         borrow = transaction_amount_sub_be(
                 fees, btchip_context_D.transactionContext.transactionAmount,
                 btchip_context_D.totalOutputAmount);
-        if (borrow && G_coin_config->kind == COIN_KIND_KOMODO) {
+        if (borrow && (G_coin_config->kind == COIN_KIND_KOMODO || G_coin_config->kind == COIN_KIND_PEERCOIN)) {
             os_memmove(vars.tmp.feesAmount, "REWARD", 6);
             vars.tmp.feesAmount[6] = '\0';
         }
@@ -844,6 +844,10 @@ error:
 void get_address_from_output_script(unsigned char* script, int script_size, char* out, int out_size) {
     if (btchip_output_script_is_op_return(script)) {
         strcpy(out, "OP_RETURN");
+        return;
+    }
+    if (G_coin_config->kind == COIN_KIND_PEERCOIN && btchip_output_script_is_empty(script)) {
+        strcpy(out, "COINSTAKE");
         return;
     }
     if ((G_coin_config->kind == COIN_KIND_QTUM || G_coin_config->kind == COIN_KIND_HYDRA) &&
