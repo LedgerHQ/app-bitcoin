@@ -20,6 +20,7 @@
 #include "btchip_bagl_extensions.h"
 #include "btchip_display_variables.h"
 #include "ui.h"
+#include "ledger_assert.h"
 
 #define SIGHASH_ALL 0x01
 
@@ -169,11 +170,11 @@ void btchip_bagl_user_action_signtx(unsigned char confirming, unsigned char dire
     if (confirming) {
         unsigned char hash[32];
         if (btchip_context_D.usingOverwinter) {
-            cx_hash_no_throw(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hash, 0, hash, 32);
+            LEDGER_ASSERT(cx_hash_no_throw(&btchip_context_D.transactionHashFull.blake2b.header, CX_LAST, hash, 0, hash, 32) == CX_OK, "Hash Failed");
         }
         else {
-            cx_hash_no_throw(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
-                hash, 0, hash, 32);
+            LEDGER_ASSERT(cx_hash_no_throw(&btchip_context_D.transactionHashFull.sha256.header, CX_LAST,
+                hash, 0, hash, 32) == CX_OK, "Hash Failed");
             PRINTF("Hash1\n%.*H\n", sizeof(hash), hash);
 
             // Rehash
