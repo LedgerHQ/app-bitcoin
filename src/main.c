@@ -531,19 +531,7 @@ void coin_main(void) {
     app_exit();
 }
 
-struct libargs_s {
-    unsigned int id;
-    unsigned int command;
-    void *coin_config_legacy; // This is unused but kept for compatibility
-    union {
-        check_address_parameters_t *check_address;
-        create_transaction_parameters_t *create_transaction;
-        get_printable_amount_parameters_t *get_printable_amount;
-    };
-};
-
-static void library_main_helper(struct libargs_s *args) {
-    check_api_level(CX_COMPAT_APILEVEL);
+static void library_main_helper(libargs_t *args) {
     PRINTF("Inside a library \n");
     switch (args->command) {
         case CHECK_ADDRESS:
@@ -559,10 +547,6 @@ static void library_main_helper(struct libargs_s *args) {
             }
             break;
         case GET_PRINTABLE_AMOUNT:
-            // ensure result is zero if an exception is thrown (compatibility breaking, disabled
-            // until LL is ready)
-            // args->get_printable_amount->result = 0;
-            // args->get_printable_amount->result =
             handle_get_printable_amount(args->get_printable_amount);
             break;
         default:
@@ -570,7 +554,7 @@ static void library_main_helper(struct libargs_s *args) {
     }
 }
 
-void library_main(struct libargs_s *args) {
+void library_main(libargs_t *args) {
     bool end = false;
     /* This loop ensures that library_main_helper and os_lib_end are called
      * within a try context, even if an exception is thrown */
@@ -598,22 +582,20 @@ __attribute__((section(".boot"))) int main(int arg0) {
     // ensure exception will work as planned
     os_boot();
 
-
-    if (!arg0) {
+    if (arg0 == 0) {
+        // Started from dashboard
         coin_main();
-    }
-    else {
-        struct libargs_s *args = (struct libargs_s *) arg0;
-
+    } else {
+        // Started from another app
+        libargs_t *args = (libargs_t *) arg0;
         if (args->id != 0x100) {
             app_exit();
-            return 0;
-        }
-
-        if (args->command == RUN_APPLICATION) {
-            coin_main();
         } else {
-            library_main(args);
+            if (args->command == RUN_APPLICATION) {
+                coin_main();
+            } else {
+                library_main(args);
+            }
         }
     }
 
