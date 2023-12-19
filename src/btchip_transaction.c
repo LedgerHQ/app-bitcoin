@@ -18,6 +18,7 @@
 #include "btchip_internal.h"
 #include "btchip_apdu_constants.h"
 #include "btchip_display_variables.h"
+#include "ledger_assert.h"
 
 #define CONSENSUS_BRANCH_ID_OVERWINTER 0x5ba81b19
 #define CONSENSUS_BRANCH_ID_SAPLING 0x76b809bb
@@ -87,18 +88,18 @@ void transaction_offset(unsigned char value) {
     if ((btchip_context_D.transactionHashOption & TRANSACTION_HASH_FULL) != 0) {
         PRINTF("--- ADD TO HASH FULL:\n%.*H\n", value, btchip_context_D.transactionBufferPointer);
         if (btchip_context_D.usingOverwinter) {
-            cx_hash_no_throw(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.transactionBufferPointer, value, NULL, 0);
+            LEDGER_ASSERT(cx_hash_no_throw(&btchip_context_D.transactionHashFull.blake2b.header, 0, btchip_context_D.transactionBufferPointer, value, NULL, 0) == CX_OK, "Hash Failed");
         }
         else {
-            cx_hash_no_throw(&btchip_context_D.transactionHashFull.sha256.header, 0,
-                btchip_context_D.transactionBufferPointer, value, NULL, 0);
+            LEDGER_ASSERT(cx_hash_no_throw(&btchip_context_D.transactionHashFull.sha256.header, 0,
+                btchip_context_D.transactionBufferPointer, value, NULL, 0) == CX_OK, "Hash Failed");
         }
     }
     if ((btchip_context_D.transactionHashOption &
          TRANSACTION_HASH_AUTHORIZATION) != 0) {
         PRINTF("--- ADD TO HASH AUTH:\n%.*H\n", value, btchip_context_D.transactionBufferPointer);
-        cx_hash_no_throw(&btchip_context_D.transactionHashAuthorization.header, 0,
-                btchip_context_D.transactionBufferPointer, value, NULL, 0);
+        LEDGER_ASSERT(cx_hash_no_throw(&btchip_context_D.transactionHashAuthorization.header, 0,
+                btchip_context_D.transactionBufferPointer, value, NULL, 0) == CX_OK, "Hash Failed");
     }
 }
 

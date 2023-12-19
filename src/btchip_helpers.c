@@ -19,6 +19,7 @@
 #include "btchip_apdu_constants.h"
 #include "lib_standard_app/crypto_helpers.h"
 #include "bip32_path.h"
+#include "ledger_assert.h"
 
 const unsigned char TRANSACTION_OUTPUT_SCRIPT_PRE[] = {
     0x19, 0x76, 0xA9,
@@ -215,7 +216,7 @@ void btchip_public_key_hash160(unsigned char *in, unsigned short inlen,
     unsigned char buffer[32];
     cx_hash_sha256(in, inlen, buffer, 32);
     cx_ripemd160_init(&riprip);
-    cx_hash_no_throw(&riprip.header, CX_LAST, buffer, 32, out, 20);
+    LEDGER_ASSERT(cx_hash_no_throw(&riprip.header, CX_LAST, buffer, 32, out, 20) == CX_OK, "hash160");
 }
 
 void btchip_compute_checksum(unsigned char* in, unsigned short inlen, unsigned char * output) {
