@@ -16,14 +16,15 @@ from ragger_bitcoin.ragger_adaptor import RaggerAdaptor
 
 TESTS_ROOT_DIR = Path(__file__).parent
 
+
 class RaggerClient(LegacyClient):
     def __init__(self, comm_client: TransportClient, screenshot_dir: Path = TESTS_ROOT_DIR) -> None:
         self.app = btchip(RaggerAdaptor(comm_client, screenshot_dir))
         self.chain = Chain.TEST
 
-    def get_extended_pubkey(self, path: str, display: bool = False, navigator: Optional[Navigator] = None,
-                            testname: str = "",
-                            instructions: Instructions = None) -> str:
+    def get_extended_pubkey(
+            self, path: str, display: bool = False, navigator: Optional[Navigator] = None,
+            testname: str = "", instructions: Instructions = None) -> str:
 
         if navigator:
             self.app.dongle.set_navigation(True, navigator, testname, instructions)
@@ -34,9 +35,10 @@ class RaggerClient(LegacyClient):
 
         return response
 
-    def sign_psbt(self, psbt: Union[PSBT, bytes, str], wallet: WalletPolicy, wallet_hmac:
-                  Optional[bytes], navigator: Optional[Navigator] = None,
-                  testname: str = "", instructions: Instructions = None) -> List[Tuple[int, PartialSignature]]:
+    def sign_psbt(self, psbt: Union[PSBT, bytes, str],
+                  wallet: WalletPolicy, wallet_hmac: Optional[bytes],
+                  navigator: Optional[Navigator] = None, testname: str = "",
+                  instructions: Instructions = None) -> List[Tuple[int, PartialSignature]]:
 
         if navigator:
             self.app.dongle.set_navigation(True, navigator, testname, instructions)
@@ -75,4 +77,3 @@ class RaggerClient(LegacyClient):
 
 def createRaggerClient(backend, screenshot_dir: Path = TESTS_ROOT_DIR) -> RaggerClient:
     return RaggerClient(backend, screenshot_dir)
-

@@ -60,7 +60,7 @@ class Instructions:
         self.new_request("Sign", NavInsID.USE_CASE_REVIEW_TAP,
                          NavInsID.USE_CASE_REVIEW_CONFIRM, save_screenshot=save_screenshot)
         self.new_request("MESSAGE", NavInsID.USE_CASE_REVIEW_TAP,
-                         NavInsID.USE_CASE_STATUS_DISMISS,  save_screenshot=save_screenshot)
+                         NavInsID.USE_CASE_STATUS_DISMISS, save_screenshot=save_screenshot)
 
     def confirm_wallet(self, save_screenshot=True):
         self.new_request("Approve", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_CONFIRM,

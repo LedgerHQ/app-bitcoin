@@ -2,3 +2,4 @@ pytest>=6.2.1
 ecdsa>=0.16.1,<0.17.0
 ragger[speculos]>=1.6.0
 ragger[ledgerwallet]>=1.6.0
+ledger-bitcoin

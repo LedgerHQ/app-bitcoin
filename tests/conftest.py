@@ -1,89 +1,31 @@
-import subprocess
-import os
-import socket
-import time
-import logging
 import pytest
+from pathlib import Path
 
-from ledgercomm import Transport
+from ragger.conftest import configuration
+from ragger.backend.interface import BackendInterface
+from ragger_bitcoin import createRaggerClient, RaggerClient
 
-from bitcoin_client.bitcoin_cmd import BitcoinCommand
+###########################
+### CONFIGURATION START ###
+###########################
 
+# You can configure optional parameters by overriding the value of ragger.configuration.OPTIONAL_CONFIGURATION
+# Please refer to ragger/conftest/configuration.py for their descriptions and accepted values
 
-logging.basicConfig(level=logging.INFO)
-
-
-def pytest_addoption(parser):
-    parser.addoption("--hid",
-                     action="store_true")
-    parser.addoption("--model", action="store", default="nanos")
-
-
-@pytest.fixture
-def model(pytestconfig):
-    return pytestconfig.getoption("model")
+MNEMONIC = "glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin"
+configuration.OPTIONAL.CUSTOM_SEED = MNEMONIC
+configuration.OPTIONAL.BACKEND_SCOPE = "function"
 
 
-@pytest.fixture
-def hid(pytestconfig):
-    return pytestconfig.getoption("hid")
+#########################
+### CONFIGURATION END ###
+#########################
+TESTS_ROOT_DIR = Path(__file__).parent
 
-@pytest.fixture
-def device(request, hid, model):
-    # If running on real hardware, nothing to do here
-    if hid:
-        yield
-        return
-
-    # Gets the speculos executable from the SPECULOS environment variable,
-    # or hopes that "speculos.py" is in the $PATH if not set
-    speculos_executable = os.environ.get("SPECULOS", "speculos.py")
-
-    base_args = [
-        speculos_executable, "./bitcoin-testnet-bin/app.elf",
-        "-l", "Bitcoin Legacy:./bitcoin-bin/app.elf",
-        "--display", "headless",
-        "--model", model
-    ]
-
-    # Look for the automation_file attribute in the test function, if present
-    try:
-        automation_args = ["--automation", f"file:{request.function.automation_file}"]
-    except AttributeError:
-        automation_args = []
-
-    speculos_proc = subprocess.Popen([*base_args, *automation_args])
-
-
-    # Attempts to connect to speculos to make sure that it's ready when the test starts
-    for _ in range(100):
-        try:
-            socket.create_connection(("127.0.0.1", 9999), timeout=1.0)
-            connected = True
-            break
-        except ConnectionRefusedError:
-            time.sleep(0.1)
-            connected = False
-
-    if not connected:
-        raise RuntimeError("Unable to connect to speculos.")
-
-    yield
-
-    speculos_proc.terminate()
-    speculos_proc.wait()
+# Pull all features from the base ragger conftest using the overridden configuration
+pytest_plugins = ("ragger.conftest.base_conftest", )
 
 
 @pytest.fixture
-def transport(device, hid):
-    transport = (Transport(interface="hid", debug=True)
-                 if hid else Transport(interface="tcp",
-                                       server="127.0.0.1",
-                                       port=9999,
-                                       debug=True))
-    yield transport
-    transport.close()
-
-@pytest.fixture
-def cmd(transport):
-    return BitcoinCommand(transport=transport, debug=False)
+def client(backend: BackendInterface) -> RaggerClient:
+    return createRaggerClient(backend, screenshot_dir=TESTS_ROOT_DIR)
