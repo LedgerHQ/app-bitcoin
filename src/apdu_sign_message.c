@@ -18,6 +18,8 @@
 #include "internal.h"
 #include "apdu_constants.h"
 #include "bagl_extensions.h"
+#include "lib_standard_app/read.h"
+#include "swap.h"
 
 #define P1_PREPARE 0x00
 #define P1_SIGN 0x80
@@ -37,14 +39,8 @@ unsigned char checkBitId(unsigned char *bip32Path) {
     unsigned char i;
     unsigned char bip32PathLength = bip32Path[0];
     bip32Path++;
-    /*
-    if ((bip32PathLength != 0) && (read_u32(bip32Path, 1, 0) == SLIP_13))
-    {
-        return BITID_MULTIPLE;
-    }
-    */
     for (i = 0; i < bip32PathLength; i++) {
-        unsigned short account = read_u32(bip32Path, 1, 0);
+        unsigned short account = read_u32_be(bip32Path, 0);
         bip32Path += 4;
 
         if (account == BITID_DERIVE) {
@@ -75,10 +71,6 @@ unsigned short apdu_sign_message_internal() {
         }
     }
 
-    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        return SW_SECURITY_STATUS_NOT_SATISFIED;
-    }
-
     if (p1 == P1_PREPARE) {
         if ((p2 == P2_FIRST) || (p2 == P2_LEGACY)) {
             unsigned char chunkLength;
@@ -91,10 +83,8 @@ unsigned short apdu_sign_message_internal() {
                 sw = SW_INCORRECT_DATA;
                 goto discard;
             }
-            context_D.transactionSummary.payToAddressVersion =
-                G_coin_config->p2pkh_version;
-            context_D.transactionSummary.payToScriptHashVersion =
-                G_coin_config->p2sh_version;
+            context_D.transactionSummary.payToAddressVersion = COIN_P2PKH_VERSION;
+            context_D.transactionSummary.payToScriptHashVersion = COIN_P2SH_VERSION;
             memmove(
                     context_D.transactionSummary.keyPath,
                     G_io_apdu_buffer + offset, MAX_BIP32_PATH_LENGTH);
@@ -127,7 +117,7 @@ unsigned short apdu_sign_message_internal() {
             }
             // Horizen signed message magic header is "Zcash"
             // See https://github.com/HorizenOfficial/zen/blob/v5.0.0/src/main.cpp#L122
-            const char* magicHeader = (G_coin_config->kind != COIN_KIND_HORIZEN) ? G_coin_config->coinid : "Zcash";
+            const char* magicHeader = (COIN_KIND != COIN_KIND_HORIZEN) ? COIN_COINID : "Zcash";
             chunkLength =
                 strlen(magicHeader) + SIGNMAGIC_LENGTH;
             if (cx_hash_no_throw(&context_D.transactionHashFull.sha256.header, 0,
@@ -245,7 +235,7 @@ unsigned short apdu_sign_message_internal() {
 }
 
 unsigned short apdu_sign_message() {
-    if (context_D.called_from_swap) {
+    if (G_called_from_swap) {
         return SW_SECURITY_STATUS_NOT_SATISFIED;
     }
     unsigned short sw = apdu_sign_message_internal();
@@ -275,8 +265,7 @@ unsigned short compute_hash() {
             sizeof(context_D.transactionSummary.keyPath),
             hash, sizeof(hash), // IN
             G_io_apdu_buffer, &out_len,                        // OUT
-            ((N_btchip.bkp.config.options &
-              OPTION_DETERMINISTIC_SIGNATURE) != 0));
+            1);
     context_D.outLength = G_io_apdu_buffer[1] + 2;
             memset(&context_D.transactionSummary, 0,
                       sizeof(transaction_summary_t));

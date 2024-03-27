@@ -99,5 +99,5 @@ convert_hex_amount_to_displayable_no_globals(unsigned char *amount, unsigned int
 
 unsigned char
 convert_hex_amount_to_displayable(unsigned char *amount) {
-    return convert_hex_amount_to_displayable_no_globals(amount, G_coin_config->flags, context_D.tmp);
+    return convert_hex_amount_to_displayable_no_globals(amount, COIN_FLAGS, context_D.tmp);
 }

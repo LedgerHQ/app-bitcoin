@@ -1,6 +1,7 @@
 #ifndef _DISPLAY_VARIABLES_H_
 #define _DISPLAY_VARIABLES_H_
 
+#include "os.h"
 // A path contains 10 elements max, which max length in ascii is 1 whitespace + 10 char + optional quote "'" + "/" + \0"
 #define MAX_DERIV_PATH_ASCII_LENGTH 1 + 10*(10+2) + 1
 #define MAX_CHAR_PER_LINE 25
@@ -12,6 +13,7 @@ typedef struct swap_data_s {
         // number of already signed input in the transaction, to compare with
         // totalNumberOfInputs and exit properly
         int alreadySignedInputs;
+        int initialized;
         unsigned char amount[8];
         unsigned char fees[8];
         char destination_address[65];

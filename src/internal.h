@@ -22,7 +22,6 @@
 #include "public_ram_variables.h"
 #include "rom_variables.h"
 #include "filesystem.h"
-#include "base58.h"
 #include "bcd.h"
 #include "ecc.h"
 #include "helpers.h"

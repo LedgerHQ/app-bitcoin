@@ -21,8 +21,15 @@
 #include "display_variables.h"
 #include "ui.h"
 #include "ledger_assert.h"
+#include "lib_standard_app/read.h"
+#include "lib_standard_app/write.h"
+#include "swap.h"
 
 #define SIGHASH_ALL 0x01
+
+#ifndef COIN_FORKID
+#define COIN_FORKID 0
+#endif 
 
 unsigned short apdu_hash_sign() {
     unsigned long int lockTime;
@@ -32,16 +39,6 @@ unsigned short apdu_hash_sign() {
     unsigned char *parameters = G_io_apdu_buffer + ISO_OFFSET_CDATA;
     unsigned short sw = SW_TECHNICAL_DETAILS(0xF);
 
-    SB_CHECK(N_btchip.bkp.config.operationMode);
-    switch (SB_GET(N_btchip.bkp.config.operationMode)) {
-    case MODE_WALLET:
-    case MODE_RELAXED_WALLET:
-    case MODE_SERVER:
-        break;
-    default:
-        return SW_CONDITIONS_OF_USE_NOT_SATISFIED;
-    }
-
     if ((G_io_apdu_buffer[ISO_OFFSET_P1] != 0) ||
         (G_io_apdu_buffer[ISO_OFFSET_P2] != 0)) {
         return SW_INCORRECT_P1_P2;
@@ -50,9 +47,6 @@ unsigned short apdu_hash_sign() {
     if (G_io_apdu_buffer[ISO_OFFSET_LC] < (1 + 1 + 4 + 1)) {
         return SW_INCORRECT_LENGTH;
     }
-
-    // Check state
-    set_check_internal_structure_integrity(0);
 
     // Zcash special - store parameters for later
 
@@ -64,13 +58,13 @@ unsigned short apdu_hash_sign() {
         parameters += (4 * G_io_apdu_buffer[ISO_OFFSET_CDATA]) + 1;
         authorizationLength = *(parameters++);
         parameters += authorizationLength;
-        lockTime = read_u32(parameters, 1, 0);
+        lockTime = read_u32_be(parameters, 0);
         parameters += 4;
         sighashType = *(parameters++);
-        expiryHeight = read_u32(parameters, 1, 0);
-        write_u32_le(context_D.nLockTime, lockTime);
-        write_u32_le(context_D.sigHashType, sighashType);
-        write_u32_le(context_D.nExpiryHeight, expiryHeight);
+        expiryHeight = read_u32_be(parameters, 0);
+        write_u32_le(context_D.nLockTime, 0, lockTime);
+        write_u32_le(context_D.sigHashType, 0, sighashType);
+        write_u32_le(context_D.nExpiryHeight, 0, expiryHeight);
         context_D.overwinterSignReady = 1;
         return SW_OK;
     }
@@ -99,34 +93,30 @@ unsigned short apdu_hash_sign() {
     parameters += (4 * G_io_apdu_buffer[ISO_OFFSET_CDATA]) + 1;
     authorizationLength = *(parameters++);
     parameters += authorizationLength;
-    lockTime = read_u32(parameters, 1, 0);
+    lockTime = read_u32_be(parameters, 0);
     parameters += 4;
     sighashType = *(parameters++);
     context_D.transactionSummary.sighashType = sighashType;
 
-    if (((N_btchip.bkp.config.options &
-                    OPTION_FREE_SIGHASHTYPE) == 0)) {
         // if bitcoin cash OR forkid is set, then use the fork id
-        if (G_coin_config->kind == COIN_KIND_BITCOIN_CASH ||
-                (G_coin_config->forkid)) {
+    if (COIN_KIND == COIN_KIND_BITCOIN_CASH || (COIN_FORKID)) {
 #define SIGHASH_FORKID 0x40
-            if (sighashType != (SIGHASH_ALL | SIGHASH_FORKID)) {
-                sw = SW_INCORRECT_DATA;
-                goto discardTransaction;
-            }
-            sighashType |= (G_coin_config->forkid << 8);
-        } else {
-            if (sighashType != SIGHASH_ALL) {
-                sw = SW_INCORRECT_DATA;
-                goto discardTransaction;
-            }
+        if (sighashType != (SIGHASH_ALL | SIGHASH_FORKID)) {
+            sw = SW_INCORRECT_DATA;
+            goto discardTransaction;
+        }
+        sighashType |= (COIN_FORKID << 8);
+    } else {
+        if (sighashType != SIGHASH_ALL) {
+            sw = SW_INCORRECT_DATA;
+            goto discardTransaction;
         }
     }
 
     // Finalize the hash
     if (!context_D.usingOverwinter) {
-        write_u32_le(dataBuffer, lockTime);
-        write_u32_le(dataBuffer + 4, sighashType);
+        write_u32_le(dataBuffer, 0, lockTime);
+        write_u32_le(dataBuffer, 4, sighashType);
         PRINTF("--- ADD TO HASH FULL:\n%.*H\n", sizeof(dataBuffer), dataBuffer);
         if (cx_hash_no_throw(&context_D.transactionHashFull.sha256.header, 0,
                 dataBuffer, sizeof(dataBuffer), NULL, 0)) {
@@ -144,7 +134,7 @@ unsigned short apdu_hash_sign() {
         bagl_user_action_signtx(1, 1);
     }
     sw = SW_OK;
-    if (context_D.called_from_swap) {
+    if (G_called_from_swap) {
         // if we signed all outputs we should exit,
         // but only after sending response, so lets raise the
         // vars.swap_data.should_exit flag and check it on timer later
@@ -154,12 +144,9 @@ unsigned short apdu_hash_sign() {
         }
     }
 
-    // Then discard the transaction and reply
-    set_check_internal_structure_integrity(1);
     return sw;
 
     discardTransaction:
-        set_check_internal_structure_integrity(1);
         context_D.transactionContext.transactionState = TRANSACTION_NONE;
         return sw;
 }
@@ -188,8 +175,7 @@ void bagl_user_action_signtx(unsigned char confirming, unsigned char direct) {
             sizeof(context_D.transactionSummary.keyPath),
             hash, sizeof(hash),
             G_io_apdu_buffer, &out_len,
-            ((N_btchip.bkp.config.options &
-                OPTION_DETERMINISTIC_SIGNATURE) != 0));
+            1);
 
         context_D.outLength = G_io_apdu_buffer[1] + 2;
         G_io_apdu_buffer[context_D.outLength++] = context_D.transactionSummary.sighashType;

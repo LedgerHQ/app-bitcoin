@@ -24,26 +24,19 @@
 unsigned short apdu_get_coin_version() {
     uint8_t offset = 0;
 
-    SB_CHECK(N_btchip.bkp.config.operationMode);
-    if ((SB_GET(N_btchip.bkp.config.operationMode) ==
-         MODE_SETUP_NEEDED) ||
-        (SB_GET(N_btchip.bkp.config.operationMode) == MODE_ISSUER)) {
-        return SW_CONDITIONS_OF_USE_NOT_SATISFIED;
-    }
-
-    G_io_apdu_buffer[offset++] = G_coin_config->p2pkh_version >> 8;
-    G_io_apdu_buffer[offset++] = G_coin_config->p2pkh_version;
-    G_io_apdu_buffer[offset++] = G_coin_config->p2sh_version >> 8;
-    G_io_apdu_buffer[offset++] = G_coin_config->p2sh_version;
-    G_io_apdu_buffer[offset++] = G_coin_config->family;
-    G_io_apdu_buffer[offset++] = strlen(G_coin_config->coinid);
-    memmove(G_io_apdu_buffer + offset, G_coin_config->coinid,
-               strlen(G_coin_config->coinid));
-    offset += strlen(G_coin_config->coinid);
-    G_io_apdu_buffer[offset++] = strlen(G_coin_config->name_short);
-    memmove(G_io_apdu_buffer + offset, G_coin_config->name_short,
-               strlen(G_coin_config->name_short));
-    offset += strlen(G_coin_config->name_short);
+    G_io_apdu_buffer[offset++] = COIN_P2PKH_VERSION >> 8;
+    G_io_apdu_buffer[offset++] = COIN_P2PKH_VERSION;
+    G_io_apdu_buffer[offset++] = COIN_P2SH_VERSION >> 8;
+    G_io_apdu_buffer[offset++] = COIN_P2SH_VERSION;
+    G_io_apdu_buffer[offset++] = COIN_FAMILY;
+    G_io_apdu_buffer[offset++] = strlen(COIN_COINID);
+    memmove(G_io_apdu_buffer + offset, COIN_COINID,
+               strlen(COIN_COINID));
+    offset += strlen(COIN_COINID);
+    G_io_apdu_buffer[offset++] = strlen(COIN_COINID_SHORT);
+    memmove(G_io_apdu_buffer + offset, COIN_COINID_SHORT,
+               strlen(COIN_COINID_SHORT));
+    offset += strlen(COIN_COINID_SHORT);
     context_D.outLength = offset;
 
     return SW_OK;
