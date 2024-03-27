@@ -16,6 +16,7 @@
 ********************************************************************************/
 
 #include "internal.h"
+#include "swap.h"
 
 void autosetup(void);
 
@@ -26,32 +27,11 @@ void context_init() {
     PRINTF("Context init\n");
     PRINTF("Backup size %d\n", sizeof(N_btchip.bkp));
     memset(&context_D, 0, sizeof(context_D));
-    SB_SET(context_D.halted, 0);
-    context_D.called_from_swap = 0;
+    G_called_from_swap = 0;
     context_D.currentOutputOffset = 0;
     context_D.outputParsingState = OUTPUT_PARSING_NUMBER_OUTPUTS;
     memset(context_D.totalOutputAmount, 0,
               sizeof(context_D.totalOutputAmount));
     context_D.changeOutputFound = 0;
     context_D.segwitWarningSeen = 0;
-
-    if (N_btchip.config_valid != 0x01) {
-        autosetup();
-    }
-
-    if (!N_btchip.config_valid) {
-        unsigned char defaultMode;
-        PRINTF("No configuration found\n");
-        defaultMode = MODE_SETUP_NEEDED;
-
-        set_operation_mode(defaultMode);
-    } else {
-        SB_CHECK(N_btchip.bkp.config.operationMode);
-    }
-    if (!N_btchip.storageInitialized) {
-        unsigned char initialized = 1, denied=1;
-
-        nvm_write((void *)&N_btchip.pubKeyRequestRestriction, &denied, 1);
-        nvm_write((void *)&N_btchip.storageInitialized, &initialized, 1);
-    }
 }

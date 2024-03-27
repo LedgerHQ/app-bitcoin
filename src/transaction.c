@@ -19,17 +19,24 @@
 #include "apdu_constants.h"
 #include "display_variables.h"
 #include "ledger_assert.h"
+#include "lib_standard_app/read.h"
+#include "lib_standard_app/write.h"
+#include "swap.h"
+
+#ifndef COIN_CONSENSUS_BRANCH_ID
+#define COIN_CONSENSUS_BRANCH_ID 0
+#endif 
 
 #define CONSENSUS_BRANCH_ID_OVERWINTER 0x5ba81b19
 #define CONSENSUS_BRANCH_ID_SAPLING 0x76b809bb
 #define CONSENSUS_BRANCH_ID_ZCLASSIC 0x930b540d
 
 // Check if fOverwintered flag is set and if nVersion is >= 0x03
-#define TRUSTED_INPUT_OVERWINTER ( (G_coin_config->kind == COIN_KIND_ZCASH || \
-                                    G_coin_config->kind == COIN_KIND_ZCLASSIC || \
-                                    G_coin_config->kind == COIN_KIND_KOMODO) && \
-                                    (read_u32(context_D.transactionVersion, 0, 0) & (1<<31)) && \
-                                    (read_u32(context_D.transactionVersion, 0, 0) ^ (1<<31)) >= 0x03 \
+#define TRUSTED_INPUT_OVERWINTER ( (COIN_KIND == COIN_KIND_ZCASH || \
+                                    COIN_KIND == COIN_KIND_ZCLASSIC || \
+                                    COIN_KIND == COIN_KIND_KOMODO) && \
+                                    (read_u32_le(context_D.transactionVersion, 0) & (1<<31)) && \
+                                    (read_u32_le(context_D.transactionVersion, 0) ^ (1<<31)) >= 0x03 \
                                 )
 
 #define DEBUG_LONG "%d"
@@ -131,8 +138,7 @@ unsigned long int transaction_get_varint(void) {
         unsigned long int result;
         transaction_offset_increase(1);
         check_transaction_available(4);
-        result =
-            read_u32(context_D.transactionBufferPointer, 0, 0);
+        result = read_u32_le(context_D.transactionBufferPointer, 0);
         transaction_offset_increase(4);
         return result;
     } else {
@@ -145,7 +151,6 @@ unsigned long int transaction_get_varint(void) {
 void transaction_parse(unsigned char parseMode) {
     unsigned char optionP2SHSkip2FA =
         ((N_btchip.bkp.config.options & OPTION_SKIP_2FA_P2SH) != 0);
-    set_check_internal_structure_integrity(0);
     BEGIN_TRY {
         TRY {
             for (;;) {
@@ -168,13 +173,13 @@ void transaction_parse(unsigned char parseMode) {
                         if (context_D.segwitParsedOnce) {
                             uint8_t parameters[16];
                             memmove(parameters, OVERWINTER_PARAM_SIGHASH, 16);
-                            if (G_coin_config->kind == COIN_KIND_ZCLASSIC) {
-                                write_u32_le(parameters + 12, CONSENSUS_BRANCH_ID_ZCLASSIC);
+                            if (COIN_KIND == COIN_KIND_ZCLASSIC) {
+                                write_u32_le(parameters, 12, CONSENSUS_BRANCH_ID_ZCLASSIC);
                             }
                             else {
-                                write_u32_le(parameters + 12,
+                                write_u32_le(parameters, 12,
                                     context_D.usingOverwinter == ZCASH_USING_OVERWINTER_SAPLING ?
-                                    (G_coin_config->zcash_consensus_branch_id != 0 ? G_coin_config->zcash_consensus_branch_id : CONSENSUS_BRANCH_ID_SAPLING) : CONSENSUS_BRANCH_ID_OVERWINTER);
+                                    (COIN_CONSENSUS_BRANCH_ID != 0 ? COIN_CONSENSUS_BRANCH_ID : CONSENSUS_BRANCH_ID_SAPLING) : CONSENSUS_BRANCH_ID_OVERWINTER);
                             }
                             if (cx_blake2b_init2_no_throw(&context_D.transactionHashFull.blake2b, 256, NULL, 0, parameters, 16)) {
                                 goto fail;
@@ -313,11 +318,11 @@ void transaction_parse(unsigned char parseMode) {
                         transaction_offset_increase(4);
                     }
 
-                    if (G_coin_config->flags & FLAG_PEERCOIN_SUPPORT) {
-                        if (((G_coin_config->family ==
+                    if (COIN_FLAGS & FLAG_PEERCOIN_SUPPORT) {
+                        if (((COIN_FAMILY ==
                             FAMILY_PEERCOIN &&
                             (context_D.transactionVersion[0] < 3))) ||
-                            ((G_coin_config->family == FAMILY_STEALTH) &&
+                            ((COIN_FAMILY == FAMILY_STEALTH) &&
                             (context_D.transactionVersion[0] < 2))) {
                             // Timestamp
                             check_transaction_available(4);
@@ -330,7 +335,7 @@ void transaction_parse(unsigned char parseMode) {
                         .transactionRemainingInputsOutputs =
                         transaction_get_varint();
                     PRINTF("Number of inputs : " DEBUG_LONG "\n",context_D.transactionContext.transactionRemainingInputsOutputs);
-                    if (context_D.called_from_swap && parseMode == PARSE_MODE_SIGNATURE) {
+                    if (G_called_from_swap && parseMode == PARSE_MODE_SIGNATURE) {
                         // remember number of inputs to know when to exit from library
                         // we will count number of already signed inputs and compare with this value
                         // As there are a lot of different states in which we can have different number of input
@@ -431,7 +436,7 @@ void transaction_parse(unsigned char parseMode) {
                                 PRINTF("====> Input HMAC:    %.*H\n", 8, context_D.transactionBufferPointer + 2 + trustedInputLength - 8);
                                 PRINTF("====> Computed HMAC: %.*H\n", 8, trustedInput);
 
-                            if (secure_memcmp(
+                            if (os_secure_memcmp(
                                     trustedInput,       // Contains computed Hmac for now
                                     context_D.transactionBufferPointer +
                                         2 + trustedInputLength - 8,
@@ -509,20 +514,7 @@ void transaction_parse(unsigned char parseMode) {
                         }
                         // Handle non-segwit inputs (i.e. InputHashStart 1st APDU's P2==00 && data[0]==0x00)
                         else if (!trustedInputFlag) {
-                            // Only authorized in relaxed wallet and server
-                            // modes
-                            SB_CHECK(N_btchip.bkp.config.operationMode);
-                            switch (SB_GET(N_btchip.bkp.config.operationMode)) {
-                            case MODE_WALLET:
-                                if (!optionP2SHSkip2FA) {
-                                    PRINTF("Untrusted input not authorized\n");
-                                    goto fail;
-                                }
-                                break;
-                            case MODE_RELAXED_WALLET:
-                            case MODE_SERVER:
-                                break;
-                            default:
+                            if (!optionP2SHSkip2FA) {
                                 PRINTF("Untrusted input not authorized\n");
                                 goto fail;
                             }
@@ -1002,13 +994,11 @@ void transaction_parse(unsigned char parseMode) {
             PRINTF("Transaction parse - surprise fail\n");
             context_D.transactionContext.transactionState =
                 TRANSACTION_NONE;
-            set_check_internal_structure_integrity(1);
             THROW(e);
         }
         // before the finally to restore the surrounding context if an exception
         // is raised during finally
         FINALLY {
-            set_check_internal_structure_integrity(1);
         }
     }
     END_TRY;

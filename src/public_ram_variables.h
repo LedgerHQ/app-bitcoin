@@ -25,6 +25,4 @@
 
 extern context_t context_D;
 
-extern altcoin_config_t *G_coin_config;
-
 #endif /* _PUBLIC_RAM_VARIABLES_H_ */

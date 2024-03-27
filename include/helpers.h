@@ -40,38 +40,16 @@ unsigned char output_script_is_op_create(unsigned char *buffer,
 unsigned char output_script_is_op_call(unsigned char *buffer,
                                                 size_t size);
 
-void sleep16(unsigned short delay);
-void sleep32(unsigned long int delayEach, unsigned long int delayRepeat);
-
-unsigned long int read_u32(unsigned char *buffer, unsigned char be,
-                                  unsigned char skipSign);
-
-void write_u32_be(unsigned char *buffer, unsigned long int value);
-void write_u32_le(unsigned char *buffer, unsigned long int value);
-
-void perform_double_hash(unsigned char *in, unsigned short inlen,
-                                unsigned char *out,
-                                unsigned char hash1Algorithm,
-                                unsigned char hash2Algorithm);
-
 void public_key_hash160(unsigned char *in, unsigned short inlen,
                                unsigned char *out);
 unsigned short public_key_to_encoded_base58(
     unsigned char *in, unsigned short inlen, unsigned char *out,
     unsigned short outlen, unsigned short version, unsigned char alreadyHashed);
 
-unsigned short decode_base58_address(unsigned char *in,
-                                            unsigned short inlen,
-                                            unsigned char *out,
-                                            unsigned short outlen);
-
 unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_path);
 unsigned char enforce_bip44_coin_type(unsigned char *bip32Path, bool for_pubkey);
 unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned char max_out_len);
 
-// void set_check_internal_structure_integrity(unsigned char
-// setParameter);
-#define set_check_internal_structure_integrity(x)
 void swap_bytes(unsigned char *target, unsigned char *source,
                        unsigned char size);
 
@@ -82,12 +60,6 @@ int sign_finalhash(unsigned char *path, size_t path_len,
 
 void transaction_add_output(unsigned char *hash160Address,
                                    unsigned char *amount, unsigned char p2sh);
-unsigned char rng_u8_modulo(unsigned char modulo);
-unsigned char secure_memcmp(const void *buf1, const void *buf2,
-                                   unsigned short length);
-unsigned char decrease_2fa(void);
-void reset_2fa(void);
-void reset_token(void);
 int get_public_key(unsigned char* keyPath, size_t keyPath_len, uint8_t raw_pubkey[static 65], unsigned char* chainCode);
 
 #endif

@@ -19,4 +19,3 @@
 
 context_t context_D;
 
-altcoin_config_t *G_coin_config;
