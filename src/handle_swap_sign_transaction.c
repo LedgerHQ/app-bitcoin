@@ -1,8 +1,8 @@
 #include "handle_swap_sign_transaction.h"
 #include "os_io_seproxyhal.h"
-#include "btchip_public_ram_variables.h"
-#include "btchip_display_variables.h"
-#include "btchip_context.h"
+#include "public_ram_variables.h"
+#include "display_variables.h"
+#include "context.h"
 #include "usbd_core.h"
 #include "ux.h"
 
@@ -40,10 +40,10 @@ bool copy_transaction_parameters(create_transaction_parameters_t* sign_transacti
     return true;
 }
 
-void handle_swap_sign_transaction(btchip_altcoin_config_t *config) {
+void handle_swap_sign_transaction(altcoin_config_t *config) {
     G_coin_config = config;
-    btchip_context_init();
-    btchip_context_D.called_from_swap = 1;
+    context_init();
+    context_D.called_from_swap = 1;
     io_seproxyhal_init();
     UX_INIT();
 #ifdef HAVE_NBGL

@@ -15,22 +15,15 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef H
+#include "internal.h"
 
-#define H
+#include "public_ram_variables.h"
 
-#include "config.h"
-#include "os.h"
-#include "os_io_seproxyhal.h"
+void set_operation_mode(unsigned char operationMode) {
+    secu8 opMode;
+    SB_SET(opMode, operationMode);
 
-#include "stdlib.h"
-#include "stdbool.h"
-#include "string.h"
-
-#define L_DEBUG_NOPREFIX(x)
-
-#define SW_TECHNICAL_DETAILS(x) SW_TECHNICAL_PROBLEM
-
-#include "secure_value.h"
-
-#endif
+    // only modify operation mode
+    nvm_write((void *)&N_btchip.bkp.config.operationMode, &opMode,
+              sizeof(opMode));
+}

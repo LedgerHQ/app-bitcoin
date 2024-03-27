@@ -15,22 +15,36 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef H
+#ifndef SECURE_VALUE_H
 
-#define H
+#define SECURE_VALUE_H
 
-#include "config.h"
 #include "os.h"
-#include "os_io_seproxyhal.h"
 
-#include "stdlib.h"
-#include "stdbool.h"
-#include "string.h"
+typedef unsigned short secu8;
+typedef unsigned long int secu16;
 
-#define L_DEBUG_NOPREFIX(x)
+void sbSet(secu8 *target, unsigned char source);
+void sbCheck(secu8 source);
+void ssSet(secu16 *target, unsigned short source);
+void ssCheck(secu16 source);
 
-#define SW_TECHNICAL_DETAILS(x) SW_TECHNICAL_PROBLEM
+#define SB_GET(x) ((unsigned char)x)
 
-#include "secure_value.h"
+#define SB_SET(x, y) sbSet(&x, y);
+
+#define SB_CHECK(x) sbCheck(x);
+
+#define SS_GET(x) ((unsigned short)x)
+
+#define SS_SET(x, y) ssSet(&x, y);
+
+#define SS_CHECK(x) ssCheck(x);
+
+#define SSEC_DEF(x) unsigned char x = 0;
+#define SSEC_INC(x) x++;
+#define SSEC_CHECK(x, value)                                                   \
+    if (x != value)                                                            \
+        reset();
 
 #endif

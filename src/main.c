@@ -20,15 +20,15 @@
 
 #include "string.h"
 
-#include "btchip_internal.h"
+#include "internal.h"
 
-#include "btchip_bagl_extensions.h"
+#include "bagl_extensions.h"
 
 #include "segwit_addr.h"
 #include "cashaddr.h"
 
 #include "ux.h"
-#include "btchip_display_variables.h"
+#include "display_variables.h"
 #include "swap_lib_calls.h"
 
 #include "swap_lib_calls.h"
@@ -133,32 +133,32 @@ uint8_t check_fee_swap() {
     unsigned char borrow;
 
     borrow = transaction_amount_sub_be(
-            fees, btchip_context_D.transactionContext.transactionAmount,
-            btchip_context_D.totalOutputAmount);
+            fees, context_D.transactionContext.transactionAmount,
+            context_D.totalOutputAmount);
     if ((borrow != 0) || (memcmp(fees, vars.swap_data.fees, 8) != 0))
         return 0;
-    btchip_context_D.transactionContext.firstSigned = 0;
+    context_D.transactionContext.firstSigned = 0;
 
-    if (btchip_context_D.usingSegwit &&  !btchip_context_D.segwitParsedOnce) {
+    if (context_D.usingSegwit &&  !context_D.segwitParsedOnce) {
         // This input cannot be signed when using segwit - just restart.
-        btchip_context_D.segwitParsedOnce = 1;
+        context_D.segwitParsedOnce = 1;
         PRINTF("Segwit parsed once\n");
-        btchip_context_D.transactionContext.transactionState =
-        BTCHIP_TRANSACTION_NONE;
+        context_D.transactionContext.transactionState =
+        TRANSACTION_NONE;
     } else {
-        btchip_context_D.transactionContext.transactionState =
-        BTCHIP_TRANSACTION_SIGN_READY;
+        context_D.transactionContext.transactionState =
+        TRANSACTION_SIGN_READY;
     }
-    btchip_context_D.sw = 0x9000;
-    btchip_context_D.outLength = 0;
-    G_io_apdu_buffer[btchip_context_D.outLength++] = 0x90;
-    G_io_apdu_buffer[btchip_context_D.outLength++] = 0x00;
+    context_D.sw = 0x9000;
+    context_D.outLength = 0;
+    G_io_apdu_buffer[context_D.outLength++] = 0x90;
+    G_io_apdu_buffer[context_D.outLength++] = 0x00;
 
     return 1;
 }
 
 uint8_t prepare_fees() {
-    if (btchip_context_D.transactionContext.relaxed) {
+    if (context_D.transactionContext.relaxed) {
         memmove(vars.tmp.feesAmount, "UNKNOWN", 7);
         vars.tmp.feesAmount[7] = '\0';
     } else {
@@ -167,8 +167,8 @@ uint8_t prepare_fees() {
         unsigned char borrow;
 
         borrow = transaction_amount_sub_be(
-                fees, btchip_context_D.transactionContext.transactionAmount,
-                btchip_context_D.totalOutputAmount);
+                fees, context_D.transactionContext.transactionAmount,
+                context_D.totalOutputAmount);
         if (borrow && G_coin_config->kind == COIN_KIND_KOMODO) {
             memmove(vars.tmp.feesAmount, "REWARD", 6);
             vars.tmp.feesAmount[6] = '\0';
@@ -181,10 +181,10 @@ uint8_t prepare_fees() {
             memmove(vars.tmp.feesAmount, G_coin_config->name_short,
                        strlen(G_coin_config->name_short));
             vars.tmp.feesAmount[strlen(G_coin_config->name_short)] = ' ';
-            btchip_context_D.tmp =
+            context_D.tmp =
                 (unsigned char *)(vars.tmp.feesAmount +
                               strlen(G_coin_config->name_short) + 1);
-            textSize = btchip_convert_hex_amount_to_displayable(fees);
+            textSize = convert_hex_amount_to_displayable(fees);
             vars.tmp.feesAmount[textSize + strlen(G_coin_config->name_short) + 1] =
                 '\0';
         }
@@ -199,21 +199,21 @@ error:
 #define USDT_ASSETID 31
 
 void get_address_from_output_script(unsigned char* script, int script_size, char* out, int out_size) {
-    if (btchip_output_script_is_op_return(script)) {
+    if (output_script_is_op_return(script)) {
         strncpy(out, "OP_RETURN", out_size);
         return;
     }
     if ((G_coin_config->kind == COIN_KIND_HYDRA) &&
-        btchip_output_script_is_op_create(script, script_size)) {
+        output_script_is_op_create(script, script_size)) {
         strncpy(out, "OP_CREATE", out_size);
         return;
     }
     if ((G_coin_config->kind == COIN_KIND_HYDRA) &&
-        btchip_output_script_is_op_call(script, script_size)) {
+        output_script_is_op_call(script, script_size)) {
         strncpy(out, "OP_CALL", out_size);
         return;
     }
-    if (btchip_output_script_is_native_witness(script)) {
+    if (output_script_is_native_witness(script)) {
         if (G_coin_config->native_segwit_prefix) {
             segwit_addr_encode(
                 out, (char *)PIC(G_coin_config->native_segwit_prefix), 0,
@@ -228,7 +228,7 @@ void get_address_from_output_script(unsigned char* script, int script_size, char
     int addressOffset = 3;
     unsigned short version = G_coin_config->p2sh_version;
 
-    if (btchip_output_script_is_regular(script)) {
+    if (output_script_is_regular(script)) {
         addressOffset = 4;
         version = G_coin_config->p2pkh_version;
     }
@@ -244,14 +244,14 @@ void get_address_from_output_script(unsigned char* script, int script_size, char
     memmove(address + versionSize, script + addressOffset, 20);
 
     // Prepare address
-    if (btchip_context_D.usingCashAddr) {
+    if (context_D.usingCashAddr) {
         cashaddr_encode(
             address + versionSize, 20, (uint8_t *)out, out_size,
             (version == G_coin_config->p2sh_version
                     ? CASHADDR_P2SH
                     : CASHADDR_P2PKH));
     } else {
-        textSize = btchip_public_key_to_encoded_base58(
+        textSize = public_key_to_encoded_base58(
             address, 20 + versionSize, (unsigned char *)out,
             out_size, version, 1);
         out[textSize] = '\0';
@@ -265,20 +265,20 @@ uint8_t prepare_single_output() {
     unsigned short textSize;
     char tmp[80] = {0};
 
-    btchip_swap_bytes(amount, btchip_context_D.currentOutput + offset, 8);
+    swap_bytes(amount, context_D.currentOutput + offset, 8);
     offset += 8;
 
-    get_address_from_output_script(btchip_context_D.currentOutput + offset,  sizeof(btchip_context_D.currentOutput) - offset, tmp, sizeof(tmp));
+    get_address_from_output_script(context_D.currentOutput + offset,  sizeof(context_D.currentOutput) - offset, tmp, sizeof(tmp));
     strncpy(vars.tmp.fullAddress, tmp, sizeof(vars.tmp.fullAddress) - 1);
 
     // Prepare amount
 
     // Handle Omni simple send
-    if ((btchip_context_D.currentOutput[offset + 2] == 0x14) &&
-        (memcmp(btchip_context_D.currentOutput + offset + 3, "omni", 4) == 0) &&
-        (memcmp(btchip_context_D.currentOutput + offset + 3 + 4, "\0\0\0\0", 4) == 0)) {
+    if ((context_D.currentOutput[offset + 2] == 0x14) &&
+        (memcmp(context_D.currentOutput + offset + 3, "omni", 4) == 0) &&
+        (memcmp(context_D.currentOutput + offset + 3 + 4, "\0\0\0\0", 4) == 0)) {
             uint8_t headerLength;
-            uint32_t omniAssetId = btchip_read_u32(btchip_context_D.currentOutput + offset + 3 + 4 + 4, 1, 0);
+            uint32_t omniAssetId = read_u32(context_D.currentOutput + offset + 3 + 4 + 4, 1, 0);
             switch(omniAssetId) {
                 case OMNI_ASSETID:
                     strcpy(vars.tmp.fullAmount, "OMNI ");
@@ -294,18 +294,18 @@ uint8_t prepare_single_output() {
                     break;
             }
             headerLength = strlen(vars.tmp.fullAmount);
-            btchip_context_D.tmp = (uint8_t *)vars.tmp.fullAmount + headerLength;
-            textSize = btchip_convert_hex_amount_to_displayable(btchip_context_D.currentOutput + offset + 3 + 4 + 4 + 4);
+            context_D.tmp = (uint8_t *)vars.tmp.fullAmount + headerLength;
+            textSize = convert_hex_amount_to_displayable(context_D.currentOutput + offset + 3 + 4 + 4 + 4);
             vars.tmp.fullAmount[textSize + headerLength] = '\0';
     }
     else {
         memmove(vars.tmp.fullAmount, G_coin_config->name_short,
                strlen(G_coin_config->name_short));
         vars.tmp.fullAmount[strlen(G_coin_config->name_short)] = ' ';
-        btchip_context_D.tmp =
+        context_D.tmp =
             (unsigned char *)(vars.tmp.fullAmount +
                           strlen(G_coin_config->name_short) + 1);
-        textSize = btchip_convert_hex_amount_to_displayable(amount);
+        textSize = convert_hex_amount_to_displayable(amount);
         vars.tmp.fullAmount[textSize + strlen(G_coin_config->name_short) + 1] =
             '\0';
     }
@@ -316,7 +316,7 @@ uint8_t prepare_single_output() {
 uint8_t prepare_message_signature() {
     uint8_t buffer[32];
 
-    if (cx_hash_no_throw(&btchip_context_D.transactionHashAuthorization.header, CX_LAST,
+    if (cx_hash_no_throw(&context_D.transactionHashAuthorization.header, CX_LAST,
             (uint8_t*)vars.tmp.fullAmount, 0, buffer, 32)) {
         return 0;
     }
@@ -328,11 +328,11 @@ uint8_t prepare_message_signature() {
 
 
 extern bool handle_output_state();
-extern void btchip_apdu_hash_input_finalize_full_reset(void);
+extern void apdu_hash_input_finalize_full_reset(void);
 
-// Analog of btchip_bagl_confirm_single_output to work
+// Analog of bagl_confirm_single_output to work
 // in silent mode, when called from SWAP app
-unsigned int btchip_silent_confirm_single_output() {
+unsigned int silent_confirm_single_output() {
     char tmp[80] = {0};
     unsigned char amount[8];
     while (true) {
@@ -343,12 +343,12 @@ unsigned int btchip_silent_confirm_single_output() {
         }
         vars.swap_data.was_address_checked = 1;
         // check amount
-        btchip_swap_bytes(amount, btchip_context_D.currentOutput, 8);
+        swap_bytes(amount, context_D.currentOutput, 8);
         if (memcmp(amount, vars.swap_data.amount, 8) != 0) {
             PRINTF("Amount not matched\n");
             return 0;
         }
-        get_address_from_output_script(btchip_context_D.currentOutput + 8, sizeof(btchip_context_D.currentOutput) - 8, tmp, sizeof(tmp));
+        get_address_from_output_script(context_D.currentOutput + 8, sizeof(context_D.currentOutput) - 8, tmp, sizeof(tmp));
         if (strcmp(tmp, vars.swap_data.destination_address) != 0) {
             PRINTF("Address not matched\n");
             return 0;
@@ -356,70 +356,70 @@ unsigned int btchip_silent_confirm_single_output() {
 
         // Check if all inputs have been confirmed
 
-        if (btchip_context_D.outputParsingState ==
-            BTCHIP_OUTPUT_PARSING_OUTPUT) {
-            btchip_context_D.remainingOutputs--;
-            if (btchip_context_D.remainingOutputs == 0)
+        if (context_D.outputParsingState ==
+            OUTPUT_PARSING_OUTPUT) {
+            context_D.remainingOutputs--;
+            if (context_D.remainingOutputs == 0)
                 break;
         }
 
-        memmove(btchip_context_D.currentOutput,
-                    btchip_context_D.currentOutput +
-                        btchip_context_D.discardSize,
-                    btchip_context_D.currentOutputOffset -
-                        btchip_context_D.discardSize);
-        btchip_context_D.currentOutputOffset -= btchip_context_D.discardSize;
-        btchip_context_D.io_flags &= ~IO_ASYNCH_REPLY;
+        memmove(context_D.currentOutput,
+                    context_D.currentOutput +
+                        context_D.discardSize,
+                    context_D.currentOutputOffset -
+                        context_D.discardSize);
+        context_D.currentOutputOffset -= context_D.discardSize;
+        context_D.io_flags &= ~IO_ASYNCH_REPLY;
         while (handle_output_state() &&
-                (!(btchip_context_D.io_flags & IO_ASYNCH_REPLY)))
+                (!(context_D.io_flags & IO_ASYNCH_REPLY)))
             ;
-        if (!(btchip_context_D.io_flags & IO_ASYNCH_REPLY)) {
+        if (!(context_D.io_flags & IO_ASYNCH_REPLY)) {
             // Out of data to process, wait for the next call
             break;
         }
     }
 
-    if ((btchip_context_D.outputParsingState == BTCHIP_OUTPUT_PARSING_OUTPUT) &&
-        (btchip_context_D.remainingOutputs == 0)) {
-        btchip_context_D.outputParsingState = BTCHIP_OUTPUT_FINALIZE_TX;
+    if ((context_D.outputParsingState == OUTPUT_PARSING_OUTPUT) &&
+        (context_D.remainingOutputs == 0)) {
+        context_D.outputParsingState = OUTPUT_FINALIZE_TX;
         // check fees
         unsigned char fees[8];
 
         if ((transaction_amount_sub_be(fees,
-                                       btchip_context_D.transactionContext.transactionAmount,
-                                       btchip_context_D.totalOutputAmount) != 0) ||
+                                       context_D.transactionContext.transactionAmount,
+                                       context_D.totalOutputAmount) != 0) ||
             (memcmp(fees, vars.swap_data.fees, 8) != 0)) {
             PRINTF("Fees is not matched\n");
             return 0;
         }
     }
 
-    if (btchip_context_D.outputParsingState == BTCHIP_OUTPUT_FINALIZE_TX) {
-        btchip_context_D.transactionContext.firstSigned = 0;
+    if (context_D.outputParsingState == OUTPUT_FINALIZE_TX) {
+        context_D.transactionContext.firstSigned = 0;
 
-        if (btchip_context_D.usingSegwit &&
-            !btchip_context_D.segwitParsedOnce) {
+        if (context_D.usingSegwit &&
+            !context_D.segwitParsedOnce) {
             // This input cannot be signed when using segwit - just restart.
-            btchip_context_D.segwitParsedOnce = 1;
+            context_D.segwitParsedOnce = 1;
             PRINTF("Segwit parsed once\n");
-            btchip_context_D.transactionContext.transactionState =
-                BTCHIP_TRANSACTION_NONE;
+            context_D.transactionContext.transactionState =
+                TRANSACTION_NONE;
         } else {
-            btchip_context_D.transactionContext.transactionState =
-                BTCHIP_TRANSACTION_SIGN_READY;
+            context_D.transactionContext.transactionState =
+                TRANSACTION_SIGN_READY;
         }
     }
-    if (btchip_context_D.outputParsingState == BTCHIP_OUTPUT_FINALIZE_TX) {
+    if (context_D.outputParsingState == OUTPUT_FINALIZE_TX) {
         // we've finished the processing of the input
-        btchip_apdu_hash_input_finalize_full_reset();
+        apdu_hash_input_finalize_full_reset();
     }
 
     return 1;
 }
 
-unsigned int btchip_bagl_confirm_single_output() {
-    if (btchip_context_D.called_from_swap) {
-        return btchip_silent_confirm_single_output();
+unsigned int bagl_confirm_single_output() {
+    if (context_D.called_from_swap) {
+        return silent_confirm_single_output();
     }
     if (!prepare_single_output()) {
         return 0;
@@ -429,8 +429,8 @@ unsigned int btchip_bagl_confirm_single_output() {
     return 1;
 }
 
-unsigned int btchip_bagl_finalize_tx() {
-    if (btchip_context_D.called_from_swap) {
+unsigned int bagl_finalize_tx() {
+    if (context_D.called_from_swap) {
         return check_fee_swap();
     }
 
@@ -442,7 +442,7 @@ unsigned int btchip_bagl_finalize_tx() {
     return 1;
 }
 
-void btchip_bagl_confirm_message_signature() {
+void bagl_confirm_message_signature() {
     if (!prepare_message_signature()) {
         return;
     }
@@ -455,7 +455,7 @@ uint8_t set_key_path_to_display(unsigned char* keyPath) {
     return bip44_derivation_guard(keyPath, false);
 }
 
-void btchip_bagl_display_public_key(uint8_t is_derivation_path_unusual) {
+void bagl_display_public_key(uint8_t is_derivation_path_unusual) {
     // append a white space at the end of the address to avoid glitch on nano S
     strlcat((char *)G_io_apdu_buffer + 200, " ", sizeof(G_io_apdu_buffer) - 200);
 
@@ -467,29 +467,29 @@ void btchip_bagl_display_public_key(uint8_t is_derivation_path_unusual) {
     }
 }
 
-void btchip_bagl_display_token()
+void bagl_display_token()
 {
     ui_display_token_flow();
 }
 
-void btchip_bagl_request_pubkey_approval()
+void bagl_request_pubkey_approval()
 {
     ui_request_pubkey_approval_flow();
 }
 
-void btchip_bagl_request_change_path_approval(unsigned char* change_path)
+void bagl_request_change_path_approval(unsigned char* change_path)
 {
     bip32_print_path(change_path, vars.tmp_warning.derivation_path, sizeof(vars.tmp_warning.derivation_path));
     ui_request_change_path_approval_flow();
 }
 
-void btchip_bagl_request_sign_path_approval(unsigned char* change_path)
+void bagl_request_sign_path_approval(unsigned char* change_path)
 {
     bip32_print_path(change_path, vars.tmp_warning.derivation_path, sizeof(vars.tmp_warning.derivation_path));
     ui_request_sign_path_approval_flow();
 }
 
-void btchip_bagl_request_segwit_input_approval()
+void bagl_request_segwit_input_approval()
 {
     ui_request_segwit_input_approval_flow();
 }
@@ -507,8 +507,8 @@ void app_exit(void) {
     END_TRY_L(exit);
 }
 
-void init_coin_config(btchip_altcoin_config_t *coin_config) {
-    memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
+void init_coin_config(altcoin_config_t *coin_config) {
+    memset(coin_config, 0, sizeof(altcoin_config_t));
     coin_config->bip44_coin_type = BIP44_COIN_TYPE;
     coin_config->bip44_coin_type2 = BIP44_COIN_TYPE_2;
     coin_config->p2pkh_version = COIN_P2PKH_VERSION;
@@ -540,8 +540,8 @@ void init_coin_config(btchip_altcoin_config_t *coin_config) {
     coin_config->kind = COIN_KIND;
 }
 
-void coin_main(btchip_altcoin_config_t *coin_config) {
-    btchip_altcoin_config_t config;
+void coin_main(altcoin_config_t *coin_config) {
+    altcoin_config_t config;
     if (coin_config == NULL) {
         init_coin_config(&config);
         G_coin_config = &config;
@@ -562,7 +562,7 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
                 G_io_app.plane_mode = os_setting_get(OS_SETTING_PLANEMODE, NULL, 0);
 #endif // TARGET_NANOX
 
-                btchip_context_init();
+                context_init();
 
                 USB_power(0);
                 USB_power(1);
@@ -617,7 +617,7 @@ static void library_main_helper(libargs_t *args) {
 }
 
 void library_main(libargs_t *args) {
-    btchip_altcoin_config_t coin_config;
+    altcoin_config_t coin_config;
     if (args->coin_config == NULL) {
         init_coin_config(&coin_config);
         args->coin_config = &coin_config;
@@ -646,7 +646,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
     BEGIN_TRY {
         TRY {
             unsigned int libcall_params[5];
-            btchip_altcoin_config_t coin_config;
+            altcoin_config_t coin_config;
             init_coin_config(&coin_config);
             PRINTF("Hello from litecoin\n");
             // delegate to bitcoin app/lib

@@ -15,22 +15,24 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef H
+#include "internal.h"
 
-#define H
+void sbSet(secu8 *target, unsigned char source) {
+    *target = (((unsigned char)~source) << 8) + source;
+}
 
-#include "config.h"
-#include "os.h"
-#include "os_io_seproxyhal.h"
+void sbCheck(secu8 source) {
+    if (((source >> 8) & 0xff) != (unsigned char)(~(source & 0xff))) {
+        reset();
+    }
+}
 
-#include "stdlib.h"
-#include "stdbool.h"
-#include "string.h"
+void ssSet(secu16 *target, unsigned short source) {
+    *target = (((unsigned long int)((unsigned short)~source)) << 16) + source;
+}
 
-#define L_DEBUG_NOPREFIX(x)
-
-#define SW_TECHNICAL_DETAILS(x) SW_TECHNICAL_PROBLEM
-
-#include "secure_value.h"
-
-#endif
+void ssCheck(secu16 source) {
+    if (((source >> 16) & 0xffff) != (unsigned short)(~(source & 0xffff))) {
+        reset();
+    }
+}

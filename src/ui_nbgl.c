@@ -18,10 +18,10 @@
 #ifdef HAVE_NBGL
 #include "ui.h"
 #include "nbgl_use_case.h"
-#include "btchip_display_variables.h"
-#include "btchip_internal.h"
+#include "display_variables.h"
+#include "internal.h"
 
-#include "btchip_bagl_extensions.h"
+#include "bagl_extensions.h"
 
 typedef enum { 
     MESSAGE_TYPE, 
@@ -55,55 +55,55 @@ static UiContext_t uiContext = {.transaction_prompt_done = 0};
 
 // User action callbacks
 static void approved_user_action_callback(void) {
-  if (!btchip_bagl_user_action(1)) {
+  if (!bagl_user_action(1)) {
     ui_idle_flow();
   }
 }
 
 static void approved_user_action_processing_callback(void) {
-  if (!btchip_bagl_user_action(1)) {
+  if (!bagl_user_action(1)) {
     nbgl_useCaseSpinner("Processing");
   }
 }
 
 static void abandon_user_action_callback(void) {
-  if (!btchip_bagl_user_action(0)) {
+  if (!bagl_user_action(0)) {
     ui_idle_flow();
   }
 }
 
 static void approved_user_action_message_signing_callback(void) {
-  btchip_bagl_user_action_message_signing(1);
+  bagl_user_action_message_signing(1);
   ui_idle_flow();
 }
 
 static void abandon_user_action_message_signing_callback(void) {
-  btchip_bagl_user_action_message_signing(0);
+  bagl_user_action_message_signing(0);
   ui_idle_flow();
 }
 
 static void approved_user_action_display_processing_callback(void) {
-  btchip_bagl_user_action_display(1);
+  bagl_user_action_display(1);
   nbgl_useCaseSpinner("Processing");
 }
 
 static void approved_user_action_display_callback(void) {
-  btchip_bagl_user_action_display(1);
+  bagl_user_action_display(1);
   ui_idle_flow();
 }
 
 static void abandon_user_action_display_callback(void) {
-  btchip_bagl_user_action_display(0);
+  bagl_user_action_display(0);
   ui_idle_flow();
 }
 
 static void approved_user_action_signtx_callback(void) {
-  btchip_bagl_user_action_signtx(1, 0);
+  bagl_user_action_signtx(1, 0);
   ui_idle_flow();
 }
 
 static void abandon_user_action_signtx_callback(void) {
-  btchip_bagl_user_action_signtx(0, 0);
+  bagl_user_action_signtx(0, 0);
   ui_idle_flow();
 }
 
@@ -310,7 +310,7 @@ void ui_confirm_single_flow(void) {
     ui_transaction_start(ui_confirm_single_flow);
   } else {
     snprintf(vars.tmp.feesAmount, sizeof(vars.tmp.feesAmount), "#%d",
-             btchip_context_D.totalOutputs - btchip_context_D.remainingOutputs +
+             context_D.totalOutputs - context_D.remainingOutputs +
                  1);
 
     uiContext.tagValues[0].item = "Output";

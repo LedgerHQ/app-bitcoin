@@ -16,11 +16,11 @@
  ********************************************************************************/
 
 #ifdef HAVE_NBGL
-#include "btchip_display_variables.h"
-#include "btchip_internal.h"
+#include "display_variables.h"
+#include "internal.h"
 #include "ui.h"
 
-#include "btchip_bagl_extensions.h"
+#include "bagl_extensions.h"
 #include "nbgl_use_case.h"
 
 #define NB_INFO_FIELDS 2

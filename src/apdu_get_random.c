@@ -15,22 +15,24 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef H
+#include "internal.h"
+#include "apdu_constants.h"
 
-#define H
+#define MAX_LENGTH 248
 
-#include "config.h"
-#include "os.h"
-#include "os_io_seproxyhal.h"
+unsigned short apdu_get_random() {
+    unsigned char length = G_io_apdu_buffer[ISO_OFFSET_LC];
+    if (length == 0) {
+        length = MAX_LENGTH;
+    }
 
-#include "stdlib.h"
-#include "stdbool.h"
-#include "string.h"
+    if (length > MAX_LENGTH) {
+        return SW_INCORRECT_LENGTH;
+    }
 
-#define L_DEBUG_NOPREFIX(x)
+    cx_rng(G_io_apdu_buffer, length);
 
-#define SW_TECHNICAL_DETAILS(x) SW_TECHNICAL_PROBLEM
+    context_D.outLength = length;
 
-#include "secure_value.h"
-
-#endif
+    return SW_OK;
+}

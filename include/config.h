@@ -15,22 +15,14 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef H
+#ifndef CONFIG_H
 
-#define H
+#define CONFIG_H
 
-#include "config.h"
-#include "os.h"
-#include "os_io_seproxyhal.h"
+//#define DISABLE_SECURE_VALUE
 
-#include "stdlib.h"
-#include "stdbool.h"
-#include "string.h"
+#define VERBOSE_6F
 
-#define L_DEBUG_NOPREFIX(x)
-
-#define SW_TECHNICAL_DETAILS(x) SW_TECHNICAL_PROBLEM
-
-#include "secure_value.h"
+#define os_crc cx_crc16
 
 #endif

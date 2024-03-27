@@ -15,22 +15,14 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef H
+#ifndef BCD_H
 
-#define H
+#define BCD_H
 
-#include "config.h"
-#include "os.h"
-#include "os_io_seproxyhal.h"
+unsigned char
+convert_hex_amount_to_displayable_no_globals(unsigned char *amount, unsigned int config_flag, unsigned char* out);
 
-#include "stdlib.h"
-#include "stdbool.h"
-#include "string.h"
-
-#define L_DEBUG_NOPREFIX(x)
-
-#define SW_TECHNICAL_DETAILS(x) SW_TECHNICAL_PROBLEM
-
-#include "secure_value.h"
+unsigned char
+convert_hex_amount_to_displayable(unsigned char *amount);
 
 #endif

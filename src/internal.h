@@ -15,22 +15,17 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef H
+#ifndef INTERNAL_H
+#define INTERNAL_H
 
-#define H
-
-#include "config.h"
-#include "os.h"
-#include "os_io_seproxyhal.h"
-
-#include "stdlib.h"
-#include "stdbool.h"
-#include "string.h"
-
-#define L_DEBUG_NOPREFIX(x)
-
-#define SW_TECHNICAL_DETAILS(x) SW_TECHNICAL_PROBLEM
-
-#include "secure_value.h"
+#include "btchip.h"
+#include "public_ram_variables.h"
+#include "rom_variables.h"
+#include "filesystem.h"
+#include "base58.h"
+#include "bcd.h"
+#include "ecc.h"
+#include "helpers.h"
+#include "transaction.h"
 
 #endif
