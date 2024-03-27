@@ -23,8 +23,10 @@
 #include "segwit_addr.h"
 #include "cashaddr.h"
 #include "apdu_get_wallet_public_key.h"
+#include "lib_standard_app/read.h"
+#include "swap.h"
 
-int get_public_key_chain_code(unsigned char* keyPath, size_t keyPath_len, bool uncompressedPublicKeys, unsigned char* publicKey, unsigned char* chainCode) {
+int get_public_key_chain_code(unsigned char* keyPath, size_t keyPath_len, unsigned char* publicKey, unsigned char* chainCode) {
     uint8_t public_key[65];
     int keyLength = 0;
 
@@ -32,12 +34,8 @@ int get_public_key_chain_code(unsigned char* keyPath, size_t keyPath_len, bool u
         return keyLength;
     }
     // Then encode it
-    if (uncompressedPublicKeys) {
-        keyLength = 65;
-    } else {
-        compress_public_key_value(public_key);
-        keyLength = 33;
-    }
+    compress_public_key_value(public_key);
+    keyLength = 33;
 
     memmove(publicKey, public_key,
                sizeof(public_key));
@@ -46,19 +44,14 @@ int get_public_key_chain_code(unsigned char* keyPath, size_t keyPath_len, bool u
 
 unsigned short apdu_get_wallet_public_key() {
     unsigned char keyLength;
-    unsigned char uncompressedPublicKeys =
-        ((N_btchip.bkp.config.options & OPTION_UNCOMPRESSED_KEYS) != 0);
-    uint32_t request_token;
     unsigned char chainCode[32];
     uint8_t is_derivation_path_unusual = 0;
 
     bool display = (G_io_apdu_buffer[ISO_OFFSET_P1] == P1_DISPLAY);
-    bool display_request_token = N_btchip.pubKeyRequestRestriction && (G_io_apdu_buffer[ISO_OFFSET_P1] == P1_REQUEST_TOKEN) && G_io_apdu_media == IO_APDU_MEDIA_U2F;
-    bool require_user_approval = N_btchip.pubKeyRequestRestriction && !(display_request_token || display) && G_io_apdu_media == IO_APDU_MEDIA_U2F;
     bool segwit = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_SEGWIT);
     bool nativeSegwit = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NATIVE_SEGWIT);
     bool cashAddr = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_CASHADDR);
-    if (display && context_D.called_from_swap) {
+    if (display && G_called_from_swap) {
         return SW_INCORRECT_DATA;
     }
     switch (G_io_apdu_buffer[ISO_OFFSET_P1]) {
@@ -72,7 +65,7 @@ unsigned short apdu_get_wallet_public_key() {
 
     switch (G_io_apdu_buffer[ISO_OFFSET_P2]) {
     case P2_NATIVE_SEGWIT:
-        if (!(G_coin_config->native_segwit_prefix)) {
+        if (!(COIN_NATIVE_SEGWIT_PREFIX)) {
             return SW_INCORRECT_P1_P2;
         }
         __attribute__((fallthrough));
@@ -80,7 +73,7 @@ unsigned short apdu_get_wallet_public_key() {
     case P2_SEGWIT:
         break;
     case P2_CASHADDR:
-        if (G_coin_config->kind != COIN_KIND_BITCOIN_CASH) {
+        if (COIN_KIND != COIN_KIND_BITCOIN_CASH) {
             return SW_INCORRECT_P1_P2;
         }
         break;
@@ -95,31 +88,10 @@ unsigned short apdu_get_wallet_public_key() {
         is_derivation_path_unusual = set_key_path_to_display(G_io_apdu_buffer + ISO_OFFSET_CDATA);
     }
 
-    if(display_request_token){
-        uint8_t request_token_offset = ISO_OFFSET_CDATA + G_io_apdu_buffer[ISO_OFFSET_CDATA]*4 + 1;
-        request_token = read_u32(G_io_apdu_buffer + request_token_offset, true, false);
-    }
-
-    SB_CHECK(N_btchip.bkp.config.operationMode);
-    switch (SB_GET(N_btchip.bkp.config.operationMode)) {
-    case MODE_WALLET:
-    case MODE_RELAXED_WALLET:
-    case MODE_SERVER:
-        break;
-    default:
-        return SW_CONDITIONS_OF_USE_NOT_SATISFIED;
-    }
-
-    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        return SW_SECURITY_STATUS_NOT_SATISFIED;
-    }
-
-    PRINTF("pin ok\n");
-
     unsigned char bip44_enforced = enforce_bip44_coin_type(G_io_apdu_buffer + ISO_OFFSET_CDATA, true);
 
     G_io_apdu_buffer[0] = 65;
-    keyLength = get_public_key_chain_code(G_io_apdu_buffer + ISO_OFFSET_CDATA, MAX_BIP32_PATH_LENGTH, uncompressedPublicKeys, G_io_apdu_buffer + 1, chainCode);
+    keyLength = get_public_key_chain_code(G_io_apdu_buffer + ISO_OFFSET_CDATA, MAX_BIP32_PATH_LENGTH, G_io_apdu_buffer + 1, chainCode);
 
     if (keyLength == 0) {
         return SW_TECHNICAL_PROBLEM;
@@ -138,7 +110,7 @@ unsigned short apdu_get_wallet_public_key() {
             keyLength,             // INLEN
             G_io_apdu_buffer + 67, // OUT
             150,                   // MAXOUTLEN
-            G_coin_config->p2pkh_version, 0);
+            COIN_P2PKH_VERSION, 0);
     } else {
         uint8_t tmp[22];
         tmp[0] = 0x00;
@@ -153,12 +125,12 @@ unsigned short apdu_get_wallet_public_key() {
                 22,                    // INLEN
                 G_io_apdu_buffer + 67, // OUT
                 150,                   // MAXOUTLEN
-                G_coin_config->p2sh_version, 0);
+                COIN_P2SH_VERSION, 0);
         } else {
-            if (G_coin_config->native_segwit_prefix) {
+            if (COIN_NATIVE_SEGWIT_PREFIX) {
                 keyLength = segwit_addr_encode(
                     (char *)(G_io_apdu_buffer + 67),
-                    (char *)PIC(G_coin_config->native_segwit_prefix), 0, tmp + 2, 20);
+                    (char *)PIC(COIN_NATIVE_SEGWIT_PREFIX), 0, tmp + 2, 20);
                 if (keyLength == 1) {
                     keyLength = strlen((char *)(G_io_apdu_buffer + 67));
                 }
@@ -167,10 +139,8 @@ unsigned short apdu_get_wallet_public_key() {
     }
     G_io_apdu_buffer[66] = keyLength;
     PRINTF("Length %d\n", keyLength);
-    if (!uncompressedPublicKeys) {
-        // Restore for the full key component
-        G_io_apdu_buffer[1] = 0x04;
-    }
+    // Restore for the full key component
+    G_io_apdu_buffer[1] = 0x04;
 
     // output chain code
     memmove(G_io_apdu_buffer + 1 + 65 + 1 + keyLength, chainCode,
@@ -192,24 +162,6 @@ unsigned short apdu_get_wallet_public_key() {
         G_io_apdu_buffer[200 + keyLength] = '\0';
         context_D.io_flags |= IO_ASYNCH_REPLY;
         bagl_display_public_key(is_derivation_path_unusual);
-    }
-    // If the token requested has already been approved in a previous call, the source is trusted so don't ask for approval again
-    else if(display_request_token &&
-           (!context_D.has_valid_token || memcmp(&request_token, context_D.last_token, 4)))
-    {
-        // disable the has_valid_token flag and store the new token
-        context_D.has_valid_token = false;
-        memcpy(context_D.last_token, &request_token, 4);
-        // Hax, avoid wasting space
-        snprintf((char *)G_io_apdu_buffer + 200, 9, "%08X", request_token);
-        G_io_apdu_buffer[200 + 8] = '\0';
-        context_D.io_flags |= IO_ASYNCH_REPLY;
-        bagl_display_token();
-    }
-    else if(require_user_approval)
-    {
-        context_D.io_flags |= IO_ASYNCH_REPLY;
-        bagl_request_pubkey_approval();
     }
 
     return SW_OK;

@@ -23,6 +23,8 @@
 #include "bagl_extensions.h"
 #include "ui.h"
 #include "lib_standard_app/crypto_helpers.h"
+#include "lib_standard_app/read.h"
+#include "swap.h"
 
 #define FINALIZE_P1_MORE 0x00
 #define FINALIZE_P1_LAST 0x80
@@ -39,7 +41,6 @@ void apdu_hash_input_finalize_full_reset(void) {
     memset(context_D.totalOutputAmount, 0,
               sizeof(context_D.totalOutputAmount));
     context_D.changeOutputFound = 0;
-    set_check_internal_structure_integrity(1);
 }
 
 static bool check_output_displayable() {
@@ -70,10 +71,10 @@ static bool check_output_displayable() {
     isOpCall =
         output_script_is_op_call(context_D.currentOutput + 8,
           sizeof(context_D.currentOutput) - 8);
-    if (((G_coin_config->kind == COIN_KIND_HYDRA) &&
+    if (((COIN_KIND == COIN_KIND_HYDRA) &&
          !output_script_is_regular(context_D.currentOutput + 8) &&
          !isP2sh && !(nullAmount && isOpReturn) && !isOpCreate && !isOpCall) ||
-        (!(G_coin_config->kind == COIN_KIND_HYDRA) &&
+        (!(COIN_KIND == COIN_KIND_HYDRA) &&
          !output_script_is_regular(context_D.currentOutput + 8) &&
          !isP2sh && !(nullAmount && isOpReturn))) {
         PRINTF("Error : Unrecognized output script");
@@ -99,7 +100,7 @@ static bool check_output_displayable() {
             public_key_hash160(changeSegwit, 22, changeSegwit);
             if (memcmp(context_D.currentOutput + 8 + addressOffset,
                           changeSegwit, 20) == 0) {
-                if (G_coin_config->flags & FLAG_SEGWIT_CHANGE_SUPPORT) {
+                if (COIN_FLAGS & FLAG_SEGWIT_CHANGE_SUPPORT) {
                     changeFound = true;
                 } else {
                     // Attempt to avoid fatal failures on Bitcoin Cash
@@ -155,7 +156,7 @@ bool handle_output_state() {
                 break;
             }
             context_D.totalOutputs = context_D.remainingOutputs =
-                read_u32(context_D.currentOutput + 1, 0, 0);
+                read_u32_le(context_D.currentOutput, 1);
             discardSize = 5;
             context_D.outputParsingState = OUTPUT_PARSING_OUTPUT;
             processed = true;
@@ -177,8 +178,7 @@ bool handle_output_state() {
             if (context_D.currentOutputOffset < 9 + 2) {
                 break;
             }
-            scriptSize =
-                read_u32(context_D.currentOutput + 9, 0, 0);
+            scriptSize = read_u32_le(context_D.currentOutput, 9);
             discardSize = 3;
         } else {
             // Unrealistically large script
@@ -227,13 +227,10 @@ int get_pubkey_hash160(unsigned char* keyPath, size_t keyPath_len, unsigned char
     if (get_public_key(keyPath, keyPath_len, public_key.W, NULL)) {
         return -1;
     }
-    if (((N_btchip.bkp.config.options &
-            OPTION_UNCOMPRESSED_KEYS) != 0)) {
-        keyLength = 65;
-    } else {
-        compress_public_key_value(public_key.W);
-        keyLength = 33;
-    }
+
+    compress_public_key_value(public_key.W);
+    keyLength = 33;
+
     public_key_hash160(
         public_key.W,   // IN
         keyLength,      // INLEN
@@ -272,7 +269,6 @@ unsigned short apdu_hash_input_finalize_full_internal(
     }
 
     // Check state
-    set_check_internal_structure_integrity(0);
     if (context_D.transactionContext.transactionState !=
             TRANSACTION_PRESIGN_READY) {
         sw = SW_CONDITIONS_OF_USE_NOT_SATISFIED;
@@ -311,7 +307,7 @@ return_OK:
 
         // if the bip44 change path provided is not canonical or its index are unsual, ask for user approval
         if(bip44_derivation_guard(transactionSummary->keyPath, true)) {
-            if (context_D.called_from_swap) {
+            if (G_called_from_swap) {
                 PRINTF("In swap mode only standart path is allowed\n");
                 sw = SW_CONDITIONS_OF_USE_NOT_SATISFIED;
                 goto discardTransaction;
@@ -459,10 +455,8 @@ return_OK:
                     sizeof(transaction_summary_t));
         }
 
-        transactionSummary->payToAddressVersion =
-            G_coin_config->p2pkh_version;
-        transactionSummary->payToScriptHashVersion =
-            G_coin_config->p2sh_version;
+        transactionSummary->payToAddressVersion = COIN_P2PKH_VERSION;
+        transactionSummary->payToScriptHashVersion = COIN_P2SH_VERSION;
 
         // Generate new nonce
 
@@ -487,7 +481,7 @@ return_OK:
                 sizeof(transactionSummary->authorizationHash));
         goto return_OK;
     } else {
-        if (secure_memcmp(
+        if (os_secure_memcmp(
                     authorizationHash,
                     transactionSummary->authorizationHash,
                     sizeof(transactionSummary->authorizationHash))) {

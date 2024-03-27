@@ -25,11 +25,6 @@
 
 bagl_element_t tmp_element;
 
-void settings_pubkey_export_change(unsigned int enabled) {
-  nvm_write((void *)&N_btchip.pubKeyRequestRestriction, &enabled, 1);
-  ui_idle_flow();
-}
-
 static unsigned int io_seproxyhal_touch_verify_cancel(const bagl_element_t *e) {
   UNUSED(e);
   // user denied the transaction, tell the USB side
@@ -112,83 +107,25 @@ void io_seproxyhal_display(const bagl_element_t *element) {
     io_seproxyhal_display_default((bagl_element_t *)element);
   }
 }
-//////////////////////////////////////////////////////////////////////////////////////
-// Public keys export submenu:
 
-const char *const settings_pubkey_export_getter_values[] = {
-    "Auto Approval", "Manual Approval", "Back"};
-
-const char *settings_submenu_getter(unsigned int idx);
-void settings_submenu_selector(unsigned int idx);
-
-const char *const settings_submenu_getter_values[] = {
-    "Public keys export",
-    "Back",
-};
-
-const char *settings_pubkey_export_getter(unsigned int idx) {
-  if (idx < ARRAYLEN(settings_pubkey_export_getter_values)) {
-    return settings_pubkey_export_getter_values[idx];
-  }
-  return NULL;
-}
-
-void settings_pubkey_export_selector(unsigned int idx) {
-  switch (idx) {
-  case 0:
-    settings_pubkey_export_change(0);
-    break;
-  case 1:
-    settings_pubkey_export_change(1);
-    break;
-  default:
-    ux_menulist_init(0, settings_submenu_getter, settings_submenu_selector);
-  }
-}
-
-const char *settings_submenu_getter(unsigned int idx) {
-  if (idx < ARRAYLEN(settings_submenu_getter_values)) {
-    return settings_submenu_getter_values[idx];
-  }
-  return NULL;
-}
-
-void settings_submenu_selector(unsigned int idx) {
-  switch (idx) {
-  case 0:
-    ux_menulist_init_select(0, settings_pubkey_export_getter,
-                            settings_pubkey_export_selector,
-                            N_btchip.pubKeyRequestRestriction);
-    break;
-  default:
-    ui_idle_flow();
-  }
-}
-
+//////////////////////////////////////////////////////////////////////
 UX_STEP_NOCB(ux_idle_flow_1_step, nn,
              {
                  "Application",
                  "is ready",
              });
-UX_STEP_CB(ux_idle_flow_2_step, pb,
-           ux_menulist_init(0, settings_submenu_getter,
-                            settings_submenu_selector),
-           {
-               &C_icon_coggle,
-               "Settings",
-           });
-UX_STEP_NOCB(ux_idle_flow_3_step, bn,
+UX_STEP_NOCB(ux_idle_flow_2_step, bn,
              {
                  "Version",
                  APPVERSION,
              });
-UX_STEP_CB(ux_idle_flow_4_step, pb, os_sched_exit(-1),
+UX_STEP_CB(ux_idle_flow_3_step, pb, os_sched_exit(-1),
            {
                &C_icon_dashboard_x,
                "Quit",
            });
 UX_FLOW(ux_idle_flow, &ux_idle_flow_1_step, &ux_idle_flow_2_step,
-        &ux_idle_flow_3_step, &ux_idle_flow_4_step, FLOW_LOOP);
+        &ux_idle_flow_3_step, FLOW_LOOP);
 
 //////////////////////////////////////////////////////////////////////
 UX_STEP_NOCB(ux_sign_flow_1_step, pnn,

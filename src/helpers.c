@@ -18,6 +18,8 @@
 #include "internal.h"
 #include "apdu_constants.h"
 #include "lib_standard_app/crypto_helpers.h"
+#include "lib_standard_app/read.h"
+#include "lib_standard_app/base58.h"
 #include "bip32_path.h"
 #include "ledger_assert.h"
 
@@ -62,7 +64,7 @@ const unsigned char ZEN_OUTPUT_SCRIPT_POST[] = {
 };                    // BIP0115 Replay Protection
 
 unsigned char output_script_is_regular(unsigned char *buffer) {
-    if (G_coin_config->native_segwit_prefix) {
+    if (COIN_NATIVE_SEGWIT_PREFIX) {
         if ((memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE)) == 0) ||
             (memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
@@ -77,7 +79,7 @@ unsigned char output_script_is_regular(unsigned char *buffer) {
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_POST)) == 0)) {
         return 1;
     }
-    if (G_coin_config->kind == COIN_KIND_HORIZEN) {
+    if (COIN_KIND == COIN_KIND_HORIZEN) {
         if ((memcmp(buffer, ZEN_OUTPUT_SCRIPT_PRE,
                        sizeof(ZEN_OUTPUT_SCRIPT_PRE)) == 0) &&
             (memcmp(buffer + sizeof(ZEN_OUTPUT_SCRIPT_PRE) + 20,
@@ -98,7 +100,7 @@ unsigned char output_script_is_p2sh(unsigned char *buffer) {
                     sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_POST)) == 0)) {
         return 1;
     }
-    if (G_coin_config->kind == COIN_KIND_HORIZEN) {
+    if (COIN_KIND == COIN_KIND_HORIZEN) {
         if ((memcmp(buffer, ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE,
                        sizeof(ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE)) == 0) &&
             (memcmp(buffer + sizeof(ZEN_TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE) + 20,
@@ -111,7 +113,7 @@ unsigned char output_script_is_p2sh(unsigned char *buffer) {
 }
 
 unsigned char output_script_is_native_witness(unsigned char *buffer) {
-    if (G_coin_config->native_segwit_prefix) {
+    if (COIN_NATIVE_SEGWIT_PREFIX) {
         if ((memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
                        sizeof(TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE)) == 0) ||
             (memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WSH_PRE,
@@ -123,7 +125,7 @@ unsigned char output_script_is_native_witness(unsigned char *buffer) {
 }
 
 unsigned char output_script_is_op_return(unsigned char *buffer) {
-    if (G_coin_config->kind == COIN_KIND_BITCOIN_CASH) {
+    if (COIN_KIND == COIN_KIND_BITCOIN_CASH) {
         return ((buffer[1] == 0x6A) || ((buffer[1] == 0x00) && (buffer[2] == 0x6A)));
     }
     else {
@@ -150,64 +152,6 @@ unsigned char output_script_is_op_call(unsigned char *buffer,
                                               size_t size) {
     return output_script_is_op_create_or_call(buffer, size, 0xC2);
 }
-
-unsigned char rng_u8_modulo(unsigned char modulo) {
-    unsigned int rng_max = 256 % modulo;
-    unsigned int rng_limit = 256 - rng_max;
-    unsigned char candidate;
-    while ((candidate = cx_rng_u8()) > rng_limit)
-        ;
-    return (candidate % modulo);
-}
-
-unsigned char secure_memcmp(const void *buf1, const void *buf2,
-                                   unsigned short length) {
-    unsigned char error = 0;
-    while (length--) {
-        error |= ((unsigned char *)buf1)[length] ^
-                 ((unsigned char *)buf2)[length];
-    }
-    if (length != 0xffff) {
-        return 1;
-    }
-    return error;
-}
-
-unsigned long int read_u32(unsigned char *buffer, unsigned char be,
-                                  unsigned char skipSign) {
-    unsigned char i;
-    unsigned long int result = 0;
-    unsigned char shiftValue = (be ? 24 : 0);
-    for (i = 0; i < 4; i++) {
-        unsigned char x = (unsigned char)buffer[i];
-        if ((i == 0) && skipSign) {
-            x &= 0x7f;
-        }
-        result += ((unsigned long int)x) << shiftValue;
-        if (be) {
-            shiftValue -= 8;
-        } else {
-            shiftValue += 8;
-        }
-    }
-    return result;
-}
-
-void write_u32_be(unsigned char *buffer, unsigned long int value) {
-    buffer[0] = ((value >> 24) & 0xff);
-    buffer[1] = ((value >> 16) & 0xff);
-    buffer[2] = ((value >> 8) & 0xff);
-    buffer[3] = (value & 0xff);
-}
-
-void write_u32_le(unsigned char *buffer, unsigned long int value) {
-    buffer[0] = (value & 0xff);
-    buffer[1] = ((value >> 8) & 0xff);
-    buffer[2] = ((value >> 16) & 0xff);
-    buffer[3] = ((value >> 24) & 0xff);
-}
-
-
 
 void public_key_hash160(unsigned char *in, unsigned short inlen,
                                unsigned char *out) {
@@ -252,8 +196,8 @@ unsigned short public_key_to_encoded_base58(
 
     compute_checksum(tmpBuffer, 20 + versionSize, tmpBuffer + 20 + versionSize);
 
-    outputLen = outlen;
-    if (encode_base58(tmpBuffer, 24 + versionSize, out, &outputLen) < 0) {
+    outputLen = base58_encode(tmpBuffer, 24 + versionSize, (char *)out, outlen);
+    if (outputLen < 0) {
         THROW(EXCEPTION);
     }
     return outputLen;
@@ -265,30 +209,6 @@ void swap_bytes(unsigned char *target, unsigned char *source,
     for (i = 0; i < size; i++) {
         target[i] = source[size - 1 - i];
     }
-}
-
-unsigned short decode_base58_address(unsigned char *in,
-                                            unsigned short inlen,
-                                            unsigned char *out,
-                                            unsigned short outlen) {
-    unsigned char hashBuffer[32];
-    size_t outputLen = outlen;
-    if (decode_base58((char *)in, inlen, out, &outputLen) < 0) {
-        THROW(EXCEPTION);
-    }
-    outlen = outputLen;
-
-    // Compute hash to verify address
-    cx_hash_sha256(out, outlen - 4, hashBuffer, 32);
-
-    cx_hash_sha256(hashBuffer, 32, hashBuffer, 32);
-
-    if (memcmp(out + outlen - 4, hashBuffer, 4)) {
-        PRINTF("Hash checksum mismatch\n%.*H\n",sizeof(hashBuffer),hashBuffer);
-        THROW(INVALID_CHECKSUM);
-    }
-
-    return outlen;
 }
 
 /*
@@ -314,9 +234,9 @@ unsigned char bip44_derivation_guard(unsigned char *bip32Path, bool is_change_pa
     }
 
     // If the coin type doesn't match, return a warning
-    if ((G_coin_config->bip44_coin_type != 0) &&
-        (((bip32PathInt.path[BIP44_COIN_TYPE_OFFSET]^0x80000000) != G_coin_config->bip44_coin_type) &&
-          ((bip32PathInt.path[BIP44_COIN_TYPE_OFFSET]^0x80000000) != G_coin_config->bip44_coin_type2))) {
+    if ((BIP44_COIN_TYPE != 0) &&
+        (((bip32PathInt.path[BIP44_COIN_TYPE_OFFSET]^0x80000000) != BIP44_COIN_TYPE) &&
+          ((bip32PathInt.path[BIP44_COIN_TYPE_OFFSET]^0x80000000) != BIP44_COIN_TYPE_2))) {
         return 1;
     }
 
@@ -337,7 +257,7 @@ Returns 0 if the path is non compliant, or 1 if compliant
 unsigned char enforce_bip44_coin_type(unsigned char *bip32Path, bool for_pubkey) {
     bip32_path_t bip32PathInt;
     // No enforcement required
-    if (G_coin_config->bip44_coin_type == 0) {
+    if (BIP44_COIN_TYPE == 0) {
         return 1;
     }
     // Path is too short - always require a user validation if signing
@@ -356,8 +276,8 @@ unsigned char enforce_bip44_coin_type(unsigned char *bip32Path, bool for_pubkey)
         return for_pubkey;
     }
 
-    if  (((bip32PathInt.path[BIP44_COIN_TYPE_OFFSET]^0x80000000) == G_coin_config->bip44_coin_type) ||
-        ((bip32PathInt.path[BIP44_COIN_TYPE_OFFSET]^0x80000000) == G_coin_config->bip44_coin_type2)) {
+    if  (((bip32PathInt.path[BIP44_COIN_TYPE_OFFSET]^0x80000000) == BIP44_COIN_TYPE) ||
+        ((bip32PathInt.path[BIP44_COIN_TYPE_OFFSET]^0x80000000) == BIP44_COIN_TYPE_2)) {
         // Valid BIP 44 path
         return 1;
     }
@@ -382,7 +302,7 @@ unsigned char bip32_print_path(unsigned char *bip32Path, char* out, unsigned cha
     out[0] = ' ';
     offset=1;
     for (i = 0; i < bip32PathLength; i++) {
-        current_level = read_u32(bip32Path, 1, 0);
+        current_level = read_u32_be(bip32Path, 0);
         hardened = (bool)(current_level & 0x80000000);
         if(hardened) {
             //remove hardening flag

@@ -130,23 +130,14 @@
 
 void commit_operation_mode(secu8 operationMode);
 
-unsigned short apdu_setup(void);
-unsigned short apdu_verify_pin(void);
-unsigned short apdu_get_operation_mode(void);
-unsigned short apdu_set_operation_mode(void);
 unsigned short apdu_get_wallet_public_key(void);
 unsigned short apdu_get_trusted_input(void);
 unsigned short apdu_hash_input_start(void);
 unsigned short apdu_hash_input_finalize(void);
 unsigned short apdu_hash_sign(void);
 unsigned short apdu_hash_input_finalize_full(void);
-unsigned short apdu_import_private_key(void);
-unsigned short apdu_get_public_key(void);
-unsigned short apdu_derive_bip32_key(void);
-unsigned short apdu_signverify_immediate(void);
 unsigned short apdu_sign_message(void);
 
-unsigned short apdu_get_random(void);
 unsigned short apdu_get_firmware_version(void);
 
 unsigned short apdu_get_coin_version(void);

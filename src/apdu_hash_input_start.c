@@ -18,6 +18,7 @@
 #include "internal.h"
 #include "apdu_constants.h"
 #include "bagl_extensions.h"
+#include "swap.h"
 
 #define P1_FIRST 0x00
 #define P1_NEXT 0x80
@@ -43,21 +44,10 @@ unsigned short apdu_hash_input_start() {
     unsigned char apduLength;
     apduLength = G_io_apdu_buffer[ISO_OFFSET_LC];
 
-    SB_CHECK(N_btchip.bkp.config.operationMode);
-    switch (SB_GET(N_btchip.bkp.config.operationMode)) {
-    case MODE_WALLET:
-    case MODE_RELAXED_WALLET:
-    case MODE_SERVER:
-        break;
-    default:
-        return SW_CONDITIONS_OF_USE_NOT_SATISFIED;
-    }
-
     if (G_io_apdu_buffer[ISO_OFFSET_P1] == P1_FIRST) {
         // Initialize
         context_D.transactionContext.transactionState =
             TRANSACTION_NONE;
-        set_check_internal_structure_integrity(1);
         context_D.transactionHashOption = TRANSACTION_HASH_BOTH;
     } else if (G_io_apdu_buffer[ISO_OFFSET_P1] != P1_NEXT) {
         return SW_INCORRECT_P1_P2;
@@ -68,8 +58,6 @@ unsigned short apdu_hash_input_start() {
         (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_CASHADDR) ||
         (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_OVERWINTER) ||
         (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_SAPLING)) {
-        // context_D.transactionContext.consumeP2SH =
-        // ((N_btchip.bkp.config.options & OPTION_SKIP_2FA_P2SH) != 0);
         if (G_io_apdu_buffer[ISO_OFFSET_P1] == P1_FIRST) {
             unsigned char usingSegwit =
                 (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT) ||
@@ -78,26 +66,16 @@ unsigned short apdu_hash_input_start() {
                 (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_SAPLING);
             unsigned char usingCashAddr =
                 (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_CASHADDR);
-            // Request PIN validation
-            // Only request PIN validation (user presence) to start a new
-            // transaction signing flow.
-            // Thus allowing for numerous output to be processed in the
-            // background without
-            // requiring to disable autolock/autopoweroff
-            if (!context_D.transactionContext.firstSigned &&
-                os_global_pin_is_validated() != BOLOS_UX_OK) {
-                return SW_SECURITY_STATUS_NOT_SATISFIED;
-            }
             // Master transaction reset
             context_D.transactionContext.firstSigned = 1;
             context_D.transactionContext.consumeP2SH = 0;
             context_D.transactionContext.relaxed = 0;
             context_D.usingSegwit = usingSegwit;
             context_D.usingCashAddr =
-                (G_coin_config->kind == COIN_KIND_BITCOIN_CASH ? usingCashAddr
+                (COIN_KIND == COIN_KIND_BITCOIN_CASH ? usingCashAddr
                                                                : 0);
             context_D.usingOverwinter = 0;
-            if ((G_coin_config->kind == COIN_KIND_ZCASH) || (G_coin_config->kind == COIN_KIND_KOMODO) || (G_coin_config->kind == COIN_KIND_ZCLASSIC) || (G_coin_config->kind == COIN_KIND_RESISTANCE)) {
+            if ((COIN_KIND == COIN_KIND_ZCASH) || (COIN_KIND == COIN_KIND_KOMODO) || (COIN_KIND == COIN_KIND_ZCLASSIC) || (COIN_KIND == COIN_KIND_RESISTANCE)) {
                 if (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NEW_SEGWIT_OVERWINTER) {
                     context_D.usingOverwinter = ZCASH_USING_OVERWINTER;
                 }
@@ -108,7 +86,6 @@ unsigned short apdu_hash_input_start() {
             }
             context_D.overwinterSignReady = 0;
             context_D.segwitParsedOnce = 0;
-            set_check_internal_structure_integrity(1);
             // Initialize for screen pairing
             memset(&context_D.tmpCtx.output, 0,
                       sizeof(context_D.tmpCtx.output));
@@ -130,7 +107,7 @@ unsigned short apdu_hash_input_start() {
         && IS_INPUT()
         && !IS_INPUT_TRUSTED())
     {
-        if(context_D.called_from_swap){
+        if(G_called_from_swap){
             /* There is no point in displaying a warning when the app is signing
             in silent mode, as its UI is hidden behind the exchange app*/
             return SW_SWAP_WITHOUT_TRUSTED_INPUTS;

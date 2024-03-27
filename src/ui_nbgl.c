@@ -187,7 +187,7 @@ static void transaction_fee_callback(int token, uint8_t index) {
   (void) index;
   if (token) {
         releaseContext();
-        snprintf(text, sizeof(text), "Sign transaction\nto send %s?", G_coin_config->name);
+        snprintf(text, sizeof(text), "Sign transaction\nto send %s?", COIN_COINID_NAME);
         nbgl_pageNavigationInfo_t info = {.activePage = 0,
                                           .nbPages = 0,
                                           .navType = NAV_WITH_TAP,
@@ -200,7 +200,7 @@ static void transaction_fee_callback(int token, uint8_t index) {
                                           .tuneId = TUNE_TAP_CASUAL};
 
         nbgl_pageContent_t content = {.type = INFO_LONG_PRESS,
-                                      .infoLongPress.icon = &G_coin_config->img_nbgl,
+                                      .infoLongPress.icon = &COIN_ICON,
                                       .infoLongPress.text = text,
                                       .infoLongPress.longPressText = "Hold to sign",
                                       .infoLongPress.longPressToken = CONFIRM_TOKEN,
@@ -225,7 +225,7 @@ static void continue_review(flow_type_t type) {
   uiContext.tagValueList.pairs = uiContext.tagValues;
   uiContext.tagValueList.nbPairs = uiContext.nbPairs;
 
-  uiContext.infoLongPress.icon = &G_coin_config->img_nbgl;
+  uiContext.infoLongPress.icon = &COIN_ICON;
   uiContext.infoLongPress.longPressText = "Hold to sign";
   uiContext.infoLongPress.longPressToken = 1;
   uiContext.infoLongPress.tuneId = TUNE_TAP_CASUAL;
@@ -252,14 +252,14 @@ static void continue_message_review(void) {
 static void ui_start(void (*cb)(void), flow_type_t type) {
   switch (type) {
       case MESSAGE_TYPE: 
-          nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, "Review\nmessage", NULL,
+          nbgl_useCaseReviewStart(&COIN_ICON, "Review\nmessage", NULL,
                   "Cancel", continue_message_review,
                   prompt_cancel_message);
           break;
 
       case TRANSACTION_TYPE:
-          snprintf(text, sizeof(text), "Review transaction\nto send %s", G_coin_config->name);
-          nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, text, NULL,
+          snprintf(text, sizeof(text), "Review transaction\nto send %s", COIN_COINID_NAME);
+          nbgl_useCaseReviewStart(&COIN_ICON, text, NULL,
                   "Cancel", cb, prompt_cancel_transaction);
           break;
   }
@@ -417,7 +417,7 @@ void ui_request_pubkey_approval_flow(void) {
 
     ui_transaction_start(ui_request_pubkey_approval_flow);
   } else {
-    nbgl_useCaseChoice(&G_coin_config->img_nbgl, "Export public key", NULL,
+    nbgl_useCaseChoice(&COIN_ICON, "Export public key", NULL,
                        "Approve", "Reject", transaction_review_callback);
   }
 }
@@ -449,7 +449,7 @@ void ui_display_token_flow(void) {
   uiContext.abandon_status = "Token\nrejected";
   uiContext.approved_status = "TOKEN\nCONFIRMED";
 
-  nbgl_useCaseChoice(&G_coin_config->img_nbgl, "Confirm token",
+  nbgl_useCaseChoice(&COIN_ICON, "Confirm token",
                      (char *)G_io_apdu_buffer + 200, "Approve", "Reject",
                      status_callback);
 }
@@ -467,14 +467,14 @@ static void warn_unusual_derivation_path(void) {
 }
 
 static void prompt_public_key(bool warning) {
-  snprintf(text, sizeof(text), "Verify %s\naddress", G_coin_config->name);
+  snprintf(text, sizeof(text), "Verify %s\naddress", COIN_COINID_NAME);
 
   if (warning) {
-    nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, text, NULL,
+    nbgl_useCaseReviewStart(&COIN_ICON, text, NULL,
                             "Cancel", warn_unusual_derivation_path,
                             abandon_status);
   } else {
-    nbgl_useCaseReviewStart(&G_coin_config->img_nbgl, text, NULL,
+    nbgl_useCaseReviewStart(&COIN_ICON, text, NULL,
                             "Cancel", display_pubkey_callback, abandon_status);
   }
 }

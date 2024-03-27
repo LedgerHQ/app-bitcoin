@@ -163,12 +163,6 @@ struct context_s {
     /** (Integrity protected) transaction context */
     transaction_context_t transactionContext;
 
-    /** Non protected transaction context */
-
-    /** Last U2F Token streamed by host to attempt pubkey request */
-    unsigned char last_token[4];
-    unsigned char has_valid_token;
-
     /** Full transaction hash context */
     union multi_hash transactionHashFull;
     /** Authorization transaction hash context */
@@ -241,9 +235,6 @@ struct context_s {
     unsigned char nExpiryHeight[4];
     unsigned char nLockTime[4];
     unsigned char sigHashType[4];
-
-    /*Is swap mode*/
-    unsigned char called_from_swap;
 };
 typedef struct context_s context_t;
 
@@ -290,27 +281,6 @@ typedef enum coin_kind_e {
     COIN_KIND_RAVENCOIN,
     COIN_KIND_HYDRA
 } coin_kind_t;
-
-typedef struct altcoin_config_s {
-    unsigned int bip44_coin_type;
-    unsigned int bip44_coin_type2;
-    unsigned short p2pkh_version;
-    unsigned short p2sh_version;
-    unsigned char family;
-#ifdef HAVE_NBGL
-    unsigned char img_raw[1024]; 
-    nbgl_icon_details_t img_nbgl;
-#endif // HAVE_NBGL
-    char coinid[14]; // used coind id for message signature prefix
-    char name[16]; // for ux displays
-    char name_short[6]; // for unit in ux displays
-    char native_segwit_prefix_val[5];
-    const char* native_segwit_prefix; // null if no segwit prefix
-    unsigned int forkid;
-    unsigned int zcash_consensus_branch_id;
-    coin_kind_t kind;
-    unsigned int flags;
-} altcoin_config_t;
 
 void context_init(void);
 

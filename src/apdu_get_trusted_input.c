@@ -17,6 +17,8 @@
 
 #include "internal.h"
 #include "apdu_constants.h"
+#include "lib_standard_app/read.h"
+#include "lib_standard_app/write.h"
 
 #define GET_TRUSTED_INPUT_P1_FIRST 0x00
 #define GET_TRUSTED_INPUT_P1_NEXT 0x80
@@ -26,25 +28,14 @@ unsigned short apdu_get_trusted_input() {
     unsigned char dataOffset = 0;
     apduLength = G_io_apdu_buffer[ISO_OFFSET_LC];
 
-    SB_CHECK(N_btchip.bkp.config.operationMode);
-    switch (SB_GET(N_btchip.bkp.config.operationMode)) {
-    case MODE_WALLET:
-    case MODE_RELAXED_WALLET:
-    case MODE_SERVER:
-        break;
-    default:
-        return SW_CONDITIONS_OF_USE_NOT_SATISFIED;
-    }
-
     if (G_io_apdu_buffer[ISO_OFFSET_P1] == GET_TRUSTED_INPUT_P1_FIRST) {
         // Initialize
         context_D.transactionTargetInput =
-            read_u32(G_io_apdu_buffer + ISO_OFFSET_CDATA, 1, 0);
+            read_u32_be(G_io_apdu_buffer, ISO_OFFSET_CDATA);
         context_D.transactionContext.transactionState =
             TRANSACTION_NONE;
         context_D.trustedInputProcessed = 0;
         context_D.transactionContext.consumeP2SH = 0;
-        set_check_internal_structure_integrity(1);
         dataOffset = 4;
         context_D.transactionHashOption = TRANSACTION_HASH_FULL;
         context_D.usingSegwit = 0;
@@ -67,7 +58,6 @@ unsigned short apdu_get_trusted_input() {
 
         context_D.transactionContext.transactionState =
             TRANSACTION_NONE;
-        set_check_internal_structure_integrity(1);
         if (!context_D.trustedInputProcessed) {
             // Output was not found
             return SW_INCORRECT_DATA;
@@ -84,7 +74,7 @@ unsigned short apdu_get_trusted_input() {
         G_io_apdu_buffer[1] = 0x00;
         cx_hash_sha256(G_io_apdu_buffer + TRUSTED_INPUT_SIZE, 32, G_io_apdu_buffer + 4, 32);
 
-        write_u32_le(G_io_apdu_buffer + 4 + 32,
+        write_u32_le(G_io_apdu_buffer, 4 + 32,
                             context_D.transactionTargetInput);
         memmove(G_io_apdu_buffer + 4 + 32 + 4,
                    context_D.transactionContext.transactionAmount, 8);
