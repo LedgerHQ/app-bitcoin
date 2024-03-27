@@ -17,16 +17,16 @@
 
 #include "os.h"
 
-#include "btchip_internal.h"
+#include "internal.h"
 
 #include "os_io_seproxyhal.h"
 
-#include "btchip_apdu_constants.h"
-#include "btchip_display_variables.h"
+#include "apdu_constants.h"
+#include "display_variables.h"
 
 #include "handle_swap_sign_transaction.h"
 
-#define BTCHIP_TECHNICAL_NOT_IMPLEMENTED 0x99
+#define TECHNICAL_NOT_IMPLEMENTED 0x99
 
 #define COMMON_CLA               0xB0
 
@@ -36,13 +36,13 @@ void app_dispatch(void) {
     unsigned char dispatched;
 
     // nothing to reply for now
-    btchip_context_D.outLength = 0;
-    btchip_context_D.io_flags = 0;
+    context_D.outLength = 0;
+    context_D.io_flags = 0;
 
     // If halted, then notify
-    SB_CHECK(btchip_context_D.halted);
-    if (SB_GET(btchip_context_D.halted)) {
-        btchip_context_D.sw = BTCHIP_SW_TECHNICAL_PROBLEM;
+    SB_CHECK(context_D.halted);
+    if (SB_GET(context_D.halted)) {
+        context_D.sw = SW_TECHNICAL_PROBLEM;
         goto sendSW;
     }
 
@@ -55,20 +55,20 @@ void app_dispatch(void) {
         }
     }
     if (dispatched == DISPATCHER_APDUS) {
-        btchip_context_D.sw = BTCHIP_SW_INS_NOT_SUPPORTED;
+        context_D.sw = SW_INS_NOT_SUPPORTED;
         goto sendSW;
     }
     if (DISPATCHER_DATA_IN[dispatched]) {
         if (G_io_apdu_buffer[ISO_OFFSET_LC] == 0x00 ||
-                btchip_context_D.inLength - 5 == 0) {
-            btchip_context_D.sw = BTCHIP_SW_INCORRECT_LENGTH;
+                context_D.inLength - 5 == 0) {
+            context_D.sw = SW_INCORRECT_LENGTH;
             goto sendSW;
         }
         // notify we need to receive data
         // io_exchange(CHANNEL_APDU | IO_RECEIVE_DATA, 0);
     }
     // call the apdu handler
-    btchip_context_D.sw = ((apduProcessingFunction)PIC(
+    context_D.sw = ((apduProcessingFunction)PIC(
                 DISPATCHER_FUNCTIONS[dispatched]))();
 
     // an APDU has been replied. request for power off time extension from the
@@ -78,18 +78,18 @@ void app_dispatch(void) {
 #endif // IO_APP_ACTIVITY
 
 sendSW:
-    if (btchip_context_D.called_from_swap) {
-        btchip_context_D.io_flags &= ~IO_ASYNCH_REPLY;
-        if(btchip_context_D.sw != BTCHIP_SW_OK) {
+    if (context_D.called_from_swap) {
+        context_D.io_flags &= ~IO_ASYNCH_REPLY;
+        if(context_D.sw != SW_OK) {
             vars.swap_data.should_exit = 1;
         }
     }
     // prepare SW after replied data
-    G_io_apdu_buffer[btchip_context_D.outLength] =
-        (btchip_context_D.sw >> 8);
-    G_io_apdu_buffer[btchip_context_D.outLength + 1] =
-        (btchip_context_D.sw & 0xff);
-    btchip_context_D.outLength += 2;
+    G_io_apdu_buffer[context_D.outLength] =
+        (context_D.sw >> 8);
+    G_io_apdu_buffer[context_D.outLength + 1] =
+        (context_D.sw & 0xff);
+    context_D.outLength += 2;
     return;
 }
 
@@ -99,27 +99,27 @@ void app_main(void) {
     // Process the incoming APDUs
 
     // first exchange, no out length :) only wait the apdu
-    btchip_context_D.outLength = 0;
-    btchip_context_D.io_flags = 0;
+    context_D.outLength = 0;
+    context_D.io_flags = 0;
     for (;;) {
 
         // memset(G_io_apdu_buffer, 0, 255); // paranoia
 
-        if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
-            btchip_context_D.io_flags |= IO_RETURN_AFTER_TX;
+        if (context_D.called_from_swap && vars.swap_data.should_exit) {
+            context_D.io_flags |= IO_RETURN_AFTER_TX;
         }
 
         // receive the whole apdu using the 7 bytes headers (ledger transport)
-        btchip_context_D.inLength =
-            io_exchange(CHANNEL_APDU | btchip_context_D.io_flags,
+        context_D.inLength =
+            io_exchange(CHANNEL_APDU | context_D.io_flags,
                         // use the previous outlength as the reply
-                        btchip_context_D.outLength);
+                        context_D.outLength);
 
-        if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
-            finalize_exchange_sign_transaction(btchip_context_D.sw == BTCHIP_SW_OK);
+        if (context_D.called_from_swap && vars.swap_data.should_exit) {
+            finalize_exchange_sign_transaction(context_D.sw == SW_OK);
         }
 
-        PRINTF("New APDU received:\n%.*H\n", btchip_context_D.inLength, G_io_apdu_buffer);
+        PRINTF("New APDU received:\n%.*H\n", context_D.inLength, G_io_apdu_buffer);
 
         app_dispatch();
 

@@ -15,22 +15,8 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef H
+#include "internal.h"
 
-#define H
+#include "public_ram_variables.h"
 
-#include "config.h"
-#include "os.h"
-#include "os_io_seproxyhal.h"
-
-#include "stdlib.h"
-#include "stdbool.h"
-#include "string.h"
-
-#define L_DEBUG_NOPREFIX(x)
-
-#define SW_TECHNICAL_DETAILS(x) SW_TECHNICAL_PROBLEM
-
-#include "secure_value.h"
-
-#endif
+storage_t const N_real;

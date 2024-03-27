@@ -15,22 +15,30 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef H
+#include "internal.h"
+#include "apdu_constants.h"
 
-#define H
+#define P1_GET_OPERATION_MODE 0x00
+#define P1_GET_SECOND_FACTOR_MODE 0x01
 
-#include "config.h"
-#include "os.h"
-#include "os_io_seproxyhal.h"
+unsigned short apdu_get_operation_mode() {
+    SB_CHECK(N_btchip.bkp.config.operationMode);
+    if ((SB_GET(N_btchip.bkp.config.operationMode) ==
+         MODE_SETUP_NEEDED) ||
+        (SB_GET(N_btchip.bkp.config.operationMode) == MODE_ISSUER)) {
+        return SW_CONDITIONS_OF_USE_NOT_SATISFIED;
+    }
 
-#include "stdlib.h"
-#include "stdbool.h"
-#include "string.h"
+    switch (G_io_apdu_buffer[ISO_OFFSET_P1]) {
+    case P1_GET_OPERATION_MODE:
+        G_io_apdu_buffer[0] = SB_GET(N_btchip.bkp.config.operationMode);
+        break;
 
-#define L_DEBUG_NOPREFIX(x)
+    default:
+        return SW_INCORRECT_P1_P2;
+    }
 
-#define SW_TECHNICAL_DETAILS(x) SW_TECHNICAL_PROBLEM
+    context_D.outLength = 1;
 
-#include "secure_value.h"
-
-#endif
+    return SW_OK;
+}

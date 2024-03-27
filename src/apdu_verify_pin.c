@@ -15,22 +15,9 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef H
+#include "internal.h"
+#include "apdu_constants.h"
 
-#define H
-
-#include "config.h"
-#include "os.h"
-#include "os_io_seproxyhal.h"
-
-#include "stdlib.h"
-#include "stdbool.h"
-#include "string.h"
-
-#define L_DEBUG_NOPREFIX(x)
-
-#define SW_TECHNICAL_DETAILS(x) SW_TECHNICAL_PROBLEM
-
-#include "secure_value.h"
-
-#endif
+unsigned short apdu_verify_pin() {
+    return SW_INS_NOT_SUPPORTED;
+}
