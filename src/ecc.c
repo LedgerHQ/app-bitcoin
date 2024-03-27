@@ -15,22 +15,8 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef H
+#include "internal.h"
 
-#define H
-
-#include "config.h"
-#include "os.h"
-#include "os_io_seproxyhal.h"
-
-#include "stdlib.h"
-#include "stdbool.h"
-#include "string.h"
-
-#define L_DEBUG_NOPREFIX(x)
-
-#define SW_TECHNICAL_DETAILS(x) SW_TECHNICAL_PROBLEM
-
-#include "secure_value.h"
-
-#endif
+void compress_public_key_value(unsigned char *value) {
+    value[0] = ((value[64] & 1) ? 0x03 : 0x02);
+}

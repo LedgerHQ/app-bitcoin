@@ -15,22 +15,16 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef H
-
-#define H
+#ifndef _PUBLIC_RAM_VARIABLES_H_
+#define _PUBLIC_RAM_VARIABLES_H_
 
 #include "config.h"
-#include "os.h"
-#include "os_io_seproxyhal.h"
-
-#include "stdlib.h"
-#include "stdbool.h"
-#include "string.h"
-
-#define L_DEBUG_NOPREFIX(x)
-
-#define SW_TECHNICAL_DETAILS(x) SW_TECHNICAL_PROBLEM
 
 #include "secure_value.h"
+#include "context.h"
 
-#endif
+extern context_t context_D;
+
+extern altcoin_config_t *G_coin_config;
+
+#endif /* _PUBLIC_RAM_VARIABLES_H_ */

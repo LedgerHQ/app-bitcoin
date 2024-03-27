@@ -15,22 +15,16 @@
 *  limitations under the License.
 ********************************************************************************/
 
-#ifndef H
+#ifndef BASE58_H
 
-#define H
+#define BASE58_H
 
-#include "config.h"
-#include "os.h"
-#include "os_io_seproxyhal.h"
+#include <stdlib.h>
 
-#include "stdlib.h"
-#include "stdbool.h"
-#include "string.h"
+int decode_base58(const char *in, size_t length,
+                         unsigned char *out, size_t *outlen);
 
-#define L_DEBUG_NOPREFIX(x)
-
-#define SW_TECHNICAL_DETAILS(x) SW_TECHNICAL_PROBLEM
-
-#include "secure_value.h"
+int encode_base58(const unsigned char *in, size_t length,
+                         unsigned char *out, size_t *outlen);
 
 #endif

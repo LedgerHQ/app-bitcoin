@@ -8,7 +8,7 @@
 
 #include "stdbool.h"
 #include "stdint.h"
-#include "btchip_context.h"
+#include "context.h"
 
 #define RUN_APPLICATION 1
 
@@ -72,7 +72,7 @@ typedef struct create_transaction_parameters_s {
 typedef struct libargs_s {
     unsigned int id;
     unsigned int command;
-    btchip_altcoin_config_t *coin_config;
+    altcoin_config_t *coin_config;
     union {
         check_address_parameters_t *check_address;
         create_transaction_parameters_t *create_transaction;
