@@ -536,7 +536,7 @@ unsigned short handler_hash_input_finalize_full(buffer_t* buffer, uint8_t p1, ui
     if (is_async) {
         // if the UI reject the processing of the request, then reply
         // immediately
-        bool status;
+        int status;
         if(context_D.outputParsingState == BIP44_CHANGE_PATH_VALIDATION) {
             context_D.outputParsingState = OUTPUT_PARSING_NUMBER_OUTPUTS;
             return 0;
@@ -547,13 +547,16 @@ unsigned short handler_hash_input_finalize_full(buffer_t* buffer, uint8_t p1, ui
         else {
             status = confirm_single_output();
         }
-        if (!status) {
+        if (status == 0) {
             ui_transaction_error();
             context_D.transactionContext.transactionState =
                 TRANSACTION_NONE;
             context_D.outLength = 0;
             sw = SW_INCORRECT_DATA;
             return io_send_sw(sw);
+        }
+        else if (status == 2) {
+            return io_send_response_pointer(G_io_apdu_buffer, context_D.outLength, SW_OK);
         }
         return 0;
     }

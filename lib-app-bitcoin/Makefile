@@ -115,7 +115,8 @@ $(error COIN_KIND must be defined)
 endif
 
 ifndef COIN_FLAGS
-$(error COIN_FLAGS must be defined)
+$(info COIN_FLAGS automatically set to 0)
+COIN_FLAGS=0
 endif
 
 ifndef COIN_FORKID

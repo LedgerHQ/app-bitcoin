@@ -230,7 +230,10 @@ unsigned int silent_confirm_single_output() {
 
 unsigned int confirm_single_output(void) {
     if (G_called_from_swap) {
-        return silent_confirm_single_output();
+        if (silent_confirm_single_output()) {
+            return 2;
+        }
+        return 0;
     }
     prepare_single_output();
 

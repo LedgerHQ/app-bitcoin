@@ -102,7 +102,7 @@ WEAK unsigned short handler_hash_sign(buffer_t* buffer, uint8_t p1, uint8_t p2) 
     context_D.transactionSummary.sighashType = sighashType;
 
     // if bitcoin cash OR forkid is set, then use the fork id
-    if (COIN_KIND == COIN_KIND_BITCOIN_CASH ||
+    if ((COIN_KIND == COIN_KIND_BITCOIN_CASH) ||
             (COIN_FORKID)) {
 #define SIGHASH_FORKID 0x40
         if (sighashType != (SIGHASH_ALL | SIGHASH_FORKID)) {
