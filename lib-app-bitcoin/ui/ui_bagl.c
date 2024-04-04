@@ -17,9 +17,9 @@
 
 #ifdef HAVE_BAGL
 //////////////////////////////////////////////////////////////////////
+#include "context.h"
 #include "display_variables.h"
 #include "transaction.h"
-#include "context.h"
 #include "ui.h"
 
 #include "extensions.h"
@@ -389,8 +389,7 @@ void ui_sign_message_flow(void) { ux_flow_init(0, ux_sign_flow, NULL); }
 
 void ui_confirm_single_flow(void) {
   snprintf(vars.tmp.feesAmount, sizeof(vars.tmp.feesAmount), "output #%d",
-           context.totalOutputs - context.remainingOutputs +
-               1);
+           context.totalOutputs - context.remainingOutputs + 1);
   ux_flow_init(0, ux_confirm_single_flow, NULL);
 }
 
@@ -429,12 +428,10 @@ void ui_idle_flow(void) {
     ux_stack_push();
   }
   ux_flow_init(0, ux_idle_flow, NULL);
-} 
-
-void ui_transaction_error(void) {
 }
 
-void ui_transaction_finish(void) {
-}
+void ui_transaction_error(void) {}
+
+void ui_transaction_finish(void) {}
 
 #endif // HAVE_BAGL

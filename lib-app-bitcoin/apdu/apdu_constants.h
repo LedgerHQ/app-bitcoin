@@ -1,24 +1,24 @@
 /*******************************************************************************
-*   Ledger App - Bitcoin Wallet
-*   (c) 2016-2019 Ledger
-*
-*  Licensed under the Apache License, Version 2.0 (the "License");
-*  you may not use this file except in compliance with the License.
-*  You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-*  Unless required by applicable law or agreed to in writing, software
-*  distributed under the License is distributed on an "AS IS" BASIS,
-*  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-*  See the License for the specific language governing permissions and
-*  limitations under the License.
-********************************************************************************/
+ *   Ledger App - Bitcoin Wallet
+ *   (c) 2016-2019 Ledger
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ ********************************************************************************/
 #pragma once
 
-#include "os.h"
 #include "buffer.h"
 #include "macros.h"
+#include "os.h"
 
 #define CLA 0xE0
 
@@ -49,12 +49,15 @@
 #define ZCASH_USING_OVERWINTER 0x01
 #define ZCASH_USING_OVERWINTER_SAPLING 0x02
 
-unsigned short handler_sign_message(buffer_t* buffer, uint8_t p1, uint8_t p2);
-unsigned short handler_hash_sign(buffer_t* buffer, uint8_t p1, uint8_t p2);
-unsigned short handler_hash_input_start(buffer_t* buffer, uint8_t p1, uint8_t p2);
-unsigned short handler_hash_input_finalize_full(buffer_t* buffer, uint8_t p1, uint8_t p2);
-unsigned short handler_get_wallet_public_key(buffer_t* buffer, uint8_t p1, uint8_t p2);
-unsigned short handler_get_trusted_input(buffer_t* buffer, uint8_t p1, uint8_t p2);
+unsigned short handler_sign_message(buffer_t *buffer, uint8_t p1, uint8_t p2);
+unsigned short handler_hash_sign(buffer_t *buffer, uint8_t p1, uint8_t p2);
+unsigned short handler_hash_input_start(buffer_t *buffer, uint8_t p1,
+                                        uint8_t p2);
+unsigned short handler_hash_input_finalize_full(buffer_t *buffer, uint8_t p1,
+                                                uint8_t p2);
+unsigned short handler_get_wallet_public_key(buffer_t *buffer, uint8_t p1,
+                                             uint8_t p2);
+unsigned short handler_get_trusted_input(buffer_t *buffer, uint8_t p1,
+                                         uint8_t p2);
 unsigned short handler_get_firmware_version(void);
 unsigned short handler_get_coin_version(void);
-

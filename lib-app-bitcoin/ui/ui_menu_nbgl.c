@@ -34,9 +34,7 @@ static char text[20];
 static const char *const infoTypes[] = {"Version", "Developer"};
 static const char *const infoContents[] = {APPVERSION, "Ledger"};
 
-static void quit_cb(void) {
-    os_sched_exit(-1);
-}
+static void quit_cb(void) { os_sched_exit(-1); }
 
 static bool settings_navigation_cb(uint8_t page, nbgl_pageContent_t *content) {
   if (page == 0) {
@@ -56,8 +54,7 @@ static void display_settings_menu(void) {
   snprintf(text, sizeof(text), "%s settings", COIN_COINID_NAME);
 
   nbgl_useCaseSettings(text, PAGE_START, NB_PAGE_SETTING, IS_TOUCHABLE,
-                       ui_idle_flow, settings_navigation_cb,
-                       NULL);
+                       ui_idle_flow, settings_navigation_cb, NULL);
 }
 
 void ui_idle_flow(void) {
