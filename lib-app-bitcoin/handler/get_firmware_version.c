@@ -1,23 +1,23 @@
 /*******************************************************************************
-*   Ledger App - Bitcoin Wallet
-*   (c) 2016-2019 Ledger
-*
-*  Licensed under the Apache License, Version 2.0 (the "License");
-*  you may not use this file except in compliance with the License.
-*  You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-*  Unless required by applicable law or agreed to in writing, software
-*  distributed under the License is distributed on an "AS IS" BASIS,
-*  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-*  See the License for the specific language governing permissions and
-*  limitations under the License.
-********************************************************************************/
+ *   Ledger App - Bitcoin Wallet
+ *   (c) 2016-2019 Ledger
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ ********************************************************************************/
 #include "io.h"
 
-#include "context.h"
 #include "apdu_constants.h"
+#include "context.h"
 
 #define FEATURES_SELF_SCREEN_BUTTONS 0x02
 #define FEATURES_NFC 0x08
@@ -35,16 +35,16 @@
 
 WEAK unsigned short handler_get_firmware_version() {
 
-    G_io_apdu_buffer[0] = FEATURES;
-    G_io_apdu_buffer[1] = ARCH_ID;
-    G_io_apdu_buffer[2] = MAJOR_VERSION;
-    G_io_apdu_buffer[3] = MINOR_VERSION;
-    G_io_apdu_buffer[4] = PATCH_VERSION;
-    G_io_apdu_buffer[5] = 1;
-    G_io_apdu_buffer[6] = TCS_LOADER_PATCH_VERSION;
-    G_io_apdu_buffer[7] = MODE;
+  G_io_apdu_buffer[0] = FEATURES;
+  G_io_apdu_buffer[1] = ARCH_ID;
+  G_io_apdu_buffer[2] = MAJOR_VERSION;
+  G_io_apdu_buffer[3] = MINOR_VERSION;
+  G_io_apdu_buffer[4] = PATCH_VERSION;
+  G_io_apdu_buffer[5] = 1;
+  G_io_apdu_buffer[6] = TCS_LOADER_PATCH_VERSION;
+  G_io_apdu_buffer[7] = MODE;
 
-    context.outLength = 0x08;
+  context.outLength = 0x08;
 
-    return io_send_response_pointer(G_io_apdu_buffer, 0x08, SW_OK);
+  return io_send_response_pointer(G_io_apdu_buffer, 0x08, SW_OK);
 }

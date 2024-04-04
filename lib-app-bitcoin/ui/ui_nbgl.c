@@ -16,31 +16,29 @@
  ********************************************************************************/
 
 #ifdef HAVE_NBGL
-#include "ui.h"
-#include "nbgl_use_case.h"
-#include "display_variables.h"
 #include "context.h"
+#include "display_variables.h"
+#include "nbgl_use_case.h"
+#include "ui.h"
 
 #include "extensions.h"
 
-typedef enum { 
-    MESSAGE_TYPE, 
-    TRANSACTION_TYPE 
-} flow_type_t;
+typedef enum { MESSAGE_TYPE, TRANSACTION_TYPE } flow_type_t;
 
 enum {
-    CANCEL_TOKEN,
-    CONFIRM_TOKEN,
-    BACK_TOKEN,
+  CANCEL_TOKEN,
+  CONFIRM_TOKEN,
+  BACK_TOKEN,
 };
-
 
 typedef struct {
   bool transaction_prompt_done;
   const char *prompt_cancel_message;
-  const char *prompt;            // text displayed in last transaction page
-  const char *approved_status;   // text displayed in confirmation page (after long press)
-  const char *abandon_status;    // text displayed in rejection page (after reject confirmed)
+  const char *prompt; // text displayed in last transaction page
+  const char *
+      approved_status; // text displayed in confirmation page (after long press)
+  const char *abandon_status; // text displayed in rejection page (after reject
+                              // confirmed)
   void (*approved_cb)(void);
   void (*abandon_cb)(void);
   nbgl_layoutTagValueList_t tagValueList;
@@ -138,25 +136,21 @@ static void status_callback(bool confirm) {
 // Prompt Cancel
 static void prompt_cancel(flow_type_t type) {
   switch (type) {
-      case MESSAGE_TYPE: 
-          nbgl_useCaseConfirm("Reject message", NULL, "Yes, Reject",
-                  "Go back to message", abandon_status);
-          break;
+  case MESSAGE_TYPE:
+    nbgl_useCaseConfirm("Reject message", NULL, "Yes, Reject",
+                        "Go back to message", abandon_status);
+    break;
 
-      case TRANSACTION_TYPE:
-          nbgl_useCaseConfirm("Reject transaction", NULL, "Yes, Reject",
-                  "Go back to transaction", abandon_status);
-          break;
+  case TRANSACTION_TYPE:
+    nbgl_useCaseConfirm("Reject transaction", NULL, "Yes, Reject",
+                        "Go back to transaction", abandon_status);
+    break;
   }
 }
 
-static void prompt_cancel_message(void) { 
-    prompt_cancel(MESSAGE_TYPE); 
-}
+static void prompt_cancel_message(void) { prompt_cancel(MESSAGE_TYPE); }
 
-static void prompt_cancel_transaction(void) {
-    prompt_cancel(TRANSACTION_TYPE);
-}
+static void prompt_cancel_transaction(void) { prompt_cancel(TRANSACTION_TYPE); }
 
 static void transaction_review_callback(bool token) {
   if (token) {
@@ -168,45 +162,48 @@ static void transaction_review_callback(bool token) {
 }
 
 static void transaction_finish_callback(int token, uint8_t index) {
-  (void) index;
+  (void)index;
   switch (token) {
-      case CANCEL_TOKEN:
-          prompt_cancel_transaction();
-          break;
-      case CONFIRM_TOKEN:
-          releaseContext();
-          uiContext.approved_cb();
-          break;
-      case BACK_TOKEN:
-          ui_finalize_flow();
-          break;
+  case CANCEL_TOKEN:
+    prompt_cancel_transaction();
+    break;
+  case CONFIRM_TOKEN:
+    releaseContext();
+    uiContext.approved_cb();
+    break;
+  case BACK_TOKEN:
+    ui_finalize_flow();
+    break;
   }
 }
 
 static void transaction_fee_callback(int token, uint8_t index) {
-  (void) index;
+  (void)index;
   if (token) {
-        releaseContext();
-        snprintf(text, sizeof(text), "Sign transaction\nto send %s?", COIN_COINID_NAME);
-        nbgl_pageNavigationInfo_t info = {.activePage = 0,
-                                          .nbPages = 0,
-                                          .navType = NAV_WITH_TAP,
-                                          .progressIndicator = true,
-                                          .navWithTap.backButton = true,
-                                          .navWithTap.backToken = BACK_TOKEN,
-                                          .navWithTap.nextPageText = NULL,
-                                          .navWithTap.quitText = "Reject transaction",
-                                          .quitToken = CANCEL_TOKEN,
-                                          .tuneId = TUNE_TAP_CASUAL};
+    releaseContext();
+    snprintf(text, sizeof(text), "Sign transaction\nto send %s?",
+             COIN_COINID_NAME);
+    nbgl_pageNavigationInfo_t info = {.activePage = 0,
+                                      .nbPages = 0,
+                                      .navType = NAV_WITH_TAP,
+                                      .progressIndicator = true,
+                                      .navWithTap.backButton = true,
+                                      .navWithTap.backToken = BACK_TOKEN,
+                                      .navWithTap.nextPageText = NULL,
+                                      .navWithTap.quitText =
+                                          "Reject transaction",
+                                      .quitToken = CANCEL_TOKEN,
+                                      .tuneId = TUNE_TAP_CASUAL};
 
-        nbgl_pageContent_t content = {.type = INFO_LONG_PRESS,
-                                      .infoLongPress.icon = &COIN_ICON,
-                                      .infoLongPress.text = text,
-                                      .infoLongPress.longPressText = "Hold to sign",
-                                      .infoLongPress.longPressToken = CONFIRM_TOKEN,
-                                      .infoLongPress.tuneId = TUNE_TAP_NEXT};
+    nbgl_pageContent_t content = {.type = INFO_LONG_PRESS,
+                                  .infoLongPress.icon = &COIN_ICON,
+                                  .infoLongPress.text = text,
+                                  .infoLongPress.longPressText = "Hold to sign",
+                                  .infoLongPress.longPressToken = CONFIRM_TOKEN,
+                                  .infoLongPress.tuneId = TUNE_TAP_NEXT};
 
-        pageContext = nbgl_pageDrawGenericContent(&transaction_finish_callback, &info, &content);
+    pageContext = nbgl_pageDrawGenericContent(&transaction_finish_callback,
+                                              &info, &content);
   } else {
     prompt_cancel_transaction();
   }
@@ -232,36 +229,34 @@ static void continue_review(flow_type_t type) {
   uiContext.infoLongPress.text = uiContext.prompt;
 
   switch (type) {
-      case MESSAGE_TYPE: 
-          nbgl_useCaseStaticReview(&uiContext.tagValueList, &uiContext.infoLongPress,
-                  "Cancel", message_review_callback);
-          break;
+  case MESSAGE_TYPE:
+    nbgl_useCaseStaticReview(&uiContext.tagValueList, &uiContext.infoLongPress,
+                             "Cancel", message_review_callback);
+    break;
 
-      case TRANSACTION_TYPE:
-          nbgl_useCaseStaticReview(&uiContext.tagValueList, &uiContext.infoLongPress,
-                  "Cancel", transaction_review_callback);
-          break;
+  case TRANSACTION_TYPE:
+    nbgl_useCaseStaticReview(&uiContext.tagValueList, &uiContext.infoLongPress,
+                             "Cancel", transaction_review_callback);
+    break;
   }
 }
 
-static void continue_message_review(void) {
-    continue_review(MESSAGE_TYPE);
-}
+static void continue_message_review(void) { continue_review(MESSAGE_TYPE); }
 
 // UI Start
 static void ui_start(void (*cb)(void), flow_type_t type) {
   switch (type) {
-      case MESSAGE_TYPE: 
-          nbgl_useCaseReviewStart(&COIN_ICON, "Review\nmessage", NULL,
-                  "Cancel", continue_message_review,
-                  prompt_cancel_message);
-          break;
+  case MESSAGE_TYPE:
+    nbgl_useCaseReviewStart(&COIN_ICON, "Review\nmessage", NULL, "Cancel",
+                            continue_message_review, prompt_cancel_message);
+    break;
 
-      case TRANSACTION_TYPE:
-          snprintf(text, sizeof(text), "Review transaction\nto send %s", COIN_COINID_NAME);
-          nbgl_useCaseReviewStart(&COIN_ICON, text, NULL,
-                  "Cancel", cb, prompt_cancel_transaction);
-          break;
+  case TRANSACTION_TYPE:
+    snprintf(text, sizeof(text), "Review transaction\nto send %s",
+             COIN_COINID_NAME);
+    nbgl_useCaseReviewStart(&COIN_ICON, text, NULL, "Cancel", cb,
+                            prompt_cancel_transaction);
+    break;
   }
 }
 
@@ -284,13 +279,14 @@ static void ui_message_start(void) {
 // Other callbacks
 static void display_pubkey_callback(void) {
   if (uiContext.nbPairs == 1) {
-      nbgl_useCaseAddressConfirmation(uiContext.tagValues[0].value, status_callback);
-  }
-  else {
-      uiContext.tagValueList.pairs = &uiContext.tagValues[1];
-      uiContext.tagValueList.nbPairs = 1;
+    nbgl_useCaseAddressConfirmation(uiContext.tagValues[0].value,
+                                    status_callback);
+  } else {
+    uiContext.tagValueList.pairs = &uiContext.tagValues[1];
+    uiContext.tagValueList.nbPairs = 1;
 
-      nbgl_useCaseAddressConfirmationExt(uiContext.tagValues[0].value, status_callback, &uiContext.tagValueList);
+    nbgl_useCaseAddressConfirmationExt(
+        uiContext.tagValues[0].value, status_callback, &uiContext.tagValueList);
   }
 }
 
@@ -310,8 +306,7 @@ void ui_confirm_single_flow(void) {
     ui_transaction_start(ui_confirm_single_flow);
   } else {
     snprintf(vars.tmp.feesAmount, sizeof(vars.tmp.feesAmount), "#%d",
-             context.totalOutputs - context.remainingOutputs +
-                 1);
+             context.totalOutputs - context.remainingOutputs + 1);
 
     uiContext.tagValues[0].item = "Output";
     uiContext.tagValues[0].value = vars.tmp.feesAmount;
@@ -324,17 +319,17 @@ void ui_confirm_single_flow(void) {
 
     uiContext.nbPairs = 3;
 
-    nbgl_pageNavigationInfo_t info = {
-        .activePage = 0,
-        .nbPages = 0,
-        .navType = NAV_WITH_TAP,
-        .progressIndicator = true,
-        .navWithTap.backButton = false,
-        .navWithTap.nextPageText = "Tap to continue",
-        .navWithTap.nextPageToken = 1,
-        .navWithTap.quitText = "Cancel",
-        .quitToken = 0,
-        .tuneId = TUNE_TAP_CASUAL};
+    nbgl_pageNavigationInfo_t info = {.activePage = 0,
+                                      .nbPages = 0,
+                                      .navType = NAV_WITH_TAP,
+                                      .progressIndicator = true,
+                                      .navWithTap.backButton = false,
+                                      .navWithTap.nextPageText =
+                                          "Tap to continue",
+                                      .navWithTap.nextPageToken = 1,
+                                      .navWithTap.quitText = "Cancel",
+                                      .quitToken = 0,
+                                      .tuneId = TUNE_TAP_CASUAL};
 
     nbgl_pageContent_t content = {
         .type = TAG_VALUE_LIST,
@@ -361,7 +356,8 @@ void ui_finalize_flow(void) {
                                     .navType = NAV_WITH_TAP,
                                     .progressIndicator = true,
                                     .navWithTap.backButton = false,
-                                    .navWithTap.nextPageText = "Tap to continue",
+                                    .navWithTap.nextPageText =
+                                        "Tap to continue",
                                     .navWithTap.nextPageToken = 1,
                                     .navWithTap.quitText = "Reject transaction",
                                     .quitToken = 0,
@@ -370,10 +366,10 @@ void ui_finalize_flow(void) {
   nbgl_pageContent_t content = {
       .type = TAG_VALUE_LIST,
       .tagValueList.nbPairs = uiContext.nbPairs,
-      .tagValueList.pairs = (nbgl_layoutTagValue_t *)uiContext.tagValues
-  };
+      .tagValueList.pairs = (nbgl_layoutTagValue_t *)uiContext.tagValues};
 
-  pageContext = nbgl_pageDrawGenericContent(&transaction_fee_callback, &info, &content);
+  pageContext =
+      nbgl_pageDrawGenericContent(&transaction_fee_callback, &info, &content);
   nbgl_refresh();
 }
 
@@ -417,8 +413,8 @@ void ui_request_pubkey_approval_flow(void) {
 
     ui_transaction_start(ui_request_pubkey_approval_flow);
   } else {
-    nbgl_useCaseChoice(&COIN_ICON, "Export public key", NULL,
-                       "Approve", "Reject", transaction_review_callback);
+    nbgl_useCaseChoice(&COIN_ICON, "Export public key", NULL, "Approve",
+                       "Reject", transaction_review_callback);
   }
 }
 
@@ -470,12 +466,11 @@ static void prompt_public_key(bool warning) {
   snprintf(text, sizeof(text), "Verify %s\naddress", COIN_COINID_NAME);
 
   if (warning) {
-    nbgl_useCaseReviewStart(&COIN_ICON, text, NULL,
-                            "Cancel", warn_unusual_derivation_path,
-                            abandon_status);
+    nbgl_useCaseReviewStart(&COIN_ICON, text, NULL, "Cancel",
+                            warn_unusual_derivation_path, abandon_status);
   } else {
-    nbgl_useCaseReviewStart(&COIN_ICON, text, NULL,
-                            "Cancel", display_pubkey_callback, abandon_status);
+    nbgl_useCaseReviewStart(&COIN_ICON, text, NULL, "Cancel",
+                            display_pubkey_callback, abandon_status);
   }
 }
 
@@ -510,9 +505,7 @@ void ui_display_public_with_warning_flow(void) {
   display_show_public_key(true);
 }
 
-void ui_display_public_flow(void) {
-  display_show_public_key(false);
-}
+void ui_display_public_flow(void) { display_show_public_key(false); }
 
 void ui_transaction_finish(void) {
   if (uiContext.transaction_prompt_done) {

@@ -1,21 +1,21 @@
 /*******************************************************************************
-*   Ledger App - Bitcoin Wallet
-*   (c) 2016-2019 Ledger
-*
-*  Licensed under the Apache License, Version 2.0 (the "License");
-*  you may not use this file except in compliance with the License.
-*  You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-*  Unless required by applicable law or agreed to in writing, software
-*  distributed under the License is distributed on an "AS IS" BASIS,
-*  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-*  See the License for the specific language governing permissions and
-*  limitations under the License.
-********************************************************************************/
+ *   Ledger App - Bitcoin Wallet
+ *   (c) 2016-2019 Ledger
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ ********************************************************************************/
 
-#pragma once 
+#pragma once
 
 // btchip asking the per-output UI
 unsigned int confirm_single_output(void);
@@ -39,16 +39,16 @@ void confirm_message_signature(void);
 int user_action_message_signing(unsigned char confirming);
 
 // Public key display
-uint8_t set_key_path_to_display(const unsigned char* keyPath);
+uint8_t set_key_path_to_display(const unsigned char *keyPath);
 void display_public_key(uint8_t is_derivation_path_unusual);
 int user_action_display(unsigned char confirming);
 
 void request_pubkey_approval(void);
-void request_change_path_approval(unsigned char* change_path);
+void request_change_path_approval(unsigned char *change_path);
 
 // UI to confirm processing of tx with segwit inputs
 void request_segwit_input_approval(void);
 
 // UI to confirm signing path
-void request_sign_path_approval(unsigned char* change_path);
+void request_sign_path_approval(unsigned char *change_path);
 int user_action_signtx(unsigned char confirming, unsigned char direct);
