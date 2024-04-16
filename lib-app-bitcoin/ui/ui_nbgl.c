@@ -23,40 +23,16 @@
 
 #include "extensions.h"
 
-typedef enum { MESSAGE_TYPE, TRANSACTION_TYPE } flow_type_t;
+static nbgl_layoutTagValue_t pairs[3];
+static nbgl_layoutTagValueList_t pairList;
 
-enum {
-  CANCEL_TOKEN,
-  CONFIRM_TOKEN,
-  BACK_TOKEN,
-};
+bool transaction_prompt_done;
 
-typedef struct {
-  bool transaction_prompt_done;
-  const char *prompt_cancel_message;
-  const char *prompt; // text displayed in last transaction page
-  const char *
-      approved_status; // text displayed in confirmation page (after long press)
-  const char *abandon_status; // text displayed in rejection page (after reject
-                              // confirmed)
-  void (*approved_cb)(void);
-  void (*abandon_cb)(void);
-  nbgl_layoutTagValueList_t tagValueList;
-  nbgl_pageInfoLongPress_t infoLongPress;
-  nbgl_layoutTagValue_t tagValues[4];
-  uint8_t nbPairs;
-} UiContext_t;
-
+static void (*start_transaction_callback)(bool);
 static char text[40];
-static nbgl_page_t *pageContext;
-static UiContext_t uiContext = {.transaction_prompt_done = 0};
 
 // User action callbacks
-static void approved_user_action_callback(void) {
-  if (!user_action(1)) {
-    ui_idle_flow();
-  }
-}
+static void approved_user_action_callback(void) { user_action(1); }
 
 static void approved_user_action_processing_callback(void) {
   if (!user_action(1)) {
@@ -64,460 +40,291 @@ static void approved_user_action_processing_callback(void) {
   }
 }
 
-static void abandon_user_action_callback(void) {
-  if (!user_action(0)) {
-    ui_idle_flow();
-  }
-}
+static void abandon_user_action_callback(void) { user_action(0); }
 
 static void approved_user_action_message_signing_callback(void) {
   user_action_message_signing(1);
-  ui_idle_flow();
 }
 
 static void abandon_user_action_message_signing_callback(void) {
   user_action_message_signing(0);
-  ui_idle_flow();
-}
-
-static void approved_user_action_display_processing_callback(void) {
-  user_action_display(1);
-  nbgl_useCaseSpinner("Processing");
 }
 
 static void approved_user_action_display_callback(void) {
   user_action_display(1);
-  ui_idle_flow();
 }
 
 static void abandon_user_action_display_callback(void) {
   user_action_display(0);
-  ui_idle_flow();
 }
 
 static void approved_user_action_signtx_callback(void) {
   user_action_signtx(1, 0);
-  ui_idle_flow();
 }
 
 static void abandon_user_action_signtx_callback(void) {
+  transaction_prompt_done = false;
   user_action_signtx(0, 0);
-  ui_idle_flow();
-}
-
-static void releaseContext(void) {
-  if (pageContext != NULL) {
-    nbgl_pageRelease(pageContext);
-    pageContext = NULL;
-  }
-}
-
-// Status
-static void abandon_status(void) {
-  nbgl_useCaseStatus(uiContext.abandon_status, false, uiContext.abandon_cb);
-  releaseContext();
-  uiContext.transaction_prompt_done = false;
-}
-
-static void approved_status(void) {
-  nbgl_useCaseStatus(uiContext.approved_status, true, uiContext.approved_cb);
-  releaseContext();
-  uiContext.transaction_prompt_done = false;
-}
-
-static void status_callback(bool confirm) {
-  if (confirm) {
-    approved_status();
-  } else {
-    abandon_status();
-  }
-}
-
-// Prompt Cancel
-static void prompt_cancel(flow_type_t type) {
-  switch (type) {
-  case MESSAGE_TYPE:
-    nbgl_useCaseConfirm("Reject message", NULL, "Yes, Reject",
-                        "Go back to message", abandon_status);
-    break;
-
-  case TRANSACTION_TYPE:
-    nbgl_useCaseConfirm("Reject transaction", NULL, "Yes, Reject",
-                        "Go back to transaction", abandon_status);
-    break;
-  }
-}
-
-static void prompt_cancel_message(void) { prompt_cancel(MESSAGE_TYPE); }
-
-static void prompt_cancel_transaction(void) { prompt_cancel(TRANSACTION_TYPE); }
-
-static void transaction_review_callback(bool token) {
-  if (token) {
-    releaseContext();
-    uiContext.approved_cb();
-  } else {
-    prompt_cancel_transaction();
-  }
-}
-
-static void transaction_finish_callback(int token, uint8_t index) {
-  (void)index;
-  switch (token) {
-  case CANCEL_TOKEN:
-    prompt_cancel_transaction();
-    break;
-  case CONFIRM_TOKEN:
-    releaseContext();
-    uiContext.approved_cb();
-    break;
-  case BACK_TOKEN:
-    ui_finalize_flow();
-    break;
-  }
-}
-
-static void transaction_fee_callback(int token, uint8_t index) {
-  (void)index;
-  if (token) {
-    releaseContext();
-    snprintf(text, sizeof(text), "Sign transaction\nto send %s?",
-             COIN_COINID_NAME);
-    nbgl_pageNavigationInfo_t info = {.activePage = 0,
-                                      .nbPages = 0,
-                                      .navType = NAV_WITH_TAP,
-                                      .progressIndicator = true,
-                                      .navWithTap.backButton = true,
-                                      .navWithTap.backToken = BACK_TOKEN,
-                                      .navWithTap.nextPageText = NULL,
-                                      .navWithTap.quitText =
-                                          "Reject transaction",
-                                      .quitToken = CANCEL_TOKEN,
-                                      .tuneId = TUNE_TAP_CASUAL};
-
-    nbgl_pageContent_t content = {.type = INFO_LONG_PRESS,
-                                  .infoLongPress.icon = &COIN_ICON,
-                                  .infoLongPress.text = text,
-                                  .infoLongPress.longPressText = "Hold to sign",
-                                  .infoLongPress.longPressToken = CONFIRM_TOKEN,
-                                  .infoLongPress.tuneId = TUNE_TAP_NEXT};
-
-    pageContext = nbgl_pageDrawGenericContent(&transaction_finish_callback,
-                                              &info, &content);
-  } else {
-    prompt_cancel_transaction();
-  }
-}
-
-static void message_review_callback(bool token) {
-  if (token) {
-    approved_status();
-  } else {
-    prompt_cancel_message();
-  }
-}
-
-// Continue Review
-static void continue_review(flow_type_t type) {
-  uiContext.tagValueList.pairs = uiContext.tagValues;
-  uiContext.tagValueList.nbPairs = uiContext.nbPairs;
-
-  uiContext.infoLongPress.icon = &COIN_ICON;
-  uiContext.infoLongPress.longPressText = "Hold to sign";
-  uiContext.infoLongPress.longPressToken = 1;
-  uiContext.infoLongPress.tuneId = TUNE_TAP_CASUAL;
-  uiContext.infoLongPress.text = uiContext.prompt;
-
-  switch (type) {
-  case MESSAGE_TYPE:
-    nbgl_useCaseStaticReview(&uiContext.tagValueList, &uiContext.infoLongPress,
-                             "Cancel", message_review_callback);
-    break;
-
-  case TRANSACTION_TYPE:
-    nbgl_useCaseStaticReview(&uiContext.tagValueList, &uiContext.infoLongPress,
-                             "Cancel", transaction_review_callback);
-    break;
-  }
-}
-
-static void continue_message_review(void) { continue_review(MESSAGE_TYPE); }
-
-// UI Start
-static void ui_start(void (*cb)(void), flow_type_t type) {
-  switch (type) {
-  case MESSAGE_TYPE:
-    nbgl_useCaseReviewStart(&COIN_ICON, "Review\nmessage", NULL, "Cancel",
-                            continue_message_review, prompt_cancel_message);
-    break;
-
-  case TRANSACTION_TYPE:
-    snprintf(text, sizeof(text), "Review transaction\nto send %s",
-             COIN_COINID_NAME);
-    nbgl_useCaseReviewStart(&COIN_ICON, text, NULL, "Cancel", cb,
-                            prompt_cancel_transaction);
-    break;
-  }
-}
-
-static void ui_transaction_start(void (*cb)(void)) {
-  uiContext.abandon_status = "Transaction\nrejected";
-  uiContext.approved_status = "TRANSACTION\nCONFIRMED";
-  uiContext.prompt_cancel_message = "Reject\nTransaction ?";
-  uiContext.prompt = "Sign transaction";
-  ui_start(cb, TRANSACTION_TYPE);
-}
-
-static void ui_message_start(void) {
-  uiContext.abandon_status = "Message\nrejected";
-  uiContext.approved_status = "MESSAGE\nSIGNED";
-  uiContext.prompt_cancel_message = "Reject\nMessage ?";
-  uiContext.prompt = "Sign message";
-  ui_start(NULL, MESSAGE_TYPE);
-}
-
-// Other callbacks
-static void display_pubkey_callback(void) {
-  if (uiContext.nbPairs == 1) {
-    nbgl_useCaseAddressConfirmation(uiContext.tagValues[0].value,
-                                    status_callback);
-  } else {
-    uiContext.tagValueList.pairs = &uiContext.tagValues[1];
-    uiContext.tagValueList.nbPairs = 1;
-
-    nbgl_useCaseAddressConfirmationExt(
-        uiContext.tagValues[0].value, status_callback, &uiContext.tagValueList);
-  }
+  nbgl_useCaseReviewStatus(STATUS_TYPE_TRANSACTION_REJECTED, ui_idle_flow);
 }
 
 // Flow entry point
-static void single_flow_callback(int token, uint8_t index) {
-  UNUSED(index);
-  transaction_review_callback(token);
+static void sign_transaction_callback(bool confirmed) {
+  if (confirmed) {
+    approved_user_action_processing_callback();
+  } else {
+    transaction_prompt_done = false;
+    abandon_user_action_callback();
+    nbgl_useCaseReviewStatus(STATUS_TYPE_TRANSACTION_REJECTED, ui_idle_flow);
+  }
 }
 
-void ui_confirm_single_flow(void) {
-  uiContext.approved_cb = approved_user_action_processing_callback;
-  uiContext.abandon_cb = abandon_user_action_callback;
-
-  if (!uiContext.transaction_prompt_done) {
-    uiContext.transaction_prompt_done = true;
-
-    ui_transaction_start(ui_confirm_single_flow);
+static void sign_transaction_processing_callback(bool confirmed) {
+  if (confirmed) {
+    approved_user_action_processing_callback();
   } else {
+    transaction_prompt_done = false;
+    abandon_user_action_callback();
+    nbgl_useCaseReviewStatus(STATUS_TYPE_TRANSACTION_REJECTED, ui_idle_flow);
+  }
+}
+
+static void continue_single_flow(bool confirmed) {
+  if (confirmed) {
     snprintf(vars.tmp.feesAmount, sizeof(vars.tmp.feesAmount), "#%d",
              context.totalOutputs - context.remainingOutputs + 1);
 
-    uiContext.tagValues[0].item = "Output";
-    uiContext.tagValues[0].value = vars.tmp.feesAmount;
+    pairs[0].item = "Output";
+    pairs[0].value = vars.tmp.feesAmount;
 
-    uiContext.tagValues[1].item = "Amount";
-    uiContext.tagValues[1].value = vars.tmp.fullAmount;
+    pairs[1].item = "Amount";
+    pairs[1].value = vars.tmp.fullAmount;
 
-    uiContext.tagValues[2].item = "Address";
-    uiContext.tagValues[2].value = vars.tmp.fullAddress;
+    pairs[2].item = "Address";
+    pairs[2].value = vars.tmp.fullAddress;
 
-    uiContext.nbPairs = 3;
+    // Setup list
+    pairList.nbMaxLinesForValue = 0;
+    pairList.nbPairs = 3;
+    pairList.pairs = pairs;
 
-    nbgl_pageNavigationInfo_t info = {.activePage = 0,
-                                      .nbPages = 0,
-                                      .navType = NAV_WITH_TAP,
-                                      .progressIndicator = true,
-                                      .navWithTap.backButton = false,
-                                      .navWithTap.nextPageText =
-                                          "Tap to continue",
-                                      .navWithTap.nextPageToken = 1,
-                                      .navWithTap.quitText = "Cancel",
-                                      .quitToken = 0,
-                                      .tuneId = TUNE_TAP_CASUAL};
+    nbgl_useCaseReviewStreamingContinue(&pairList, sign_transaction_callback);
+  } else {
+    sign_transaction_callback(false);
+  }
+}
 
-    nbgl_pageContent_t content = {
-        .type = TAG_VALUE_LIST,
-        .tagValueList.nbPairs = uiContext.nbPairs,
-        .tagValueList.pairs = (nbgl_layoutTagValue_t *)uiContext.tagValues};
-    releaseContext();
-    pageContext =
-        nbgl_pageDrawGenericContent(&single_flow_callback, &info, &content);
-    nbgl_refresh();
+static void start_transaction_flow(void) {
+  snprintf(text, sizeof(text), "Review transaction\nto send %s?",
+           COIN_COINID_NAME);
+  transaction_prompt_done = true;
+  nbgl_useCaseReviewStreamingStart(TYPE_TRANSACTION, &COIN_ICON, text, NULL,
+                                   start_transaction_callback);
+}
+
+void ui_confirm_single_flow(void) {
+  if (!transaction_prompt_done) {
+    start_transaction_callback = continue_single_flow;
+    start_transaction_flow();
+  }
+
+  else {
+    continue_single_flow(true);
+  }
+}
+
+static void finish_transaction_flow(bool choice) {
+  if (choice) {
+    nbgl_useCaseReviewStreamingFinish("Sign transaction\nto send Bitcoin?",
+                                      sign_transaction_processing_callback);
+  } else {
+    sign_transaction_processing_callback(false);
+  }
+}
+
+static void continue_finalize_flow(bool confirmed) {
+  if (confirmed) {
+    pairs[0].item = "Fees";
+    pairs[0].value = vars.tmp.feesAmount;
+
+    // Setup list
+    pairList.nbMaxLinesForValue = 0;
+    pairList.pairs = pairs;
+    pairList.nbPairs = 1;
+
+    nbgl_useCaseReviewStreamingContinue(&pairList, finish_transaction_flow);
+  } else {
+    finish_transaction_flow(false);
   }
 }
 
 void ui_finalize_flow(void) {
-  uiContext.approved_cb = approved_user_action_processing_callback;
-  uiContext.abandon_cb = abandon_user_action_callback;
+  if (!transaction_prompt_done) {
+    start_transaction_callback = continue_finalize_flow;
+    start_transaction_flow();
+  } else {
+    continue_finalize_flow(true);
+  }
+}
 
-  uiContext.tagValues[0].item = "Fees";
-  uiContext.tagValues[0].value = vars.tmp.feesAmount;
+static void request_approval_callback(bool confirmed) {
+  if (confirmed) {
+    approved_user_action_processing_callback();
+  } else {
+    transaction_prompt_done = false;
+    abandon_user_action_display_callback();
+    nbgl_useCaseReviewStatus(STATUS_TYPE_TRANSACTION_REJECTED, ui_idle_flow);
+  }
+}
 
-  uiContext.nbPairs = 1;
-
-  nbgl_pageNavigationInfo_t info = {.activePage = 0,
-                                    .nbPages = 0,
-                                    .navType = NAV_WITH_TAP,
-                                    .progressIndicator = true,
-                                    .navWithTap.backButton = false,
-                                    .navWithTap.nextPageText =
-                                        "Tap to continue",
-                                    .navWithTap.nextPageToken = 1,
-                                    .navWithTap.quitText = "Reject transaction",
-                                    .quitToken = 0,
-                                    .tuneId = TUNE_TAP_CASUAL};
-
-  nbgl_pageContent_t content = {
-      .type = TAG_VALUE_LIST,
-      .tagValueList.nbPairs = uiContext.nbPairs,
-      .tagValueList.pairs = (nbgl_layoutTagValue_t *)uiContext.tagValues};
-
-  pageContext =
-      nbgl_pageDrawGenericContent(&transaction_fee_callback, &info, &content);
-  nbgl_refresh();
+static void continue_change_path_approval_flow(bool confirmed) {
+  if (confirmed) {
+    nbgl_useCaseChoice(&C_Important_Circle_64px, "Unusual\nchange path",
+                       vars.tmp_warning.derivation_path, "Continue",
+                       "Reject if not sure", request_approval_callback);
+  } else {
+    request_approval_callback(false);
+  }
 }
 
 void ui_request_change_path_approval_flow(void) {
-  uiContext.approved_cb = approved_user_action_display_processing_callback;
-  uiContext.abandon_cb = abandon_user_action_display_callback;
-
-  if (!uiContext.transaction_prompt_done) {
-    uiContext.transaction_prompt_done = true;
-
-    ui_transaction_start(ui_request_change_path_approval_flow);
+  if (!transaction_prompt_done) {
+    start_transaction_callback = continue_change_path_approval_flow;
+    start_transaction_flow();
   } else {
-    nbgl_useCaseChoice(&C_Important_Circle_64px, "Unusual\nchange path",
-                       vars.tmp_warning.derivation_path, "Continue",
-                       "Reject if not sure", transaction_review_callback);
+    continue_change_path_approval_flow(false);
+  }
+}
+
+static void continue_segwit_input_approval_flow(bool confirmed) {
+  if (confirmed) {
+    nbgl_useCaseChoice(&C_Important_Circle_64px, "Unverified inputs",
+                       "Update Ledger Live\nor third party software",
+                       "Continue", "Reject if not sure",
+                       request_approval_callback);
+  } else {
+    request_approval_callback(false);
   }
 }
 
 void ui_request_segwit_input_approval_flow(void) {
-  uiContext.approved_cb = approved_user_action_processing_callback;
-  uiContext.abandon_cb = abandon_user_action_display_callback;
-
-  if (!uiContext.transaction_prompt_done) {
-    uiContext.transaction_prompt_done = true;
-
-    ui_transaction_start(ui_request_segwit_input_approval_flow);
+  if (!transaction_prompt_done) {
+    start_transaction_callback = continue_segwit_input_approval_flow;
+    start_transaction_flow();
   } else {
-    nbgl_useCaseChoice(&C_Important_Circle_64px, "Unverified inputs",
-                       "Update Ledger Live\nor third party software",
-                       "Continue", "Reject if not sure",
-                       transaction_review_callback);
+    continue_change_path_approval_flow(false);
   }
 }
 
 void ui_request_pubkey_approval_flow(void) {
-  uiContext.approved_cb = approved_user_action_processing_callback;
-  uiContext.abandon_cb = abandon_user_action_display_callback;
+  nbgl_useCaseChoice(&COIN_ICON, "Export public key", NULL, "Approve", "Reject",
+                     request_approval_callback);
+}
 
-  if (!uiContext.transaction_prompt_done) {
-    uiContext.transaction_prompt_done = true;
-
-    ui_transaction_start(ui_request_pubkey_approval_flow);
+static void user_action_signtx_callback(bool confirmed) {
+  if (confirmed) {
+    nbgl_useCaseSpinner("Processing");
+    approved_user_action_signtx_callback();
   } else {
-    nbgl_useCaseChoice(&COIN_ICON, "Export public key", NULL, "Approve",
-                       "Reject", transaction_review_callback);
+    abandon_user_action_signtx_callback();
   }
 }
 
 void ui_request_sign_path_approval_flow(void) {
-  uiContext.approved_cb = approved_user_action_signtx_callback;
-  uiContext.abandon_cb = abandon_user_action_signtx_callback;
-
   nbgl_useCaseChoice(&C_Important_Circle_64px, "Unusual\nsign path",
                      vars.tmp_warning.derivation_path, "Continue",
-                     "Reject if not sure", transaction_review_callback);
+                     "Reject if not sure", user_action_signtx_callback);
 }
 
+static void sign_message_callback(bool confirmed) {
+  if (confirmed) {
+    nbgl_useCaseSpinner("Processing");
+    approved_user_action_message_signing_callback();
+    nbgl_useCaseReviewStatus(STATUS_TYPE_MESSAGE_SIGNED, ui_idle_flow);
+  } else {
+    abandon_user_action_message_signing_callback();
+    nbgl_useCaseReviewStatus(STATUS_TYPE_MESSAGE_REJECTED, ui_idle_flow);
+  }
+}
 void ui_sign_message_flow(void) {
-  uiContext.approved_cb = approved_user_action_message_signing_callback;
-  uiContext.abandon_cb = abandon_user_action_message_signing_callback;
+  // Setup data to display
+  pairs[0].item = "Message hash";
+  pairs[0].value = vars.tmp.fullAddress;
 
-  uiContext.tagValues[0].item = "Message hash";
-  uiContext.tagValues[0].value = vars.tmp.fullAddress;
+  // Setup list
+  pairList.nbMaxLinesForValue = 0;
+  pairList.nbPairs = 1;
+  pairList.pairs = pairs;
 
-  uiContext.nbPairs = 1;
+  nbgl_useCaseReview(TYPE_MESSAGE, &pairList, &COIN_ICON, "Review\nmessage",
+                     NULL, "Sign message", sign_message_callback);
+}
 
-  ui_message_start();
+static void token_flow_callback(bool confirmed) {
+  if (confirmed) {
+    approved_user_action_display_callback();
+    nbgl_useCaseStatus("Token\nconfirmed", true, ui_idle_flow);
+  } else {
+    abandon_user_action_display_callback();
+    nbgl_useCaseStatus("Token\nrejected", false, ui_idle_flow);
+  }
 }
 
 void ui_display_token_flow(void) {
-  uiContext.approved_cb = approved_user_action_display_callback;
-  uiContext.abandon_cb = abandon_user_action_display_callback;
-  uiContext.abandon_status = "Token\nrejected";
-  uiContext.approved_status = "TOKEN\nCONFIRMED";
-
   nbgl_useCaseChoice(&COIN_ICON, "Confirm token",
                      (char *)G_io_apdu_buffer + 200, "Approve", "Reject",
-                     status_callback);
+                     token_flow_callback);
 }
 
-static void unusual_derivation_cb(bool status) {
-  if (status) {
-    display_pubkey_callback();
+static void public_flow_callback(bool confirmed) {
+  if (confirmed) {
+    approved_user_action_callback();
+    nbgl_useCaseReviewStatus(STATUS_TYPE_ADDRESS_VERIFIED, ui_idle_flow);
   } else {
-    abandon_status();
+    abandon_user_action_callback();
+    nbgl_useCaseReviewStatus(STATUS_TYPE_ADDRESS_REJECTED, ui_idle_flow);
   }
 }
-static void warn_unusual_derivation_path(void) {
-  nbgl_useCaseChoice(&C_Important_Circle_64px, "Unusual\nderivation path", NULL,
-                     "Continue", "Reject if not sure", unusual_derivation_cb);
-}
 
-static void prompt_public_key(bool warning) {
-  snprintf(text, sizeof(text), "Verify %s\naddress", COIN_COINID_NAME);
+static void public_post_warning_flow(bool confirmed) {
+  if (confirmed) {
+    pairs[0].item = "Derivation path";
+    pairs[0].value = vars.tmp_warning.derivation_path;
 
-  if (warning) {
-    nbgl_useCaseReviewStart(&COIN_ICON, text, NULL, "Cancel",
-                            warn_unusual_derivation_path, abandon_status);
+    // Setup list
+    pairList.nbMaxLinesForValue = 0;
+    pairList.nbPairs = 1;
+    pairList.pairs = pairs;
+
+    snprintf(text, sizeof(text), "Verify %s\naddress", COIN_COINID_NAME);
+    nbgl_useCaseAddressReview((char *)G_io_apdu_buffer + 200, &pairList,
+                              &COIN_ICON, text, NULL, public_flow_callback);
   } else {
-    nbgl_useCaseReviewStart(&COIN_ICON, text, NULL, "Cancel",
-                            display_pubkey_callback, abandon_status);
+    public_flow_callback(false);
   }
-}
-
-static void display_show_public_key(bool warning) {
-  uiContext.abandon_status = "Address verification\ncancelled";
-  uiContext.approved_status = "ADDRESS\nVERIFIED";
-  uiContext.prompt_cancel_message = "Reject\nAddress?";
-
-  uiContext.tagValues[0].item = "Address";
-  uiContext.tagValues[0].value = (char *)G_io_apdu_buffer + 200;
-
-  uiContext.nbPairs = 1;
-
-  if (warning) {
-    uiContext.approved_cb = approved_user_action_callback;
-    uiContext.abandon_cb = abandon_user_action_callback;
-
-    uiContext.tagValues[1].item = "Derivation path";
-    uiContext.tagValues[1].value = vars.tmp_warning.derivation_path;
-
-    uiContext.nbPairs = 2;
-  }
-
-  else {
-    uiContext.approved_cb = approved_user_action_display_callback;
-    uiContext.abandon_cb = abandon_user_action_display_callback;
-  }
-  prompt_public_key(warning);
 }
 
 void ui_display_public_with_warning_flow(void) {
-  display_show_public_key(true);
+  nbgl_useCaseChoice(&C_Important_Circle_64px, "Unusual\nderivation path", NULL,
+                     "Continue", "Reject if not sure",
+                     public_post_warning_flow);
 }
 
-void ui_display_public_flow(void) { display_show_public_key(false); }
+void ui_display_public_flow(void) {
+  snprintf(text, sizeof(text), "Verify %s\naddress", COIN_COINID_NAME);
+  nbgl_useCaseAddressReview((char *)G_io_apdu_buffer + 200, NULL, &COIN_ICON,
+                            text, NULL, public_flow_callback);
+}
 
 void ui_transaction_finish(void) {
-  if (uiContext.transaction_prompt_done) {
-    uiContext.approved_status = "TRANSACTION\nCONFIRMED";
-    uiContext.approved_cb = ui_idle_flow;
-    approved_status();
+  if (transaction_prompt_done) {
+    transaction_prompt_done = false;
+    nbgl_useCaseReviewStatus(STATUS_TYPE_TRANSACTION_SIGNED, ui_idle_flow);
   }
 }
 
 void ui_transaction_error(void) {
-  uiContext.abandon_status = "Transaction\nerror";
-  uiContext.approved_cb = ui_idle_flow;
-  abandon_status();
+  transaction_prompt_done = false;
+  nbgl_useCaseStatus("Transaction\nerror", false, ui_idle_flow);
 }
 #endif // HAVE_NBGL
