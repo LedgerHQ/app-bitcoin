@@ -382,7 +382,7 @@ void ui_request_change_path_approval_flow(void) {
 
     ui_transaction_start(ui_request_change_path_approval_flow);
   } else {
-    nbgl_useCaseChoice(&C_round_warning_64px, "Unusual\nchange path",
+    nbgl_useCaseChoice(&C_Important_Circle_64px, "Unusual\nchange path",
                        vars.tmp_warning.derivation_path, "Continue",
                        "Reject if not sure", transaction_review_callback);
   }
@@ -397,7 +397,7 @@ void ui_request_segwit_input_approval_flow(void) {
 
     ui_transaction_start(ui_request_segwit_input_approval_flow);
   } else {
-    nbgl_useCaseChoice(&C_round_warning_64px, "Unverified inputs",
+    nbgl_useCaseChoice(&C_Important_Circle_64px, "Unverified inputs",
                        "Update Ledger Live\nor third party software",
                        "Continue", "Reject if not sure",
                        transaction_review_callback);
@@ -422,7 +422,7 @@ void ui_request_sign_path_approval_flow(void) {
   uiContext.approved_cb = approved_user_action_signtx_callback;
   uiContext.abandon_cb = abandon_user_action_signtx_callback;
 
-  nbgl_useCaseChoice(&C_round_warning_64px, "Unusual\nsign path",
+  nbgl_useCaseChoice(&C_Important_Circle_64px, "Unusual\nsign path",
                      vars.tmp_warning.derivation_path, "Continue",
                      "Reject if not sure", transaction_review_callback);
 }
@@ -458,7 +458,7 @@ static void unusual_derivation_cb(bool status) {
   }
 }
 static void warn_unusual_derivation_path(void) {
-  nbgl_useCaseChoice(&C_round_warning_64px, "Unusual\nderivation path", NULL,
+  nbgl_useCaseChoice(&C_Important_Circle_64px, "Unusual\nderivation path", NULL,
                      "Continue", "Reject if not sure", unusual_derivation_cb);
 }
 
