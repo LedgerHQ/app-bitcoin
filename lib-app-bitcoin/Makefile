@@ -43,8 +43,10 @@ ICON_NANOS = icons/nanos_app_$(COIN).gif
 ICON_NANOX = icons/nanox_app_$(COIN).gif
 ICON_NANOSP = icons/nanox_app_$(COIN).gif
 ICON_STAX = icons/stax_app_$(COIN).gif
+# Temporary reuse of stax icons while waiting for flex icons
+ICON_FLEX = icons/stax_app_$(COIN).gif
 
-ifeq ($(TARGET_NAME),TARGET_STAX)
+ifeq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_STAX TARGET_FLEX))
 DEFINES += COIN_ICON=C_$(COIN)_64px
 DEFINES += COIN_ICON_BITMAP=C_$(COIN)_64px_bitmap
 endif
@@ -137,7 +139,9 @@ DEFINES +=COIN_KIND=$(COIN_KIND)
 DEFINES +=COIN_FLAGS=$(COIN_FLAGS)
 DEFINES +=COIN_FORKID=$(COIN_FORKID)
 
-# COIN_COINID_NAME exposed to the app as a CFLAG because it might contain spaces
+# Following defines exposed to the app as a CFLAG because it might contain spaces
 CFLAGS += -DCOIN_COINID_NAME=\"$(COIN_COINID_NAME)\"
+CFLAGS += -DAPPDEVELOPPER=\"$(APPDEVELOPPER)\"
+CFLAGS += -DAPPCOPYRIGHT=\"$(APPCOPYRIGHT)\"
 
 include $(BOLOS_SDK)/Makefile.standard_app

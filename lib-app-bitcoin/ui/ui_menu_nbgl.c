@@ -22,43 +22,22 @@
 #include "extensions.h"
 #include "nbgl_use_case.h"
 
-#define NB_INFO_FIELDS 2
-#define PAGE_START 0
-#define NB_PAGE_SETTING 1
-#define IS_TOUCHABLE true
+#define SETTING_INFO_NB 3
+static const char *const INFO_TYPES[SETTING_INFO_NB] = {"Version", "Developer",
+                                                        "Copyright"};
+static const char *const INFO_CONTENTS[SETTING_INFO_NB] = {
+    APPVERSION, APPDEVELOPPER, APPCOPYRIGHT};
 
-#define NB_SETTINGS_SWITCHES 1
-#define SWITCH_PUBLIC_KEY_SET_TOKEN FIRST_USER_TOKEN
+static const nbgl_contentInfoList_t infoList = {
+    .nbInfos = SETTING_INFO_NB,
+    .infoTypes = INFO_TYPES,
+    .infoContents = INFO_CONTENTS,
+};
 
-static char text[20];
-static const char *const infoTypes[] = {"Version", "Developer"};
-static const char *const infoContents[] = {APPVERSION, "Ledger"};
-
-static void quit_cb(void) { os_sched_exit(-1); }
-
-static bool settings_navigation_cb(uint8_t page, nbgl_pageContent_t *content) {
-  if (page == 0) {
-    content->type = INFOS_LIST;
-    content->infosList.nbInfos = NB_INFO_FIELDS;
-    content->infosList.infoTypes = (const char **)infoTypes;
-    content->infosList.infoContents = (const char **)infoContents;
-  } else {
-    return false;
-  }
-  return true;
-}
-
-static void display_settings_menu(void);
-
-static void display_settings_menu(void) {
-  snprintf(text, sizeof(text), "%s settings", COIN_COINID_NAME);
-
-  nbgl_useCaseSettings(text, PAGE_START, NB_PAGE_SETTING, IS_TOUCHABLE,
-                       ui_idle_flow, settings_navigation_cb, NULL);
-}
+static void exit(void) { os_sched_exit(-1); }
 
 void ui_idle_flow(void) {
-  nbgl_useCaseHome(COIN_COINID_NAME, &COIN_ICON, NULL, true,
-                   display_settings_menu, quit_cb);
+  nbgl_useCaseHomeAndSettings(COIN_COINID_NAME, &COIN_ICON, NULL,
+                              INIT_HOME_PAGE, NULL, &infoList, NULL, exit);
 }
 #endif // HAVE_NBGL

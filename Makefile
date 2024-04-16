@@ -24,6 +24,9 @@ APPVERSION_M = 2
 APPVERSION_N = 4
 APPVERSION_P = 0
 
+APPDEVELOPPER="Ledger"
+APPCOPYRIGHT="(c) 2024 Ledger"
+
 VARIANT_VALUES = bitcoin_testnet_legacy bitcoin_legacy bitcoin_cash bitcoin_gold litecoin dogecoin dash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte bitcoin_private firo gamecredits zclassic xsn nix lbry ravencoin hydra hydra_testnet xrhodium
 
 # Application source files
