@@ -14,7 +14,7 @@ def message_instruction_approve(model: Firmware) -> Instructions:
         instructions.same_request("Sign")
     else:
         instructions.address_confirm()
-        instructions.same_request("ADDRESS", NavInsID.USE_CASE_REVIEW_TAP,
+        instructions.same_request("Address", NavInsID.USE_CASE_REVIEW_TAP,
                                   NavInsID.USE_CASE_STATUS_DISMISS)
         instructions.confirm_message()
     return instructions

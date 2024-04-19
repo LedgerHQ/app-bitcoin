@@ -12,7 +12,7 @@ def pubkey_instruction_approve(model: Firmware) -> Instructions:
         instructions.new_request("Approve")
     else:
         instructions.address_confirm()
-        instructions.same_request("ADDRESS", NavInsID.USE_CASE_REVIEW_TAP,
+        instructions.same_request("Address", NavInsID.USE_CASE_REVIEW_TAP,
                                   NavInsID.USE_CASE_STATUS_DISMISS)
     return instructions
 
@@ -24,11 +24,11 @@ def pubkey_instruction_warning_approve(model: Firmware) -> Instructions:
         instructions.new_request("Approve")
         instructions.same_request("Approve")
     else:
-        instructions.new_request("Unusual", NavInsID.USE_CASE_REVIEW_TAP,
+        instructions.new_request("Unusual", NavInsID.USE_CASE_CHOICE_CONFIRM,
                                  NavInsID.USE_CASE_CHOICE_CONFIRM)
         instructions.same_request("Confirm", NavInsID.USE_CASE_ADDRESS_CONFIRMATION_TAP,
                                   NavInsID.USE_CASE_ADDRESS_CONFIRMATION_CONFIRM)
-        instructions.same_request("ADDRESS", NavInsID.USE_CASE_REVIEW_TAP,
+        instructions.same_request("Address", NavInsID.USE_CASE_REVIEW_TAP,
                                   NavInsID.USE_CASE_STATUS_DISMISS)
     return instructions
 

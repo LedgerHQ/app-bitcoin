@@ -21,6 +21,8 @@ def sign_psbt_instruction_approve(model: Firmware) -> Instructions:
         instructions.new_request("Accept")
         instructions.same_request("Accept")
     else:
+        instructions.review_start()
+        instructions.review_fees()
         instructions.confirm_transaction()
     return instructions
 
@@ -32,7 +34,8 @@ def sign_psbt_instruction_approve_2(model: Firmware) -> Instructions:
         instructions.new_request("Accept")
         instructions.new_request("Accept")
     else:
-        instructions.navigate_end_of_flow()
+        instructions.review_start()
+        instructions.review_fees(fees_on_same_request=False)
         instructions.confirm_transaction()
     return instructions
 
