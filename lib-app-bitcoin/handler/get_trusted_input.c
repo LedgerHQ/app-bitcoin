@@ -26,6 +26,24 @@
 #define GET_TRUSTED_INPUT_P1_FIRST 0x00
 #define GET_TRUSTED_INPUT_P1_NEXT 0x80
 
+/*
+ * Function: handler_get_trusted_input
+ * ------------------------------------
+ * Handles the retrieval of a trusted input for transaction signing.
+ * This function is defined as WEAK and can be overridden in the application own
+ * sources.
+ *
+ * The function manages the retrieval of a trusted input for transaction
+ * signing. It initializes transaction parameters, including the target input
+ * and hash option. It then parses the transaction data, processes the trusted
+ * input, and prepares the response.
+ *
+ * Parameters:
+ *   - buffer: Pointer to the buffer containing transaction data.
+ *   - p1: Instruction parameter 1.
+ *   - p2: Instruction parameter 2.
+ *
+ */
 WEAK unsigned short handler_get_trusted_input(buffer_t *buffer, uint8_t p1,
                                               uint8_t p2) {
   unsigned char dataOffset = 0;

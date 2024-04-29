@@ -57,6 +57,18 @@ const unsigned char ZEN_OUTPUT_SCRIPT_POST[] = {
     0xb4              // OP_CHECKBLOCKATHEIGHT
 };                    // BIP0115 Replay Protection
 
+/*
+ * Function: output_script_is_regular
+ * -----------------------------------
+ * Checks if the given output script is a regular script.
+ *
+ * Parameters:
+ *   - buffer: Pointer to the output script buffer.
+ *
+ * Returns:
+ *   - 1 if the output script is regular
+ *   - 0 otherwise.
+ */
 WEAK unsigned char output_script_is_regular(unsigned char *buffer) {
   if (COIN_NATIVE_SEGWIT_PREFIX) {
     if ((memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
@@ -85,6 +97,18 @@ WEAK unsigned char output_script_is_regular(unsigned char *buffer) {
   return 0;
 }
 
+/*
+ * Function: output_script_is_p2sh
+ * --------------------------------
+ * Checks if the given output script is a pay-to-script-hash (P2SH) script.
+ *
+ * Parameters:
+ *   - buffer: Pointer to the output script buffer.
+ *
+ * Returns:
+ *   - 1 if the output script is a P2SH script.
+ *   - 0 otherwise.
+ */
 WEAK unsigned char output_script_is_p2sh(unsigned char *buffer) {
   if ((memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE,
               sizeof(TRANSACTION_OUTPUT_SCRIPT_P2SH_PRE)) == 0) &&
@@ -105,6 +129,19 @@ WEAK unsigned char output_script_is_p2sh(unsigned char *buffer) {
   return 0;
 }
 
+/*
+ * Function: output_script_is_native_witness
+ * ------------------------------------------
+ * Checks if the given output script is a native witness script (P2WPKH or
+ * P2WSH).
+ *
+ * Parameters:
+ *   - buffer: Pointer to the output script buffer.
+ *
+ * Returns:
+ *   - 1 if the output script is a native witness script.
+ *   - 0 otherwise.
+ */
 WEAK unsigned char output_script_is_native_witness(unsigned char *buffer) {
   if (COIN_NATIVE_SEGWIT_PREFIX) {
     if ((memcmp(buffer, TRANSACTION_OUTPUT_SCRIPT_P2WPKH_PRE,
@@ -117,6 +154,19 @@ WEAK unsigned char output_script_is_native_witness(unsigned char *buffer) {
   return 0;
 }
 
+/*
+ * Function: output_script_is_op_return
+ * -------------------------------------
+ * Checks if the given output script is an OP_RETURN script.
+ *
+ * Parameters:
+ *   - buffer: Pointer to the output script buffer.
+ *
+ * Returns:
+ *   - 1 if the output script is an OP_RETURN script.
+ *   - 0 otherwise.
+ *
+ */
 WEAK unsigned char output_script_is_op_return(unsigned char *buffer) {
   if (COIN_KIND == COIN_KIND_BITCOIN_CASH) {
     return ((buffer[1] == 0x6A) ||
@@ -126,6 +176,20 @@ WEAK unsigned char output_script_is_op_return(unsigned char *buffer) {
   }
 }
 
+/*
+ * Function: output_script_is_op_create_or_call
+ * ---------------------------------------------
+ * Checks if the given output script is an OP_CREATE or OP_CALL script.
+ *
+ * Parameters:
+ *   - buffer: Pointer to the output script buffer.
+ *   - size: Size of the output script.
+ *   - value: Value to match against the last byte of the script.
+ *
+ * Returns:
+ *   - 1 if the output script is an OP_CREATE or OP_CALL script.
+ *   - 0 otherwise.
+ */
 WEAK unsigned char output_script_is_op_create_or_call(unsigned char *buffer,
                                                       size_t size,
                                                       unsigned char value) {
@@ -134,11 +198,37 @@ WEAK unsigned char output_script_is_op_create_or_call(unsigned char *buffer,
           (buffer[0] < size) && (buffer[buffer[0]] == value));
 }
 
+/*
+ * Function: output_script_is_op_create
+ * -------------------------------------
+ * Checks if the given output script is an OP_CREATE script.
+ *
+ * Parameters:
+ *   - buffer: Pointer to the output script buffer.
+ *   - size: Size of the output script.
+ *
+ * Returns:
+ *   - 1 if the output script is an OP_CREATE script.
+ *   - 0 otherwise.
+ */
 WEAK unsigned char output_script_is_op_create(unsigned char *buffer,
                                               size_t size) {
   return output_script_is_op_create_or_call(buffer, size, 0xC1);
 }
 
+/*
+ * Function: output_script_is_op_call
+ * -----------------------------------
+ * Checks if the given output script is an OP_CALL script.
+ *
+ * Parameters:
+ *   - buffer: Pointer to the output script buffer.
+ *   - size: Size of the output script.
+ *
+ * Returns:
+ *   - 1 if the output script is an OP_CALL script.
+ *   - 0 otherwise.
+ */
 WEAK unsigned char output_script_is_op_call(unsigned char *buffer,
                                             size_t size) {
   return output_script_is_op_create_or_call(buffer, size, 0xC2);

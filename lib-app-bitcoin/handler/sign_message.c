@@ -246,6 +246,23 @@ discard:
   return io_send_sw(sw);
 }
 
+/*
+ * Function: handler_sign_message
+ * ------------------------------
+ * Handles the signing of a message.
+ * This function is defined as WEAK and can be overridden in the application own
+ * sources.
+ *
+ * The function checks if called from the swap application, in which case it
+ * sends an error status code indicating security status not satisfied. All the
+ * logic for message signing is done in the sign_message_internal function.
+ *
+ * Parameters:
+ *   - buffer: Pointer to the buffer containing the message data.
+ *   - p1: Instruction parameter 1.
+ *   - p2: Instruction parameter 2.
+ *
+ */
 WEAK unsigned short handler_sign_message(buffer_t *buffer, uint8_t p1,
                                          uint8_t p2) {
   if (G_called_from_swap) {

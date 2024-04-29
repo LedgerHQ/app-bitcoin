@@ -54,6 +54,23 @@ static int get_public_key_chain_code(const unsigned char *keyPath,
   return keyLength;
 }
 
+/*
+ * Function: handler_get_wallet_public_key
+ * ---------------------------------------
+ * Handles the retrieval of the wallet's public key.
+ * This function is defined as WEAK and can be overridden in the application own
+ * sources.
+ *
+ * The function retrieves the wallet's public key and optionally displays it.
+ * It validates input parameters, computes the public key and chain code,
+ * encodes them, and prepares the response. If the public key is to be
+ * displayed, it ensures the key length is appropriate and sends it for display.
+ * Parameters:
+ *   - buffer: Pointer to the buffer containing the instruction data.
+ *   - p1: Instruction parameter 1.
+ *   - p2: Instruction parameter 2.
+ *
+ */
 WEAK unsigned short handler_get_wallet_public_key(buffer_t *buffer, uint8_t p1,
                                                   uint8_t p2) {
   unsigned char keyLength;

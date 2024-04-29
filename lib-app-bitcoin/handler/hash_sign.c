@@ -35,6 +35,23 @@
 #define COIN_FORKID 0
 #endif
 
+/*
+ * Function: handler_hash_sign
+ * ----------------------------
+ * Handles the signing process for hashing a transaction.
+ * This function is defined as WEAK and can be overridden in the application own
+ * sources.
+ *
+ * The function verifies parameters handles Zcash-specific scenarios, reads
+ * transaction parameters, finalizes the hash, checks for path enforcement, and
+ * initiates signing. It also handles specific cases for Bitcoin Cash and sets
+ * the appropriate sighash type. After hashing and signing, it sends the
+ * response. Parameters:
+ *   - buffer: Pointer to the buffer containing transaction data.
+ *   - p1: Instruction parameter 1.
+ *   - p2: Instruction parameter 2.
+ *
+ */
 WEAK unsigned short handler_hash_sign(buffer_t *buffer, uint8_t p1,
                                       uint8_t p2) {
   unsigned long int lockTime;

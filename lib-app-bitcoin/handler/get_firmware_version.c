@@ -33,6 +33,14 @@
 
 #define TCS_LOADER_PATCH_VERSION 0
 
+/*
+ * Function: handler_get_firmware_version
+ * ---------------------------------------
+ * Retrieves the firmware version information.
+ *
+ * Returns:
+ *   - -1 if the operation is unsuccessful.
+ */
 WEAK unsigned short handler_get_firmware_version() {
 
   G_io_apdu_buffer[0] = FEATURES;

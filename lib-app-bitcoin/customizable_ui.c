@@ -25,6 +25,19 @@
 #include "read.h"
 #include "segwit_addr.h"
 
+/*
+ * Function: get_address_from_output_script
+ * -----------------------------------------
+ * Retrieves the address from a given output script and stores it in the
+ * provided buffer.
+ *
+ * Parameters:
+ *   - script: Pointer to the output script data.
+ *   - script_size: Size of the output script.
+ *   - out: Pointer to the buffer where the address will be stored.
+ *   - out_size: Size of the output buffer.
+ *
+ */
 WEAK void get_address_from_output_script(unsigned char *script, int script_size,
                                          char *out, int out_size) {
   if (output_script_is_op_return(script)) {
@@ -83,6 +96,15 @@ WEAK void get_address_from_output_script(unsigned char *script, int script_size,
   }
 }
 
+/*
+ * Function: prepare_fees
+ * -----------------------
+ * Prepares the fee amount for display
+ *
+ * Returns:
+ *   - 1 if the fee amount is successfully prepared.
+ *   - 0 if an error occurs.
+ */
 WEAK uint8_t prepare_fees(void) {
   if (context.transactionContext.relaxed) {
     memmove(vars.tmp.feesAmount, "UNKNOWN", 7);

@@ -21,6 +21,14 @@
 #include "apdu_constants.h"
 #include "context.h"
 
+/*
+ * Function: handler_get_coin_version
+ * -----------------------------------
+ * Handles the retrieval of coin version information.
+ *
+ * Returns:
+ *   - SW_OK if the operation is successful.
+ */
 WEAK unsigned short handler_get_coin_version(void) {
   uint8_t offset = 0;
   size_t string_size;

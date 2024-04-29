@@ -40,6 +40,26 @@
   (buffer->ptr[0] == 0x01 && buffer->ptr[1] == TRUSTED_INPUT_TOTAL_SIZE &&     \
    buffer->ptr[2] == MAGIC_TRUSTED_INPUT && buffer->ptr[3] == 0x00)
 
+/*
+ * Function: handler_hash_input_start
+ * -----------------------------------
+ * Handles the start of input hashing for a transaction.
+ * This function is defined as WEAK and can be overridden in the application own
+ * sources.
+ *
+ * The function manages the initialization and parsing of input data for hashing
+ * a transaction. It sets transaction parameters based on the instruction
+ * parameters, including flags for SegWit, CashAddr, Overwinter, and Sapling. It
+ * handles warnings for SegWit inputs, requests approval if needed, and starts
+ * parsing the transaction data for signature. Finally, it sends the response
+ * after parsing is complete.
+ *
+ * Parameters:
+ *   - buffer: Pointer to the buffer containing transaction data.
+ *   - p1: Instruction parameter 1.
+ *   - p2: Instruction parameter 2.
+ *
+ */
 WEAK unsigned short handler_hash_input_start(buffer_t *buffer, uint8_t p1,
                                              uint8_t p2) {
   if (p1 == P1_FIRST) {
