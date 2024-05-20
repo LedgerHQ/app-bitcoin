@@ -1,89 +1,171 @@
-from hashlib import sha256
-import json
 from pathlib import Path
-from typing import Tuple, List, Dict, Any
-import pytest
 
-from ecdsa.curves import SECP256k1
-from ecdsa.keys import VerifyingKey
-from ecdsa.util import sigdecode_der
+from ledger_bitcoin import WalletPolicy, PartialSignature
 
-from bitcoin_client.hwi.serialization import CTransaction
-from bitcoin_client.exception import ConditionOfUseNotSatisfiedError
-from utils import automation
+from ledger_bitcoin.psbt import PSBT
+
+from ragger_bitcoin import RaggerClient
+from ragger_bitcoin.ragger_instructions import Instructions
+from ragger.navigator import Navigator
+from ragger.firmware import Firmware
+tests_root: Path = Path(__file__).parent
 
 
-def sign_from_json(cmd, filepath: Path):
-    tx_dct: Dict[str, Any] = json.load(open(filepath, "r"))
+CURRENCY_TICKER = "TEST"
 
-    raw_utxos: List[Tuple[bytes, int]] = [
-        (bytes.fromhex(utxo_dct["raw"]), output_index)
-        for utxo_dct in tx_dct["utxos"]
-        for output_index in utxo_dct["output_indexes"]
-    ]
-    to_address: str = tx_dct["to"]
-    to_amount: int = tx_dct["amount"]
-    fees: int = tx_dct["fees"]
 
-    sigs = cmd.sign_new_tx(address=to_address,
-                           amount=to_amount,
-                           fees=fees,
-                           change_path=tx_dct["change_path"],
-                           sign_paths=tx_dct["sign_paths"],
-                           raw_utxos=raw_utxos,
-                           lock_time=tx_dct["lock_time"])
+def sign_psbt_instruction_approve(model: Firmware) -> Instructions:
+    instructions = Instructions(model)
 
-    expected_tx = CTransaction.from_bytes(bytes.fromhex(tx_dct["raw"]))
-    witnesses = expected_tx.wit.vtxinwit
-    for witness, (tx_hash_digest, sign_pub_key, (v, der_sig)) in zip(witnesses, sigs):
-        expected_der_sig, expected_pubkey = witness.scriptWitness.stack
-        assert expected_pubkey == sign_pub_key
-        assert expected_der_sig == der_sig
-        pk: VerifyingKey = VerifyingKey.from_string(
-            sign_pub_key,
-            curve=SECP256k1,
-            hashfunc=sha256
+    if model.name.startswith("nano"):
+        instructions.new_request("Accept")
+        instructions.same_request("Accept")
+    else:
+        instructions.review_start()
+        instructions.review_fees()
+        instructions.confirm_transaction()
+    return instructions
+
+
+def sign_psbt_instruction_approve_2(model: Firmware) -> Instructions:
+    instructions = Instructions(model)
+
+    if model.name.startswith("nano"):
+        instructions.new_request("Accept")
+        instructions.new_request("Accept")
+    else:
+        instructions.review_start()
+        instructions.review_fees(fees_on_same_request=False)
+        instructions.confirm_transaction()
+    return instructions
+
+
+def open_psbt_from_file(filename: str) -> PSBT:
+    raw_psbt_base64 = open(filename, "r").read()
+
+    psbt = PSBT()
+    psbt.deserialize(raw_psbt_base64)
+    return psbt
+
+
+def test_sign_psbt_singlesig_pkh_1to1(
+        navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+
+    # PSBT for a legacy 1-input 1-output spend (no change address)
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/pkh-1to1.psbt")
+
+    wallet = WalletPolicy(
+        "",
+        "pkh(@0/**)",
+        ["[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"],
+    )
+
+    # expected sigs:
+    # #0:
+    #  "pubkey" : "02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718",
+    #  "signature" : "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
+    result = client.sign_psbt(psbt, wallet, None, navigator=navigator,
+                              instructions=sign_psbt_instruction_approve(firmware),
+                              testname=test_name)
+
+    assert result == [(0, PartialSignature(pubkey=bytes.fromhex("02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718"), signature=bytes.fromhex(
+        "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401")))]
+
+
+def test_sign_psbt_singlesig_sh_wpkh_1to2(
+        navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+
+    # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/sh-wpkh-1to2.psbt")
+
+    wallet = WalletPolicy(
+        "",
+        "sh(wpkh(@0/**))",
+        ["[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3"],
+    )
+
+    # expected sigs:
+    # #0:
+    #  "pubkey" : "024ba3b77d933de9fa3f9583348c40f3caaf2effad5b6e244ece8abbfcc7244f67",
+    #  "signature" : "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
+    result = client.sign_psbt(psbt, wallet, None, navigator=navigator,
+                              instructions=sign_psbt_instruction_approve_2(firmware),
+                              testname=test_name)
+
+    assert len(result) == 1
+
+    assert result == [(
+        0,
+        PartialSignature(
+            pubkey=bytes.fromhex(
+                "024ba3b77d933de9fa3f9583348c40f3caaf2effad5b6e244ece8abbfcc7244f67"),
+            signature=bytes.fromhex(
+                "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
+            )
         )
-        assert pk.verify_digest(signature=der_sig[:-1],  # remove sighash
-                                digest=tx_hash_digest,
-                                sigdecode=sigdecode_der) is True
+    )]
 
 
-def test_untrusted_hash_sign_fail_nonzero_p1_p2(cmd, transport):
-    # payloads do not matter, should check and fail before checking it (but non-empty is required)
-    sw, _ = transport.exchange(0xE0, 0x48, 0x01, 0x01, None, b"\x00")
-    assert sw == 0x6B00, "should fail with p1 and p2 both non-zero"
-    sw, _ = transport.exchange(0xE0, 0x48, 0x01, 0x00, None, b"\x00")
-    assert sw == 0x6B00, "should fail with non-zero p1"
-    sw, _ = transport.exchange(0xE0, 0x48, 0x00, 0x01, None, b"\x00")
-    assert sw == 0x6B00, "should fail with non-zero p2"
+def test_sign_psbt_singlesig_wpkh_1to2(
+        navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+
+    # PSBT for a legacy 1-input 2-output spend (1 change address)
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
+
+    wallet = WalletPolicy(
+        "",
+        "wpkh(@0/**)",
+        ["[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"],
+    )
+
+    result = client.sign_psbt(psbt, wallet, None, navigator=navigator,
+                              instructions=sign_psbt_instruction_approve_2(firmware),
+                              testname=test_name)
+    result = client.sign_psbt(psbt, wallet, None, navigator=navigator,
+                              instructions=sign_psbt_instruction_approve_2(firmware),
+                              testname=f"{test_name}_2")
+
+    # expected sigs
+    # #0:
+    #   "pubkey" : "03ee2c3d98eb1f93c0a1aa8e5a4009b70eb7b44ead15f1666f136b012ad58d3068",
+    #   "signature" : "3045022100ab44f34dd7e87c9054591297a101e8500a0641d1d591878d0d23cf8096fa79e802205d12d1062d925e27b57bdcf994ecf332ad0a8e67b8fe407bab2101255da632aa01"
+
+    assert result == [(0, PartialSignature(pubkey=bytes.fromhex("03ee2c3d98eb1f93c0a1aa8e5a4009b70eb7b44ead15f1666f136b012ad58d3068"), signature=bytes.fromhex(
+        "3045022100ab44f34dd7e87c9054591297a101e8500a0641d1d591878d0d23cf8096fa79e802205d12d1062d925e27b57bdcf994ecf332ad0a8e67b8fe407bab2101255da632aa01")))]
 
 
-def test_untrusted_hash_sign_fail_short_payload(cmd, transport):
-    # should fail if the payload is less than 7 bytes
-    sw, _ = transport.exchange(0xE0, 0x48, 0x00, 0x00, None, b"\x01\x02\x03\x04\x05\x06")
-    assert sw == 0x6700
+def test_sign_psbt_singlesig_wpkh_2to2(
+        navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    # PSBT for a legacy 2-input 2-output spend (1 change address)
 
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-2to2.psbt")
 
-@automation("automations/accept.json")
-def test_sign_p2wpkh_accept(cmd):
-    for filepath in Path("data").rglob("p2wpkh/tx.json"):
-        sign_from_json(cmd, filepath)
+    wallet = WalletPolicy(
+        "",
+        "wpkh(@0/**)",
+        ["[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"],
+    )
 
+    result = client.sign_psbt(psbt, wallet, None, navigator=navigator,
+                              instructions=sign_psbt_instruction_approve(firmware),
+                              testname=test_name)
 
-@automation("automations/accept.json")
-def test_sign_p2sh_p2wpkh_accept(cmd):
-    for filepath in Path("data").rglob("p2sh-p2wpkh/tx.json"):
-        sign_from_json(cmd, filepath)
-
-
-@automation("automations/accept.json")
-def test_sign_p2pkh_accept(cmd):
-    for filepath in Path("data").rglob("p2pkh/tx.json"):
-        sign_from_json(cmd, filepath)
-
-
-@automation("automations/reject.json")
-def test_sign_fail_p2pkh_reject(cmd):
-    with pytest.raises(ConditionOfUseNotSatisfiedError):
-        sign_from_json(cmd, "./data/one-to-one/p2pkh/tx.json")
+    assert result == [(
+        0,
+        PartialSignature(
+            pubkey=bytes.fromhex(
+                "03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3"),
+            signature=bytes.fromhex(
+                "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
+            )
+        )
+    ), (
+        1,
+        PartialSignature(
+            pubkey=bytes.fromhex(
+                "0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0"),
+            signature=bytes.fromhex(
+                "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
+            )
+        )
+    )]
