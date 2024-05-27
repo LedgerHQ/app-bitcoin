@@ -35,7 +35,7 @@ VARIANT_VALUES = bitcoin_testnet_legacy bitcoin_legacy bitcoin_cash bitcoin_gold
 
 # simplify for tests
 ifndef COIN
-COIN=bitcoin_legacy
+COIN=bitcoin_testnet_legacy
 endif
 
 # Enabling DEBUG flag will enable PRINTF and disable optimizations
