@@ -27,7 +27,7 @@ APPVERSION_P = 1
 APPDEVELOPPER="Ledger"
 APPCOPYRIGHT="(c) 2024 Ledger"
 
-VARIANT_VALUES = bitcoin_testnet_legacy bitcoin_legacy bitcoin_cash bitcoin_gold litecoin dogecoin dash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte bitcoin_private firo gamecredits zclassic xsn nix lbry ravencoin hydra hydra_testnet xrhodium
+VARIANT_VALUES = bitcoin_testnet_legacy bitcoin_legacy bitcoin_cash bitcoin_gold litecoin dogecoin dash horizen komodo stratis peercoin pivx viacoin vertcoin digibyte bitcoin_private firo gamecredits zclassic nix lbry ravencoin hydra hydra_testnet xrhodium
 
 # Application source files
 # There is no additional sources for bitcoin
@@ -239,20 +239,6 @@ COIN_COINID_SHORT=\"PIVX\"
 COIN_KIND=COIN_KIND_PIVX
 APPNAME ="PivX"
 
-else ifeq ($(COIN),stealth)
-# Stealth
-BIP44_COIN_TYPE=125 
-BIP44_COIN_TYPE_2=125 
-COIN_P2PKH_VERSION=62 
-COIN_P2SH_VERSION=85 
-COIN_FAMILY=4 
-COIN_COINID=\"Stealth\" 
-COIN_COINID_NAME="Stealth"
-COIN_COINID_SHORT=\"XST\" 
-COIN_KIND=COIN_KIND_STEALTH 
-COIN_FLAGS=FLAG_PEERCOIN_UNITS\|FLAG_PEERCOIN_SUPPORT
-APPNAME ="Stealth"
-
 else ifeq ($(COIN),viacoin)
 # Viacoin
 BIP44_COIN_TYPE=14 
@@ -353,21 +339,6 @@ COIN_COINID_NAME="ZClassic"
 COIN_COINID_SHORT=\"ZCL\" 
 COIN_KIND=COIN_KIND_ZCLASSIC
 APPNAME ="ZClassic"
-
-else ifeq ($(COIN),xsn)
-# XSN mainnet
-BIP44_COIN_TYPE=384  
-BIP44_COIN_TYPE_2=384 
-COIN_P2PKH_VERSION=76 
-COIN_P2SH_VERSION=16 
-COIN_FAMILY=1 
-COIN_COINID=\"XSN\" 
-COIN_COINID_NAME="XSN"
-COIN_COINID_SHORT=\"XSN\" 
-COIN_NATIVE_SEGWIT_PREFIX=\"xc\" 
-COIN_KIND=COIN_KIND_XSN 
-COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
-APPNAME ="XSN"
 
 else ifeq ($(COIN),nix)
 # NIX
