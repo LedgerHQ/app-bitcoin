@@ -22,7 +22,7 @@
 # Application version
 APPVERSION_M = 2
 APPVERSION_N = 4
-APPVERSION_P = 1
+APPVERSION_P = 2
 
 APPDEVELOPPER="Ledger"
 APPCOPYRIGHT="(c) 2024 Ledger"
@@ -35,7 +35,7 @@ VARIANT_VALUES = bitcoin_testnet_legacy bitcoin_legacy bitcoin_cash bitcoin_gold
 
 # simplify for tests
 ifndef COIN
-COIN=bitcoin_legacy
+COIN=bitcoin_testnet_legacy
 endif
 
 # Enabling DEBUG flag will enable PRINTF and disable optimizations
