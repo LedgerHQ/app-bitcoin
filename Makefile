@@ -27,7 +27,7 @@ APPVERSION_P = 6
 APPDEVELOPPER="Ledger"
 APPCOPYRIGHT="(c) 2024 Ledger"
 
-VARIANT_VALUES = bitcoin_testnet_legacy bitcoin_legacy bitcoin_cash bitcoin_gold litecoin dogecoin dash horizen komodo stratis peercoin pivx viacoin vertcoin digibyte bitcoin_private firo gamecredits zclassic nix lbry ravencoin hydra hydra_testnet xrhodium
+VARIANT_VALUES = bitcoin_testnet_legacy bitcoin_legacy bitcoin_cash bitcoin_gold litecoin dogecoin dash horizen komodo stratis peercoin pivx viacoin vertcoin digibyte bitcoin_private firo gamecredits zclassic nix lbry ravencoin hydra hydra_testnet xrhodium ecash
 
 # Application source files
 # There is no additional sources for bitcoin
@@ -425,6 +425,21 @@ COIN_KIND=COIN_KIND_HYDRA
 COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
 APPNAME ="Hydra"
 APP_LOAD_PARAMS += --path "44'/609'"
+
+else ifeq ($(COIN),ecash)
+# eCash
+# Fork from Bitcoin Cash
+BIP44_COIN_TYPE=899
+BIP44_COIN_TYPE_2=0 
+COIN_P2PKH_VERSION=0 
+COIN_P2SH_VERSION=5 
+COIN_FAMILY=1 
+COIN_COINID=\"eCash\" 
+COIN_COINID_NAME="eCash"
+COIN_COINID_SHORT=\"XEC\" 
+COIN_KIND=COIN_KIND_ECASH 
+COIN_FORKID=0
+APPNAME ="eCash"
 
 else ifeq ($(filter clean,$(MAKECMDGOALS)),)
 $(error Unsupported COIN - use $(VARIANT_VALUES))
