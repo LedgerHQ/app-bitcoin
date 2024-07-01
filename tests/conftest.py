@@ -41,7 +41,6 @@ def device(request, hid, model):
 
     base_args = [
         speculos_executable, "./zcash-bin/app.elf",
-        "--sdk", "2.1",
         "--display", "headless"
     ]
 
