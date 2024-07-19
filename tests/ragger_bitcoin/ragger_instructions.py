@@ -43,17 +43,17 @@ class Instructions:
                          save_screenshot=save_screenshot)
 
     def review_start(self, output_count: int = 1, save_screenshot=True):
-        self.new_request("Review", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+        self.new_request("Review", NavInsID.SWIPE_CENTER_TO_LEFT, NavInsID.SWIPE_CENTER_TO_LEFT,
                          save_screenshot=save_screenshot)
         for _ in range(0, output_count):
-            self.same_request("Amount", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+            self.same_request("Amount", NavInsID.SWIPE_CENTER_TO_LEFT, NavInsID.SWIPE_CENTER_TO_LEFT,
                          save_screenshot=save_screenshot)
     def review_fees(self, fees_on_same_request: bool = True, save_screenshot=True):
         if fees_on_same_request:
-            self.same_request("Fees", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+            self.same_request("Fees", NavInsID.SWIPE_CENTER_TO_LEFT, NavInsID.SWIPE_CENTER_TO_LEFT,
                          save_screenshot=save_screenshot)
         else:
-            self.new_request("Fees", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+            self.new_request("Fees", NavInsID.SWIPE_CENTER_TO_LEFT, NavInsID.SWIPE_CENTER_TO_LEFT,
                          save_screenshot=save_screenshot)
 
     def confirm_transaction(self, save_screenshot=True):
@@ -64,9 +64,9 @@ class Instructions:
                          save_screenshot=save_screenshot)
 
     def confirm_message(self, save_screenshot=True):
-        self.new_request("Sign", NavInsID.USE_CASE_REVIEW_TAP,
+        self.new_request("Sign", NavInsID.SWIPE_CENTER_TO_LEFT,
                          NavInsID.USE_CASE_REVIEW_CONFIRM, save_screenshot=save_screenshot)
-        self.new_request("Message", NavInsID.USE_CASE_REVIEW_TAP,
+        self.new_request("Message", NavInsID.SWIPE_CENTER_TO_LEFT,
                          NavInsID.USE_CASE_STATUS_DISMISS, save_screenshot=save_screenshot)
 
     def confirm_wallet(self, save_screenshot=True):
@@ -88,7 +88,7 @@ class Instructions:
                          save_screenshot=save_screenshot)
 
     def address_confirm(self, save_screenshot=True):
-        self.new_request("Confirm", NavInsID.USE_CASE_REVIEW_TAP,
+        self.new_request("Confirm", NavInsID.SWIPE_CENTER_TO_LEFT,
                          NavInsID.USE_CASE_ADDRESS_CONFIRMATION_CONFIRM,
                          save_screenshot=save_screenshot)
 
