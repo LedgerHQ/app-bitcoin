@@ -294,14 +294,9 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     }
 
     if (!is_array_all_zeros(wallet_hmac, sizeof(wallet_hmac))) {
-        // Verify hmac
-        if (!check_wallet_hmac(wallet_id, wallet_hmac)) {
-            PRINTF("Incorrect hmac\n");
-            SEND_SW(dc, SW_SIGNATURE_FAIL);
-            return false;
-        }
-
-        st->is_wallet_default = false;
+        // non-default wallet policies are not supported in derived apps
+        SEND_SW(dc, SW_NOT_SUPPORTED);
+        return false;
     } else {
         st->is_wallet_default = true;
     }
