@@ -182,14 +182,9 @@ static bool __attribute__((noinline)) load_wallet_account(dispatcher_context_t *
                                                           const uint8_t wallet_id[static 32],
                                                           const uint8_t wallet_hmac[static 32]) {
     if (!is_array_all_zeros(wallet_hmac, 32)) {
-        // Verify hmac
-        if (!check_wallet_hmac(wallet_id, wallet_hmac)) {
-            PRINTF("Incorrect hmac\n");
-            SEND_SW(dc, SW_SIGNATURE_FAIL);
-            return false;
-        }
-
-        st->account.is_default = false;
+        // non-default wallet policies are not supported in derived apps
+        SEND_SW(dc, SW_NOT_SUPPORTED);
+        return false;
     } else {
         st->account.is_default = true;
     }
