@@ -23,8 +23,6 @@
 #include "sign_psbt/preprocess_inputs.h"
 #include "sign_psbt/preprocess_outputs.h"
 #include "sign_psbt/sign_input.h"
-#include "sign_psbt/swap_checks.h"
-#include "sign_psbt/transaction_display.h"
 
 /* SDK headers */
 #include "swap.h"
@@ -47,6 +45,35 @@
 // reserving RAM that can only be used for the signing flow (which, at time of writing, is the most
 // RAM-intensive operation command of the app).
 sign_psbt_cache_t G_sign_psbt_cache;
+
+// TODO: validate_and_display_transaction and sign_custom_inputs should perhaps not have access
+// to the entire sign_psbt_state_t struct, which should be opaque.
+// Can we pass a subset of fields? What is needed in derived apps?
+
+__attribute__((weak))  // derived applications must replace this
+bool validate_and_display_transaction(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *st,
+    const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)],
+    const uint8_t internal_outputs[static BITVECTOR_REAL_SIZE(MAX_N_OUTPUTS_CAN_SIGN)]) {
+    UNUSED(st), UNUSED(internal_inputs), UNUSED(internal_outputs);
+
+    // if the derived application doesn't implement this, we stop with an error
+    PRINTF("Derived applications must implement validate_and_display_transaction\n");
+    SEND_SW(dc, SW_NOT_SUPPORTED);
+    return false;
+}
+
+__attribute__((weak))  // derived applications can replace this
+bool sign_custom_inputs(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *st,
+    tx_hashes_t *tx_hashes,
+    const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
+    UNUSED(dc), UNUSED(st), UNUSED(tx_hashes), UNUSED(internal_inputs);
+
+    return true;
+}
 
 void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
@@ -125,24 +152,12 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     // we execute the signing flow only if we're expected to produce any signature
     // (including, possibly, any MuSig2 partial signature from Round 2 of MuSig2)
     if (!only_signing_for_musig || st.has_musig2_pub_nonces) {
-#ifdef HAVE_SWAP
-        if (G_called_from_swap) {
-            /** SWAP CHECKS
-             *
-             *  If called from the exchange app, perform the necessary additional checks.
-             */
-
-            // During swaps, the user approval was already obtained in the exchange app
-            if (!execute_swap_checks(dc, &st)) return;
-        } else
-#endif /* HAVE_SWAP */
-        {
-            /** TRANSACTION CONFIRMATION
-             *
-             *  Display each non-change output, and transaction fees, and acquire user confirmation,
-             */
-            if (!display_transaction(dc, &st, internal_outputs)) return;
-        }
+        /** TRANSACTION CONFIRMATION
+         *
+         * Derived apps implement this functionality by replacing the
+         * validate_and_display_transaction method.
+         */
+        if (!validate_and_display_transaction(dc, &st, internal_inputs, internal_outputs)) return;
 
         // Signing always takes some time, so we rather not wait before showing the spinner
         ioe_show_processing_screen();
@@ -152,16 +167,20 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
          * For each internal key expression, and for each internal input, sign using the
          * appropriate algorithm.
          */
-        int sign_result = sign_transaction(dc, &st, cache, &signing_state, internal_inputs);
-
-#ifdef HAVE_SWAP
-        if (!G_called_from_swap)
-#endif /* HAVE_SWAP */
-        {
-            ui_post_processing_confirm_transaction(dc, sign_result);
+        if (!st.has_no_wallet_policy) {
+            int sign_result = sign_internal_inputs(dc, &st, cache, &signing_state, internal_inputs);
+            if (!sign_result) {
+                ui_post_processing_confirm_transaction(dc, false);
+                return;
+            }
         }
 
-        if (!sign_result) {
+        /**
+         * For any input that is not internal, it is the responsibility of the
+         * derived app to sign it.
+         */
+        if (!sign_custom_inputs(dc, &st, &signing_state.tx_hashes, internal_inputs)) {
+            ui_post_processing_confirm_transaction(dc, false);
             return;
         }
 

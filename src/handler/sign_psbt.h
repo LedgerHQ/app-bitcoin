@@ -154,9 +154,15 @@ typedef struct {
     uint8_t outputs_root[32];  // merkle root of the vector of output maps commitments
 
     uint64_t inputs_total_amount;
+    uint64_t internal_inputs_total_amount;
 
     unsigned int n_external_inputs;
     unsigned int n_external_outputs;
+
+    // true if no wallet policy was passed in the initial APDU of sign_psbt;
+    // in that case, all inputs and outputs are assumed external (the derived app
+    // signs the custom inputs itself).
+    bool has_no_wallet_policy;
 
     // set to true if at least a PSBT_IN_MUSIG2_PUB_NONCE field is present in the PSBT
     bool has_musig2_pub_nonces;
