@@ -86,9 +86,34 @@ bool produce_musig2_pubnonces(
  * producing the appropriate signature for each (legacy ECDSA, SegwitV0
  * ECDSA, SegwitV1 Schnorr, or MuSig2 partial signature).
  */
-bool sign_transaction(
+bool sign_internal_inputs(
     dispatcher_context_t *dc,
     sign_psbt_state_t *st,
     sign_psbt_cache_t *sign_psbt_cache,
     signing_state_t *signing_state,
+    const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]);
+
+/**
+ * Validates the transaction and displays it to the user for confirmation.
+ *
+ * This is a weak function that derived applications MUST replace in order to
+ * implement their own transaction validation and user-facing review flow. The
+ * default implementation rejects the transaction with SW_NOT_SUPPORTED.
+ */
+bool validate_and_display_transaction(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *st,
+    const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)],
+    const uint8_t internal_outputs[static BITVECTOR_REAL_SIZE(MAX_N_OUTPUTS_CAN_SIGN)]);
+
+/**
+ * Signs any input that is not internal to the wallet policy.
+ *
+ * This is a weak function that derived applications can replace to sign custom
+ * (non-policy) inputs. The default implementation is a no-op that returns true.
+ */
+bool sign_custom_inputs(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *st,
+    tx_hashes_t *tx_hashes,
     const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]);

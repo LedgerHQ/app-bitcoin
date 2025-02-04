@@ -51,6 +51,9 @@ static void output_keys_callback(dispatcher_context_t *dc,
 
         if ((key_type == PSBT_OUT_BIP32_DERIVATION || key_type == PSBT_OUT_TAP_BIP32_DERIVATION) &&
             !callback_data->output->in_out.key_expression_found) {
+            if (callback_data->state->has_no_wallet_policy) {
+                return;  // only relevant if there is a wallet policy
+            }
             derivation_info_t derivation_info;
             int res = read_change_and_index_from_psbt_bip32_derivation(dc,
                                                                        key_type,

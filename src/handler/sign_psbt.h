@@ -181,6 +181,11 @@ typedef struct {
     bool seen_sighash_set;
     bool sighash_mixed;  // seen inputs disagree on sighash -> can't display coherently
 
+    // true if no wallet policy was passed in the initial APDU of sign_psbt;
+    // in that case, all inputs and outputs are assumed external (the derived app
+    // signs the custom inputs itself).
+    bool has_no_wallet_policy;
+
     // set to true if at least a PSBT_IN_MUSIG2_PUB_NONCE field is present in the PSBT
     bool has_musig2_pub_nonces;
 

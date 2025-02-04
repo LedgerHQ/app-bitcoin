@@ -24,7 +24,6 @@
 #include "read.h"
 
 /* Local headers */
-#include "app_settings.h"
 #include "amount_from_psbt.h"
 #include "bitvector.h"
 #include "buffer.h"
@@ -38,7 +37,7 @@
 #include "process_in_outs.h"
 #include "psbt.h"
 #include "psbt_fields.h"
-#include "sighash.h"
+#include "script.h"
 #include "sign_psbt_cache.h"
 #include "sw.h"
 
@@ -65,6 +64,9 @@ void input_keys_callback(dispatcher_context_t *dc,
             callback_data->input->has_sighash_type = true;
         } else if (key_type == PSBT_IN_BIP32_DERIVATION ||
                    key_type == PSBT_IN_TAP_BIP32_DERIVATION) {
+            if (callback_data->state->has_no_wallet_policy) {
+                return;  // only relevant if there is a wallet policy
+            }
             derivation_info_t derivation_info;
             int res = read_change_and_index_from_psbt_bip32_derivation(dc,
                                                                        key_type,
@@ -126,7 +128,9 @@ bool __attribute__((noinline)) preprocess_inputs(
 
     memset(internal_inputs, 0, BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN));
 
-    if (!fill_internal_key_expressions(dc, st)) return false;
+    if (!st->has_no_wallet_policy) {
+        if (!fill_internal_key_expressions(dc, st)) return false;
+    }
 
     // process each input
     for (unsigned int cur_input_index = 0; cur_input_index < st->n_inputs; cur_input_index++) {
@@ -240,30 +244,54 @@ bool __attribute__((noinline)) preprocess_inputs(
             }
         }
 
-        // check if the input is internal; if not, continue
+        int is_internal = 0;
+        if (!st->has_no_wallet_policy) {
+            // check if the input is internal to the wallet policy
 
-        int is_internal = is_in_out_internal(dc, st, sign_psbt_cache, &input.in_out, true);
-        if (is_internal < 0) {
-            PRINTF("Error checking if input %d is internal\n", cur_input_index);
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        } else if (is_internal == 0) {
-            ++st->n_external_inputs;
-            st->warnings.external_inputs = true;
-            if (!input.has_nonWitnessUtxo) {
-                // The amount comes only from the (unverified) witness-utxo, not hash-verified
-                // against the prevout txid. Trustworthy only if we sign taproot inputs (which
-                // commit sha_amounts over all inputs).
-                st->external_amount_unverified = true;
+            is_internal = is_in_out_internal(dc, st, sign_psbt_cache, &input.in_out, true);
+            if (is_internal < 0) {
+                PRINTF("Error checking if input %d is internal\n", cur_input_index);
+                SEND_SW(dc, SW_INCORRECT_DATA);
+                return false;
+            } else if (is_internal == 0) {
+                ++st->n_external_inputs;
+                if (!input.has_nonWitnessUtxo) {
+                    // The amount comes only from the (unverified) witness-utxo, not hash-verified
+                    // against the prevout txid. Trustworthy only if we sign taproot inputs (which
+                    // commit sha_amounts over all inputs).
+                    st->external_amount_unverified = true;
+                }
+                PRINTF("INPUT %d is external\n", cur_input_index);
+                // unlike the Bitcoin app, we do not abort on external inputs, as the derived app
+                // might sign for them
+            } else {
+                bitvector_set(internal_inputs, cur_input_index, 1);
+                st->internal_inputs_total_amount += input.prevout_amount;
             }
-            PRINTF("INPUT %d is external\n", cur_input_index);
-            continue;
         }
 
-        bitvector_set(internal_inputs, cur_input_index, 1);
-        st->internal_inputs_total_amount += input.prevout_amount;
-
-        int segwit_version = get_policy_segwit_version(st->account.policy_map);
+        int segwit_version = -1;
+        if (is_internal) {
+            // we get the SegWit version from the wallet policy; in this way, we correctly classify
+            // wrapped segwit inputs (which are SegWitV0 even if the scriptPubKey is that of a
+            // legacy one)
+            segwit_version = get_policy_segwit_version(st->account.policy_map);
+        } else {
+            // deduce the segwit version from the scriptPubKey;
+            // we only support P2WPKH, P2WSH and P2TR for external inputs
+            int script_type =
+                get_script_type(input.in_out.scriptPubKey, input.in_out.scriptPubKey_len);
+            if (script_type == SCRIPT_TYPE_P2WPKH || script_type == SCRIPT_TYPE_P2WSH) {
+                segwit_version = 0;
+            } else if (script_type == SCRIPT_TYPE_P2TR) {
+                segwit_version = 1;
+            } else {
+                // if external, only SegWitV0 and SegWitV1 inputs are supported
+                PRINTF("Only SegWitV0 and SegWitV1 external inputs are supported\n");
+                SEND_SW(dc, SW_NOT_SUPPORTED);
+                return false;
+            }
+        }
 
         // For legacy inputs, the non-witness utxo must be present
         // and the witness utxo must be absent.
@@ -279,11 +307,13 @@ bool __attribute__((noinline)) preprocess_inputs(
             }
         }
 
-        // For segwitv0 inputs, the non-witness utxo _should_ be present; we show a warning
-        // to the user otherwise, but we continue nonetheless on approval
+        // For segwitv0 inputs the non-witness utxo must be present. The Bitcoin app only shows a
+        // warning, but here we are more strict, since the UX is controlled by the derived app.
         if (segwit_version == 0 && !input.has_nonWitnessUtxo) {
-            PRINTF("Non-witness utxo missing for segwitv0 input. Will show a warning.\n");
+            PRINTF("Non-witness utxo missing for segwitv0 input. Not supported in derived apps.\n");
             st->warnings.missing_nonwitnessutxo = true;
+            SEND_SW(dc, SW_NOT_SUPPORTED);
+            return false;
         }
 
         // For all segwit transactions, the witness utxo must be present
@@ -293,9 +323,8 @@ bool __attribute__((noinline)) preprocess_inputs(
             return false;
         }
 
-        // If any of the internal inputs has a sighash type that is not SIGHASH_DEFAULT or
-        // SIGHASH_ALL, we show a warning
-
+        // Only SIGHASH_ALL (and SIGHASH_DEFAULT for taproot) is supported, including for external
+        // inputs.
         if (!input.has_sighash_type) {
             track_seen_sighash(st, SIGHASH_ALL);  // no explicit sighash => commits all
             continue;
@@ -310,54 +339,16 @@ bool __attribute__((noinline)) preprocess_inputs(
             return false;
         }
 
-        sighash_class_t sighash_class = classify_sighash(input.sighash_type, segwit_version);
-        if (sighash_class == SIGHASH_CLASS_SAFE) {
+        if (((segwit_version > 0) && (input.sighash_type == SIGHASH_DEFAULT)) ||
+            (input.sighash_type == SIGHASH_ALL)) {
             PRINTF("Sighash type is SIGHASH_DEFAULT or SIGHASH_ALL\n");
-
-        } else if (sighash_class == SIGHASH_CLASS_NON_SAFE) {
-            // Non-standard sighash: only allowed if the user explicitly enabled
-            // "Allow non-standard sighash" in the application settings.
-            if (!app_settings_get_allow_nondefault_sighash()) {
-                PRINTF("Non-standard sighash rejected: setting not enabled\n");
-                // Show a clear on-device status so the user understands why the
-                // transaction was rejected
-                ui_warn_nondefault_sighash_disabled(dc);
-                SEND_SW_EC(dc,
-                           SW_SECURITY_STATUS_NOT_SATISFIED,
-                           EC_SIGN_PSBT_NONDEFAULT_SIGHASH_NOT_ALLOWED);
-                return false;
-            }
-            PRINTF("Sighash type is non-default, will show a warning.\n");
-            st->warnings.non_default_sighash = true;
         } else {
-            PRINTF("Unsupported sighash\n");
+            PRINTF("Sighash flags are not supported\n");
             SEND_SW(dc, SW_NOT_SUPPORTED);
             return false;
         }
 
-        // track whether any signed input leaves the inputs or outputs open
-        if (!sighash_input_set_closed(input.sighash_type)) {
-            st->sighash_inputs_open = true;
-        }
-        if (!sighash_output_set_closed(input.sighash_type)) {
-            st->sighash_outputs_open = true;
-        }
-
         track_seen_sighash(st, input.sighash_type);
-
-        if (((input.sighash_type & SIGHASH_SINGLE) == SIGHASH_SINGLE) &&
-            (cur_input_index >= st->n_outputs)) {
-            PRINTF("SIGHASH_SINGLE with input idx >= n_output is not allowed \n");
-            SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_SIGN_PSBT_UNALLOWED_SIGHASH_SINGLE);
-            return false;
-        }
-    }
-
-    if (st->n_external_inputs == st->n_inputs) {
-        // no internal inputs, nothing to sign
-        PRINTF("No internal inputs. Aborting\n");
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return false;
     }
 
     return true;
