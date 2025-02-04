@@ -122,6 +122,7 @@ typedef struct {
     uint8_t outputs_root[32];  // merkle root of the vector of output maps commitments
 
     uint64_t inputs_total_amount;
+    uint64_t internal_inputs_total_amount;
 
     policy_map_wallet_header_t wallet_header;
 
@@ -141,6 +142,11 @@ typedef struct {
         uint64_t output_amounts[N_CACHED_EXTERNAL_OUTPUTS];
     } outputs;
 
+    // true if no wallet policy was passed in the initial APDU of sign_psbt
+    // in that case, all inputs and outputs are assumed external
+    bool has_no_wallet_policy;
+
+    // only relevante if has_no_wallet_policy is false
     bool is_wallet_default;
 
     uint8_t protocol_version;
