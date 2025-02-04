@@ -131,11 +131,6 @@ bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_context
                                                               const uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    if (st->account.policy_map->type != TOKEN_TR) {
-        SEND_SW(dc, SW_BAD_STATE);  // should never happen
-        return false;
-    }
-
     uint8_t sig[64 + 1];  // extra byte for the appended sighash-type, possibly
     size_t sig_len = 0;
 
@@ -641,12 +636,12 @@ bool __attribute__((noinline)) produce_musig2_pubnonces(
     return true;
 }
 
-bool __attribute__((noinline)) sign_transaction(
-    dispatcher_context_t *dc,
-    sign_psbt_state_t *st,
-    sign_psbt_cache_t *sign_psbt_cache,
-    signing_state_t *signing_state,
-    const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
+bool __attribute__((noinline))
+sign_internal_inputs(dispatcher_context_t *dc,
+                     sign_psbt_state_t *st,
+                     sign_psbt_cache_t *sign_psbt_cache,
+                     signing_state_t *signing_state,
+                     const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     bool keyexpr_to_process[MAX_INTERNAL_KEY_EXPRESSIONS] = {0};

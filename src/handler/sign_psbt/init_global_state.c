@@ -189,6 +189,14 @@ static bool __attribute__((noinline)) load_wallet_account(dispatcher_context_t *
         st->account.is_default = true;
     }
 
+    // If no wallet policy was provided (all-zero wallet id), all inputs/outputs are treated as
+    // external; the derived app is responsible for signing its custom inputs. In that case there
+    // is no policy to fetch or validate.
+    st->has_no_wallet_policy = is_array_all_zeros(wallet_id, 32);
+    if (st->has_no_wallet_policy) {
+        return true;
+    }
+
     // Fetch the serialized wallet policy from the client
     uint8_t serialized_wallet_policy[MAX_WALLET_POLICY_SERIALIZED_LENGTH];
     int serialized_wallet_policy_len = call_get_preimage(dc,
