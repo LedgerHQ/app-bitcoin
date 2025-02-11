@@ -131,6 +131,13 @@ extern ui_state_t g_ui_state;
  */
 typedef void (*action_validate_cb)(dispatcher_context_t *dispatcher_context, bool);
 
+/** 
+ * Process UI events until the current flow terminates; it does not handle any APDU exchange.
+ * Used to allow a command handler to process UX events to allow for user interaction during
+ * the execution of a command.
+ */
+bool io_ui_process(dispatcher_context_t *context);
+
 /**
  * Display the derivation path and pubkey, and asks the confirmation to export.
  *
