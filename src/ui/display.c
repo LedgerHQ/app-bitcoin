@@ -64,7 +64,7 @@ void decrease_streaming_index(void) {
 
 // Process UI events until the current flow terminates; does not handle any APDU exchange
 // Returns true/false depending if the user accepted in the corresponding UX flow.
-static bool io_ui_process(dispatcher_context_t *context) {
+bool io_ui_process(dispatcher_context_t *context) {
     UNUSED(context);
     G_was_processing_screen_shown = false;
 
