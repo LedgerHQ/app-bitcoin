@@ -58,6 +58,22 @@ static inline void SEND_SW_EC(struct dispatcher_context_s *dc, uint16_t sw, uint
 }
 
 /**
+ * Allows derived apps to handle custom APDU commands.
+ * The default implementation always returns false.
+ *
+ * @param[in] dc
+ *  The dispatcher context.
+ *
+ * @param[in] cmd
+ *  Structured APDU command (CLA, INS, P1, P2, Lc, Command data).
+ * 
+ * @return true if the command was handled (either with success or returning an error), false otherwise.
+ * 
+ * If false is returned, the dispatcher will proceed with the usual handlers.
+ */
+bool custom_apdu_handler(dispatcher_context_t *dc, const command_t *cmd);
+
+/**
  * Describes a command that can be processed by the dispatcher.
  */
 typedef struct {
