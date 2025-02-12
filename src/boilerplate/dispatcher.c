@@ -115,6 +115,13 @@ static int process_interruption(dispatcher_context_t *dc) {
     return 0;
 }
 
+__attribute__((weak)) // derived applications can replace this
+bool custom_apdu_handler(dispatcher_context_t *dc, const command_t *cmd) {
+    UNUSED(dc), UNUSED(cmd);
+
+    return false;
+}
+
 void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
                      int n_descriptors,
                      void (*termination_cb)(void),
@@ -137,33 +144,37 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
         return;
     }
 
-    if (cmd->cla == CLA_FRAMEWORK && cmd->ins == INS_CONTINUE) {
-        PRINTF("Unexpected INS_CONTINUE.\n");
-        ioe_send_sw(SW_BAD_STATE);  // received INS_CONTINUE, but no command was interrupted.
+    if (custom_apdu_handler(&G_dispatcher_context, cmd)) {
         return;
     } else {
-        bool cla_found = false, ins_found = false;
-        command_handler_t handler;
-        for (int i = 0; i < n_descriptors; i++) {
-            if (cmd_descriptors[i].cla != cmd->cla) continue;
-            cla_found = true;
-            if (cmd_descriptors[i].ins != cmd->ins) continue;
-            ins_found = true;
-
-            handler = (command_handler_t) PIC(cmd_descriptors[i].handler);
-            break;
-        }
-
-        if (!cla_found) {
-            ioe_send_sw(SW_CLA_NOT_SUPPORTED);
+        if (cmd->cla == CLA_FRAMEWORK && cmd->ins == INS_CONTINUE) {
+            PRINTF("Unexpected INS_CONTINUE.\n");
+            io_send_sw(SW_BAD_STATE);  // received INS_CONTINUE, but no command was interrupted.
             return;
-        } else if (!ins_found) {
-            ioe_send_sw(SW_INS_NOT_SUPPORTED);
-            return;
-        }
+        } else {
+            bool cla_found = false, ins_found = false;
+            command_handler_t handler;
+            for (int i = 0; i < n_descriptors; i++) {
+                if (cmd_descriptors[i].cla != cmd->cla) continue;
+                cla_found = true;
+                if (cmd_descriptors[i].ins != cmd->ins) continue;
+                ins_found = true;
 
-        ioe_start_processing_timeout();
-        handler(&G_dispatcher_context, cmd->p2);
+                handler = (command_handler_t) PIC(cmd_descriptors[i].handler);
+                break;
+            }
+
+            if (!cla_found) {
+                ioe_send_sw(SW_CLA_NOT_SUPPORTED);
+                return;
+            } else if (!ins_found) {
+                ioe_send_sw(SW_INS_NOT_SUPPORTED);
+                return;
+            }
+
+            ioe_start_processing_timeout();
+            handler(&G_dispatcher_context, cmd->p2);
+        }
     }
 
     // Here a response (either success or error) should have been sent.
