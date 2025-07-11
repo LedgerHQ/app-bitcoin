@@ -71,17 +71,6 @@ bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_context
                                                               const uint8_t sighash[static 32]);
 
 /**
- * MuSig2 Round 1: produces and yields the public nonces for every internal
- * MuSig2 key expression and every internal input.
- */
-bool produce_musig2_pubnonces(
-    dispatcher_context_t *dc,
-    sign_psbt_state_t *st,
-    signing_state_t *signing_state,
-    sign_psbt_cache_t *sign_psbt_cache,
-    const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]);
-
-/**
  * Iterates over all the internal key expressions and all internal inputs,
  * producing the appropriate signature for each (legacy ECDSA, SegwitV0
  * ECDSA, SegwitV1 Schnorr, or MuSig2 partial signature).
