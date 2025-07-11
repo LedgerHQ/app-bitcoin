@@ -24,20 +24,19 @@
 #include "sign_psbt/preprocess_outputs.h"
 #include "sign_psbt/sign_input.h"
 
-/* SDK headers */
-#include "swap.h"
-
 /* Local headers */
 #include "bitvector.h"
 #include "constants.h"
 #include "display.h"
 #include "dispatcher.h"
-#include "handle_swap_sign_transaction.h"
 #include "musig_sessions.h"
 #include "sign_psbt_cache.h"
-#include "swap_globals.h"
 #include "sw.h"
 #include "txhashes.h"
+
+// Defined in the UI layer (display_nbgl.c): the processing-screen text shown while the
+// transaction is being loaded.
+extern const char GA_LOADING_TRANSACTION[];
 
 // We declare this in the global space in order to use less stack space, since BOLOS enforces on
 // some devices an 8kb stack limit.
@@ -117,85 +116,47 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
      */
     if (!preprocess_outputs(dc, &st, cache, internal_outputs)) return;
 
-    // check if we're only executing the MuSig2 Round 1
-    bool only_signing_for_musig = true;
-    for (size_t i = 0; i < st.account.n_internal_key_expressions; i++) {
-        if (st.account.internal_key_expressions[i].to_sign &&
-            st.account.internal_key_expressions[i].key_expression_ptr->type !=
-                KEY_EXPRESSION_MUSIG) {
-            // at least one of the key expressions we're signing for is not a MuSig
-            only_signing_for_musig = false;
-        }
-    }
-
     signing_state_t signing_state;
     memset(&signing_state, 0, sizeof(signing_state));
-
-    // Make sure that the signing state for MuSig2 is initialized correctly
-    musigsession_initialize_signing_state(&signing_state.musig);
 
     // compute all the tx-wide hashes
     if (!compute_tx_hashes(dc, &st, &signing_state.tx_hashes)) {
         return;
     }
 
-    if (!st.has_musig2_pub_nonces) {
-        // We execute the first round of MuSig for any musig2 key expression, producing the
-        // pubnonces; this does not involve the private keys, therefore we can do it without user
-        // confirmation
+    /** TRANSACTION CONFIRMATION
+     *
+     * Derived apps implement this functionality by replacing the
+     * validate_and_display_transaction method.
+     */
+    if (!validate_and_display_transaction(dc, &st, internal_inputs, internal_outputs)) return;
 
-        if (!produce_musig2_pubnonces(dc, &st, &signing_state, cache, internal_inputs)) {
-            return;
-        }
-    }
+    // Signing always takes some time, so we rather not wait before showing the spinner
+    ioe_show_processing_screen();
 
-    // we execute the signing flow only if we're expected to produce any signature
-    // (including, possibly, any MuSig2 partial signature from Round 2 of MuSig2)
-    if (!only_signing_for_musig || st.has_musig2_pub_nonces) {
-        /** TRANSACTION CONFIRMATION
-         *
-         * Derived apps implement this functionality by replacing the
-         * validate_and_display_transaction method.
-         */
-        if (!validate_and_display_transaction(dc, &st, internal_inputs, internal_outputs)) return;
-
-        // Signing always takes some time, so we rather not wait before showing the spinner
-        ioe_show_processing_screen();
-
-        /** SIGNING FLOW
-         *
-         * For each internal key expression, and for each internal input, sign using the
-         * appropriate algorithm.
-         */
-        if (!st.has_no_wallet_policy) {
-            int sign_result = sign_internal_inputs(dc, &st, cache, &signing_state, internal_inputs);
-            if (!sign_result) {
-                ui_post_processing_confirm_transaction(dc, false);
-                return;
-            }
-        }
-
-        /**
-         * For any input that is not internal, it is the responsibility of the
-         * derived app to sign it.
-         */
-        if (!sign_custom_inputs(dc, &st, &signing_state.tx_hashes, internal_inputs)) {
+    /** SIGNING FLOW
+     *
+     * For each internal key expression, and for each internal input, sign using the
+     * appropriate algorithm.
+     */
+    if (!st.has_no_wallet_policy) {
+        int sign_result = sign_internal_inputs(dc, &st, cache, &signing_state, internal_inputs);
+        if (!sign_result) {
             ui_post_processing_confirm_transaction(dc, false);
             return;
         }
-
-#ifdef HAVE_SWAP
-        // Only if called from swap, the app should terminate after sending the response
-        if (G_called_from_swap) {
-            G_swap_state.should_exit = true;
-        }
-#endif /* HAVE_SWAP */
     }
 
-    // MuSig2: if there is an active session at the end of round 1, we move it to persistent
-    // storage. It is important that this is only done at the very end of the signing process,
-    // end only if everything is successful.
-    musigsession_commit(&signing_state.musig);
+    /**
+     * For any input that is not internal, it is the responsibility of the
+     * derived app to sign it.
+     */
+    if (!sign_custom_inputs(dc, &st, &signing_state.tx_hashes, internal_inputs)) {
+        ui_post_processing_confirm_transaction(dc, false);
+        return;
+    }
+
+    ui_post_processing_confirm_transaction(dc, true);
 
     SEND_SW(dc, SW_OK);
 }
