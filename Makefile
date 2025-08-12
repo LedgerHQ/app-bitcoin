@@ -35,6 +35,10 @@ ifeq ($(BOLOS_SDK),)
 $(error Environment variable BOLOS_SDK is not set)
 endif
 
+ifndef APP_DEVELOPER
+APP_DEVELOPER = "Ledger"
+endif
+
 include $(BOLOS_SDK)/Makefile.target
 
 ########################################
@@ -94,6 +98,12 @@ endif
 # See SDK `include/appflags.h` for the purpose of each permission
 HAVE_APPLICATION_FLAG_GLOBAL_PIN = 1
 HAVE_APPLICATION_FLAG_BOLOS_SETTINGS = 1
+
+$(info APP_DESCRIPTION is $(APP_DESCRIPTION))
+
+CFLAGS += -DAPP_DESCRIPTION=\"$(APP_DESCRIPTION)\"
+
+CFLAGS += -DAPP_DEVELOPER=\"$(APP_DEVELOPER)\"
 
 ########################################
 # Application communication interfaces #
