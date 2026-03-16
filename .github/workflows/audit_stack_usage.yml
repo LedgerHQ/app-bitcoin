@@ -1,0 +1,71 @@
+name: Stack Usage Audit
+
+# Runs the SDK 'audit' target for every hardware target to generate
+# compile_commands.json, AST bridges, and worst-case stack usage reports.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - main
+      - develop
+  pull_request:
+
+jobs:
+  audit:
+    name: "Stack audit – ${{ matrix.target }}"
+
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [nanox, nanos2, stax, flex, apex_p]
+
+    runs-on: ubuntu-latest
+
+    container:
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
+
+    env:
+      # Hard-coded SDK branch for test purposes
+      SDK_REF: stack_analysis_API_LEVEL_25
+      SDK_DIR: ledger-secure-sdk
+
+    steps:
+      - name: Clone app
+        uses: actions/checkout@v4
+
+      - name: Clone SDK (branch ${{ env.SDK_REF }})
+        uses: actions/checkout@v4
+        with:
+          repository: LedgerHQ/ledger-secure-sdk
+          ref: ${{ env.SDK_REF }}
+          path: ${{ env.SDK_DIR }}
+
+      - name: Install audit dependencies (bear, libclang)
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends bear libclang-dev
+          pip3 install --quiet --break-system-packages libclang
+
+      - name: Run stack usage audit (TARGET=${{ matrix.target }})
+        run: |
+          make -C . -j \
+            TARGET=${{ matrix.target }} \
+            BOLOS_SDK=${{ env.SDK_DIR }} \
+            COIN=bitcoin_testnet \
+            DEBUG=0 \
+            audit
+
+      - name: Show stack usage report
+        if: always()
+        run: |
+          echo "=========================================="
+          echo " Stack audit results for ${{ matrix.target }}"
+          echo "=========================================="
+          if [ -f debug/compile_commands.json ]; then
+            echo "compile_commands.json entries: $(jq length debug/compile_commands.json)"
+          fi
+          if [ -f debug/bridges.json ]; then
+            echo "AST bridge edges: $(jq '.force_edges | length' debug/bridges.json)"
+          fi
