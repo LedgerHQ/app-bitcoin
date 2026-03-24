@@ -5,6 +5,9 @@ from ragger_bitcoin import createRaggerClient, RaggerClient
 from ragger.backend import RaisePolicy
 from ragger.backend.interface import BackendInterface
 from ragger.conftest import configuration
+from ragger.firmware import Firmware
+from ragger.firmware.touch.positions import STAX_X_CENTER, FLEX_X_CENTER, APEX_P_X_CENTER
+from ragger.navigator import Navigator, NavInsID, NavIns
 import ledger_bitcoin._base58 as base58
 from ledger_bitcoin.common import sha256
 from ledger_bitcoin import Chain
@@ -253,3 +256,61 @@ def client(bitcoin_network: str, backend: BackendInterface) -> RaggerClient:
     backend.raise_policy = RaisePolicy.RAISE_CUSTOM
     backend.whitelisted_status = [0x9000, 0xE000]
     return createRaggerClient(backend, chain=chain, debug=True, screenshot_dir=TESTS_ROOT_DIR)
+
+
+def toggle_nonstandard_sighash_setting(navigator: Navigator, firmware: Firmware,
+                                       test_case_name: str = None):
+    """Navigate to app settings and toggle the 'Non-standard sighash' switch.
+
+    Must be called at the start of any test that needs non-standard sighash types
+    to be accepted (the setting is disabled by default and resets per test).
+
+    If test_case_name* is provided, screenshots are captured and
+    compared against golden images via ``navigate_and_compare``; otherwise only
+    ``navigate`` (no screenshot comparison) is used.
+    """
+    if firmware.device.startswith("nano"):
+        # The warning in the choice dialog can span a variable number of Nano pages,
+        # so scroll to the confirm button by text ("enable", from "I understand,
+        # enable") instead of hard-coding the RIGHT_CLICK count.
+        open_dialog = [NavInsID.RIGHT_CLICK, NavInsID.BOTH_CLICK, NavInsID.BOTH_CLICK]
+        exit_settings = [NavInsID.RIGHT_CLICK, NavInsID.BOTH_CLICK]
+
+        if test_case_name is not None:
+            navigator.navigate_and_compare(
+                TESTS_ROOT_DIR, test_case_name, open_dialog,
+                screen_change_before_first_instruction=False, snap_start_idx=0)
+            # exit is not snapshotted: the scroll length above is variable
+            navigator.navigate_until_text_and_compare(
+                NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], "enable",
+                TESTS_ROOT_DIR, test_case_name,
+                screen_change_before_first_instruction=False, snap_start_idx=len(open_dialog))
+        else:
+            navigator.navigate(open_dialog, screen_change_before_first_instruction=False)
+            navigator.navigate_until_text(
+                NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], "enable",
+                screen_change_before_first_instruction=False)
+        navigator.navigate(exit_settings, screen_change_before_first_instruction=False)
+        return
+
+    # Touch devices (Stax/Flex/Apex): open settings, tap the switch row,
+    # confirm the "are you sure?" warning dialog, then exit settings
+    if firmware.device == "stax":
+        switch_pos = (STAX_X_CENTER, 140)
+    elif firmware.device == "flex":
+        switch_pos = (FLEX_X_CENTER, 150)
+    else:  # apex_p, apex_m
+        switch_pos = (APEX_P_X_CENTER, 90)
+    instructions = [
+        NavInsID.USE_CASE_HOME_SETTINGS,
+        NavIns(NavInsID.TOUCH, switch_pos),
+        NavInsID.USE_CASE_CHOICE_CONFIRM,
+        NavInsID.USE_CASE_SETTINGS_MULTI_PAGE_EXIT,
+    ]
+
+    if test_case_name is not None:
+        navigator.navigate_and_compare(TESTS_ROOT_DIR, test_case_name, instructions,
+                                       screen_change_before_first_instruction=False)
+    else:
+        navigator.navigate(instructions,
+                           screen_change_before_first_instruction=False)
