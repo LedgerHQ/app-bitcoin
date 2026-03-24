@@ -10,6 +10,7 @@ from ragger.error import ExceptionRAPDU
 from ragger.firmware import Firmware
 from ragger_bitcoin import RaggerClient
 
+from .conftest import toggle_nonstandard_sighash_setting
 from .instructions import sign_psbt_instruction_approve
 tests_root: Path = Path(__file__).parent
 
@@ -119,6 +120,7 @@ def test_sighash_all_output_modified(navigator: Navigator, firmware: Firmware, c
 
 
 def test_sighash_none_sign_psbt(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-sign.psbt")
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
@@ -144,6 +146,7 @@ def test_sighash_none_sign_psbt(navigator: Navigator, firmware: Firmware, client
 
 
 def test_sighash_none_input_modified(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-sign.psbt")
     psbt.tx.vin[0].nSequence = psbt.tx.vin[0].nSequence - 1
 
@@ -164,6 +167,7 @@ def test_sighash_none_input_modified(navigator: Navigator, firmware: Firmware, c
 
 
 def test_sighash_none_output_modified(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-sign.psbt")
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
 
@@ -184,6 +188,7 @@ def test_sighash_none_output_modified(navigator: Navigator, firmware: Firmware, 
 
 
 def test_sighash_single_sign_psbt(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-sign.psbt")
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
@@ -210,6 +215,7 @@ def test_sighash_single_sign_psbt(navigator: Navigator, firmware: Firmware, clie
 
 def test_sighash_single_input_modified(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-sign.psbt")
     psbt.tx.vin[1].nSequence = psbt.tx.vin[1].nSequence - 1
 
@@ -232,6 +238,7 @@ def test_sighash_single_input_modified(navigator: Navigator, firmware: Firmware,
 
 def test_sighash_single_output_same_index_modified(navigator: Navigator, firmware: Firmware, client:
                                                    RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-sign.psbt")
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
 
@@ -254,6 +261,7 @@ def test_sighash_single_output_same_index_modified(navigator: Navigator, firmwar
 
 def test_sighash_single_output_different_index_modified(navigator: Navigator, firmware: Firmware,
                                                         client: RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-sign.psbt")
     psbt.tx.vout[1].nValue = psbt.tx.vout[1].nValue - 1
 
@@ -275,6 +283,7 @@ def test_sighash_single_output_different_index_modified(navigator: Navigator, fi
 
 
 def test_sighash_single_3_ins_2_out(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-3-ins-2-outs.psbt")
 
     with pytest.raises(ExceptionRAPDU) as e:
@@ -292,6 +301,7 @@ def test_sighash_single_3_ins_2_out(navigator: Navigator, firmware: Firmware, cl
 
 
 def test_sighash_all_anyone_sign(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-all-anyone-can-pay-sign.psbt")
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
@@ -318,6 +328,7 @@ def test_sighash_all_anyone_sign(navigator: Navigator, firmware: Firmware, clien
 
 def test_sighash_all_anyone_input_changed(navigator: Navigator, firmware: Firmware, client:
                                           RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-all-anyone-can-pay-sign.psbt")
     psbt.tx.vin[0].nSequence = psbt.tx.vin[0].nSequence - 1
 
@@ -340,6 +351,7 @@ def test_sighash_all_anyone_input_changed(navigator: Navigator, firmware: Firmwa
 
 def test_sighash_all_anyone_output_changed(navigator: Navigator, firmware: Firmware, client:
                                            RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-all-anyone-can-pay-sign.psbt")
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
 
@@ -361,6 +373,7 @@ def test_sighash_all_anyone_output_changed(navigator: Navigator, firmware: Firmw
 
 
 def test_sighash_none_anyone_sign(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-anyone-can-pay-sign.psbt")
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
@@ -387,6 +400,7 @@ def test_sighash_none_anyone_sign(navigator: Navigator, firmware: Firmware, clie
 
 def test_sighash_none_anyone_input_changed(navigator: Navigator, firmware: Firmware, client:
                                            RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-anyone-can-pay-sign.psbt")
     psbt.tx.vin[0].nSequence = psbt.tx.vin[0].nSequence - 1
 
@@ -409,6 +423,7 @@ def test_sighash_none_anyone_input_changed(navigator: Navigator, firmware: Firmw
 
 def test_sighash_none_anyone_output_changed(navigator: Navigator, firmware: Firmware, client:
                                             RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-anyone-can-pay-sign.psbt")
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
 
@@ -430,6 +445,7 @@ def test_sighash_none_anyone_output_changed(navigator: Navigator, firmware: Firm
 
 
 def test_sighash_single_anyone_sign(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-anyone-can-pay-sign.psbt")
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
@@ -456,6 +472,7 @@ def test_sighash_single_anyone_sign(navigator: Navigator, firmware: Firmware, cl
 
 def test_sighash_single_anyone_input_changed(navigator: Navigator, firmware: Firmware, client:
                                              RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-anyone-can-pay-sign.psbt")
     psbt.tx.vin[0].nSequence = psbt.tx.vin[0].nSequence - 1
 
@@ -478,6 +495,7 @@ def test_sighash_single_anyone_input_changed(navigator: Navigator, firmware: Fir
 
 def test_sighash_single_anyone_output_changed(navigator: Navigator, firmware: Firmware, client:
                                               RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-anyone-can-pay-sign.psbt")
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
 
@@ -565,6 +583,7 @@ def test_sighash_segwitv0_sighash1(navigator: Navigator, firmware: Firmware, cli
 
 
 def test_sighash_segwitv0_sighash2(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     expected_sig = b'0D\x02 o\x86>\xd5\x8b\xb5\xa5\xa2KZ\xcez\xb2\x92\xd0\xce\x04!L_\x8f9\xeb#m3\x9e\xb4\x8d\xc6sK\x02 p\x8d\x95\x0b4B\x02^\xf1nB\xd2\xea\x84b\x14\xc7\x00\x88"\xed\x19o<f}E\xcc\xfa\xc2\xfc\xd3\x02'
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
@@ -576,6 +595,7 @@ def test_sighash_segwitv0_sighash2(navigator: Navigator, firmware: Firmware, cli
 
 
 def test_sighash_segwitv0_sighash3(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     expected_sig = b'0D\x02 \x11.vf\xbe\x1bd2\x1cx\x89\xcf\xca(\x03\xb0\xc1\x03\x86\xcb\x08\xe4\xe9\xbf\xef/\x1e\xa1\x93\x02\x01C\x02 .)XC\x991\xa6\x85\xa2\x06\xa4\xf7\xde\xfc\xb7\xce\x0b\xc7\xf6\xd6ov\x8a\xdd\xa9\xb5\xf9\x8f\xb8\x07\x82\xc2\x03'
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
@@ -587,6 +607,7 @@ def test_sighash_segwitv0_sighash3(navigator: Navigator, firmware: Firmware, cli
 
 
 def test_sighash_segwitv0_sighash81(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     expected_sig = b"0E\x02!\x00\xde\xae\xfd\x1fg\x96\x9a,\xb9\x0e\xfe\xa9\xc343L\xca=\x9f\xeb4\xcfg\xd62u\xc4c\xa5'0\xd9\x02 rd\x88\x7f s\x93\xd0\x97\xea\xc1@\xc8\xbe\xedu 7w4\x04z\x99.&\xd99\xa1Il/\x82\x81"
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
@@ -598,6 +619,7 @@ def test_sighash_segwitv0_sighash81(navigator: Navigator, firmware: Firmware, cl
 
 
 def test_sighash_segwitv0_sighash82(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
     expected_sig = b'0E\x02!\x00\xe5\r7m\xa2\x1a\xb4\x89\xd48k\x14\xeb\xd0\xa9\xcc\x00\x17\x9ch\x8b\x16\xb5\x9d&\xab\x94md9\x929\x02 "\x159\xdc\xa3\x06\x06\x9cR\n\xf1\x9a\xfb^\xde)\x1a\xe9\x1e\x07S\x96\xedARN\xfeY\xa4\xc1A\xd4\x82'
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
@@ -609,6 +631,7 @@ def test_sighash_segwitv0_sighash82(navigator: Navigator, firmware: Firmware, cl
 
 
 def test_sighash_segwitv0_sighash83(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    toggle_nonstandard_sighash_setting(navigator, firmware)
 
     expected_sig = b'0D\x02 \x07q\xb3\xe4\x05\xa3|\xd4\xaa$\x95\x1c\x08\x8d~L7\t:|\xddp7\xa7h\x81\x14\xd5$V\x03v\x02 @\xff\xf9\xbc\xd0|\x00\xfa\x91-}\x1e\xed\x04\x0e\xcc\x9d\xd4\xe4NM\\\xf6\xef\x9a\x94\xaf\x83l\xd8\x7f\xdd\x83'
 
