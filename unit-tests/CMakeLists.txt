@@ -327,6 +327,14 @@ if(SPECULOS AND SPECULOS_SRC)
   target_link_libraries(test_script PRIVATE cmocka app_crypto)
   add_test(test_script test_script)
 
+  # test_sighash exercises classify_sighash (src/common/sighash.h), which only
+  # depends on constants.h (and therefore the real SDK headers). No app object
+  # code or syscalls are needed, so it just links cmocka.
+  add_executable(test_sighash test_sighash.c)
+  app_apply_real_sdk_config(test_sighash)
+  target_link_libraries(test_sighash PRIVATE cmocka)
+  add_test(test_sighash test_sighash)
+
   add_executable(test_wallet test_wallet.c)
   app_apply_real_sdk_config(test_wallet)
   target_link_libraries(test_wallet PRIVATE cmocka app_crypto buffer buffer_ext)
