@@ -64,6 +64,10 @@
 // The wallet policy has too many internal keys.
 #define EC_SIGN_PSBT_WALLET_POLICY_TOO_MANY_INTERNAL_KEYS 0x000c
 
+// Non-standard sighash types are not allowed unless the user has explicitly enabled them
+// in the application settings. Enable "Allow non-standard sighash" in the app settings to proceed.
+#define EC_SIGN_PSBT_NONDEFAULT_SIGHASH_NOT_ALLOWED 0x000d
+
 /**
  * Swap
  */
