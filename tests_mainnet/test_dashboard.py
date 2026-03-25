@@ -13,11 +13,15 @@ def test_dashboard(comm: SpeculosClient, is_speculos: bool, app_version: str, mo
         pytest.skip("No dashboard test for stax, flex and apex_p")
 
     comm.press_and_release("right")
+    comm.wait_for_text_event("App settings")
+
+    comm.press_and_release("right")
     comm.wait_for_text_event("App info")
 
     comm.press_and_release("right")
     comm.wait_for_text_event("Quit app")
 
+    comm.press_and_release("left")
     comm.press_and_release("left")
     comm.press_and_release("left")
     comm.wait_for_text_event("Bitcoin")
