@@ -1,4 +1,5 @@
 #include <string.h>
+#include <limits.h>
 
 /* Local headers */
 #include "client_commands.h"
@@ -32,6 +33,11 @@ int call_get_preimage(dispatcher_context_t *dispatcher_context,
         !buffer_can_read(&dispatcher_context->read_buffer, partial_data_len)) {
         return -2;
     }
+
+    if (preimage_len_u64 > UINT32_MAX) {
+        return -11;
+    }
+
     uint32_t preimage_len = (uint32_t) preimage_len_u64;
 
     if (preimage_len < 1) {
