@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <string.h>
+#include <limits.h>
 
 #include "extract_bip32_derivation.h"
 
@@ -21,7 +22,15 @@ typedef struct {
 } fpt_der_callback_data_t;
 
 static void fpt_der_data_len_callback(size_t data_length, void *callback_state) {
-    ((fpt_der_callback_data_t *) callback_state)->total_data_length = data_length;
+    fpt_der_callback_data_t *cs = (fpt_der_callback_data_t *) callback_state;
+
+    if (data_length > INT_MAX) {
+        // fail early if the conversion to int would overflow
+        // by setting the error result in the callback state
+        cs->result = -1;
+        return;
+    }
+    cs->total_data_length = data_length;
 }
 
 static void fpt_der_data_callback(buffer_t *data, void *callback_state) {
