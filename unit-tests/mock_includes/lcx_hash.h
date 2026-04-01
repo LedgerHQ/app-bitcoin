@@ -30,34 +30,34 @@
 #define PLENGTH(...)
 #endif
 
-#define WIDE // const // don't !!
+#define WIDE  // const // don't !!
 
 /** Message Digest algorithm identifiers. */
 enum cx_md_e {
-  /** NONE Digest */
-  CX_NONE,
-  /** RIPEMD160 Digest */
-  CX_RIPEMD160, // 20 bytes
-  /** SHA224 Digest */
-  CX_SHA224, // 28 bytes
-  /** SHA256 Digest */
-  CX_SHA256, // 32 bytes
-  /** SHA384 Digest */
-  CX_SHA384, // 48 bytes
-  /** SHA512 Digest */
-  CX_SHA512, // 64 bytes
-  /** Keccak (pre-SHA3) Digest */
-  CX_KECCAK, // 28,32,48,64 bytes
-  /** SHA3 Digest */
-  CX_SHA3, // 28,32,48,64 bytes
-  /** Groestl Digest */
-  CX_GROESTL,
-  /** Blake Digest */
-  CX_BLAKE2B,
-  /** SHAKE-128 Digest */
-  CX_SHAKE128, // any bytes
-  /** SHAKE-128 Digest */
-  CX_SHAKE256, // any bytes
+    /** NONE Digest */
+    CX_NONE,
+    /** RIPEMD160 Digest */
+    CX_RIPEMD160,  // 20 bytes
+    /** SHA224 Digest */
+    CX_SHA224,  // 28 bytes
+    /** SHA256 Digest */
+    CX_SHA256,  // 32 bytes
+    /** SHA384 Digest */
+    CX_SHA384,  // 48 bytes
+    /** SHA512 Digest */
+    CX_SHA512,  // 64 bytes
+    /** Keccak (pre-SHA3) Digest */
+    CX_KECCAK,  // 28,32,48,64 bytes
+    /** SHA3 Digest */
+    CX_SHA3,  // 28,32,48,64 bytes
+    /** Groestl Digest */
+    CX_GROESTL,
+    /** Blake Digest */
+    CX_BLAKE2B,
+    /** SHAKE-128 Digest */
+    CX_SHAKE128,  // any bytes
+    /** SHAKE-128 Digest */
+    CX_SHAKE256,  // any bytes
 };
 /** Convenience type. See #cx_md_e. */
 typedef enum cx_md_e cx_md_t;
@@ -72,10 +72,10 @@ typedef enum cx_md_e cx_md_t;
  * Common Message Digest context, used as abstract type.
  */
 struct cx_hash_header_s {
-  /** Message digest identifier, See cx_md_e. */
-  cx_md_t algo;
-  /** Number of block already processed */
-  unsigned int counter;
+    /** Message digest identifier, See cx_md_e. */
+    cx_md_t algo;
+    /** Number of block already processed */
+    unsigned int counter;
 };
 /** Convenience type. See #cx_hash_header_s. */
 typedef struct cx_hash_header_s cx_hash_t;
@@ -116,8 +116,29 @@ typedef struct cx_hash_header_s cx_hash_t;
  *
  */
 CXCALL int cx_hash(cx_hash_t *hash PLENGTH(scc__cx_scc_struct_size_hash__hash),
-                   int mode, const unsigned char WIDE *in PLENGTH(len),
-                   unsigned int len, unsigned char *out PLENGTH(out_len),
+                   int mode,
+                   const unsigned char WIDE *in PLENGTH(len),
+                   unsigned int len,
+                   unsigned char *out PLENGTH(out_len),
                    unsigned int out_len);
+
+/**
+ * cx_hash_no_throw - same as cx_hash but returns error code instead of throwing.
+ * In unit tests we use this as the primary implementation.
+ */
+int cx_hash_no_throw(cx_hash_t *hash,
+                     int mode,
+                     const unsigned char *in,
+                     unsigned int in_len,
+                     unsigned char *out,
+                     unsigned int out_len);
+
+/**
+ * I/O vector for cx_sha256_hash_iovec.
+ */
+typedef struct {
+    const uint8_t *iov_base;
+    size_t iov_len;
+} cx_iovec_t;
 
 #endif
