@@ -23,6 +23,8 @@
 #include <stddef.h>
 
 #include "dispatcher.h"
+#include "common/merkle.h"
+#include "psbt_parse.h"
 
 /* ---- Configuration ---- */
 #define MOCK_MAX_PREIMAGES   1024
@@ -122,6 +124,61 @@ void mock_dispatcher_add_list(mock_dispatcher_t *mock,
                               const uint8_t *const *elements,
                               const size_t *element_lens,
                               size_t n);
+
+/**
+ * Register a key-value mapping (like a PSBT map) and its Merkle trees.
+ * Sorts items by key, builds separate Merkle trees for keys and values,
+ * registers preimages for all leaves, and fills in the commitment struct.
+ *
+ * This mirrors the Python ClientCommandInterpreter.add_known_mapping().
+ *
+ * @param keys          Array of pointers to key data.
+ * @param key_lens      Array of key lengths.
+ * @param values        Array of pointers to value data.
+ * @param value_lens    Array of value lengths.
+ * @param n             Number of key-value pairs.
+ * @param out_commitment  Filled with the merkleized map commitment (size, keys_root, values_root).
+ */
+void mock_dispatcher_add_map(mock_dispatcher_t *mock,
+                             const uint8_t *const *keys,
+                             const size_t *key_lens,
+                             const uint8_t *const *values,
+                             const size_t *value_lens,
+                             size_t n,
+                             merkleized_map_commitment_t *out_commitment);
+
+/** Result of mock_dispatcher_add_psbt. */
+typedef struct {
+    merkleized_map_commitment_t global_map;
+    merkleized_map_commitment_t input_maps[PSBT_MAX_MAPS];
+    size_t n_inputs;
+    merkleized_map_commitment_t output_maps[PSBT_MAX_MAPS];
+    size_t n_outputs;
+} mock_psbt_t;
+
+/**
+ * Parse a PSBTv2 binary and register all its maps with the mock dispatcher.
+ *
+ * This mirrors the registration flow in the Python sign_psbt() method:
+ *  1. Parses the PSBT into global/input/output maps.
+ *  2. Registers each map (keys + values trees) with mock_dispatcher_add_map.
+ *  3. Computes the merkleized map commitment for each input/output map.
+ *  4. Registers the list of input commitments and output commitments.
+ *
+ * @param mock       The mock dispatcher state.
+ * @param psbt       Raw PSBTv2 bytes (starting with "psbt\xff").
+ * @param psbt_len   Length of the PSBT data.
+ * @param n_inputs   Number of input maps in the PSBT.
+ * @param n_outputs  Number of output maps in the PSBT.
+ * @param out        Filled with parsed map commitments on success.
+ * @return 0 on success, negative on error.
+ */
+int mock_dispatcher_add_psbt(mock_dispatcher_t *mock,
+                             const uint8_t *psbt,
+                             size_t psbt_len,
+                             size_t n_inputs,
+                             size_t n_outputs,
+                             mock_psbt_t *out);
 
 /**
  * Get the dispatcher_context_t pointer for use with app functions.

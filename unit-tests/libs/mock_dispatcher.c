@@ -470,3 +470,144 @@ void mock_dispatcher_add_list(mock_dispatcher_t *mock,
     /* Compute Merkle root */
     build_merkle_root((const uint8_t(*)[32]) tree->element_hashes, 0, n, tree->root);
 }
+
+void mock_dispatcher_add_map(mock_dispatcher_t *mock,
+                             const uint8_t *const *keys,
+                             const size_t *key_lens,
+                             const uint8_t *const *values,
+                             const size_t *value_lens,
+                             size_t n,
+                             merkleized_map_commitment_t *out_commitment) {
+    /* Sort items by key (simple insertion sort, matching Python's sorted()) */
+    size_t sorted_indices[MOCK_MAX_TREE_ELEMS];
+    assert(n <= MOCK_MAX_TREE_ELEMS);
+    for (size_t i = 0; i < n; i++) {
+        sorted_indices[i] = i;
+    }
+    for (size_t i = 1; i < n; i++) {
+        size_t j = i;
+        while (j > 0) {
+            size_t a = sorted_indices[j - 1];
+            size_t b = sorted_indices[j];
+            size_t min_len = key_lens[a] < key_lens[b] ? key_lens[a] : key_lens[b];
+            int cmp = memcmp(keys[a], keys[b], min_len);
+            if (cmp > 0 || (cmp == 0 && key_lens[a] > key_lens[b])) {
+                sorted_indices[j - 1] = b;
+                sorted_indices[j] = a;
+                j--;
+            } else {
+                break;
+            }
+        }
+    }
+
+    /* Build sorted key and value arrays */
+    const uint8_t *sorted_keys[MOCK_MAX_TREE_ELEMS];
+    size_t sorted_key_lens[MOCK_MAX_TREE_ELEMS];
+    const uint8_t *sorted_values[MOCK_MAX_TREE_ELEMS];
+    size_t sorted_value_lens[MOCK_MAX_TREE_ELEMS];
+    for (size_t i = 0; i < n; i++) {
+        sorted_keys[i] = keys[sorted_indices[i]];
+        sorted_key_lens[i] = key_lens[sorted_indices[i]];
+        sorted_values[i] = values[sorted_indices[i]];
+        sorted_value_lens[i] = value_lens[sorted_indices[i]];
+    }
+
+    /* Register both keys and values as Merkle trees (mirrors add_known_mapping) */
+    size_t keys_tree_idx = mock->n_trees;
+    mock_dispatcher_add_list(mock, sorted_keys, sorted_key_lens, n);
+
+    size_t values_tree_idx = mock->n_trees;
+    mock_dispatcher_add_list(mock, sorted_values, sorted_value_lens, n);
+
+    /* Fill in the commitment */
+    out_commitment->size = (uint64_t) n;
+    memcpy(out_commitment->keys_root, mock->trees[keys_tree_idx].root, 32);
+    memcpy(out_commitment->values_root, mock->trees[values_tree_idx].root, 32);
+}
+
+/* ---- Helper: register a psbt_map_t with the mock ---- */
+static void register_psbt_map(mock_dispatcher_t *mock,
+                              const psbt_map_t *map,
+                              merkleized_map_commitment_t *out_commitment) {
+    const uint8_t *keys[PSBT_MAP_MAX_ENTRIES];
+    size_t key_lens[PSBT_MAP_MAX_ENTRIES];
+    const uint8_t *values[PSBT_MAP_MAX_ENTRIES];
+    size_t value_lens[PSBT_MAP_MAX_ENTRIES];
+
+    for (size_t i = 0; i < map->n_entries; i++) {
+        keys[i] = map->entries[i].key;
+        key_lens[i] = map->entries[i].key_len;
+        values[i] = map->entries[i].value;
+        value_lens[i] = map->entries[i].value_len;
+    }
+
+    mock_dispatcher_add_map(mock,
+                            keys,
+                            key_lens,
+                            values,
+                            value_lens,
+                            map->n_entries,
+                            out_commitment);
+}
+
+/* ---- Helper: serialize a merkleized_map_commitment_t ---- */
+static size_t serialize_commitment(const merkleized_map_commitment_t *c, uint8_t *out) {
+    int vlen = varint_write(out, 0, c->size);
+    memcpy(out + vlen, c->keys_root, 32);
+    memcpy(out + vlen + 32, c->values_root, 32);
+    return (size_t) vlen + 64;
+}
+
+int mock_dispatcher_add_psbt(mock_dispatcher_t *mock,
+                             const uint8_t *psbt,
+                             size_t psbt_len,
+                             size_t n_inputs,
+                             size_t n_outputs,
+                             mock_psbt_t *out) {
+    static parsed_psbt_t parsed;
+
+    if (psbt_parse(psbt, psbt_len, n_inputs, n_outputs, &parsed) < 0) {
+        return -1;
+    }
+
+    out->n_inputs = n_inputs;
+    out->n_outputs = n_outputs;
+
+    /* Register global map */
+    register_psbt_map(mock, &parsed.global_map, &out->global_map);
+
+    /* Register each input map and compute commitments */
+    uint8_t input_commitment_bufs[PSBT_MAX_MAPS][73]; /* varint(9) + 32 + 32 max */
+    size_t input_commitment_lens[PSBT_MAX_MAPS];
+    const uint8_t *input_commitment_ptrs[PSBT_MAX_MAPS];
+
+    for (size_t i = 0; i < n_inputs; i++) {
+        register_psbt_map(mock, &parsed.input_maps[i], &out->input_maps[i]);
+        input_commitment_lens[i] =
+            serialize_commitment(&out->input_maps[i], input_commitment_bufs[i]);
+        input_commitment_ptrs[i] = input_commitment_bufs[i];
+    }
+
+    /* Register each output map and compute commitments */
+    uint8_t output_commitment_bufs[PSBT_MAX_MAPS][73];
+    size_t output_commitment_lens[PSBT_MAX_MAPS];
+    const uint8_t *output_commitment_ptrs[PSBT_MAX_MAPS];
+
+    for (size_t i = 0; i < n_outputs; i++) {
+        register_psbt_map(mock, &parsed.output_maps[i], &out->output_maps[i]);
+        output_commitment_lens[i] =
+            serialize_commitment(&out->output_maps[i], output_commitment_bufs[i]);
+        output_commitment_ptrs[i] = output_commitment_bufs[i];
+    }
+
+    /* Register the list of input commitments and the list of output commitments */
+    if (n_inputs > 0) {
+        mock_dispatcher_add_list(mock, input_commitment_ptrs, input_commitment_lens, n_inputs);
+    }
+    if (n_outputs > 0) {
+        mock_dispatcher_add_list(mock, output_commitment_ptrs, output_commitment_lens, n_outputs);
+    }
+
+    return 0;
+}
