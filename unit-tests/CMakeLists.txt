@@ -54,6 +54,8 @@ add_executable(test_parser test_parser.c)
 add_executable(test_script test_script.c)
 add_executable(test_wallet test_wallet.c)
 add_executable(test_get_preimage test_get_preimage.c)
+add_executable(test_extract_bip32_derivation test_extract_bip32_derivation.c)
+add_executable(test_psbt_parse test_psbt_parse.c)
 
 # add_executable(test_crypto test_crypto.c)
 
@@ -62,6 +64,7 @@ add_library(crypto_mocks SHARED libs/crypto_mocks.c)
 add_library(sha256 SHARED libs/sha-256.c)
 add_library(cx_hash_mock SHARED libs/cx_hash_mock.c)
 add_library(mock_dispatcher SHARED libs/mock_dispatcher.c)
+add_library(psbt_parse SHARED libs/psbt_parse.c)
 
 # App's libraries
 add_library(base58 SHARED $ENV{BOLOS_SDK}/lib_standard_app/base58.c)
@@ -69,8 +72,12 @@ add_library(bip32 SHARED $ENV{BOLOS_SDK}/lib_standard_app/bip32.c)
 add_library(buffer SHARED $ENV{BOLOS_SDK}/lib_standard_app/buffer.c)
 add_library(buffer_ext SHARED ../src/common/buffer_ext.c)
 add_library(display_utils SHARED ../src/ui/display_utils.c)
+add_library(extract_bip32_derivation SHARED ../src/handler/sign_psbt/extract_bip32_derivation.c)
+add_library(get_merkle_leaf_hash SHARED ../src/handler/lib/get_merkle_leaf_hash.c)
 add_library(get_preimage SHARED ../src/handler/lib/get_preimage.c)
 add_library(merkle SHARED ../src/common/merkle.c)
+add_library(stream_merkle_leaf_element SHARED ../src/handler/lib/stream_merkle_leaf_element.c)
+add_library(stream_preimage SHARED ../src/handler/lib/stream_preimage.c)
 add_library(parser SHARED ../src/common/parser_ext.c)
 add_library(read SHARED $ENV{BOLOS_SDK}/lib_standard_app/read.c)
 add_library(script SHARED ../src/common/script.c)
@@ -81,13 +88,19 @@ add_library(write SHARED $ENV{BOLOS_SDK}/lib_standard_app/write.c)
 # add_library(crypto SHARED ../src/crypto.c)
 
 # Additional include directories for handler code
+target_include_directories(extract_bip32_derivation PRIVATE ../src/handler ../src/handler/lib ../src/handler/sign_psbt ../src/common)
+target_include_directories(get_merkle_leaf_hash PRIVATE ../src/handler ../src/handler/lib ../src/common)
 target_include_directories(get_preimage PRIVATE ../src/handler ../src/handler/lib)
 target_include_directories(mock_dispatcher PRIVATE ../src/handler ../src/handler/lib ../src/common)
+target_include_directories(stream_merkle_leaf_element PRIVATE ../src/handler ../src/handler/lib ../src/common)
+target_include_directories(stream_preimage PRIVATE ../src/handler ../src/handler/lib)
+target_include_directories(test_extract_bip32_derivation PRIVATE ../src/handler ../src/handler/lib ../src/handler/sign_psbt ../src/common)
 target_include_directories(test_get_preimage PRIVATE ../src/handler ../src/handler/lib)
 
 # Mock libraries
 target_link_libraries(crypto_mocks PUBLIC sha256)
 target_link_libraries(cx_hash_mock PUBLIC sha256)
+target_link_libraries(mock_dispatcher PUBLIC psbt_parse)
 
 # App's libraries
 target_link_libraries(test_bitvector PUBLIC cmocka gcov)
@@ -97,6 +110,8 @@ target_link_libraries(test_parser PUBLIC cmocka gcov parser buffer buffer_ext va
 target_link_libraries(test_script PUBLIC cmocka gcov script buffer varint read write bip32)
 target_link_libraries(test_wallet PUBLIC cmocka gcov wallet script buffer buffer_ext varint read write bip32 base58 crypto_mocks)
 target_link_libraries(test_get_preimage PUBLIC cmocka gcov mock_dispatcher cx_hash_mock sha256 buffer buffer_ext varint read write bip32 merkle get_preimage)
+target_link_libraries(test_extract_bip32_derivation PUBLIC cmocka gcov mock_dispatcher cx_hash_mock sha256 buffer buffer_ext varint read write bip32 merkle extract_bip32_derivation stream_merkle_leaf_element get_merkle_leaf_hash stream_preimage psbt_parse)
+target_link_libraries(test_psbt_parse PUBLIC cmocka gcov psbt_parse)
 
 # target_link_libraries(test_crypto PUBLIC cmocka gcov crypto)
 add_test(test_bitvector test_bitvector)
@@ -106,5 +121,7 @@ add_test(test_parser test_parser)
 add_test(test_script test_script)
 add_test(test_wallet test_wallet)
 add_test(test_get_preimage test_get_preimage)
+add_test(test_extract_bip32_derivation test_extract_bip32_derivation)
+add_test(test_psbt_parse test_psbt_parse)
 
 # add_test(test_crypto test_crypto)
