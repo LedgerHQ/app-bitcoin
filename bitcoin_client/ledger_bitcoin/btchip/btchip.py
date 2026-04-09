@@ -56,6 +56,9 @@ class btchip:
 	BTCHIP_INS_GET_FIRMWARE_VERSION = 0xc4
 	BTCHIP_INS_COMPOSE_MOFN_ADDRESS = 0xc6
 	BTCHIP_INS_GET_POS_SEED = 0xca
+	# Introduced in app-bitcoin (legacy) v2.4.11 to provide a way to fetch
+	# the master key fingerprint after path derivation hardening applied
+	BTCHIP_INS_GET_MASTER_FINGERPRINT = 0xd0
 
 	BTCHIP_INS_EXT_GET_HALF_PUBLIC_KEY = 0x20
 	BTCHIP_INS_EXT_CACHE_PUT_PUBLIC_KEY = 0x22
@@ -63,7 +66,7 @@ class btchip:
 	BTCHIP_INS_EXT_CACHE_GET_FEATURES = 0x26
 
 	OPERATION_MODE_WALLET = 0x01
-	OPERATION_MODE_RELAXED_WALLET = 0x02 
+	OPERATION_MODE_RELAXED_WALLET = 0x02
 	OPERATION_MODE_SERVER = 0x04
 	OPERATION_MODE_DEVELOPER = 0x08
 
@@ -87,13 +90,13 @@ class btchip:
 			else:
 				self.scriptBlockLength = 255
 		except Exception:
-			pass				
+			pass
 
 	def getWalletPublicKey(self, path, showOnScreen=False, segwit=False, segwitNative=False, cashAddr=False):
 		result = {}
 		donglePath = parse_bip32_path(path)
 		if self.needKeyCache:
-			self.resolvePublicKeysInPath(path)			
+			self.resolvePublicKeysInPath(path)
 		apdu = [ self.BTCHIP_CLA, self.BTCHIP_INS_GET_WALLET_PUBLIC_KEY, 0x01 if showOnScreen else 0x00, 0x03 if cashAddr else 0x02 if segwitNative else 0x01 if segwit else 0x00, len(donglePath) ]
 		apdu.extend(donglePath)
 		response = self.dongle.exchange(bytearray(apdu))
@@ -237,14 +240,14 @@ class btchip:
 			if len(script) == 0:
 				apdu = [ self.BTCHIP_CLA, self.BTCHIP_INS_HASH_INPUT_START, 0x80, 0x00, len(sequence) ]
 				apdu.extend(sequence)
-				self.dongle.exchange(bytearray(apdu))				
+				self.dongle.exchange(bytearray(apdu))
 			currentIndex += 1
 
 	def finalizeInput(self, outputAddress, amount, fees, changePath, rawTx=None):
 		alternateEncoding = False
 		donglePath = parse_bip32_path(changePath)
 		if self.needKeyCache:
-			self.resolvePublicKeysInPath(changePath)		
+			self.resolvePublicKeysInPath(changePath)
 		result = {}
 		outputs = None
 		if rawTx is not None:
@@ -291,7 +294,7 @@ class btchip:
 		if result['confirmationType'] == 0x02:
 			result['keycardData'] = response[1 + response[0] + 1:]
 		if result['confirmationType'] == 0x03:
-			offset = 1 + response[0] + 1 
+			offset = 1 + response[0] + 1
 			keycardDataLength = response[offset]
 			offset = offset + 1
 			result['keycardData'] = response[offset : offset + keycardDataLength]
@@ -300,7 +303,7 @@ class btchip:
 		if result['confirmationType'] == 0x04:
 			offset = 1 + response[0] + 1
 			keycardDataLength = response[offset]
-			result['keycardData'] = response[offset + 1 : offset + 1 + keycardDataLength]			
+			result['keycardData'] = response[offset + 1 : offset + 1 + keycardDataLength]
 		if outputs == None:
 			result['outputData'] = response[1 : 1 + response[0]]
 		else:
@@ -312,7 +315,7 @@ class btchip:
 			pin = pin.encode('utf-8')
 		donglePath = parse_bip32_path(path)
 		if self.needKeyCache:
-			self.resolvePublicKeysInPath(path)		
+			self.resolvePublicKeysInPath(path)
 		apdu = [ self.BTCHIP_CLA, self.BTCHIP_INS_HASH_SIGN, 0x00, 0x00 ]
 		params = []
 		params.extend(donglePath)
@@ -329,7 +332,7 @@ class btchip:
 	def signMessagePrepareV1(self, path, message):
 		donglePath = parse_bip32_path(path)
 		if self.needKeyCache:
-			self.resolvePublicKeysInPath(path)		
+			self.resolvePublicKeysInPath(path)
 		result = {}
 		apdu = [ self.BTCHIP_CLA, self.BTCHIP_INS_SIGN_MESSAGE, 0x00, 0x00 ]
 		params = []
@@ -350,7 +353,7 @@ class btchip:
 	def signMessagePrepareV2(self, path, message):
 		donglePath = parse_bip32_path(path)
 		if self.needKeyCache:
-			self.resolvePublicKeysInPath(path)				
+			self.resolvePublicKeysInPath(path)
 		result = {}
 		offset = 0
 		encryptedOutputData = b""
@@ -379,8 +382,8 @@ class btchip:
 		result['confirmationType'] = response[1 + response[0]]
 		if result['confirmationType'] == 0x03:
 			offset = 1 + response[0] + 1
-			result['secureScreenData'] = response[offset:]			
-			result['encryptedOutputData'] = encryptedOutputData 
+			result['secureScreenData'] = response[offset:]
+			result['encryptedOutputData'] = encryptedOutputData
 
 		return result
 
@@ -444,3 +447,15 @@ class btchip:
 		result['patch_version'] = response[4]
 		result['specialVersion'] = response[1]
 		return result
+
+	def getMasterFingerprint(self):
+		"""Returns the 4-byte master key fingerprint.
+
+		Uses the INS_GET_MASTER_FINGERPRINT APDU which internally
+		calls os_perso_get_master_key_identifier() to compute
+		RIPEMD160(SHA256(compressed_master_pubkey)) and returns the first
+		4 bytes, without requiring DERIVE_MASTER permission.
+		"""
+		apdu = [ self.BTCHIP_CLA, self.BTCHIP_INS_GET_MASTER_FINGERPRINT, 0x00, 0x00, 0x00 ]
+		response = self.dongle.exchange(bytearray(apdu))
+		return bytes(response[0:4])

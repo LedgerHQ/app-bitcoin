@@ -80,6 +80,20 @@ class LegacyClient(Client):
         if self.app.getAppName() not in ["Bitcoin", "Bitcoin Legacy", "Bitcoin Test", "Bitcoin Test Legacy", "app"]:
             raise ValueError("Ledger is not in either the Bitcoin or Bitcoin Testnet app")
 
+
+    def _get_master_fingerprint(self) -> bytes:
+        """Returns the 4-byte master key fingerprint.
+
+        Tries the dedicated GET_MASTER_FINGERPRINT APDU first (INS 0xD0).
+        If the device does not support it (old firmware or Nano S), falls
+        back to getWalletPublicKey("") + client-side HASH160.
+        """
+        try:
+            return self.app.getMasterFingerprint()
+        except Exception:
+            master_pubkey = self.app.getWalletPublicKey("")
+            return hash160(compress_public_key(master_pubkey["publicKey"]))[:4]
+
     def get_extended_pubkey(self, path: str, display: bool = False) -> str:
         # mostly taken from HWI
 
@@ -97,8 +111,12 @@ class LegacyClient(Client):
             parent_path = parent_path[:-1]
 
             # Get parent key fingerprint
-            parent = self.app.getWalletPublicKey(parent_path)
-            fpr = hash160(compress_public_key(parent["publicKey"]))[:4]
+            if len(parent_path) == 0:
+                # Root level: use dedicated APDU instead of deriving master key
+                fpr = self._get_master_fingerprint()
+            else:
+                parent = self.app.getWalletPublicKey(parent_path)
+                fpr = hash160(compress_public_key(parent["publicKey"]))[:4]
 
             child = int_path[-1]
         # Special case for m
@@ -177,7 +195,7 @@ class LegacyClient(Client):
         tx_bytes = c_tx.serialize_with_witness()
 
         # Master key fingerprint
-        master_fpr = hash160(compress_public_key(self.app.getWalletPublicKey('')["publicKey"]))[:4]
+        master_fpr = self._get_master_fingerprint()
         # An entry per input, each with 0 to many keys to sign with
         all_signature_attempts: List[List[Tuple[str, bytes]]] = [[]] * len(c_tx.vin)
 
@@ -328,8 +346,7 @@ class LegacyClient(Client):
         return result
 
     def get_master_fingerprint(self) -> bytes:
-        master_pubkey = self.app.getWalletPublicKey("")
-        return hash160(compress_public_key(master_pubkey["publicKey"]))[:4]
+        return self._get_master_fingerprint()
 
     def sign_message(self, message: Union[str, bytes], keypath: str) -> str:
         # copied verbatim from HWI
