@@ -83,6 +83,7 @@ void handler_sign_message(dispatcher_context_t *dc, uint8_t protocol_version) {
     }
 
     uint8_t message_full[MAX_DISPLAYBLE_MESSAGE_LENGTH + 1];
+    message_full[0] = '\0';
     size_t n_chunks = (message_length + MESSAGE_CHUNK_SIZE - 1) / MESSAGE_CHUNK_SIZE;
     for (unsigned int i = 0; i < n_chunks; i++) {
         uint8_t *message_chunk = &message_full[i * MESSAGE_CHUNK_SIZE * not_long_message];
