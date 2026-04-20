@@ -2,6 +2,9 @@ mod command;
 mod interpreter;
 mod merkle;
 
+#[cfg(feature = "paranoid_client")]
+mod bip327;
+
 pub mod apdu;
 pub mod client;
 pub mod error;

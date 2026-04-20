@@ -81,6 +81,13 @@ impl<T: Transport> BitcoinClient<T> {
         let desc_str = wallet
             .get_descriptor(change)
             .map_err(|_| BitcoinClientError::ClientError("Failed to get descriptor".to_string()))?;
+
+        // Replace musig() expressions with their aggregate xpub, since rust-miniscript
+        // currently does not support musig().
+        let desc_str = crate::bip327::replace_musigs(&desc_str).map_err(|e| {
+            BitcoinClientError::ClientError(format!("Failed to process musig keys: {}", e))
+        })?;
+
         let descriptor = Descriptor::<DescriptorPublicKey>::from_str(&desc_str).map_err(|_| {
             BitcoinClientError::ClientError("Failed to parse descriptor".to_string())
         })?;
