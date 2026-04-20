@@ -76,7 +76,7 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         return;
     }
 
-    uint8_t policy_map_descriptor[MAX_DESCRIPTOR_TEMPLATE_LENGTH];
+    uint8_t policy_map_descriptor[MAX_DESCRIPTOR_TEMPLATE_LENGTH + 1];
     if (0 > read_and_parse_wallet_policy(dc,
                                          &dc->read_buffer,
                                          &wallet_header,
@@ -86,6 +86,7 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
+    policy_map_descriptor[wallet_header.descriptor_template_len] = '\0';
 
     if (count_distinct_keys_info(&policy_map.parsed) != (int) wallet_header.n_keys) {
         PRINTF("Number of keys in descriptor template doesn't provided keys\n");
