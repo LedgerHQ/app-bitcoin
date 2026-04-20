@@ -1477,6 +1477,10 @@ static int parse_script(buffer_t *in_buf,
                 }
             }
 
+            if (node->k > node->n) {
+                return WITH_ERROR(-1, "thresh: k exceeds n");
+            }
+
             // thresh(k, X1, ..., Xn)
             // X1 is Bdu; others are Wdu
 
