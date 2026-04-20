@@ -1,6 +1,6 @@
 [package]
 name = "ledger_bitcoin_client"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["Ledger"]
 edition = "2018"
 description = "Ledger Bitcoin application client"
