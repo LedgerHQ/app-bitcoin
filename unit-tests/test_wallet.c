@@ -415,6 +415,12 @@ static void test_failures(void **state) {
     assert_true(0 > parse_policy("multi(1)", out, sizeof(out)));
     assert_true(0 > parse_policy("multi(1,)", out, sizeof(out)));
 
+    // invalid k in thresh (0, or too large)
+    assert_true(0 >
+                parse_policy("wsh(thresh(0,pk(@0/**),s:pk(@1/**),s:pk(@2/**)))", out, sizeof(out)));
+    assert_true(0 >
+                parse_policy("wsh(thresh(4,pk(@0/**),s:pk(@1/**),s:pk(@2/**)))", out, sizeof(out)));
+
     // syntactically invalid tr descriptors
     assert_true(0 > parse_policy("tr(,pk(@0))", out, sizeof(out)));
     assert_true(0 > parse_policy("tr(pk(@0))", out, sizeof(out)));
