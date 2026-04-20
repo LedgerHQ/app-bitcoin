@@ -75,7 +75,7 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         return;
     }
 
-    uint8_t policy_map_descriptor[MAX_DESCRIPTOR_TEMPLATE_LENGTH];
+    uint8_t policy_map_descriptor[MAX_DESCRIPTOR_TEMPLATE_LENGTH + 1];
     if (0 > read_and_parse_wallet_policy(dc,
                                          &dc->read_buffer,
                                          &wallet_header,
@@ -85,6 +85,7 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
+    policy_map_descriptor[wallet_header.descriptor_template_len] = '\0';
 
     if (wallet_header.n_keys > MAX_N_KEYS_IN_WALLET_POLICY) {
         PRINTF("At most %d key expressions are supported in a wallet policy.\n",
