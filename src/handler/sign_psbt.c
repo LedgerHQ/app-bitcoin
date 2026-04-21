@@ -1095,7 +1095,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
         uint8_t *opreturn_script = st->outputs.output_scripts[0];
         size_t opreturn_script_len = st->outputs.output_script_lengths[0];
-        size_t opreturn_amount = st->outputs.output_amounts[0];
+        uint64_t opreturn_amount = st->outputs.output_amounts[0];
         if (opreturn_script_len < 4 || opreturn_script[0] != OP_RETURN) {
             PRINTF("The first output must be OP_RETURN <data> for a cross-chain swap\n");
             SEND_SW_EC(dc,
