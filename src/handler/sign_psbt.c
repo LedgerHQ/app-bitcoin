@@ -1455,9 +1455,7 @@ static bool __attribute__((noinline)) display_transaction(
 
         // If it's not a default wallet policy, let's save this info to ask the user for
         // confirmation
-        if (!st->is_wallet_default) {
-            ui_prepare_authorize_wallet_spend(st->wallet_header.name);
-        }
+        ui_prepare_authorize_wallet_spend(!st->is_wallet_default ? st->wallet_header.name : NULL);
 
         // "Review transaction to send Bitcoin"
         if (!ui_transaction_streaming_prompt(dc)) {

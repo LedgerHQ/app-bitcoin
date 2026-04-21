@@ -200,9 +200,12 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
 
 void ui_prepare_authorize_wallet_spend(const char *wallet_name) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
-
-    strncpy(state->wallet_policy_name, wallet_name, sizeof(state->wallet_policy_name));
-    state->has_wallet_policy = true;
+    if (wallet_name == NULL) {
+        state->has_wallet_policy = false;
+    } else {
+        strncpy(state->wallet_policy_name, wallet_name, sizeof(state->wallet_policy_name));
+        state->has_wallet_policy = true;
+    }
 }
 
 bool ui_warn_external_inputs(dispatcher_context_t *context) {
