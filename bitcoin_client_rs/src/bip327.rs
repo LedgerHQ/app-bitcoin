@@ -152,18 +152,28 @@ mod tests {
         let cases: &[(&str, Option<&str>)] = &[
             // No musig: descriptor is returned unchanged
             (
-                "wpkh(tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/0/*)",
-                Some("wpkh(tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/0/*)"),
+                "wpkh(tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/<0;1>/*)",
+                Some("wpkh(tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/<0;1>/*)"),
             ),
             // musig() with origin-prefixed keys
             (
-                "tr(musig([76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF,[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK)/0/*)",
-                Some("tr(tpubD6NzVbkrYhZ4XgHkCEtfpuZPJDLaLPxu5ZBEtAbub9GcUX1mTS2t3eCnBaQqFP72F6Sdr6LkYSK7RSHasFxRSq6Vfa4Cn1g47oASGeLixXb/0/*)"),
+                "tr(musig([76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF,[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK)/<0;1>/*)",
+                Some("tr(tpubD6NzVbkrYhZ4XgHkCEtfpuZPJDLaLPxu5ZBEtAbub9GcUX1mTS2t3eCnBaQqFP72F6Sdr6LkYSK7RSHasFxRSq6Vfa4Cn1g47oASGeLixXb/<0;1>/*)"),
             ),
             // musig() without origin info produces the same aggregate
             (
-                "tr(musig(tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF,tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK)/0/*)",
-                Some("tr(tpubD6NzVbkrYhZ4XgHkCEtfpuZPJDLaLPxu5ZBEtAbub9GcUX1mTS2t3eCnBaQqFP72F6Sdr6LkYSK7RSHasFxRSq6Vfa4Cn1g47oASGeLixXb/0/*)"),
+                "tr(musig(tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF,tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK)/<0;1>/*)",
+                Some("tr(tpubD6NzVbkrYhZ4XgHkCEtfpuZPJDLaLPxu5ZBEtAbub9GcUX1mTS2t3eCnBaQqFP72F6Sdr6LkYSK7RSHasFxRSq6Vfa4Cn1g47oASGeLixXb/<0;1>/*)"),
+            ),
+            // Two musig() expressions in the same descriptor
+            (
+                "tr(musig(tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF,tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK)/<0;1>/*,pk(musig(tpubDCwYjpDhUdPGQWG6wG6hkBJuWFZEtrn7j3xwG3i8XcQabcGC53xWZm1hSXrUPFS5UvZ3QhdPSjXWNfWmFGTioARHuG5J7XguEjgg7p8PxAm,tpubD6NzVbkrYhZ4WLczPJWReQycCJdd6YVWXubbVUFnJ5KgU5MDQrD998ZJLSmaB7GVcCnJSDWprxmrGkJ6SvgQC6QAffVpqSvonXmeizXcrkN)/<0;1>/*))",
+                Some("tr(tpubD6NzVbkrYhZ4XgHkCEtfpuZPJDLaLPxu5ZBEtAbub9GcUX1mTS2t3eCnBaQqFP72F6Sdr6LkYSK7RSHasFxRSq6Vfa4Cn1g47oASGeLixXb/<0;1>/*,pk(tpubD6NzVbkrYhZ4XgHkCEtfpuZPJDLaLPxu5ZBEtAbub9GcUX1mTS2t3eCnBYxU9s7tLUd3f8yJNQQoJti5S2SnZCtiyXkbqRLWwD6DbA1kmyX/<0;1>/*))"),
+            ),
+            // Empty musig(): error
+            (
+                "tr(musig()/<0;1>/*)",
+                None,
             ),
             // Unmatched parenthesis: error
             (
@@ -172,12 +182,12 @@ mod tests {
             ),
             // musig() with only one key: error
             (
-                "tr(musig(tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF)/0/*)",
+                "tr(musig(tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF)/<0;1>/*)",
                 None,
             ),
             // Mixed mainnet/testnet keys: error
             (
-                "tr(musig(xpub6ERApfzeWPeNZbNJ3FKMT8SZNJncpBBBbdcuWkMpJeFfFBPDcKHgZ7hiKthVEEPqRHJFZ1vnJtGqmjJnx2z4f5mRezvGJ7mP1DqxbNkk7pE,tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK)/0/*)",
+                "tr(musig(xpub6ERApfzeWPeNZbNJ3FKMT8SZNJncpBBBbdcuWkMpJeFfFBPDcKHgZ7hiKthVEEPqRHJFZ1vnJtGqmjJnx2z4f5mRezvGJ7mP1DqxbNkk7pE,tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK)/<0;1>/*)",
                 None,
             ),
         ];
