@@ -6,7 +6,9 @@ use bitcoin::{
     hashes::{hex::FromHex, Hash},
     psbt::Psbt,
 };
-use ledger_bitcoin_client::{async_client, client, psbt::PartialSignature, wallet};
+use ledger_bitcoin_client::{
+    async_client, client, psbt::PartialSignature, wallet, SignPsbtYieldedObject,
+};
 
 fn test_cases(path: &str) -> Vec<serde_json::Value> {
     let data = std::fs::read_to_string(path).expect("Unable to read file");
@@ -319,44 +321,50 @@ async fn test_sign_psbt() {
             .sign_psbt(&psbt, &wallet, hmac.as_ref())
             .unwrap();
 
-        let check_signatures = |sigs: &[serde_json::Value], res: Vec<(usize, PartialSignature)>| {
-            for (i, psbt_sig) in res {
-                for (j, res_sig) in sigs.iter().enumerate() {
-                    if i == j {
-                        match psbt_sig {
-                            PartialSignature::TapScriptSig(key, tapleaf_hash, sig) => {
-                                assert_eq!(
-                                    res_sig
-                                        .get("key")
-                                        .map(|v| serde_json::from_value::<String>(v.clone())
-                                            .unwrap())
-                                        .unwrap(),
-                                    key.to_string()
-                                );
-                                if let Some(tapleaf_hash_res) = res_sig
-                                    .get("tapleaf_hash")
-                                    .map(|v| serde_json::from_value::<String>(v.clone()).unwrap())
-                                {
+        let check_signatures =
+            |sigs: &[serde_json::Value], res: Vec<(usize, SignPsbtYieldedObject)>| {
+                for (i, psbt_sig) in res {
+                    for (j, res_sig) in sigs.iter().enumerate() {
+                        if i == j {
+                            match psbt_sig {
+                                SignPsbtYieldedObject::Partial(PartialSignature::TapScriptSig(
+                                    key,
+                                    tapleaf_hash,
+                                    sig,
+                                )) => {
                                     assert_eq!(
-                                        tapleaf_hash_res,
-                                        hex::encode(tapleaf_hash.unwrap().to_byte_array())
+                                        res_sig
+                                            .get("key")
+                                            .map(|v| serde_json::from_value::<String>(v.clone())
+                                                .unwrap())
+                                            .unwrap(),
+                                        key.to_string()
+                                    );
+                                    if let Some(tapleaf_hash_res) =
+                                        res_sig.get("tapleaf_hash").map(|v| {
+                                            serde_json::from_value::<String>(v.clone()).unwrap()
+                                        })
+                                    {
+                                        assert_eq!(
+                                            tapleaf_hash_res,
+                                            hex::encode(tapleaf_hash.unwrap().to_byte_array())
+                                        );
+                                    }
+                                    assert_eq!(
+                                        res_sig
+                                            .get("sig")
+                                            .map(|v| serde_json::from_value::<String>(v.clone())
+                                                .unwrap())
+                                            .unwrap(),
+                                        hex::encode(sig.to_vec())
                                     );
                                 }
-                                assert_eq!(
-                                    res_sig
-                                        .get("sig")
-                                        .map(|v| serde_json::from_value::<String>(v.clone())
-                                            .unwrap())
-                                        .unwrap(),
-                                    hex::encode(sig.to_vec())
-                                );
+                                _ => {}
                             }
-                            _ => {}
                         }
                     }
                 }
-            }
-        };
+            };
 
         check_signatures(&sigs, res);
 

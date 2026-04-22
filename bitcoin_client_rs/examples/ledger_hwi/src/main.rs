@@ -12,6 +12,7 @@ use ledger_bitcoin_client::{
     async_client::{BitcoinClient, Transport},
     psbt::PartialSignature,
     wallet::{Version, WalletPolicy, WalletPubKey},
+    SignPsbtYieldedObject,
 };
 
 mod transport;
@@ -175,12 +176,16 @@ async fn sign<T: Transport>(
         .await
         .map_err(|e| format!("{:#?}", e))?;
 
-    for (index, sig) in res {
-        match sig {
-            PartialSignature::Sig(key, sig) => {
+    for (index, obj) in res {
+        match obj {
+            SignPsbtYieldedObject::Partial(PartialSignature::Sig(key, sig)) => {
                 println!("index: {}, key: {}, sig: {}", index, key, sig);
             }
-            PartialSignature::TapScriptSig(key, tapleaf_hash, sig) => {
+            SignPsbtYieldedObject::Partial(PartialSignature::TapScriptSig(
+                key,
+                tapleaf_hash,
+                sig,
+            )) => {
                 println!(
                     "index: {}, key: {}, tapleaf_hash: {}, sig: {}",
                     index,
@@ -191,6 +196,31 @@ async fn sign<T: Transport>(
                     hex::encode(sig.to_vec())
                 );
             }
+            SignPsbtYieldedObject::MusigPubNonce(pn) => {
+                println!(
+                    "index: {}, musig pubnonce: participant: {}, aggregate: {}, tapleaf_hash: {}, pubnonce: {}",
+                    index,
+                    pn.participant_pubkey,
+                    pn.aggregate_pubkey,
+                    pn.tapleaf_hash
+                        .map(|h| hex::encode(h))
+                        .unwrap_or("none".to_string()),
+                    hex::encode(pn.pubnonce)
+                );
+            }
+            SignPsbtYieldedObject::MusigPartialSignature(ps) => {
+                println!(
+                    "index: {}, musig partial sig: participant: {}, aggregate: {}, tapleaf_hash: {}, partial_sig: {}",
+                    index,
+                    ps.participant_pubkey,
+                    ps.aggregate_pubkey,
+                    ps.tapleaf_hash
+                        .map(|h| hex::encode(h))
+                        .unwrap_or("none".to_string()),
+                    hex::encode(ps.partial_signature)
+                );
+            }
+            _ => {}
         }
     }
     Ok(())
