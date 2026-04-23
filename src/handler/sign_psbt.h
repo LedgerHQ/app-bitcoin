@@ -108,13 +108,26 @@ typedef struct signing_state_s {
 // Moreover, that is needed for the swap checks.
 #define N_CACHED_EXTERNAL_OUTPUTS MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER
 
+// Per-wallet-account context used during signing.
+// Groups the wallet policy AST, its header, the standard/registered flag, and
+// the device-controlled key expressions discovered in the policy.
+typedef struct {
+    policy_map_wallet_header_t wallet_header;
+
+    // true iff the wallet policy is a default (BIP-44/49/84/86) policy used without HMAC.
+    bool is_default;
+
+    __attribute__((aligned(4))) uint8_t policy_map_bytes[MAX_WALLET_POLICY_BYTES];
+    policy_node_t *policy_map;
+
+    unsigned int n_internal_key_expressions;
+    keyexpr_info_t internal_key_expressions[MAX_INTERNAL_KEY_EXPRESSIONS];
+} account_ctx_t;
+
 typedef struct {
     uint32_t master_key_fingerprint;
     uint32_t tx_version;
     uint32_t locktime;
-
-    unsigned int n_internal_key_expressions;
-    keyexpr_info_t internal_key_expressions[MAX_INTERNAL_KEY_EXPRESSIONS];
 
     unsigned int n_inputs;
     uint8_t inputs_root[32];  // merkle root of the vector of input maps commitments
@@ -122,8 +135,6 @@ typedef struct {
     uint8_t outputs_root[32];  // merkle root of the vector of output maps commitments
 
     uint64_t inputs_total_amount;
-
-    policy_map_wallet_header_t wallet_header;
 
     unsigned int n_external_inputs;
     unsigned int n_external_outputs;
@@ -141,12 +152,10 @@ typedef struct {
         uint64_t output_amounts[N_CACHED_EXTERNAL_OUTPUTS];
     } outputs;
 
-    bool is_wallet_default;
-
     uint8_t protocol_version;
 
-    __attribute__((aligned(4))) uint8_t wallet_policy_map_bytes[MAX_WALLET_POLICY_BYTES];
-    policy_node_t *wallet_policy_map;
+    // The wallet account used to sign this transaction.
+    account_ctx_t account;
 
     tx_ux_warning_t warnings;
 
