@@ -34,7 +34,7 @@ const char GA_RISK_NON_STD_SIGHASH[] =
     "This transaction uses non-standard signing rules (modified sighash). You could spend more "
     "than expected.";
 const char GA_WARN_HIGH_FEES[] =
-    "This transaction has fees higher than 10% of the amount you’re sending.";
+    "This transaction has fees higher than 10% of the amount you're sending.";
 #else
 const char GA_SECURITY_RISK_TITLE[] = "Security risk";
 const char GA_WARN_HIGH_FEES_TITLE[] = "High fees warning";
