@@ -120,8 +120,18 @@ class MusigPartialSignature:
     partial_signature: bytes
 
 
+@dataclass(frozen=True)
+class UnknownSignPsbtYieldedObject:
+    """Represents an unknown object returned by sign_psbt, for forward compatibility.
+
+    It contains the tag and the opaque bytes returned by the device.
+    """
+    tag: int
+    data: bytes
+
+
 SignPsbtYieldedObject = Union[PartialSignature,
-                              MusigPubNonce, MusigPartialSignature]
+                              MusigPubNonce, MusigPartialSignature, UnknownSignPsbtYieldedObject]
 
 
 class Client:
