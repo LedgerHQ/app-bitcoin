@@ -1,3 +1,20 @@
+/*****************************************************************************
+ *   Ledger App Bitcoin.
+ *   (c) 2025, 2026 Ledger SAS.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *****************************************************************************/
+
 #pragma once
 
 /* Local headers */
@@ -160,63 +177,3 @@ typedef struct {
     tx_ux_warning_t warnings;
 
 } sign_psbt_state_t;
-
-/**
- * Signs a legacy or SegwitV0 sighash using the ECDSA algorithm, and yields the necessary
- * info for the partial signature.
- *
- * @param[in] dc The dispatcher context
- * @param[in] st The signing state
- * @param[in] input_index The index of the input whose sighash is being signed
- * @param[in] sign_path The BIP32 path of the key being used to sign
- * @param[in] sign_path_len The number of derivation steps of the BIP32 path
- * @param[in] sighash_byte The sighash type byte
- * @param[out] sighash Pointer to a 32-byte array that will receive the computed sighash
- * @return true if the computation is successful, false otherwise. On failure, an error status word
- * is already sent.
- */
-bool __attribute__((noinline)) sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
-                                                            sign_psbt_state_t *st,
-                                                            unsigned int input_index,
-                                                            const uint32_t sign_path[],
-                                                            size_t sign_path_len,
-                                                            uint8_t sighash_byte,
-                                                            uint8_t sighash[static 32]);
-
-/**
- * Signs a legacy or SegwitV0 sighash using the ECDSA algorithm, and yields the necessary
- * info for the partial signature.
- *
- * This function allows to select the tweak_data to be used after the BIP-32 derivation. This should
- * be:
- * - a zero-length array for key conforming to BIP-86 and BIP-386.abort
- * - a 32-byte array containing the taproot Merkle tree root for taproot Script path spends.
- * Passing NULL allows to sign with an untweaked key, for example in case this is used for a
- * protocol using the `rawtr()` expression.
- *
- * @param[in] dc The dispatcher context
- * @param[in] st The signing state
- * @param[in] input_index The index of the input whose sighash is being signed
- * @param[in] sign_path The BIP32 path of the key being used to sign
- * @param[in] sign_path_len The number of derivation steps of the BIP32 path
- * @param[in] tweak_data If the key used to sign has to be tweaked, a pointer to an array containing
- * the tweak data. NULL otherwise.
- * @param[in] tweak_data_len The length of the `tweak_data` array. If `tweak_data` is NULL, this
- * should be 0.
- * @param[in] tapleaf_hash NULL if the sighash was signed using the keypath spend, or the tapleaf
- * hash if the sighash was signed using a script path spend.
- * @param[in] sighash_byte The sighash type byte
- * @param[in] sighash Pointer to a 32-byte array containing the sighash to sign
- * @return true if the computation is successful, false otherwise. On failure, an error status word
- * is already sent.
- */
-bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
-                                                              sign_psbt_state_t *st,
-                                                              unsigned int input_index,
-                                                              const uint32_t sign_path[],
-                                                              size_t sign_path_len,
-                                                              const uint8_t *tweak_data,
-                                                              size_t tweak_data_len,
-                                                              const uint8_t *tapleaf_hash,
-                                                              uint8_t sighash_byte,
-                                                              const uint8_t sighash[static 32]);
