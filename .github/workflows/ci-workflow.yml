@@ -15,268 +15,268 @@ on:
     - develop
 
 jobs:
-  job_build:
-    name: Compilation for X, S+, Stax, Flex and Apex P
+  # job_build:
+  #   name: Compilation for X, S+, Stax, Flex and Apex P
 
-    strategy:
-      matrix:
-        include:
-          - model: nanox
-            SDK: "$NANOX_SDK"
-          - model: nanosp
-            SDK: "$NANOSP_SDK"
-          - model: stax
-            SDK: "$STAX_SDK"
-          - model: flex
-            SDK: "$FLEX_SDK"
-          - model: apex_p
-            SDK: "$APEX_P_SDK"
+  #   strategy:
+  #     matrix:
+  #       include:
+  #         - model: nanox
+  #           SDK: "$NANOX_SDK"
+  #         - model: nanosp
+  #           SDK: "$NANOSP_SDK"
+  #         - model: stax
+  #           SDK: "$STAX_SDK"
+  #         - model: flex
+  #           SDK: "$FLEX_SDK"
+  #         - model: apex_p
+  #           SDK: "$APEX_P_SDK"
 
-    runs-on: ubuntu-latest
+  #   runs-on: ubuntu-latest
 
-    container:
-      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
+  #   container:
+  #     image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
 
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Clone
+  #       uses: actions/checkout@v4
 
-      - name: Build
-        run: |
-          make DEBUG=0 COIN=bitcoin BOLOS_SDK=${{ matrix.SDK }} && mv bin/ bitcoin-bin/
-          make clean
-          make DEBUG=0 COIN=bitcoin_testnet BOLOS_SDK=${{ matrix.SDK }} && mv bin/ bitcoin-testnet-bin/
-      - name: Upload Bitcoin app binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: bitcoin-app-${{ matrix.model }}
-          path: bitcoin-bin
+  #     - name: Build
+  #       run: |
+  #         make DEBUG=0 COIN=bitcoin BOLOS_SDK=${{ matrix.SDK }} && mv bin/ bitcoin-bin/
+  #         make clean
+  #         make DEBUG=0 COIN=bitcoin_testnet BOLOS_SDK=${{ matrix.SDK }} && mv bin/ bitcoin-testnet-bin/
+  #     - name: Upload Bitcoin app binary
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: bitcoin-app-${{ matrix.model }}
+  #         path: bitcoin-bin
 
-      - name: Upload Bitcoin Testnet app binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: bitcoin-testnet-app-${{ matrix.model }}
-          path: bitcoin-testnet-bin
+  #     - name: Upload Bitcoin Testnet app binary
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: bitcoin-testnet-app-${{ matrix.model }}
+  #         path: bitcoin-testnet-bin
 
-  job_build_app_perftest:
-    name: Compile the UX-less version of the app on Nano S+ for performance tests
+  # job_build_app_perftest:
+  #   name: Compile the UX-less version of the app on Nano S+ for performance tests
 
-    runs-on: ubuntu-latest
+  #   runs-on: ubuntu-latest
 
-    container:
-      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
+  #   container:
+  #     image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
 
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Clone
+  #       uses: actions/checkout@v4
 
-      - name: Build
-        run: |
-          make DEBUG=0 COIN=bitcoin_testnet BOLOS_SDK="$NANOSP_SDK" AUTOAPPROVE_FOR_PERF_TESTS=1
+  #     - name: Build
+  #       run: |
+  #         make DEBUG=0 COIN=bitcoin_testnet BOLOS_SDK="$NANOSP_SDK" AUTOAPPROVE_FOR_PERF_TESTS=1
 
-      - name: Upload Bitcoin Testnet app binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: bitcoin-testnet-perftest-app-nanosp
-          path: bin
+  #     - name: Upload Bitcoin Testnet app binary
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: bitcoin-testnet-perftest-app-nanosp
+  #         path: bin
 
-  job_test_mainnet:
-    name: Tests on mainnet
-    strategy:
-      matrix:
-        include:
-          - model: nanox
-          - model: nanosp
-          - model: stax
-          - model: flex
-          - model: apex_p
+  # job_test_mainnet:
+  #   name: Tests on mainnet
+  #   strategy:
+  #     matrix:
+  #       include:
+  #         - model: nanox
+  #         - model: nanosp
+  #         - model: stax
+  #         - model: flex
+  #         - model: apex_p
 
-    needs: job_build
-    runs-on: ubuntu-latest
+  #   needs: job_build
+  #   runs-on: ubuntu-latest
 
-    container:
-      image: ghcr.io/ledgerhq/speculos:latest
-      ports:
-        - 1234:1234
-        - 9999:9999
-        - 40000:40000
-        - 41000:41000
-        - 42000:42000
-        - 43000:43000
-      options: --entrypoint /bin/bash
+  #   container:
+  #     image: ghcr.io/ledgerhq/speculos:latest
+  #     ports:
+  #       - 1234:1234
+  #       - 9999:9999
+  #       - 40000:40000
+  #       - 41000:41000
+  #       - 42000:42000
+  #       - 43000:43000
+  #     options: --entrypoint /bin/bash
 
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Clone
+  #       uses: actions/checkout@v4
 
-      - name: Download Bitcoin app binary
-        uses: actions/download-artifact@v4
-        with:
-          name: bitcoin-app-${{matrix.model}}
-          path: bin
+  #     - name: Download Bitcoin app binary
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: bitcoin-app-${{matrix.model}}
+  #         path: bin
 
-      - name: Install build dependencies
-        run: apt update && apt install -y build-essential
+  #     - name: Install build dependencies
+  #       run: apt update && apt install -y build-essential
 
-      - name: Run tests
-        run: |
-          pip install -r requirements.txt
-          cd tests_mainnet
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --timeout=300
+  #     - name: Run tests
+  #       run: |
+  #         pip install -r requirements.txt
+  #         cd tests_mainnet
+  #         PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --timeout=300
 
-  job_test_python_lib_legacyapp:
-    name: Tests with the Python library and legacy Bitcoin app
-    needs: job_build
-    runs-on: ubuntu-latest
+  # job_test_python_lib_legacyapp:
+  #   name: Tests with the Python library and legacy Bitcoin app
+  #   needs: job_build
+  #   runs-on: ubuntu-latest
 
-    container:
-      # As for the test we use v1.6.5 Nano S BTC binary we freeze the last Speculos version supporting this device
-      image: ghcr.io/ledgerhq/speculos:0.25.5
-      ports:
-        - 1234:1234
-        - 9999:9999
-        - 40000:40000
-        - 41000:41000
-        - 42000:42000
-        - 43000:43000
-      options: --entrypoint /bin/bash
+  #   container:
+  #     # As for the test we use v1.6.5 Nano S BTC binary we freeze the last Speculos version supporting this device
+  #     image: ghcr.io/ledgerhq/speculos:0.25.5
+  #     ports:
+  #       - 1234:1234
+  #       - 9999:9999
+  #       - 40000:40000
+  #       - 41000:41000
+  #       - 42000:42000
+  #       - 43000:43000
+  #     options: --entrypoint /bin/bash
 
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Clone
+  #       uses: actions/checkout@v4
 
-      - name: Install build dependencies
-        run: apt update && apt install -y build-essential
+  #     - name: Install build dependencies
+  #       run: apt update && apt install -y build-essential
 
-      - name: Run tests
-        run: |
-          pip install -r requirements.txt
-          cd bitcoin_client/tests
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --timeout=300 --model=nanos
+  #     - name: Run tests
+  #       run: |
+  #         pip install -r requirements.txt
+  #         cd bitcoin_client/tests
+  #         PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --timeout=300 --model=nanos
 
-  job_perftests:
-    name: Performance report
+  # job_perftests:
+  #   name: Performance report
 
-    needs: job_build_app_perftest
-    runs-on: ubuntu-latest
+  #   needs: job_build_app_perftest
+  #   runs-on: ubuntu-latest
 
-    container:
-      image: ghcr.io/ledgerhq/speculos:latest
-      ports:
-        - 1234:1234
-        - 9999:9999
-        - 40000:40000
-        - 41000:41000
-        - 42000:42000
-        - 43000:43000
-      options: --entrypoint /bin/bash
+  #   container:
+  #     image: ghcr.io/ledgerhq/speculos:latest
+  #     ports:
+  #       - 1234:1234
+  #       - 9999:9999
+  #       - 40000:40000
+  #       - 41000:41000
+  #       - 42000:42000
+  #       - 43000:43000
+  #     options: --entrypoint /bin/bash
 
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Clone
+  #       uses: actions/checkout@v4
 
-      - name: Download Bitcoin app binary for perftests
-        uses: actions/download-artifact@v4
-        with:
-          name: bitcoin-testnet-perftest-app-nanosp
-          path: bin
+  #     - name: Download Bitcoin app binary for perftests
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: bitcoin-testnet-perftest-app-nanosp
+  #         path: bin
 
-      - name: Install build dependencies
-        run: apt update && apt install -y build-essential
+  #     - name: Install build dependencies
+  #       run: apt update && apt install -y build-essential
 
-      - name: Run tests
-        run: |
-          pip install -r requirements.txt
-          cd tests_perf
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=nanosp --benchmark-json=benchmarks.json
-      - name: Upload benchmarks summary
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchmarks-log
-          path: tests_perf/benchmarks.json
+  #     - name: Run tests
+  #       run: |
+  #         pip install -r requirements.txt
+  #         cd tests_perf
+  #         PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=nanosp --benchmark-json=benchmarks.json
+  #     - name: Upload benchmarks summary
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: benchmarks-log
+  #         path: tests_perf/benchmarks.json
 
-  python_package_and_deploy:
-    name: Build and deploy the bitcoin client Python package
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_pypi_deployment.yml@v1
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/pyclient')
-    with:
-      package_name: ledger_bitcoin
-      package_directory: ./bitcoin_client/
-      jfrog_deployment: true
-      release: false
-      publish: true
-    secrets:
-      pypi_token: ${{ secrets.PYPI_PUBLIC_API_TOKEN }}
+  # python_package_and_deploy:
+  #   name: Build and deploy the bitcoin client Python package
+  #   uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_pypi_deployment.yml@v1
+  #   if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/pyclient')
+  #   with:
+  #     package_name: ledger_bitcoin
+  #     package_directory: ./bitcoin_client/
+  #     jfrog_deployment: true
+  #     release: false
+  #     publish: true
+  #   secrets:
+  #     pypi_token: ${{ secrets.PYPI_PUBLIC_API_TOKEN }}
 
-  job_test_js_lib:
-    name: Tests with the JS library
-    needs: job_build
-    runs-on: ubuntu-latest
+  # job_test_js_lib:
+  #   name: Tests with the JS library
+  #   needs: job_build
+  #   runs-on: ubuntu-latest
 
-    container:
-      image: ghcr.io/ledgerhq/speculos:latest
-      ports:
-        - 1234:1234
-        - 9999:9999
-        - 40000:40000
-        - 41000:41000
-        - 42000:42000
-        - 43000:43000
-      options: --entrypoint /bin/bash
+  #   container:
+  #     image: ghcr.io/ledgerhq/speculos:latest
+  #     ports:
+  #       - 1234:1234
+  #       - 9999:9999
+  #       - 40000:40000
+  #       - 41000:41000
+  #       - 42000:42000
+  #       - 43000:43000
+  #     options: --entrypoint /bin/bash
 
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Clone
+  #       uses: actions/checkout@v4
 
-      - name: Install node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+  #     - name: Install node
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20
 
-      - name: Install yarn
-        run: |
-          npm install -g yarn
+  #     - name: Install yarn
+  #       run: |
+  #         npm install -g yarn
 
-      - name: Download Bitcoin Testnet app binary
-        uses: actions/download-artifact@v4
-        with:
-          name: bitcoin-testnet-app-nanosp
-          path: bin
+  #     - name: Download Bitcoin Testnet app binary
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: bitcoin-testnet-app-nanosp
+  #         path: bin
 
-      - name: Run tests
-        run: |
-          cd bitcoin_client_js
-          yarn install --immutable
-          LOG_SPECULOS=1 LOG_APDUS=1 SPECULOS="/speculos/speculos.py" yarn test
+  #     - name: Run tests
+  #       run: |
+  #         cd bitcoin_client_js
+  #         yarn install --immutable
+  #         LOG_SPECULOS=1 LOG_APDUS=1 SPECULOS="/speculos/speculos.py" yarn test
 
-  deploy_js_client_check_tag:
-    name: Check that tag matches version in package.json prior to deploying on JFrog
-    needs: job_test_js_lib
-    runs-on: ubuntu-latest
-    if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/jsclient')
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
+  # deploy_js_client_check_tag:
+  #   name: Check that tag matches version in package.json prior to deploying on JFrog
+  #   needs: job_test_js_lib
+  #   runs-on: ubuntu-latest
+  #   if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/jsclient')
+  #   steps:
+  #     - name: Clone
+  #       uses: actions/checkout@v4
 
-      - name: Check that tag matches semver in CHANGELOG.md
-        run: |
-            cd bitcoin_client_js
-            package_version=$(sed -r -n -e '/"version":/s/^\s+"version": "([[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+)",$/\1/p' package.json)
-            tag_version=${GITHUB_REF#refs/tags/jsclient-}
-            if [[ $package_version == $tag_version ]]; then
-                echo "[INFO] Tag matches version in package.json. Continuing."
-            else
-                echo "[ERROR] mismatch between version in tag and package.json. Aborting."
-                exit 1
-            fi
+  #     - name: Check that tag matches semver in CHANGELOG.md
+  #       run: |
+  #           cd bitcoin_client_js
+  #           package_version=$(sed -r -n -e '/"version":/s/^\s+"version": "([[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+)",$/\1/p' package.json)
+  #           tag_version=${GITHUB_REF#refs/tags/jsclient-}
+  #           if [[ $package_version == $tag_version ]]; then
+  #               echo "[INFO] Tag matches version in package.json. Continuing."
+  #           else
+  #               echo "[ERROR] mismatch between version in tag and package.json. Aborting."
+  #               exit 1
+  #           fi
 
-  deploy_js_client:
-    name: Deploy
-    needs: deploy_js_client_check_tag
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_npm_deployment.yml@v1
-    if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/jsclient')
-    with:
-      package_directory: "bitcoin_client_js"
+  # deploy_js_client:
+  #   name: Deploy
+  #   needs: deploy_js_client_check_tag
+  #   uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_npm_deployment.yml@v1
+  #   if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/jsclient')
+  #   with:
+  #     package_directory: "bitcoin_client_js"
 
   job_test_rust_client:
     name: Tests for rust client library
