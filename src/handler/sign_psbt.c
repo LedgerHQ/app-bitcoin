@@ -189,10 +189,10 @@ static int is_in_out_internal(dispatcher_context_t *dispatcher_context,
                                          sign_psbt_cache,
                                          in_out_info->is_change,
                                          in_out_info->address_index,
-                                         state->wallet_policy_map,
-                                         state->wallet_header.version,
-                                         state->wallet_header.keys_info_merkle_root,
-                                         state->wallet_header.n_keys,
+                                         state->account.policy_map,
+                                         state->account.wallet_header.version,
+                                         state->account.wallet_header.keys_info_merkle_root,
+                                         state->account.wallet_header.n_keys,
                                          in_out_info->scriptPubKey,
                                          in_out_info->scriptPubKey_len);
 }
@@ -301,9 +301,9 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             return false;
         }
 
-        st->is_wallet_default = false;
+        st->account.is_default = false;
     } else {
-        st->is_wallet_default = true;
+        st->account.is_default = true;
     }
 
     {
@@ -325,9 +325,9 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
         int desc_temp_len = read_and_parse_wallet_policy(dc,
                                                          &serialized_wallet_policy_buf,
-                                                         &st->wallet_header,
+                                                         &st->account.wallet_header,
                                                          policy_map_descriptor,
-                                                         st->wallet_policy_map_bytes,
+                                                         st->account.policy_map_bytes,
                                                          MAX_WALLET_POLICY_BYTES);
         if (desc_temp_len < 0) {
             PRINTF("Failed to read or parse wallet policy");
@@ -335,17 +335,19 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             return false;
         }
 
-        st->wallet_policy_map = (policy_node_t *) st->wallet_policy_map_bytes;
+        st->account.policy_map = (policy_node_t *) st->account.policy_map_bytes;
 
-        if (st->is_wallet_default) {
+        if (st->account.is_default) {
             // No hmac, verify that the policy is indeed a default one
-            if (!is_wallet_policy_standard(dc, &st->wallet_header, st->wallet_policy_map)) {
+            if (!is_wallet_policy_standard(dc,
+                                           &st->account.wallet_header,
+                                           st->account.policy_map)) {
                 PRINTF("Non-standard policy, and no hmac provided\n");
                 SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_MISSING_HMAC_FOR_NONDEFAULT_POLICY);
                 return false;
             }
 
-            if (st->wallet_header.name_len != 0) {
+            if (st->account.wallet_header.name_len != 0) {
                 PRINTF("Name must be zero-length for a standard wallet policy\n");
                 SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_NO_NAME_FOR_DEFAULT_POLICY);
                 return false;
@@ -368,8 +370,8 @@ static bool __attribute__((noinline)) get_and_verify_key_info(dispatcher_context
     uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
 
     int key_info_len = call_get_merkle_leaf_element(dc,
-                                                    st->wallet_header.keys_info_merkle_root,
-                                                    st->wallet_header.n_keys,
+                                                    st->account.wallet_header.keys_info_merkle_root,
+                                                    st->account.wallet_header.n_keys,
                                                     key_index,
                                                     key_info_str,
                                                     sizeof(key_info_str));
@@ -380,7 +382,8 @@ static bool __attribute__((noinline)) get_and_verify_key_info(dispatcher_context
     // Make a sub-buffer for the pubkey info
     buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
 
-    if (parse_policy_map_key_info(&key_info_buffer, &key_info, st->wallet_header.version) == -1) {
+    if (parse_policy_map_key_info(&key_info_buffer, &key_info, st->account.wallet_header.version) ==
+        -1) {
         return false;  // should never happen
     }
 
@@ -541,8 +544,10 @@ static void input_keys_callback(dispatcher_context_t *dc,
                 // nothing to do
             } else if (res == 1) {
                 in_out_info_t *in_out = &callback_data->input->in_out;
-                for (size_t i = 0; i < callback_data->state->n_internal_key_expressions; i++) {
-                    keyexpr_info_t *key_expr = &callback_data->state->internal_key_expressions[i];
+                for (size_t i = 0; i < callback_data->state->account.n_internal_key_expressions;
+                     i++) {
+                    keyexpr_info_t *key_expr =
+                        &callback_data->state->account.internal_key_expressions[i];
                     if (is_keyexpr_compatible_with_derivation_info(key_expr, &derivation_info)) {
                         key_expr->to_sign = true;
 
@@ -568,8 +573,8 @@ static void input_keys_callback(dispatcher_context_t *dc,
 static bool fill_internal_key_expressions(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     size_t cur_index = 0;
 
-    st->n_internal_key_expressions = 0;
-    memset(st->internal_key_expressions, 0, sizeof(st->internal_key_expressions));
+    st->account.n_internal_key_expressions = 0;
+    memset(st->account.internal_key_expressions, 0, sizeof(st->account.internal_key_expressions));
 
     // find and parse our registered key info in the wallet
     keyexpr_info_t keyexpr_info;
@@ -577,7 +582,7 @@ static bool fill_internal_key_expressions(dispatcher_context_t *dc, sign_psbt_st
     while (true) {
         keyexpr_info.index = cur_index;
         const policy_node_t *tapleaf_ptr = NULL;
-        int n_key_expressions = get_keyexpr_by_index(st->wallet_policy_map,
+        int n_key_expressions = get_keyexpr_by_index(st->account.policy_map,
                                                      cur_index,
                                                      &tapleaf_ptr,
                                                      &keyexpr_info.key_expression_ptr);
@@ -598,7 +603,7 @@ static bool fill_internal_key_expressions(dispatcher_context_t *dc, sign_psbt_st
         }
 
         if (fill_keyexpr_info_if_internal(dc, st, &keyexpr_info)) {
-            if (st->n_internal_key_expressions >= MAX_INTERNAL_KEY_EXPRESSIONS) {
+            if (st->account.n_internal_key_expressions >= MAX_INTERNAL_KEY_EXPRESSIONS) {
                 PRINTF("Too many internal key expressions. The maximum supported is %d\n",
                        MAX_INTERNAL_KEY_EXPRESSIONS);
                 SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_SIGN_PSBT_WALLET_POLICY_TOO_MANY_INTERNAL_KEYS);
@@ -606,16 +611,16 @@ static bool fill_internal_key_expressions(dispatcher_context_t *dc, sign_psbt_st
             }
 
             // store this key info, as it's internal
-            memcpy(&st->internal_key_expressions[st->n_internal_key_expressions],
+            memcpy(&st->account.internal_key_expressions[st->account.n_internal_key_expressions],
                    &keyexpr_info,
                    sizeof(keyexpr_info_t));
-            ++st->n_internal_key_expressions;
+            ++st->account.n_internal_key_expressions;
         }
 
         ++cur_index;
     }
 
-    if (st->n_internal_key_expressions == 0) {
+    if (st->account.n_internal_key_expressions == 0) {
         PRINTF("No internal key found in wallet policy");
         SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_WALLET_POLICY_HAS_NO_INTERNAL_KEY);
         return false;
@@ -762,7 +767,7 @@ preprocess_inputs(dispatcher_context_t *dc,
 
         bitvector_set(internal_inputs, cur_input_index, 1);
 
-        int segwit_version = get_policy_segwit_version(st->wallet_policy_map);
+        int segwit_version = get_policy_segwit_version(st->account.policy_map);
 
         // For legacy inputs, the non-witness utxo must be present
         // and the witness utxo must be absent.
@@ -880,9 +885,10 @@ static void output_keys_callback(dispatcher_context_t *dc,
                 callback_data->output->in_out.unexpected_pubkey_error = true;
             } else if (res == 1) {
                 in_out_info_t *in_out = &callback_data->output->in_out;
-                for (size_t i = 0; i < callback_data->state->n_internal_key_expressions; i++) {
+                for (size_t i = 0; i < callback_data->state->account.n_internal_key_expressions;
+                     i++) {
                     const keyexpr_info_t *key_expr =
-                        &callback_data->state->internal_key_expressions[i];
+                        &callback_data->state->account.internal_key_expressions[i];
                     if (is_keyexpr_compatible_with_derivation_info(key_expr, &derivation_info)) {
                         bool is_change =
                             key_expr->key_expression_ptr->num_second ==
@@ -1046,7 +1052,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     // Swap feature: check that wallet policy is a default one
-    if (!st->is_wallet_default) {
+    if (!st->account.is_default) {
         PRINTF("Must be a default wallet policy for swap feature\n");
         SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_NONDEFAULT_POLICY);
         finalize_exchange_sign_transaction(false);
@@ -1417,9 +1423,10 @@ static bool __attribute__((noinline)) display_transaction(
 
         /** TRANSACTION CONFIRMATION */
         /* Init*/
-        ui_transaction_simplified_init(st->is_wallet_default ? NULL : st->wallet_header.name,
-                                       is_self_transfer ? 1 : st->n_external_outputs,
-                                       st->warnings);
+        ui_transaction_simplified_init(
+            st->account.is_default ? NULL : st->account.wallet_header.name,
+            is_self_transfer ? 1 : st->n_external_outputs,
+            st->warnings);
 
         /* Adding outputs */
         if (!is_self_transfer) {
@@ -1455,7 +1462,8 @@ static bool __attribute__((noinline)) display_transaction(
 
         // If it's not a default wallet policy, let's save this info to ask the user for
         // confirmation
-        ui_prepare_authorize_wallet_spend(!st->is_wallet_default ? st->wallet_header.name : NULL);
+        ui_prepare_authorize_wallet_spend(!st->account.is_default ? st->account.wallet_header.name
+                                                                  : NULL);
 
         // "Review transaction to send Bitcoin"
         if (!ui_transaction_streaming_prompt(dc)) {
@@ -1571,7 +1579,7 @@ bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_context
                                                               const uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    if (st->wallet_policy_map->type != TOKEN_TR) {
+    if (st->account.policy_map->type != TOKEN_TR) {
         SEND_SW(dc, SW_BAD_STATE);  // should never happen
         return false;
     }
@@ -1792,7 +1800,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
             }
         }
 
-        int segwit_version = get_policy_segwit_version(st->wallet_policy_map);
+        int segwit_version = get_policy_segwit_version(st->account.policy_map);
         uint8_t sighash[32];
         if (segwit_version == 0) {
             LEDGER_ASSERT(keyexpr_info->key_expression_ptr->type == KEY_EXPRESSION_NORMAL,
@@ -1838,7 +1846,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                     sighash))
                 return false;
 
-            policy_node_tr_t *policy = (policy_node_tr_t *) st->wallet_policy_map;
+            policy_node_tr_t *policy = (policy_node_tr_t *) st->account.policy_map;
             if (!keyexpr_info->is_tapscript && !isnull_policy_node_tree(&policy->tree)) {
                 // keypath spend, we compute the taptree hash
                 if (0 > compute_taptree_hash(
@@ -1846,9 +1854,9 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                             &(wallet_derivation_info_t){
                                 .address_index = input->in_out.address_index,
                                 .change = input->in_out.is_change ? 1 : 0,
-                                .keys_merkle_root = st->wallet_header.keys_info_merkle_root,
-                                .n_keys = st->wallet_header.n_keys,
-                                .wallet_version = st->wallet_header.version,
+                                .keys_merkle_root = st->account.wallet_header.keys_info_merkle_root,
+                                .n_keys = st->account.wallet_header.n_keys,
+                                .wallet_version = st->account.wallet_header.version,
                                 .sign_psbt_cache = sign_psbt_cache},
                             r_policy_node_tree(&policy->tree),
                             input->taptree_hash)) {
@@ -1922,12 +1930,13 @@ fill_taproot_keyexpr_info(dispatcher_context_t *dc,
     cx_sha256_t hash_context;
     crypto_tr_tapleaf_hash_init(&hash_context);
 
-    wallet_derivation_info_t wdi = {.wallet_version = st->wallet_header.version,
-                                    .keys_merkle_root = st->wallet_header.keys_info_merkle_root,
-                                    .n_keys = st->wallet_header.n_keys,
-                                    .change = input->in_out.is_change,
-                                    .address_index = input->in_out.address_index,
-                                    .sign_psbt_cache = sign_psbt_cache};
+    wallet_derivation_info_t wdi = {
+        .wallet_version = st->account.wallet_header.version,
+        .keys_merkle_root = st->account.wallet_header.keys_info_merkle_root,
+        .n_keys = st->account.wallet_header.n_keys,
+        .change = input->in_out.is_change,
+        .address_index = input->in_out.address_index,
+        .sign_psbt_cache = sign_psbt_cache};
 
     // we compute the tapscript once just to compute its length
     // this avoids having to store it
@@ -1962,13 +1971,13 @@ static bool __attribute__((noinline)) produce_musig2_pubnonces(
     const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    if (st->wallet_policy_map->type != TOKEN_TR) {
+    if (st->account.policy_map->type != TOKEN_TR) {
         return true;  // nothing to do
     }
 
     // Iterate over all the key expressions that correspond to keys owned by us
-    for (size_t i_keyexpr = 0; i_keyexpr < st->n_internal_key_expressions; i_keyexpr++) {
-        keyexpr_info_t *keyexpr_info = &st->internal_key_expressions[i_keyexpr];
+    for (size_t i_keyexpr = 0; i_keyexpr < st->account.n_internal_key_expressions; i_keyexpr++) {
+        keyexpr_info_t *keyexpr_info = &st->account.internal_key_expressions[i_keyexpr];
         if (!keyexpr_info->to_sign ||
             keyexpr_info->key_expression_ptr->type != KEY_EXPRESSION_MUSIG) {
             continue;
@@ -2009,19 +2018,20 @@ static bool __attribute__((noinline)) produce_musig2_pubnonces(
                     }
                 }
 
-                policy_node_tr_t *policy = (policy_node_tr_t *) st->wallet_policy_map;
+                policy_node_tr_t *policy = (policy_node_tr_t *) st->account.policy_map;
                 if (!isnull_policy_node_tree(&policy->tree)) {
-                    if (0 > compute_taptree_hash(
-                                dc,
-                                &(wallet_derivation_info_t){
-                                    .address_index = input.in_out.address_index,
-                                    .change = input.in_out.is_change ? 1 : 0,
-                                    .keys_merkle_root = st->wallet_header.keys_info_merkle_root,
-                                    .n_keys = st->wallet_header.n_keys,
-                                    .wallet_version = st->wallet_header.version,
-                                    .sign_psbt_cache = sign_psbt_cache},
-                                r_policy_node_tree(&policy->tree),
-                                input.taptree_hash)) {
+                    if (0 >
+                        compute_taptree_hash(
+                            dc,
+                            &(wallet_derivation_info_t){
+                                .address_index = input.in_out.address_index,
+                                .change = input.in_out.is_change ? 1 : 0,
+                                .keys_merkle_root = st->account.wallet_header.keys_info_merkle_root,
+                                .n_keys = st->account.wallet_header.n_keys,
+                                .wallet_version = st->account.wallet_header.version,
+                                .sign_psbt_cache = sign_psbt_cache},
+                            r_policy_node_tree(&policy->tree),
+                            input.taptree_hash)) {
                         PRINTF("Error while computing taptree hash\n");
                         SEND_SW(dc, SW_BAD_STATE);
                         return false;
@@ -2047,8 +2057,8 @@ sign_transaction(dispatcher_context_t *dc,
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     // Iterate over all the key expressions that correspond to keys owned by us
-    for (size_t i_keyexpr = 0; i_keyexpr < st->n_internal_key_expressions; i_keyexpr++) {
-        keyexpr_info_t *keyexpr_info = &st->internal_key_expressions[i_keyexpr];
+    for (size_t i_keyexpr = 0; i_keyexpr < st->account.n_internal_key_expressions; i_keyexpr++) {
+        keyexpr_info_t *keyexpr_info = &st->account.internal_key_expressions[i_keyexpr];
         if (!keyexpr_info->to_sign) {
             continue;
         }
@@ -2154,9 +2164,10 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
 
     // check if we're only executing the MuSig2 Round 1
     bool only_signing_for_musig = true;
-    for (size_t i = 0; i < st.n_internal_key_expressions; i++) {
-        if (st.internal_key_expressions[i].to_sign &&
-            st.internal_key_expressions[i].key_expression_ptr->type != KEY_EXPRESSION_MUSIG) {
+    for (size_t i = 0; i < st.account.n_internal_key_expressions; i++) {
+        if (st.account.internal_key_expressions[i].to_sign &&
+            st.account.internal_key_expressions[i].key_expression_ptr->type !=
+                KEY_EXPRESSION_MUSIG) {
             // at least one of the key expressions we're signing for is not a MuSig
             only_signing_for_musig = false;
         }
