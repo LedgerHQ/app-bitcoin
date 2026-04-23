@@ -146,6 +146,8 @@ typedef struct {
     uint32_t tx_version;
     uint32_t locktime;
 
+    merkleized_map_commitment_t global_map;
+
     unsigned int n_inputs;
     uint8_t inputs_root[32];  // merkle root of the vector of input maps commitments
     unsigned int n_outputs;

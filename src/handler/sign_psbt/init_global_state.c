@@ -46,17 +46,31 @@
 #include "sw.h"
 #include "wallet.h"
 
-bool __attribute__((noinline)) init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
-    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
-
-    merkleized_map_commitment_t global_map;
-    if (!buffer_read_varint(&dc->read_buffer, &global_map.size)) {
+/**
+ * Parses the APDU payload for the SIGN_PSBT command and populates the parts
+ * of the signing state that come directly from the APDU:
+ * - st->global_map (commitment to the PSBT global map)
+ * - st->n_inputs / st->inputs_root
+ * - st->n_outputs / st->outputs_root
+ *
+ * The wallet_id and wallet_hmac are returned via out parameters as they are
+ * only needed to load the wallet account; they do not need to be kept in the
+ * state.
+ *
+ * Returns true on success; on failure, an error status word has already been
+ * sent.
+ */
+static bool __attribute__((noinline)) parse_sign_psbt_apdu(dispatcher_context_t *dc,
+                                                           sign_psbt_state_t *st,
+                                                           uint8_t wallet_id[static 32],
+                                                           uint8_t wallet_hmac[static 32]) {
+    if (!buffer_read_varint(&dc->read_buffer, &st->global_map.size)) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return false;
     }
 
-    if (!buffer_read_bytes(&dc->read_buffer, global_map.keys_root, 32) ||
-        !buffer_read_bytes(&dc->read_buffer, global_map.values_root, 32)) {
+    if (!buffer_read_bytes(&dc->read_buffer, st->global_map.keys_root, 32) ||
+        !buffer_read_bytes(&dc->read_buffer, st->global_map.values_root, 32)) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return false;
     }
@@ -90,58 +104,84 @@ bool __attribute__((noinline)) init_global_state(dispatcher_context_t *dc, sign_
     }
     st->n_outputs = (unsigned int) n_outputs_u64;
 
-    uint8_t wallet_hmac[32];
-    uint8_t wallet_id[32];
     if (!buffer_read_bytes(&dc->read_buffer, wallet_id, 32) ||
         !buffer_read_bytes(&dc->read_buffer, wallet_hmac, 32)) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return false;
     }
 
-    {  // process global map
-        // Check integrity of the global map
-        if (call_check_merkle_tree_sorted(dc, global_map.keys_root, (size_t) global_map.size) < 0) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        }
+    return true;
+}
 
-        uint8_t raw_result[9];  // max size for a varint
-        int result_len;
-
-        // Read tx version
-        result_len = call_get_merkleized_map_value(dc,
-                                                   &global_map,
-                                                   (uint8_t[]){PSBT_GLOBAL_TX_VERSION},
-                                                   1,
-                                                   raw_result,
-                                                   sizeof(raw_result));
-        if (result_len != 4) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        }
-        st->tx_version = read_u32_le(raw_result, 0);
-
-        // Read fallback locktime.
-        // Unlike BIP-0370 recommendation, we use the fallback locktime as-is, ignoring each input's
-        // preferred height/block locktime. If that's relevant, the client must set the fallback
-        // locktime to the appropriate value before calling sign_psbt.
-        result_len = call_get_merkleized_map_value(dc,
-                                                   &global_map,
-                                                   (uint8_t[]){PSBT_GLOBAL_FALLBACK_LOCKTIME},
-                                                   1,
-                                                   raw_result,
-                                                   sizeof(raw_result));
-        if (result_len < 0) {
-            st->locktime = 0;
-        } else if (result_len != 4) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        } else {
-            st->locktime = read_u32_le(raw_result, 0);
-        }
+/**
+ * Verifies the integrity of the PSBT global map (already committed to by
+ * st->global_map) and extracts the transaction-wide fields from it
+ * (tx_version, locktime).
+ *
+ * Returns true on success; on failure, an error status word has already been
+ * sent.
+ */
+static bool __attribute__((noinline))
+process_global_map(dispatcher_context_t *dc, sign_psbt_state_t *st) {
+    // Check integrity of the global map
+    if (call_check_merkle_tree_sorted(dc, st->global_map.keys_root, (size_t) st->global_map.size) <
+        0) {
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return false;
     }
 
-    if (!is_array_all_zeros(wallet_hmac, sizeof(wallet_hmac))) {
+    uint8_t raw_result[9];  // max size for a varint
+    int result_len;
+
+    // Read tx version
+    result_len = call_get_merkleized_map_value(dc,
+                                               &st->global_map,
+                                               (uint8_t[]){PSBT_GLOBAL_TX_VERSION},
+                                               1,
+                                               raw_result,
+                                               sizeof(raw_result));
+    if (result_len != 4) {
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return false;
+    }
+    st->tx_version = read_u32_le(raw_result, 0);
+
+    // Read fallback locktime.
+    // Unlike BIP-0370 recommendation, we use the fallback locktime as-is, ignoring each input's
+    // preferred height/block locktime. If that's relevant, the client must set the fallback
+    // locktime to the appropriate value before calling sign_psbt.
+    result_len = call_get_merkleized_map_value(dc,
+                                               &st->global_map,
+                                               (uint8_t[]){PSBT_GLOBAL_FALLBACK_LOCKTIME},
+                                               1,
+                                               raw_result,
+                                               sizeof(raw_result));
+    if (result_len < 0) {
+        st->locktime = 0;
+    } else if (result_len != 4) {
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return false;
+    } else {
+        st->locktime = read_u32_le(raw_result, 0);
+    }
+
+    return true;
+}
+
+/**
+ * Loads the wallet account: verifies the wallet HMAC (or marks the policy as
+ * default if the HMAC is all-zero), fetches and parses the serialized wallet
+ * policy from the client, and validates that a default policy is indeed
+ * standard.
+ *
+ * Returns true on success; on failure, an error status word has already been
+ * sent.
+ */
+static bool __attribute__((noinline)) load_wallet_account(dispatcher_context_t *dc,
+                                                          sign_psbt_state_t *st,
+                                                          const uint8_t wallet_id[static 32],
+                                                          const uint8_t wallet_hmac[static 32]) {
+    if (!is_array_all_zeros(wallet_hmac, 32)) {
         // Verify hmac
         if (!check_wallet_hmac(wallet_id, wallet_hmac)) {
             PRINTF("Incorrect hmac\n");
@@ -154,57 +194,68 @@ bool __attribute__((noinline)) init_global_state(dispatcher_context_t *dc, sign_
         st->account.is_default = true;
     }
 
-    {
-        // Fetch the serialized wallet policy from the client
-        uint8_t serialized_wallet_policy[MAX_WALLET_POLICY_SERIALIZED_LENGTH];
-        int serialized_wallet_policy_len = call_get_preimage(dc,
-                                                             wallet_id,
-                                                             serialized_wallet_policy,
-                                                             sizeof(serialized_wallet_policy));
-        if (serialized_wallet_policy_len < 0) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        }
-
-        buffer_t serialized_wallet_policy_buf =
-            buffer_create(serialized_wallet_policy, serialized_wallet_policy_len);
-
-        uint8_t policy_map_descriptor[MAX_DESCRIPTOR_TEMPLATE_LENGTH];
-
-        int desc_temp_len = read_and_parse_wallet_policy(dc,
-                                                         &serialized_wallet_policy_buf,
-                                                         &st->account.wallet_header,
-                                                         policy_map_descriptor,
-                                                         st->account.policy_map_bytes,
-                                                         MAX_WALLET_POLICY_BYTES);
-        if (desc_temp_len < 0) {
-            PRINTF("Failed to read or parse wallet policy");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        }
-
-        st->account.policy_map = (policy_node_t *) st->account.policy_map_bytes;
-
-        if (st->account.is_default) {
-            // No hmac, verify that the policy is indeed a default one
-            if (!is_wallet_policy_standard(dc,
-                                           &st->account.wallet_header,
-                                           st->account.policy_map)) {
-                PRINTF("Non-standard policy, and no hmac provided\n");
-                SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_MISSING_HMAC_FOR_NONDEFAULT_POLICY);
-                return false;
-            }
-
-            if (st->account.wallet_header.name_len != 0) {
-                PRINTF("Name must be zero-length for a standard wallet policy\n");
-                SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_NO_NAME_FOR_DEFAULT_POLICY);
-                return false;
-            }
-
-            // unlike in get_wallet_address, we do not check if the address_index is small:
-            // if funds were already sent there, there is no point in preventing to spend them.
-        }
+    // Fetch the serialized wallet policy from the client
+    uint8_t serialized_wallet_policy[MAX_WALLET_POLICY_SERIALIZED_LENGTH];
+    int serialized_wallet_policy_len = call_get_preimage(dc,
+                                                         wallet_id,
+                                                         serialized_wallet_policy,
+                                                         sizeof(serialized_wallet_policy));
+    if (serialized_wallet_policy_len < 0) {
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return false;
     }
+
+    buffer_t serialized_wallet_policy_buf =
+        buffer_create(serialized_wallet_policy, serialized_wallet_policy_len);
+
+    uint8_t policy_map_descriptor[MAX_DESCRIPTOR_TEMPLATE_LENGTH];
+
+    int desc_temp_len = read_and_parse_wallet_policy(dc,
+                                                     &serialized_wallet_policy_buf,
+                                                     &st->account.wallet_header,
+                                                     policy_map_descriptor,
+                                                     st->account.policy_map_bytes,
+                                                     MAX_WALLET_POLICY_BYTES);
+    if (desc_temp_len < 0) {
+        PRINTF("Failed to read or parse wallet policy");
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return false;
+    }
+
+    st->account.policy_map = (policy_node_t *) st->account.policy_map_bytes;
+
+    if (st->account.is_default) {
+        // No hmac, verify that the policy is indeed a default one
+        if (!is_wallet_policy_standard(dc, &st->account.wallet_header, st->account.policy_map)) {
+            PRINTF("Non-standard policy, and no hmac provided\n");
+            SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_MISSING_HMAC_FOR_NONDEFAULT_POLICY);
+            return false;
+        }
+
+        if (st->account.wallet_header.name_len != 0) {
+            PRINTF("Name must be zero-length for a standard wallet policy\n");
+            SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_NO_NAME_FOR_DEFAULT_POLICY);
+            return false;
+        }
+
+        // unlike in get_wallet_address, we do not check if the address_index is small:
+        // if funds were already sent there, there is no point in preventing to spend them.
+    }
+
+    return true;
+}
+
+bool __attribute__((noinline)) init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
+
+    uint8_t wallet_id[32];
+    uint8_t wallet_hmac[32];
+
+    if (!parse_sign_psbt_apdu(dc, st, wallet_id, wallet_hmac)) return false;
+
+    if (!process_global_map(dc, st)) return false;
+
+    if (!load_wallet_account(dc, st, wallet_id, wallet_hmac)) return false;
 
     st->master_key_fingerprint = crypto_get_master_key_fingerprint();
     return true;
