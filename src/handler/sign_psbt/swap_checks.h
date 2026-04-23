@@ -17,22 +17,23 @@
 
 #pragma once
 
-/* Local headers */
+#ifdef HAVE_SWAP
+
+#include <stdbool.h>
+
 #include "dispatcher.h"
-#include "merkle.h"
-#include "sign_psbt_cache.h"
-#include "wallet.h"
+#include "sign_psbt.h"
 
 /**
- * TODO
+ * Performs the additional checks required when signing a PSBT initiated by
+ * the Exchange app: validates that the wallet policy is default, that there
+ * are no external inputs, that the destination address, total amount and
+ * fees match those negotiated with app-exchange, and (for cross-chain swaps)
+ * that the OP_RETURN payload matches the expected payin hash.
+ *
+ * On any check failure, sends an SW_FAIL_SWAP and calls
+ * finalize_exchange_sign_transaction(false) (which never returns).
  */
-int compare_wallet_script_at_path(dispatcher_context_t *dispatcher_context,
-                                  sign_psbt_cache_t *sign_psbt_cache,
-                                  uint32_t change,
-                                  uint32_t address_index,
-                                  const policy_node_t *policy,
-                                  int wallet_version,
-                                  const uint8_t keys_merkle_root[static 32],
-                                  uint32_t n_keys,
-                                  const uint8_t expected_script[],
-                                  size_t expected_script_len);
+bool execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st);
+
+#endif /* HAVE_SWAP */

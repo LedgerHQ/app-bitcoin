@@ -17,22 +17,27 @@
 
 #pragma once
 
-/* Local headers */
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "bitvector.h"
+#include "constants.h"
 #include "dispatcher.h"
-#include "merkle.h"
+#include "sign_psbt.h"
 #include "sign_psbt_cache.h"
-#include "wallet.h"
+
+typedef struct {
+    sign_psbt_state_t *state;
+    output_info_t *output;
+} output_keys_callback_data_t;
 
 /**
- * TODO
+ * For each output, checks if it's a change address and validates that it is
+ * acceptable. Also computes the total amount of all outputs. Marks internal
+ * outputs in the `internal_outputs` bitvector.
  */
-int compare_wallet_script_at_path(dispatcher_context_t *dispatcher_context,
-                                  sign_psbt_cache_t *sign_psbt_cache,
-                                  uint32_t change,
-                                  uint32_t address_index,
-                                  const policy_node_t *policy,
-                                  int wallet_version,
-                                  const uint8_t keys_merkle_root[static 32],
-                                  uint32_t n_keys,
-                                  const uint8_t expected_script[],
-                                  size_t expected_script_len);
+bool preprocess_outputs(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *st,
+    sign_psbt_cache_t *sign_psbt_cache,
+    uint8_t internal_outputs[static BITVECTOR_REAL_SIZE(MAX_N_OUTPUTS_CAN_SIGN)]);
