@@ -280,7 +280,7 @@ jobs:
 
   job_test_rust_client:
     name: Tests for rust client library
-    needs: job_build
+    # needs: job_build
     runs-on: ubuntu-latest
 
     container:
