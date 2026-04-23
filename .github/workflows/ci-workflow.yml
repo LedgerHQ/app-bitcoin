@@ -298,7 +298,7 @@ jobs:
     name: Deploy rust client library
     needs: job_test_rust_client
     if: success() && github.event_name == 'push'
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_crates_deployment.yml@mbr/test-crates-artifactory
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_crates_deployment.yml@mbr/fix-crates
     with:
       package_directory: "bitcoin_client_rs"
       publish: true
