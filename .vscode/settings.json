@@ -5,6 +5,7 @@
     "C_Cpp.clang_format_path": "/usr/bin/clang-format",
     "editor.formatOnSave": true,
     "ledgerDevTools.appSettings": {
-        "selectedUseCase": "release"
+        "selectedUseCase": "release",
+        "selectedDevice": "Nano S Plus"
     }
 }
