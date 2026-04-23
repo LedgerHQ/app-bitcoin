@@ -422,7 +422,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
             size_t tweak_data_len = 0;
             const uint8_t *tapleaf_hash = NULL;
             if (!keyexpr_info->is_tapscript) {
-                // keypath spend;
+                // keypath spend
                 if (isnull_policy_node_tree(&policy->tree)) {
                     // tweak as specified in BIP-86 and BIP-386
                     tweak_data = (uint8_t[]){};
