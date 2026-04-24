@@ -102,7 +102,7 @@ export class AppClient {
         CLA_FRAMEWORK,
         FrameworkIns.CONTINUE_INTERRUPTED,
         0,
-        0,
+        CURRENT_PROTOCOL_VERSION,
         commandResponse,
         [0x9000, 0xe000]
       );
