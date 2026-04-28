@@ -527,72 +527,92 @@ bool __attribute__((noinline)) produce_musig2_pubnonces(
         return true;  // nothing to do
     }
 
-    // Iterate over all the key expressions that correspond to keys owned by us
+    // Pre-pass: identify the MuSig2 key expressions we will produce pubnonces for
+    bool keyexpr_to_process[MAX_INTERNAL_KEY_EXPRESSIONS] = {0};
+    bool any_keyexpr_to_process = false;
     for (size_t i_keyexpr = 0; i_keyexpr < st->account.n_internal_key_expressions; i_keyexpr++) {
         keyexpr_info_t *keyexpr_info = &st->account.internal_key_expressions[i_keyexpr];
         if (!keyexpr_info->to_sign ||
             keyexpr_info->key_expression_ptr->type != KEY_EXPRESSION_MUSIG) {
             continue;
         }
-
         if (!fill_keyexpr_info_if_internal(dc, st, keyexpr_info)) {
             continue;
         }
+        keyexpr_to_process[i_keyexpr] = true;
+        any_keyexpr_to_process = true;
+    }
 
-        for (unsigned int i = 0; i < st->n_inputs; i++) {
-            if (bitvector_get(internal_inputs, i)) {
-                input_info_t input;
-                memset(&input, 0, sizeof(input));
+    if (!any_keyexpr_to_process) {
+        return true;  // nothing to do
+    }
 
-                input_keys_callback_data_t callback_data = {.input = &input, .state = st};
-                int res = call_get_merkleized_map_with_callback(
-                    dc,
-                    (void *) &callback_data,
-                    st->inputs_root,
-                    st->n_inputs,
-                    i,
-                    (merkle_tree_elements_callback_t) input_keys_callback,
-                    &input.in_out.map);
-                if (res < 0) {
-                    SEND_SW(dc, SW_INCORRECT_DATA);
+    // Iterate over all internal inputs
+    for (unsigned int i = 0; i < st->n_inputs; i++) {
+        if (!bitvector_get(internal_inputs, i)) {
+            continue;
+        }
+
+        input_info_t input;
+        memset(&input, 0, sizeof(input));
+
+        input_keys_callback_data_t callback_data = {.input = &input, .state = st};
+        int res = call_get_merkleized_map_with_callback(
+            dc,
+            (void *) &callback_data,
+            st->inputs_root,
+            st->n_inputs,
+            i,
+            (merkle_tree_elements_callback_t) input_keys_callback,
+            &input.in_out.map);
+        if (res < 0) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+
+        // The taptree hash only depends on the input (change, address_index) and the policy,
+        // so it is computed once per input and reused for every MuSig2 key expression below.
+        policy_node_tr_t *policy = (policy_node_tr_t *) st->account.policy_map;
+        bool has_taptree = !isnull_policy_node_tree(&policy->tree);
+        if (has_taptree) {
+            if (0 > compute_taptree_hash(
+                        dc,
+                        &(wallet_derivation_info_t){
+                            .address_index = input.in_out.address_index,
+                            .change = input.in_out.is_change ? 1 : 0,
+                            .keys_merkle_root = st->account.wallet_header.keys_info_merkle_root,
+                            .n_keys = st->account.wallet_header.n_keys,
+                            .wallet_version = st->account.wallet_header.version,
+                            .sign_psbt_cache = sign_psbt_cache},
+                        r_policy_node_tree(&policy->tree),
+                        input.taptree_hash)) {
+                PRINTF("Error while computing taptree hash\n");
+                SEND_SW(dc, SW_BAD_STATE);
+                return false;
+            }
+        }
+
+        for (size_t i_keyexpr = 0; i_keyexpr < st->account.n_internal_key_expressions;
+             i_keyexpr++) {
+            if (!keyexpr_to_process[i_keyexpr]) {
+                continue;
+            }
+            keyexpr_info_t *keyexpr_info = &st->account.internal_key_expressions[i_keyexpr];
+
+            // TODO: code duplication with sign_transaction_input
+            if (keyexpr_info->tapleaf_ptr != NULL) {
+                if (!fill_taproot_keyexpr_info(dc,
+                                               st,
+                                               &input,
+                                               keyexpr_info->tapleaf_ptr,
+                                               keyexpr_info,
+                                               sign_psbt_cache)) {
                     return false;
                 }
+            }
 
-                // TODO: code duplication with sign_transaction_input
-                if (keyexpr_info->tapleaf_ptr != NULL) {
-                    if (!fill_taproot_keyexpr_info(dc,
-                                                   st,
-                                                   &input,
-                                                   keyexpr_info->tapleaf_ptr,
-                                                   keyexpr_info,
-                                                   sign_psbt_cache)) {
-                        return false;
-                    }
-                }
-
-                policy_node_tr_t *policy = (policy_node_tr_t *) st->account.policy_map;
-                if (!isnull_policy_node_tree(&policy->tree)) {
-                    if (0 >
-                        compute_taptree_hash(
-                            dc,
-                            &(wallet_derivation_info_t){
-                                .address_index = input.in_out.address_index,
-                                .change = input.in_out.is_change ? 1 : 0,
-                                .keys_merkle_root = st->account.wallet_header.keys_info_merkle_root,
-                                .n_keys = st->account.wallet_header.n_keys,
-                                .wallet_version = st->account.wallet_header.version,
-                                .sign_psbt_cache = sign_psbt_cache},
-                            r_policy_node_tree(&policy->tree),
-                            input.taptree_hash)) {
-                        PRINTF("Error while computing taptree hash\n");
-                        SEND_SW(dc, SW_BAD_STATE);
-                        return false;
-                    }
-                }
-
-                if (!produce_and_yield_pubnonce(dc, st, signing_state, keyexpr_info, &input, i)) {
-                    return false;
-                }
+            if (!produce_and_yield_pubnonce(dc, st, signing_state, keyexpr_info, &input, i)) {
+                return false;
             }
         }
     }
@@ -608,56 +628,75 @@ sign_transaction(dispatcher_context_t *dc,
                  const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    // Iterate over all the key expressions that correspond to keys owned by us
+    // Pre-pass: identify the key expressions we will sign for.
+    bool keyexpr_to_process[MAX_INTERNAL_KEY_EXPRESSIONS] = {0};
+    bool any_keyexpr_to_process = false;
     for (size_t i_keyexpr = 0; i_keyexpr < st->account.n_internal_key_expressions; i_keyexpr++) {
         keyexpr_info_t *keyexpr_info = &st->account.internal_key_expressions[i_keyexpr];
         if (!keyexpr_info->to_sign) {
             continue;
         }
-
         if (!fill_keyexpr_info_if_internal(dc, st, keyexpr_info)) {
             continue;
         }
+        keyexpr_to_process[i_keyexpr] = true;
+        any_keyexpr_to_process = true;
+    }
 
-        for (unsigned int i = 0; i < st->n_inputs; i++) {
-            if (bitvector_get(internal_inputs, i)) {
-                input_info_t input;
-                memset(&input, 0, sizeof(input));
+    if (!any_keyexpr_to_process) {
+        return true;
+    }
 
-                input_keys_callback_data_t callback_data = {.input = &input, .state = st};
-                int res = call_get_merkleized_map_with_callback(
-                    dc,
-                    (void *) &callback_data,
-                    st->inputs_root,
-                    st->n_inputs,
-                    i,
-                    (merkle_tree_elements_callback_t) input_keys_callback,
-                    &input.in_out.map);
-                if (res < 0) {
-                    SEND_SW(dc, SW_INCORRECT_DATA);
-                    return false;
-                }
-                if (keyexpr_info->tapleaf_ptr != NULL &&
-                    !fill_taproot_keyexpr_info(dc,
-                                               st,
-                                               &input,
-                                               keyexpr_info->tapleaf_ptr,
-                                               keyexpr_info,
-                                               sign_psbt_cache)) {
-                    return false;
-                }
+    // Iterate over all internal inputs
+    for (unsigned int i = 0; i < st->n_inputs; i++) {
+        if (!bitvector_get(internal_inputs, i)) {
+            continue;
+        }
 
-                if (!sign_transaction_input(dc,
-                                            st,
-                                            sign_psbt_cache,
-                                            signing_state,
-                                            keyexpr_info,
-                                            &input,
-                                            i)) {
-                    // we do not send a status word, since sign_transaction_input
-                    // already does it on failure
-                    return false;
-                }
+        input_info_t input;
+        memset(&input, 0, sizeof(input));
+
+        input_keys_callback_data_t callback_data = {.input = &input, .state = st};
+        int res = call_get_merkleized_map_with_callback(
+            dc,
+            (void *) &callback_data,
+            st->inputs_root,
+            st->n_inputs,
+            i,
+            (merkle_tree_elements_callback_t) input_keys_callback,
+            &input.in_out.map);
+        if (res < 0) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+
+        for (size_t i_keyexpr = 0; i_keyexpr < st->account.n_internal_key_expressions;
+             i_keyexpr++) {
+            if (!keyexpr_to_process[i_keyexpr]) {
+                continue;
+            }
+            keyexpr_info_t *keyexpr_info = &st->account.internal_key_expressions[i_keyexpr];
+
+            if (keyexpr_info->tapleaf_ptr != NULL &&
+                !fill_taproot_keyexpr_info(dc,
+                                           st,
+                                           &input,
+                                           keyexpr_info->tapleaf_ptr,
+                                           keyexpr_info,
+                                           sign_psbt_cache)) {
+                return false;
+            }
+
+            if (!sign_transaction_input(dc,
+                                        st,
+                                        sign_psbt_cache,
+                                        signing_state,
+                                        keyexpr_info,
+                                        &input,
+                                        i)) {
+                // we do not send a status word, since sign_transaction_input
+                // already does it on failure
+                return false;
             }
         }
     }
