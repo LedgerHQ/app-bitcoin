@@ -303,6 +303,3 @@ jobs:
       package_directory: "bitcoin_client_rs"
       publish: true
       release: false
-      jfrog_deployment: true
-    secrets:
-      cargo_token: ${{ secrets.CARGO_CRATES_TOKEN }}
