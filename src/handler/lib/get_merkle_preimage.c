@@ -11,8 +11,6 @@
 #include "debug.h"
 #include "sw.h"
 
-// TODO: refactor common code with stream_preimage.c
-
 int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
                              const uint8_t hash[static 32],
                              uint8_t *out_ptr,
