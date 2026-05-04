@@ -57,6 +57,7 @@ add_executable(test_get_preimage test_get_preimage.c)
 add_executable(test_extract_bip32_derivation test_extract_bip32_derivation.c)
 add_executable(test_psbt_parse test_psbt_parse.c)
 add_executable(test_check_merkle_tree_sorted test_check_merkle_tree_sorted.c)
+add_executable(test_get_merkle_leaf_element test_get_merkle_leaf_element.c)
 
 # add_executable(test_crypto test_crypto.c)
 
@@ -103,6 +104,7 @@ target_include_directories(get_merkle_leaf_element PRIVATE ../src/handler ../src
 target_include_directories(get_merkle_preimage PRIVATE ../src/handler ../src/handler/lib ../src/common)
 target_include_directories(check_merkle_tree_sorted PRIVATE ../src/handler ../src/handler/lib ../src/common)
 target_include_directories(test_get_preimage PRIVATE ../src/handler ../src/handler/lib)
+target_include_directories(test_get_merkle_leaf_element PRIVATE ../src/handler ../src/handler/lib ../src/common)
 target_include_directories(test_check_merkle_tree_sorted PRIVATE ../src/handler ../src/handler/lib ../src/common)
 
 # Mock libraries
@@ -121,6 +123,7 @@ target_link_libraries(test_get_preimage PUBLIC cmocka gcov mock_dispatcher cx_ha
 target_link_libraries(test_extract_bip32_derivation PUBLIC cmocka gcov mock_dispatcher cx_hash_mock sha256 buffer buffer_ext varint read write bip32 merkle extract_bip32_derivation stream_merkle_leaf_element get_merkle_leaf_hash stream_preimage psbt_parse)
 target_link_libraries(test_psbt_parse PUBLIC cmocka gcov psbt_parse)
 target_link_libraries(test_check_merkle_tree_sorted PUBLIC cmocka gcov mock_dispatcher cx_hash_mock sha256 buffer buffer_ext varint read write bip32 merkle check_merkle_tree_sorted get_merkle_leaf_element get_merkle_leaf_hash get_merkle_preimage stream_preimage psbt_parse)
+target_link_libraries(test_get_merkle_leaf_element PUBLIC cmocka gcov mock_dispatcher cx_hash_mock sha256 buffer buffer_ext varint read write bip32 merkle get_merkle_leaf_element get_merkle_leaf_hash get_merkle_preimage stream_preimage psbt_parse)
 
 # target_link_libraries(test_crypto PUBLIC cmocka gcov crypto)
 add_test(test_bitvector test_bitvector)
@@ -133,5 +136,6 @@ add_test(test_get_preimage test_get_preimage)
 add_test(test_extract_bip32_derivation test_extract_bip32_derivation)
 add_test(test_psbt_parse test_psbt_parse)
 add_test(test_check_merkle_tree_sorted test_check_merkle_tree_sorted)
+add_test(test_get_merkle_leaf_element test_get_merkle_leaf_element)
 
 # add_test(test_crypto test_crypto)
