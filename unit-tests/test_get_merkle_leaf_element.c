@@ -1,0 +1,301 @@
+/**
+ * Unit tests for call_get_merkle_leaf_element using the mock dispatcher.
+ *
+ * Tests verify that the function correctly retrieves the preimage of a
+ * leaf in a Merkle tree identified by root and tree_size, combining
+ * call_get_merkle_leaf_hash and call_get_merkle_preimage internally.
+ */
+
+#include <stdarg.h>
+#include <stddef.h>
+#include <setjmp.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <string.h>
+#include <stdio.h>
+
+#include <cmocka.h>
+
+/* SDK mock stubs */
+unsigned int pic(unsigned int linked_address) {
+    return linked_address;
+}
+#undef PIC
+#define PIC(x) (x)
+
+#include "mock_dispatcher.h"
+#include "cx_hash_mock.h"
+#include "sha-256.h"
+
+#include "handler/lib/get_merkle_leaf_element.h"
+
+/* ---------- Helpers ---------- */
+
+/**
+ * Build a Merkle tree from the given elements and copy the root hash.
+ */
+static void build_tree(mock_dispatcher_t *mock,
+                       const uint8_t *const *elems,
+                       const size_t *lens,
+                       size_t n,
+                       uint8_t root_out[32]) {
+    mock_dispatcher_add_list(mock, elems, lens, n);
+    memcpy(root_out, mock->trees[mock->n_trees - 1].root, 32);
+}
+
+/* ---------- Test cases ---------- */
+
+/**
+ * Happy path: single element tree, retrieve the only leaf.
+ */
+static void test_get_leaf_element_single(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    const uint8_t elem[] = {0xCA, 0xFE};
+    const uint8_t *elems[] = {elem};
+    size_t lens[] = {sizeof(elem)};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 1, root);
+
+    uint8_t out[256];
+    memset(out, 0xAA, sizeof(out));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_element(dc, root, 1, 0, out, sizeof(out));
+
+    assert_int_equal(result, (int) sizeof(elem));
+    assert_memory_equal(out, elem, sizeof(elem));
+}
+
+/**
+ * Happy path: three-element tree, retrieve each leaf by index.
+ */
+static void test_get_leaf_element_three_elements(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    const uint8_t *elems[] = {(const uint8_t *) "alpha",
+                              (const uint8_t *) "beta",
+                              (const uint8_t *) "gamma"};
+    size_t lens[] = {5, 4, 5};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 3, root);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+
+    for (size_t i = 0; i < 3; i++) {
+        uint8_t out[256];
+        memset(out, 0, sizeof(out));
+
+        int result = call_get_merkle_leaf_element(dc, root, 3, (uint32_t) i, out, sizeof(out));
+
+        assert_int_equal(result, (int) lens[i]);
+        assert_memory_equal(out, elems[i], lens[i]);
+    }
+}
+
+/**
+ * Happy path: power-of-two number of elements (4 elements, balanced tree).
+ */
+static void test_get_leaf_element_four_elements(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t e0[] = {0x00, 0x01, 0x02};
+    uint8_t e1[] = {0x10, 0x11};
+    uint8_t e2[] = {0x20};
+    uint8_t e3[] = {0x30, 0x31, 0x32, 0x33};
+
+    const uint8_t *elems[] = {e0, e1, e2, e3};
+    size_t lens[] = {sizeof(e0), sizeof(e1), sizeof(e2), sizeof(e3)};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 4, root);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+
+    for (size_t i = 0; i < 4; i++) {
+        uint8_t out[256];
+        memset(out, 0, sizeof(out));
+
+        int result = call_get_merkle_leaf_element(dc, root, 4, (uint32_t) i, out, sizeof(out));
+
+        assert_int_equal(result, (int) lens[i]);
+        assert_memory_equal(out, elems[i], lens[i]);
+    }
+}
+
+/**
+ * Edge case: leaf element of exactly 1 byte.
+ */
+static void test_get_leaf_element_one_byte(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    const uint8_t elem[] = {0x42};
+    const uint8_t *elems[] = {elem};
+    size_t lens[] = {1};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 1, root);
+
+    uint8_t out[64];
+    memset(out, 0, sizeof(out));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_element(dc, root, 1, 0, out, sizeof(out));
+
+    assert_int_equal(result, 1);
+    assert_int_equal(out[0], 0x42);
+}
+
+/**
+ * Error: output buffer too small for the leaf element.
+ */
+static void test_get_leaf_element_buffer_too_small(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t elem[100];
+    for (size_t i = 0; i < sizeof(elem); i++) {
+        elem[i] = (uint8_t) i;
+    }
+    const uint8_t *elems[] = {elem};
+    size_t lens[] = {sizeof(elem)};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 1, root);
+
+    uint8_t out[10]; /* Too small */
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_element(dc, root, 1, 0, out, sizeof(out));
+
+    assert_true(result < 0);
+}
+
+/**
+ * Error: wrong Merkle root (no matching tree).
+ */
+static void test_get_leaf_element_wrong_root(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    const uint8_t elem[] = {0xAB, 0xCD};
+    const uint8_t *elems[] = {elem};
+    size_t lens[] = {sizeof(elem)};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 1, root);
+
+    /* Corrupt the root */
+    uint8_t bad_root[32];
+    memset(bad_root, 0xFF, 32);
+
+    uint8_t out[256];
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_element(dc, bad_root, 1, 0, out, sizeof(out));
+
+    assert_true(result < 0);
+}
+
+/**
+ * Error: leaf index out of bounds (>= tree_size).
+ */
+static void test_get_leaf_element_index_out_of_bounds(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    const uint8_t *elems[] = {(const uint8_t *) "x", (const uint8_t *) "y"};
+    size_t lens[] = {1, 1};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 2, root);
+
+    uint8_t out[256];
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_element(dc, root, 2, 5, out, sizeof(out));
+
+    assert_true(result < 0);
+}
+
+/**
+ * Happy path: larger tree (8 elements) to exercise deeper proof paths.
+ */
+static void test_get_leaf_element_eight_elements(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t data[8][16];
+    const uint8_t *elems[8];
+    size_t lens[8];
+
+    for (size_t i = 0; i < 8; i++) {
+        for (size_t j = 0; j < 16; j++) {
+            data[i][j] = (uint8_t) (i * 16 + j);
+        }
+        elems[i] = data[i];
+        lens[i] = 16;
+    }
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 8, root);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+
+    for (size_t i = 0; i < 8; i++) {
+        uint8_t out[256];
+        memset(out, 0, sizeof(out));
+
+        int result = call_get_merkle_leaf_element(dc, root, 8, (uint32_t) i, out, sizeof(out));
+
+        assert_int_equal(result, 16);
+        assert_memory_equal(out, data[i], 16);
+    }
+}
+
+/* ---------- Main ---------- */
+
+int main(void) {
+    const struct CMUnitTest tests[] = {
+        cmocka_unit_test(test_get_leaf_element_single),
+        cmocka_unit_test(test_get_leaf_element_three_elements),
+        cmocka_unit_test(test_get_leaf_element_four_elements),
+        cmocka_unit_test(test_get_leaf_element_one_byte),
+        cmocka_unit_test(test_get_leaf_element_buffer_too_small),
+        cmocka_unit_test(test_get_leaf_element_wrong_root),
+        cmocka_unit_test(test_get_leaf_element_index_out_of_bounds),
+        cmocka_unit_test(test_get_leaf_element_eight_elements),
+    };
+
+    return cmocka_run_group_tests(tests, NULL, NULL);
+}
