@@ -346,6 +346,9 @@ int read_and_parse_wallet_policy(
         if (descriptor_template_len < 0) {
             return WITH_ERROR(-1, "Failed getting wallet policy descriptor template");
         }
+        if ((size_t) descriptor_template_len != wallet_header->descriptor_template_len) {
+            return WITH_ERROR(-1, "Descriptor template length mismatch");
+        }
     }
 
     buffer_t policy_map_buffer =
