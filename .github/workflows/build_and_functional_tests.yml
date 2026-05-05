@@ -34,6 +34,8 @@ jobs:
     with:
       upload_app_binaries_artifact: "compiled_app_binaries"
       flags: "DEBUG=0 COIN=bitcoin_testnet"
+      build_comparison: true
+      enable_stack_consumption: true
 
   ragger_tests:
     name: Run ragger tests using the reusable workflow
@@ -45,3 +47,4 @@ jobs:
       # when merging a PR, we run the tests with the --enable_slow_tests parameter
       test_options: ${{ github.event_name == 'push' && '--enable_slow_tests' || '' }}
       regenerate_snapshots: ${{ github.event_name == 'workflow_dispatch' && inputs.golden_run == 'Open a PR' }}
+      post_stack_consumption: true
