@@ -27,6 +27,7 @@ unsigned int pic(unsigned int linked_address) {
 #include "cx_hash_mock.h"
 #include "sha-256.h"
 
+#include "client_commands.h"
 #include "handler/lib/get_merkle_leaf_index.h"
 
 /* ---------- Helpers ---------- */
@@ -306,6 +307,107 @@ static void test_get_leaf_index_eight_elements(void **state) {
     }
 }
 
+/* ==========================================================================
+ *  Adversarial tests: malicious client behavior
+ * ========================================================================== */
+
+/**
+ * Adversarial: client claims a leaf is at a wrong index.  The device fetches
+ * the leaf hash at the claimed index and compares — must detect mismatch.
+ */
+static int tamper_wrong_index(uint8_t *response_buf,
+                              size_t *response_len,
+                              uint8_t cmd,
+                              int call_count,
+                              void *user_data) {
+    (void) user_data;
+
+    if (cmd == CCMD_GET_MERKLE_LEAF_INDEX && call_count == 0) {
+        if (*response_len >= 2) {
+            response_buf[0] = 1; /* found */
+            /* Swap: 0↔1 */
+            response_buf[1] = (response_buf[1] == 0) ? 1 : 0;
+        }
+    }
+    return 0;
+}
+
+static void test_get_leaf_index_wrong_index(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t e0[] = {0x01, 0x02, 0x03};
+    uint8_t e1[] = {0x04, 0x05, 0x06};
+
+    const uint8_t *elems[] = {e0, e1};
+    size_t lens[] = {sizeof(e0), sizeof(e1)};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 2, root);
+
+    /* Query for e1 (index 1), tamper will claim index 0 */
+    uint8_t leaf_hash[32];
+    compute_leaf_hash(e1, sizeof(e1), leaf_hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_wrong_index, NULL);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_index(dc, 2, root, leaf_hash);
+
+    /* Verification fetch at wrong index → hash mismatch → must fail */
+    assert_true(result < 0);
+}
+
+/**
+ * Adversarial: client claims found=1 but returns an out-of-bounds index.
+ */
+static int tamper_oob_index(uint8_t *response_buf,
+                            size_t *response_len,
+                            uint8_t cmd,
+                            int call_count,
+                            void *user_data) {
+    (void) user_data;
+
+    if (cmd == CCMD_GET_MERKLE_LEAF_INDEX && call_count == 0) {
+        if (*response_len >= 2) {
+            response_buf[0] = 1; /* found */
+            response_buf[1] = 2; /* out of bounds */
+        }
+    }
+    return 0;
+}
+
+static void test_get_leaf_index_oob_index(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t e0[] = {0xAA};
+    uint8_t e1[] = {0xBB};
+
+    const uint8_t *elems[] = {e0, e1};
+    size_t lens[] = {1, 1};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 2, root);
+
+    uint8_t leaf_hash[32];
+    compute_leaf_hash(e0, sizeof(e0), leaf_hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_oob_index, NULL);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_index(dc, 2, root, leaf_hash);
+
+    /* index >= size → must fail */
+    assert_true(result < 0);
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -318,6 +420,8 @@ int main(void) {
         cmocka_unit_test(test_get_leaf_index_wrong_root),
         cmocka_unit_test(test_get_leaf_index_two_elements),
         cmocka_unit_test(test_get_leaf_index_eight_elements),
+        cmocka_unit_test(test_get_leaf_index_wrong_index),
+        cmocka_unit_test(test_get_leaf_index_oob_index),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
