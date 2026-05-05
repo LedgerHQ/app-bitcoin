@@ -27,6 +27,7 @@ unsigned int pic(unsigned int linked_address) {
 #include "cx_hash_mock.h"
 #include "sha-256.h"
 
+#include "client_commands.h"
 #include "handler/lib/get_merkle_leaf_element.h"
 
 /* ---------- Helpers ---------- */
@@ -283,6 +284,99 @@ static void test_get_leaf_element_eight_elements(void **state) {
     }
 }
 
+/* ==========================================================================
+ *  Adversarial tests: malicious client behavior
+ * ========================================================================== */
+
+/**
+ * Adversarial: client corrupts the leaf hash in the proof response so it
+ * doesn't match the actual leaf.  call_get_merkle_leaf_hash will fail
+ * (root mismatch), causing call_get_merkle_leaf_element to fail.
+ */
+static int tamper_corrupt_leaf_in_proof(uint8_t *response_buf,
+                                        size_t *response_len,
+                                        uint8_t cmd,
+                                        int call_count,
+                                        void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MERKLE_LEAF_PROOF && *response_len >= 32) {
+        response_buf[5] ^= 0x01;
+    }
+    return 0;
+}
+
+static void test_get_leaf_element_corrupted_proof(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t e0[] = {0x01, 0x02, 0x03};
+    uint8_t e1[] = {0x04, 0x05, 0x06};
+    uint8_t e2[] = {0x07, 0x08, 0x09};
+    uint8_t e3[] = {0x0A, 0x0B, 0x0C};
+
+    const uint8_t *elems[] = {e0, e1, e2, e3};
+    size_t lens[] = {sizeof(e0), sizeof(e1), sizeof(e2), sizeof(e3)};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 4, root);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_corrupt_leaf_in_proof, NULL);
+
+    uint8_t out[256];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_element(dc, root, 4, 0, out, sizeof(out));
+
+    assert_true(result < 0);
+}
+
+/**
+ * Adversarial: client corrupts the preimage data returned after the proof
+ * verified.  The leaf hash was correct (proof passed), but the preimage
+ * returned doesn't hash to it.
+ */
+static int tamper_corrupt_preimage_after_proof(uint8_t *response_buf,
+                                               size_t *response_len,
+                                               uint8_t cmd,
+                                               int call_count,
+                                               void *user_data) {
+    (void) user_data;
+
+    /* Only tamper the second interruption (first is the proof, second is preimage) */
+    if (cmd == CCMD_GET_PREIMAGE && call_count == 1 && *response_len > 3) {
+        response_buf[3] ^= 0xFF;
+    }
+    return 0;
+}
+
+static void test_get_leaf_element_corrupted_preimage(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t e0[] = {0xDE, 0xAD, 0xBE, 0xEF};
+    const uint8_t *elems[] = {e0};
+    size_t lens[] = {sizeof(e0)};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 1, root);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_corrupt_preimage_after_proof, NULL);
+
+    uint8_t out[256];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_element(dc, root, 1, 0, out, sizeof(out));
+
+    /* Preimage hash mismatch → must fail */
+    assert_true(result < 0);
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -295,6 +389,8 @@ int main(void) {
         cmocka_unit_test(test_get_leaf_element_wrong_root),
         cmocka_unit_test(test_get_leaf_element_index_out_of_bounds),
         cmocka_unit_test(test_get_leaf_element_eight_elements),
+        cmocka_unit_test(test_get_leaf_element_corrupted_proof),
+        cmocka_unit_test(test_get_leaf_element_corrupted_preimage),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

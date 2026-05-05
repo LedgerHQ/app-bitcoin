@@ -27,6 +27,7 @@ unsigned int pic(unsigned int linked_address) {
 #include "cx_hash_mock.h"
 #include "sha-256.h"
 
+#include "client_commands.h"
 #include "handler/lib/get_merkle_preimage.h"
 
 /* ---------- Helpers ---------- */
@@ -44,7 +45,7 @@ static void add_merkle_preimage(mock_dispatcher_t *mock,
                                 const uint8_t *element,
                                 size_t element_len,
                                 uint8_t hash_out[32]) {
-    uint8_t prefixed[257];
+    uint8_t prefixed[513];
     prefixed[0] = 0x00;
     memcpy(prefixed + 1, element, element_len);
 
@@ -286,6 +287,96 @@ static void test_get_merkle_preimage_exact_buffer(void **state) {
     assert_memory_equal(out, element, sizeof(element));
 }
 
+/* ==========================================================================
+ *  Adversarial tests: malicious client behavior
+ * ========================================================================== */
+
+/**
+ * Adversarial: client returns valid structure but corrupted data bytes,
+ * causing a SHA-256 hash mismatch on the leaf preimage.
+ */
+static int tamper_corrupt_data(uint8_t *response_buf,
+                               size_t *response_len,
+                               uint8_t cmd,
+                               int call_count,
+                               void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_PREIMAGE && *response_len > 3) {
+        response_buf[3] ^= 0xFF;
+    }
+    return 0;
+}
+
+static void test_get_merkle_preimage_corrupted_data(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[50];
+    for (size_t i = 0; i < sizeof(element); i++) {
+        element[i] = (uint8_t) (i & 0xFF);
+    }
+
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_corrupt_data, NULL);
+
+    uint8_t out[256];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
+
+    /* Must detect hash mismatch */
+    assert_true(result < 0);
+}
+
+/**
+ * Adversarial: client corrupts the continuation data for a large preimage.
+ */
+static int tamper_corrupt_continuation(uint8_t *response_buf,
+                                       size_t *response_len,
+                                       uint8_t cmd,
+                                       int call_count,
+                                       void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MORE_ELEMENTS && *response_len > 2) {
+        response_buf[2] ^= 0xFF;
+    }
+    return 0;
+}
+
+static void test_get_merkle_preimage_corrupted_continuation(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    /* Element large enough to require continuation (preimage = 0x00 || element) */
+    uint8_t element[300];
+    for (size_t i = 0; i < sizeof(element); i++) {
+        element[i] = (uint8_t) (i * 7);
+    }
+
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_corrupt_continuation, NULL);
+
+    uint8_t out[512];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
+
+    /* Must detect the corruption (hash mismatch or protocol error) */
+    assert_true(result < 0);
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -298,6 +389,8 @@ int main(void) {
         cmocka_unit_test(test_get_merkle_preimage_exact_fit),
         cmocka_unit_test(test_get_merkle_preimage_one_byte_overflow),
         cmocka_unit_test(test_get_merkle_preimage_exact_buffer),
+        cmocka_unit_test(test_get_merkle_preimage_corrupted_data),
+        cmocka_unit_test(test_get_merkle_preimage_corrupted_continuation),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

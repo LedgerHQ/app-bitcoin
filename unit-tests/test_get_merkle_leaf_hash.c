@@ -26,6 +26,7 @@ unsigned int pic(unsigned int linked_address) {
 #include "cx_hash_mock.h"
 #include "sha-256.h"
 
+#include "client_commands.h"
 #include "handler/lib/get_merkle_leaf_hash.h"
 
 /* ---------- Helpers ---------- */
@@ -330,6 +331,239 @@ static void test_get_leaf_hash_two_elements(void **state) {
     }
 }
 
+/* ==========================================================================
+ *  Adversarial tests: malicious client behavior
+ * ========================================================================== */
+
+/**
+ * Adversarial: client returns a corrupted sibling hash in the Merkle proof.
+ * The proof won't verify against the root.
+ */
+static int tamper_corrupt_proof_hash(uint8_t *response_buf,
+                                     size_t *response_len,
+                                     uint8_t cmd,
+                                     int call_count,
+                                     void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MERKLE_LEAF_PROOF && *response_len > 35) {
+        /* Response: <leaf_hash:32> <proof_size:1> <n_proof_elements:1> <proof_hashes...>
+         * Corrupt byte in first proof hash (offset 34) */
+        response_buf[35] ^= 0xFF;
+    }
+    return 0;
+}
+
+static void test_get_leaf_hash_corrupted_proof(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t e0[] = {0x00, 0x01};
+    uint8_t e1[] = {0x10, 0x11};
+    uint8_t e2[] = {0x20, 0x21};
+    uint8_t e3[] = {0x30, 0x31};
+
+    const uint8_t *elems[] = {e0, e1, e2, e3};
+    size_t lens[] = {sizeof(e0), sizeof(e1), sizeof(e2), sizeof(e3)};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 4, root);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_corrupt_proof_hash, NULL);
+
+    uint8_t out[32];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_hash(dc, root, 4, 0, out);
+
+    assert_true(result < 0);
+}
+
+/**
+ * Adversarial: client returns a corrupted leaf hash. The proof (built for the
+ * real leaf) won't verify when starting from the wrong leaf hash.
+ */
+static int tamper_corrupt_leaf_hash(uint8_t *response_buf,
+                                    size_t *response_len,
+                                    uint8_t cmd,
+                                    int call_count,
+                                    void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MERKLE_LEAF_PROOF && *response_len >= 32) {
+        response_buf[0] ^= 0xFF;
+    }
+    return 0;
+}
+
+static void test_get_leaf_hash_corrupted_leaf(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t e0[] = {0xAA, 0xBB};
+    uint8_t e1[] = {0xCC, 0xDD};
+
+    const uint8_t *elems[] = {e0, e1};
+    size_t lens[] = {sizeof(e0), sizeof(e1)};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 2, root);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_corrupt_leaf_hash, NULL);
+
+    uint8_t out[32];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_hash(dc, root, 2, 0, out);
+
+    assert_true(result < 0);
+}
+
+/**
+ * Adversarial: client claims n_proof_elements > proof_size.
+ */
+static int tamper_proof_elements_overflow(uint8_t *response_buf,
+                                          size_t *response_len,
+                                          uint8_t cmd,
+                                          int call_count,
+                                          void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MERKLE_LEAF_PROOF && *response_len >= 34) {
+        uint8_t proof_size = response_buf[32];
+        response_buf[33] = proof_size + 5;
+    }
+    return 0;
+}
+
+static void test_get_leaf_hash_proof_elements_overflow(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t e0[] = {0xAA};
+    uint8_t e1[] = {0xBB};
+
+    const uint8_t *elems[] = {e0, e1};
+    size_t lens[] = {sizeof(e0), sizeof(e1)};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 2, root);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_proof_elements_overflow, NULL);
+
+    uint8_t out[32];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_hash(dc, root, 2, 0, out);
+
+    assert_true(result < 0);
+}
+
+/**
+ * Adversarial: client claims proof_size=0 for a multi-element tree.
+ * The leaf hash alone won't match the root.
+ */
+static int tamper_zero_proof_size(uint8_t *response_buf,
+                                  size_t *response_len,
+                                  uint8_t cmd,
+                                  int call_count,
+                                  void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MERKLE_LEAF_PROOF && *response_len >= 34) {
+        response_buf[32] = 0;
+        response_buf[33] = 0;
+        *response_len = 34;
+    }
+    return 0;
+}
+
+static void test_get_leaf_hash_zero_proof_size(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t e0[] = {0xAA};
+    uint8_t e1[] = {0xBB};
+    uint8_t e2[] = {0xCC};
+
+    const uint8_t *elems[] = {e0, e1, e2};
+    size_t lens[] = {1, 1, 1};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 3, root);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_zero_proof_size, NULL);
+
+    uint8_t out[32];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_hash(dc, root, 3, 0, out);
+
+    assert_true(result < 0);
+}
+
+/**
+ * Adversarial: during proof continuation (GET_MORE_ELEMENTS), client sends
+ * elements_len != 32.
+ */
+static int tamper_bad_proof_element_size(uint8_t *response_buf,
+                                         size_t *response_len,
+                                         uint8_t cmd,
+                                         int call_count,
+                                         void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MORE_ELEMENTS && *response_len >= 2) {
+        response_buf[1] = 16; /* should be 32 */
+    }
+    return 0;
+}
+
+static void test_get_leaf_hash_bad_proof_element_size(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    /* Need a tree large enough that proof spills: 128 elements → depth 7,
+     * first response fits 6 proof hashes → 1 goes via GET_MORE_ELEMENTS */
+    uint8_t data[128][2];
+    const uint8_t *elems[128];
+    size_t lens[128];
+
+    for (size_t i = 0; i < 128; i++) {
+        data[i][0] = (uint8_t) (i >> 8);
+        data[i][1] = (uint8_t) (i & 0xFF);
+        elems[i] = data[i];
+        lens[i] = 2;
+    }
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 128, root);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_bad_proof_element_size, NULL);
+
+    uint8_t out[32];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_hash(dc, root, 128, 0, out);
+
+    assert_true(result < 0);
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -342,6 +576,11 @@ int main(void) {
         cmocka_unit_test(test_get_leaf_hash_one_byte_element),
         cmocka_unit_test(test_get_leaf_hash_wrong_root),
         cmocka_unit_test(test_get_leaf_hash_two_elements),
+        cmocka_unit_test(test_get_leaf_hash_corrupted_proof),
+        cmocka_unit_test(test_get_leaf_hash_corrupted_leaf),
+        cmocka_unit_test(test_get_leaf_hash_proof_elements_overflow),
+        cmocka_unit_test(test_get_leaf_hash_zero_proof_size),
+        cmocka_unit_test(test_get_leaf_hash_bad_proof_element_size),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
