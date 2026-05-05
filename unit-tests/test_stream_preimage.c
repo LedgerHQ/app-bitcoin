@@ -28,6 +28,7 @@ unsigned int pic(unsigned int linked_address) {
 #include "cx_hash_mock.h"
 #include "sha-256.h"
 
+#include "client_commands.h"
 #include "handler/lib/stream_preimage.h"
 
 /* ---------- Helpers ---------- */
@@ -295,6 +296,142 @@ static void test_stream_preimage_one_byte_overflow(void **state) {
     assert_memory_equal(acc.buf, element, sizeof(element));
 }
 
+/* ==========================================================================
+ *  Adversarial tests: malicious client behavior
+ * ========================================================================== */
+
+/**
+ * Adversarial: client returns corrupted data in the initial chunk.
+ * Hash verification must detect the mismatch.
+ */
+static int tamper_corrupt_stream_data(uint8_t *response_buf,
+                                      size_t *response_len,
+                                      uint8_t cmd,
+                                      int call_count,
+                                      void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_PREIMAGE && *response_len > 3) {
+        response_buf[3] ^= 0xFF;
+    }
+    return 0;
+}
+
+static void test_stream_preimage_corrupted_data(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[50];
+    for (size_t i = 0; i < sizeof(element); i++) {
+        element[i] = (uint8_t) (i & 0xFF);
+    }
+
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_corrupt_stream_data, NULL);
+
+    stream_accumulator_t acc;
+    memset(&acc, 0, sizeof(acc));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
+
+    assert_true(result < 0);
+}
+
+/**
+ * Adversarial: client corrupts continuation data during streaming.
+ */
+static int tamper_corrupt_stream_continuation(uint8_t *response_buf,
+                                              size_t *response_len,
+                                              uint8_t cmd,
+                                              int call_count,
+                                              void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MORE_ELEMENTS && *response_len > 2) {
+        response_buf[2] ^= 0xFF;
+    }
+    return 0;
+}
+
+static void test_stream_preimage_corrupted_continuation(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[300];
+    for (size_t i = 0; i < sizeof(element); i++) {
+        element[i] = (uint8_t) (i * 7);
+    }
+
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_corrupt_stream_continuation, NULL);
+
+    stream_accumulator_t acc;
+    memset(&acc, 0, sizeof(acc));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
+
+    assert_true(result < 0);
+}
+
+/**
+ * Adversarial: communication failure mid-stream (second interruption fails).
+ */
+static int tamper_fail_on_second(uint8_t *response_buf,
+                                 size_t *response_len,
+                                 uint8_t cmd,
+                                 int call_count,
+                                 void *user_data) {
+    (void) response_buf;
+    (void) response_len;
+    (void) cmd;
+    (void) user_data;
+
+    if (call_count >= 1) {
+        return -1;
+    }
+    return 0;
+}
+
+static void test_stream_preimage_communication_failure(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[300];
+    for (size_t i = 0; i < sizeof(element); i++) {
+        element[i] = (uint8_t) (i * 3);
+    }
+
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_fail_on_second, NULL);
+
+    stream_accumulator_t acc;
+    memset(&acc, 0, sizeof(acc));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
+
+    assert_true(result < 0);
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -306,6 +443,9 @@ int main(void) {
         cmocka_unit_test(test_stream_preimage_null_len_callback),
         cmocka_unit_test(test_stream_preimage_exact_fit),
         cmocka_unit_test(test_stream_preimage_one_byte_overflow),
+        cmocka_unit_test(test_stream_preimage_corrupted_data),
+        cmocka_unit_test(test_stream_preimage_corrupted_continuation),
+        cmocka_unit_test(test_stream_preimage_communication_failure),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
