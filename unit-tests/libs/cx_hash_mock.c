@@ -71,7 +71,8 @@ int cx_hash_sha256(const unsigned char *in,
                    unsigned int in_len,
                    unsigned char *out,
                    unsigned int out_len) {
-    (void) out_len;
+    assert(out != NULL);
+    assert(out_len >= CX_SHA256_SIZE);
     calc_sha_256(out, in, in_len);
     return CX_SHA256_SIZE;
 }
