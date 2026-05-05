@@ -349,7 +349,7 @@ static int tamper_corrupt_proof_hash(uint8_t *response_buf,
 
     if (cmd == CCMD_GET_MERKLE_LEAF_PROOF && *response_len > 35) {
         /* Response: <leaf_hash:32> <proof_size:1> <n_proof_elements:1> <proof_hashes...>
-         * Corrupt byte in first proof hash (offset 34) */
+         * Corrupt byte in first proof hash (starting at offset 34) */
         response_buf[35] ^= 0xFF;
     }
     return 0;
