@@ -62,6 +62,25 @@ typedef struct {
     size_t head;                            /* next to dequeue */
 } mock_queue_t;
 
+/**
+ * Tamper hook signature.
+ * Called after a response is built but before it's delivered to the caller.
+ * Can modify response_buf/response_len to simulate malicious client behavior.
+ * Return 0 to deliver the (possibly modified) response normally.
+ * Return -1 to simulate a communication failure (process_interruption returns -1).
+ *
+ * @param response_buf   The response buffer (writable).
+ * @param response_len   Pointer to the response length (readable/writable).
+ * @param cmd            The client command that produced this response.
+ * @param call_count     How many times this hook has been called (0-indexed).
+ * @param user_data      Opaque pointer set by the test.
+ */
+typedef int (*mock_tamper_hook_t)(uint8_t *response_buf,
+                                  size_t *response_len,
+                                  uint8_t cmd,
+                                  int call_count,
+                                  void *user_data);
+
 /* ---- Main mock state ---- */
 typedef struct {
     dispatcher_context_t dc; /* MUST be first member (container_of pattern) */
@@ -96,6 +115,11 @@ typedef struct {
         size_t len;
     } yielded[MOCK_MAX_YIELDED];
     size_t n_yielded;
+
+    /* Tamper hook (NULL = no tampering, behave honestly) */
+    mock_tamper_hook_t tamper_hook;
+    void *tamper_user_data;
+    int tamper_call_count;
 } mock_dispatcher_t;
 
 /* ---- Public API ---- */
@@ -111,6 +135,19 @@ void mock_dispatcher_init(mock_dispatcher_t *mock);
  * The mock will respond to CCMD_GET_PREIMAGE requests matching this hash.
  */
 void mock_dispatcher_add_preimage(mock_dispatcher_t *mock, const uint8_t *data, size_t len);
+
+/**
+ * Set a tamper hook to simulate malicious client behavior.
+ * The hook is called after each response is built, before delivery.
+ * Pass NULL to disable tampering.
+ */
+static inline void mock_dispatcher_set_tamper_hook(mock_dispatcher_t *mock,
+                                                   mock_tamper_hook_t hook,
+                                                   void *user_data) {
+    mock->tamper_hook = hook;
+    mock->tamper_user_data = user_data;
+    mock->tamper_call_count = 0;
+}
 
 /**
  * Build a Merkle tree from a list of elements and register it.
