@@ -36,7 +36,7 @@ if(NOT DEFINED ENV{BOLOS_SDK})
     message(FATAL_ERROR "BOLOS_SDK is not defined.")
 endif()
 
-add_compile_definitions(TEST DEBUG=0 SKIP_FOR_CMOCKA PRINTF=printf COIN_NATIVE_SEGWIT_PREFIX=\"tb\")
+add_compile_definitions(TEST DEBUG=0 SKIP_FOR_CMOCKA PRINTF=printf COIN_NATIVE_SEGWIT_PREFIX=\"tb\" COIN_P2PKH_VERSION=111 COIN_P2SH_VERSION=196)
 
 include_directories(../src)
 include_directories(../src/debug-helpers)
@@ -64,6 +64,7 @@ add_executable(test_get_merkle_leaf_index test_get_merkle_leaf_index.c)
 add_executable(test_stream_preimage test_stream_preimage.c)
 add_executable(test_stream_merkle_leaf_element test_stream_merkle_leaf_element.c)
 add_executable(test_stream_merkleized_map_value test_stream_merkleized_map_value.c)
+add_executable(test_get_wallet_address test_get_wallet_address.c)
 
 # add_executable(test_crypto test_crypto.c)
 
@@ -98,6 +99,39 @@ add_library(varint SHARED $ENV{BOLOS_SDK}/lib_standard_app/varint.c)
 add_library(wallet SHARED ../src/common/wallet.c)
 add_library(write SHARED $ENV{BOLOS_SDK}/lib_standard_app/write.c)
 
+# Libraries for test_get_wallet_address (need real crypto)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SECP256K1 REQUIRED libsecp256k1)
+pkg_check_modules(OPENSSL REQUIRED openssl)
+
+add_library(crypto_real SHARED libs/crypto_real.c)
+target_include_directories(crypto_real PRIVATE ../src/handler ../src/handler/lib ../src/handler/sign_psbt ../src/common ../src/musig)
+target_link_libraries(crypto_real PUBLIC sha256 ${SECP256K1_LIBRARIES} ${OPENSSL_LIBRARIES})
+target_include_directories(crypto_real PRIVATE ${SECP256K1_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIRS})
+
+add_library(policy SHARED ../src/handler/lib/policy.c)
+target_compile_definitions(policy PRIVATE SKIP_FOR_CMOCKA BIP32_PUBKEY_VERSION=0x043587CF BIP44_COIN_TYPE=1 CX_OK=0)
+target_include_directories(policy PRIVATE ../src/handler ../src/handler/lib ../src/handler/sign_psbt ../src/common ../src/musig)
+
+add_library(sign_psbt_cache SHARED ../src/handler/sign_psbt/sign_psbt_cache.c)
+target_include_directories(sign_psbt_cache PRIVATE ../src/handler ../src/handler/lib ../src/handler/sign_psbt ../src/common ../src/musig)
+
+add_library(segwit_addr SHARED ../src/common/segwit_addr.c)
+target_include_directories(segwit_addr PRIVATE ../src/common)
+
+# script_full: script.c compiled WITHOUT SKIP_FOR_CMOCKA (needs crypto for get_script_address)
+add_library(script_full SHARED ../src/common/script.c)
+set_target_properties(script_full PROPERTIES COMPILE_DEFINITIONS "TEST;DEBUG=0;PRINTF=printf;COIN_P2PKH_VERSION=111;COIN_P2SH_VERSION=196")
+target_compile_definitions(script_full PRIVATE COIN_NATIVE_SEGWIT_PREFIX="tb")
+target_compile_options(script_full PRIVATE -USKIP_FOR_CMOCKA)
+target_include_directories(script_full PRIVATE ../src/common)
+
+add_library(stubs_wallet_address SHARED libs/stubs_wallet_address.c)
+target_include_directories(stubs_wallet_address PRIVATE ../src/common ../src/boilerplate ../src)
+
+add_library(secp256k1_consts SHARED ../src/secp256k1.c)
+target_include_directories(secp256k1_consts PRIVATE ../src)
+
 # add_library(crypto SHARED ../src/crypto.c)
 
 # Additional include directories for handler code
@@ -124,6 +158,8 @@ target_include_directories(test_stream_preimage PRIVATE ../src/handler ../src/ha
 target_include_directories(test_stream_merkle_leaf_element PRIVATE ../src/handler ../src/handler/lib ../src/common)
 target_include_directories(test_stream_merkleized_map_value PRIVATE ../src/handler ../src/handler/lib ../src/common)
 
+target_include_directories(test_get_wallet_address PRIVATE ../src/handler ../src/handler/lib ../src/handler/sign_psbt ../src/common ../src/musig)
+
 # Mock libraries
 target_link_libraries(crypto_mocks PUBLIC sha256)
 target_link_libraries(cx_hash_mock PUBLIC sha256)
@@ -147,6 +183,7 @@ target_link_libraries(test_get_merkle_leaf_index PUBLIC cmocka gcov mock_dispatc
 target_link_libraries(test_stream_preimage PUBLIC cmocka gcov mock_dispatcher cx_hash_mock sha256 buffer buffer_ext varint read write bip32 merkle stream_preimage psbt_parse)
 target_link_libraries(test_stream_merkle_leaf_element PUBLIC cmocka gcov mock_dispatcher cx_hash_mock sha256 buffer buffer_ext varint read write bip32 merkle stream_merkle_leaf_element get_merkle_leaf_hash stream_preimage psbt_parse)
 target_link_libraries(test_stream_merkleized_map_value PUBLIC cmocka gcov mock_dispatcher cx_hash_mock sha256 buffer buffer_ext varint read write bip32 merkle stream_merkleized_map_value stream_merkle_leaf_element get_merkle_leaf_hash get_merkle_leaf_index stream_preimage psbt_parse)
+target_link_libraries(test_get_wallet_address PUBLIC cmocka gcov mock_dispatcher cx_hash_mock sha256 buffer buffer_ext varint read write bip32 merkle policy sign_psbt_cache script_full segwit_addr crypto_real get_merkle_leaf_element get_merkle_leaf_hash get_merkle_preimage get_preimage stream_preimage wallet buffer_ext base58 psbt_parse stubs_wallet_address secp256k1_consts ${SECP256K1_LIBRARIES} ${OPENSSL_LIBRARIES})
 
 # target_link_libraries(test_crypto PUBLIC cmocka gcov crypto)
 add_test(test_bitvector test_bitvector)
@@ -166,5 +203,6 @@ add_test(test_get_merkle_leaf_index test_get_merkle_leaf_index)
 add_test(test_stream_preimage test_stream_preimage)
 add_test(test_stream_merkle_leaf_element test_stream_merkle_leaf_element)
 add_test(test_stream_merkleized_map_value test_stream_merkleized_map_value)
+add_test(test_get_wallet_address test_get_wallet_address)
 
 # add_test(test_crypto test_crypto)
