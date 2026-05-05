@@ -403,6 +403,19 @@ static int mock_process_interruption(dispatcher_context_t *dc) {
         return -1;
     }
 
+    /* Call tamper hook if set */
+    if (m->tamper_hook != NULL) {
+        int tamper_rc = m->tamper_hook(m->response_buf,
+                                       &m->response_len,
+                                       cmd,
+                                       m->tamper_call_count,
+                                       m->tamper_user_data);
+        m->tamper_call_count++;
+        if (tamper_rc < 0) {
+            return -1;
+        }
+    }
+
     /* Set read_buffer to point at the response */
     dc->read_buffer = buffer_create(m->response_buf, m->response_len);
     return 0;
