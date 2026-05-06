@@ -2,8 +2,10 @@
 ///
 use bitcoin::{
     bip32::{ChildNumber, DerivationPath},
-    consensus::encode::{self, VarInt},
+    consensus::encode::{self},
 };
+
+use crate::protocol::UncheckedVarInt;
 use core::default::Default;
 
 use super::{
@@ -54,7 +56,7 @@ pub fn get_extended_pubkey(path: &DerivationPath, display: bool) -> APDUCommand 
 /// Creates the APDU command required to register the given wallet policy.
 pub fn register_wallet(policy: &WalletPolicy) -> APDUCommand {
     let bytes = policy.serialize();
-    let mut data = encode::serialize(&VarInt(bytes.len() as u64));
+    let mut data = encode::serialize(&UncheckedVarInt(bytes.len() as u64));
     data.extend(bytes);
     APDUCommand {
         cla: apdu::Cla::Bitcoin as u8,
@@ -98,9 +100,9 @@ pub fn sign_psbt(
 ) -> APDUCommand {
     let mut data: Vec<u8> = Vec::new();
     data.extend_from_slice(global_mapping_commitment);
-    data.extend(encode::serialize(&VarInt(inputs_number as u64)));
+    data.extend(encode::serialize(&UncheckedVarInt(inputs_number as u64)));
     data.extend_from_slice(input_commitments_root);
-    data.extend(encode::serialize(&VarInt(outputs_number as u64)));
+    data.extend(encode::serialize(&UncheckedVarInt(outputs_number as u64)));
     data.extend_from_slice(output_commitments_root);
     data.extend_from_slice(&policy.id());
     data.extend_from_slice(hmac.unwrap_or(&[b'\0'; 32]));
@@ -126,7 +128,7 @@ pub fn sign_message(
                 acc.extend_from_slice(&u32::from(x).to_be_bytes());
                 acc
             });
-    data.extend(encode::serialize(&VarInt(message_length as u64)));
+    data.extend(encode::serialize(&UncheckedVarInt(message_length as u64)));
     data.extend_from_slice(message_commitment_root);
 
     APDUCommand {

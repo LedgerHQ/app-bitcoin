@@ -1,13 +1,95 @@
 //! This module contains types that are specific to the Ledger Bitcoin application protocol.
 
 use bitcoin::{
-    consensus::encode::{deserialize_partial, VarInt},
+    consensus::encode::{deserialize_partial, Decodable, Encodable, Error as EncodeError},
     hashes::Hash,
+    io::{Read, Write},
     taproot::TapLeafHash,
     PublicKey,
 };
 
 use crate::psbt::{PartialSignature, PartialSignatureError};
+
+/// A variable-length unsigned integer using the same wire encoding as
+/// Bitcoin's `CompactSize`, but without the upper-bound limit enforced by the
+/// `bitcoin` crate's [`VarInt`](bitcoin::consensus::encode::VarInt).
+///
+/// The Ledger protocol reuses the CompactSize encoding for tag values (e.g.
+/// `0xFFFFFFFF`) that exceed `MAX_COMPACT_SIZE`.  This type can be used for
+/// both serialization and deserialization of any `u64` value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct UncheckedVarInt(pub u64);
+
+impl Encodable for UncheckedVarInt {
+    fn consensus_encode<W: Write + ?Sized>(&self, w: &mut W) -> Result<usize, bitcoin::io::Error> {
+        match self.0 {
+            0..=0xFC => {
+                (self.0 as u8).consensus_encode(w)?;
+                Ok(1)
+            }
+            0xFD..=0xFFFF => {
+                0xFDu8.consensus_encode(w)?;
+                (self.0 as u16).consensus_encode(w)?;
+                Ok(3)
+            }
+            0x10000..=0xFFFFFFFF => {
+                0xFEu8.consensus_encode(w)?;
+                (self.0 as u32).consensus_encode(w)?;
+                Ok(5)
+            }
+            _ => {
+                0xFFu8.consensus_encode(w)?;
+                self.0.consensus_encode(w)?;
+                Ok(9)
+            }
+        }
+    }
+}
+
+impl Decodable for UncheckedVarInt {
+    fn consensus_decode<R: Read + ?Sized>(r: &mut R) -> Result<Self, EncodeError> {
+        let n = u8::consensus_decode(r)?;
+        match n {
+            0xFF => {
+                let x = u64::consensus_decode(r)?;
+                if x < 0x1_0000_0000 {
+                    Err(EncodeError::NonMinimalVarInt)
+                } else {
+                    Ok(UncheckedVarInt(x))
+                }
+            }
+            0xFE => {
+                let x = u32::consensus_decode(r)?;
+                if x < 0x10000 {
+                    Err(EncodeError::NonMinimalVarInt)
+                } else {
+                    Ok(UncheckedVarInt(x as u64))
+                }
+            }
+            0xFD => {
+                let x = u16::consensus_decode(r)?;
+                if x < 0xFD {
+                    Err(EncodeError::NonMinimalVarInt)
+                } else {
+                    Ok(UncheckedVarInt(x as u64))
+                }
+            }
+            n => Ok(UncheckedVarInt(n as u64)),
+        }
+    }
+}
+
+impl UncheckedVarInt {
+    /// Returns the number of bytes this varint occupies when serialized.
+    pub fn size(&self) -> usize {
+        match self.0 {
+            0..=0xFC => 1,
+            0xFD..=0xFFFF => 3,
+            0x10000..=0xFFFFFFFF => 5,
+            _ => 9,
+        }
+    }
+}
 
 /// Tag yielded by the device to introduce a MuSig2 pubnonce payload.
 pub const CCMD_YIELD_MUSIG_PUBNONCE_TAG: u64 = 0xFFFFFFFF;
@@ -70,13 +152,14 @@ pub enum SignPsbtYieldedObject {
 pub fn parse_sign_psbt_yielded(
     data: &[u8],
 ) -> Result<(usize, SignPsbtYieldedObject), PartialSignatureError> {
-    let (tag, i): (VarInt, usize) =
+    let (UncheckedVarInt(tag), i): (UncheckedVarInt, usize) =
         deserialize_partial(data).map_err(|_| PartialSignatureError::InvalidLength)?;
 
-    match tag.0 {
+    match tag {
         CCMD_YIELD_MUSIG_PUBNONCE_TAG => {
-            let (input_index, j): (VarInt, usize) = deserialize_partial(&data[i..])
-                .map_err(|_| PartialSignatureError::InvalidLength)?;
+            let (UncheckedVarInt(input_index), j): (UncheckedVarInt, usize) =
+                deserialize_partial(&data[i..])
+                    .map_err(|_| PartialSignatureError::InvalidLength)?;
             let rest = &data[i + j..];
             // Layout: 66-byte pubnonce || 33-byte participant pubkey ||
             //         33-byte aggregate pubkey || optional 32-byte tapleaf hash.
@@ -98,7 +181,7 @@ pub fn parse_sign_psbt_yielded(
                 None
             };
             Ok((
-                input_index.0 as usize,
+                input_index as usize,
                 SignPsbtYieldedObject::MusigPubNonce(MusigPubNonce {
                     participant_pubkey,
                     aggregate_pubkey,
@@ -108,8 +191,9 @@ pub fn parse_sign_psbt_yielded(
             ))
         }
         CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG => {
-            let (input_index, j): (VarInt, usize) = deserialize_partial(&data[i..])
-                .map_err(|_| PartialSignatureError::InvalidLength)?;
+            let (UncheckedVarInt(input_index), j): (UncheckedVarInt, usize) =
+                deserialize_partial(&data[i..])
+                    .map_err(|_| PartialSignatureError::InvalidLength)?;
             let rest = &data[i + j..];
             // Layout: 32-byte partial signature || 33-byte participant pubkey ||
             //         33-byte aggregate pubkey || optional 32-byte tapleaf hash.
@@ -131,7 +215,7 @@ pub fn parse_sign_psbt_yielded(
                 None
             };
             Ok((
-                input_index.0 as usize,
+                input_index as usize,
                 SignPsbtYieldedObject::MusigPartialSignature(MusigPartialSignature {
                     participant_pubkey,
                     aggregate_pubkey,
@@ -145,18 +229,19 @@ pub fn parse_sign_psbt_yielded(
         // for future use.
         tag_value if tag_value >= 0x80000000 => {
             // Future tags are expected to follow the same layout, using the first varint to refer to the input index
-            let (input_index, j): (VarInt, usize) = deserialize_partial(&data[i..])
-                .map_err(|_| PartialSignatureError::InvalidLength)?;
+            let (UncheckedVarInt(input_index), j): (UncheckedVarInt, usize) =
+                deserialize_partial(&data[i..])
+                    .map_err(|_| PartialSignatureError::InvalidLength)?;
             let rest = &data[i + j..];
             Ok((
-                input_index.0 as usize,
+                input_index as usize,
                 SignPsbtYieldedObject::Unknown(rest.to_vec()),
             ))
         }
         // Otherwise the leading varint is the input index and the remainder is a regular partial signature.
         // These are the only payloads that were used in protocol versions prior to the introduction of the tags.
         _ => {
-            let input_index = tag.0 as usize;
+            let input_index = tag as usize;
             let ps = PartialSignature::from_slice(&data[i..])?;
             Ok((input_index, SignPsbtYieldedObject::Partial(ps)))
         }
@@ -190,7 +275,7 @@ mod tests {
     fn parse_legacy_partial_taproot_no_tapleaf() {
         // Layout (untagged, used by protocol versions <= 2.1):
         //   varint(input_index) || key_augment_len(=32) || 32-byte x-only pk || 64-byte schnorr sig
-        let mut payload = serialize(&VarInt(3));
+        let mut payload = serialize(&UncheckedVarInt(3));
         payload.push(32);
         payload.extend(XONLY);
         payload.extend([0xAAu8; 64]);
@@ -206,8 +291,8 @@ mod tests {
     }
 
     fn build_musig_pubnonce(input_index: u64, with_tapleaf: bool) -> Vec<u8> {
-        let mut payload = serialize(&VarInt(CCMD_YIELD_MUSIG_PUBNONCE_TAG));
-        payload.extend(serialize(&VarInt(input_index)));
+        let mut payload = serialize(&UncheckedVarInt(CCMD_YIELD_MUSIG_PUBNONCE_TAG));
+        payload.extend(serialize(&UncheckedVarInt(input_index)));
         payload.extend([0xAAu8; 66]); // pubnonce
         payload.extend(PUBKEY); // participant pk (33)
         payload.extend(PUBKEY); // aggregate pk  (33)
@@ -248,8 +333,8 @@ mod tests {
     }
 
     fn build_musig_partial_sig(input_index: u64, with_tapleaf: bool) -> Vec<u8> {
-        let mut payload = serialize(&VarInt(CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG));
-        payload.extend(serialize(&VarInt(input_index)));
+        let mut payload = serialize(&UncheckedVarInt(CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG));
+        payload.extend(serialize(&UncheckedVarInt(input_index)));
         payload.extend([0xBBu8; 32]); // partial signature
         payload.extend(PUBKEY); // participant pk (33)
         payload.extend(PUBKEY); // aggregate pk  (33)
@@ -297,8 +382,8 @@ mod tests {
         const UNKNOWN_TAG: u64 = 0x89AB_CDEF;
         let trailer = hex!("deadbeef");
 
-        let mut payload = serialize(&VarInt(UNKNOWN_TAG));
-        payload.extend(serialize(&VarInt(11)));
+        let mut payload = serialize(&UncheckedVarInt(UNKNOWN_TAG));
+        payload.extend(serialize(&UncheckedVarInt(11)));
         payload.extend(&trailer);
 
         let (idx, obj) = parse_ok(&payload);
