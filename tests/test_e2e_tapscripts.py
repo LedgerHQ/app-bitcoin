@@ -101,6 +101,8 @@ def run_test_e2e(navigator: Navigator, client: RaggerClient, wallet_policy: Wall
 
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
+    psbt.tx.nVersion = 2  # Ensure transaction version 2 (walletcreatefundedpsbt may produce version 1)
+    psbt_b64 = psbt.serialize()
 
     hww_sigs = client.sign_psbt(psbt, wallet_policy, wallet_hmac, navigator,
                                 instructions=instructions_sign_psbt,
