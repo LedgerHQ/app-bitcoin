@@ -5,7 +5,7 @@
 /// rust-bitcoin currently support V0.
 use bitcoin::{
     blockdata::transaction::{TxIn, TxOut},
-    consensus::encode::{deserialize, serialize, VarInt},
+    consensus::encode::{deserialize, serialize},
     ecdsa,
     hashes::Hash,
     key::FromSliceError as KeyError,
@@ -16,6 +16,7 @@ use bitcoin::{
     PublicKey,
 };
 
+use crate::protocol::UncheckedVarInt;
 use serialize::Serialize;
 
 #[rustfmt::skip]
@@ -94,7 +95,7 @@ pub fn get_v2_global_pairs(psbt: &Psbt) -> Vec<raw::Pair> {
             type_value: PSBT_GLOBAL_INPUT_COUNT,
             key: vec![],
         },
-        value: serialize(&VarInt(psbt.inputs.len() as u64)),
+        value: serialize(&UncheckedVarInt(psbt.inputs.len() as u64)),
     });
 
     rv.push(raw::Pair {
@@ -102,7 +103,7 @@ pub fn get_v2_global_pairs(psbt: &Psbt) -> Vec<raw::Pair> {
             type_value: PSBT_GLOBAL_OUTPUT_COUNT,
             key: vec![],
         },
-        value: serialize(&VarInt(psbt.outputs.len() as u64)),
+        value: serialize(&UncheckedVarInt(psbt.outputs.len() as u64)),
     });
 
     rv.push(raw::Pair {
@@ -459,8 +460,9 @@ mod serialize {
         secp256k1::{self, XOnlyPublicKey},
         taproot,
         taproot::{ControlBlock, LeafVersion, TapLeafHash, TapNodeHash, TapTree, TaprootBuilder},
-        VarInt,
     };
+
+    use crate::protocol::UncheckedVarInt;
 
     macro_rules! impl_psbt_de_serialize {
         ($thing:ty) => {
@@ -547,7 +549,7 @@ mod serialize {
     impl Serialize for bitcoin::psbt::raw::Key {
         fn serialize(&self) -> Vec<u8> {
             let mut buf = Vec::new();
-            VarInt((self.key.len() + 1) as u64)
+            UncheckedVarInt((self.key.len() + 1) as u64)
                 .consensus_encode(&mut buf)
                 .expect("in-memory writers don't error");
 
@@ -814,7 +816,7 @@ mod serialize {
             let capacity = self
                 .script_leaves()
                 .map(|l| {
-                    l.script().len() + VarInt(l.script().len() as u64).size() // script version
+                    l.script().len() + UncheckedVarInt(l.script().len() as u64).size() // script version
             + 1 // merkle branch
             + 1 // leaf version
                 })
