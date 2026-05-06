@@ -130,6 +130,8 @@ def run_test_e2e_musig2(navigator: Navigator, client: RaggerClient, wallet_polic
 
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
+    psbt.tx.nVersion = 2  # Ensure transaction version 2 (walletcreatefundedpsbt may produce version 1)
+    psbt_b64 = psbt.serialize()
 
     psbt_stripped = strip_non_musig2_derivations(psbt)
     hww_yielded: List[Tuple[int, SignPsbtYieldedObject]] = client.sign_psbt(psbt_stripped, wallet_policy, wallet_hmac, navigator,
