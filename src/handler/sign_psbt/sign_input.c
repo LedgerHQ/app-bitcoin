@@ -585,34 +585,40 @@ bool __attribute__((noinline)) produce_musig2_pubnonces(
             return false;
         }
 
-        // The taptree hash only depends on the input (change, address_index) and the policy,
-        // so it is computed once per input and reused for every MuSig2 key expression below.
-        policy_node_tr_t *policy = (policy_node_tr_t *) st->account.policy_map;
-        bool has_taptree = !isnull_policy_node_tree(&policy->tree);
-        if (has_taptree) {
-            if (0 > compute_taptree_hash(
-                        dc,
-                        &(wallet_derivation_info_t){
-                            .address_index = input.in_out.address_index,
-                            .change = input.in_out.is_change ? 1 : 0,
-                            .keys_merkle_root = st->account.wallet_header.keys_info_merkle_root,
-                            .n_keys = st->account.wallet_header.n_keys,
-                            .wallet_version = st->account.wallet_header.version,
-                            .sign_psbt_cache = sign_psbt_cache},
-                        r_policy_node_tree(&policy->tree),
-                        input.taptree_hash)) {
-                PRINTF("Error while computing taptree hash\n");
-                SEND_SW(dc, SW_BAD_STATE);
-                return false;
-            }
-        }
-
         for (size_t i_keyexpr = 0; i_keyexpr < st->account.n_internal_key_expressions;
              i_keyexpr++) {
             if (!keyexpr_to_process[i_keyexpr]) {
                 continue;
             }
             keyexpr_info_t *keyexpr_info = &st->account.internal_key_expressions[i_keyexpr];
+
+            if (!keyexpr_info->is_tapscript) {
+                // The taptree hash only depends on the input (change, address_index) and the
+                // policy, so it could be computed outside of this loop. However, it is only needed
+                // for at most a single key placeholder (the taproot keypath, if it's a musig with
+                // an internal key), and might not be needed at all otherwise. Therefore, it is
+                // actually more efficient to compute it here.
+                policy_node_tr_t *policy = (policy_node_tr_t *) st->account.policy_map;
+                bool has_taptree = !isnull_policy_node_tree(&policy->tree);
+                if (has_taptree) {
+                    if (0 >
+                        compute_taptree_hash(
+                            dc,
+                            &(wallet_derivation_info_t){
+                                .address_index = input.in_out.address_index,
+                                .change = input.in_out.is_change ? 1 : 0,
+                                .keys_merkle_root = st->account.wallet_header.keys_info_merkle_root,
+                                .n_keys = st->account.wallet_header.n_keys,
+                                .wallet_version = st->account.wallet_header.version,
+                                .sign_psbt_cache = sign_psbt_cache},
+                            r_policy_node_tree(&policy->tree),
+                            input.taptree_hash)) {
+                        PRINTF("Error while computing taptree hash\n");
+                        SEND_SW(dc, SW_BAD_STATE);
+                        return false;
+                    }
+                }
+            }
 
             // TODO: code duplication with sign_transaction_input
             if (keyexpr_info->tapleaf_ptr != NULL) {
