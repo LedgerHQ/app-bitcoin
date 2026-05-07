@@ -515,6 +515,36 @@ fill_taproot_keyexpr_info(dispatcher_context_t *dc,
     return true;
 }
 
+/**
+ * Pre-pass: identifies which internal key expressions need processing.
+ * If required_type >= 0, only key expressions matching that type are selected.
+ * If required_type < 0, all signable key expressions are selected.
+ */
+static bool select_keyexprs_to_process(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *st,
+    int required_type,
+    bool keyexpr_to_process[static MAX_INTERNAL_KEY_EXPRESSIONS]) {
+    bool any = false;
+    for (size_t i = 0; i < st->account.n_internal_key_expressions; i++) {
+        keyexpr_to_process[i] = false;
+        keyexpr_info_t *keyexpr_info = &st->account.internal_key_expressions[i];
+        if (!keyexpr_info->to_sign) {
+            continue;
+        }
+        if (required_type >= 0 &&
+            keyexpr_info->key_expression_ptr->type != (KeyExpressionType) required_type) {
+            continue;
+        }
+        if (!fill_keyexpr_info_if_internal(dc, st, keyexpr_info)) {
+            continue;
+        }
+        keyexpr_to_process[i] = true;
+        any = true;
+    }
+    return any;
+}
+
 bool __attribute__((noinline)) produce_musig2_pubnonces(
     dispatcher_context_t *dc,
     sign_psbt_state_t *st,
@@ -527,23 +557,8 @@ bool __attribute__((noinline)) produce_musig2_pubnonces(
         return true;  // nothing to do
     }
 
-    // Pre-pass: identify the MuSig2 key expressions we will produce pubnonces for
     bool keyexpr_to_process[MAX_INTERNAL_KEY_EXPRESSIONS] = {0};
-    bool any_keyexpr_to_process = false;
-    for (size_t i_keyexpr = 0; i_keyexpr < st->account.n_internal_key_expressions; i_keyexpr++) {
-        keyexpr_info_t *keyexpr_info = &st->account.internal_key_expressions[i_keyexpr];
-        if (!keyexpr_info->to_sign ||
-            keyexpr_info->key_expression_ptr->type != KEY_EXPRESSION_MUSIG) {
-            continue;
-        }
-        if (!fill_keyexpr_info_if_internal(dc, st, keyexpr_info)) {
-            continue;
-        }
-        keyexpr_to_process[i_keyexpr] = true;
-        any_keyexpr_to_process = true;
-    }
-
-    if (!any_keyexpr_to_process) {
+    if (!select_keyexprs_to_process(dc, st, KEY_EXPRESSION_MUSIG, keyexpr_to_process)) {
         return true;  // nothing to do
     }
 
@@ -628,22 +643,8 @@ sign_transaction(dispatcher_context_t *dc,
                  const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    // Pre-pass: identify the key expressions we will sign for.
     bool keyexpr_to_process[MAX_INTERNAL_KEY_EXPRESSIONS] = {0};
-    bool any_keyexpr_to_process = false;
-    for (size_t i_keyexpr = 0; i_keyexpr < st->account.n_internal_key_expressions; i_keyexpr++) {
-        keyexpr_info_t *keyexpr_info = &st->account.internal_key_expressions[i_keyexpr];
-        if (!keyexpr_info->to_sign) {
-            continue;
-        }
-        if (!fill_keyexpr_info_if_internal(dc, st, keyexpr_info)) {
-            continue;
-        }
-        keyexpr_to_process[i_keyexpr] = true;
-        any_keyexpr_to_process = true;
-    }
-
-    if (!any_keyexpr_to_process) {
+    if (!select_keyexprs_to_process(dc, st, -1, keyexpr_to_process)) {
         return true;
     }
 
