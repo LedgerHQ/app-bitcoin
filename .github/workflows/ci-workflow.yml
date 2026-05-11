@@ -95,13 +95,6 @@ jobs:
 
     container:
       image: ghcr.io/ledgerhq/speculos:latest
-      ports:
-        - 1234:1234
-        - 9999:9999
-        - 40000:40000
-        - 41000:41000
-        - 42000:42000
-        - 43000:43000
       options: --entrypoint /bin/bash
 
     steps:
@@ -131,13 +124,6 @@ jobs:
     container:
       # As for the test we use v1.6.5 Nano S BTC binary we freeze the last Speculos version supporting this device
       image: ghcr.io/ledgerhq/speculos:0.25.5
-      ports:
-        - 1234:1234
-        - 9999:9999
-        - 40000:40000
-        - 41000:41000
-        - 42000:42000
-        - 43000:43000
       options: --entrypoint /bin/bash
 
     steps:
@@ -161,13 +147,6 @@ jobs:
 
     container:
       image: ghcr.io/ledgerhq/speculos:latest
-      ports:
-        - 1234:1234
-        - 9999:9999
-        - 40000:40000
-        - 41000:41000
-        - 42000:42000
-        - 43000:43000
       options: --entrypoint /bin/bash
 
     steps:
@@ -214,13 +193,6 @@ jobs:
 
     container:
       image: ghcr.io/ledgerhq/speculos:latest
-      ports:
-        - 1234:1234
-        - 9999:9999
-        - 40000:40000
-        - 41000:41000
-        - 42000:42000
-        - 43000:43000
       options: --entrypoint /bin/bash
 
     steps:
