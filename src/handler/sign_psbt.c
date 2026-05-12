@@ -740,10 +740,11 @@ preprocess_inputs(dispatcher_context_t *dc,
             }
         }
 
+        int is_internal = 0;
         if (!st->has_no_wallet_policy) {
             // check if the input is internal
 
-            int is_internal = is_in_out_internal(dc, st, sign_psbt_cache, &input.in_out, true);
+            is_internal = is_in_out_internal(dc, st, sign_psbt_cache, &input.in_out, true);
             if (is_internal < 0) {
                 PRINTF("Error checking if input %d is internal\n", cur_input_index);
                 SEND_SW(dc, SW_INCORRECT_DATA);
@@ -752,14 +753,34 @@ preprocess_inputs(dispatcher_context_t *dc,
                 ++st->n_external_inputs;
 
                 PRINTF("INPUT %d is external\n", cur_input_index);
-                continue;
+                // unlike the Bitcoin app, we still validate external outputs, as the derived app might sign for them
             } else {
                 bitvector_set(internal_inputs, cur_input_index, 1);
                 st->internal_inputs_total_amount += input.prevout_amount;
             }
         }
 
-        int segwit_version = get_policy_segwit_version(st->wallet_policy_map);
+        int segwit_version = -1; 
+        if (is_internal) {
+            // we get the SegWit version from the wallet policy; in this way, we correctly classify wrapped segwit inputs
+            // (which are SegWitV0 even if the scriptPubKey is that of a legacy one)
+            segwit_version = get_policy_segwit_version(st->wallet_policy_map);
+        } else {
+            // deduce the segwit version from the scriptPubKey
+            // we only support P2WPKH, P2WSH and P2TR for external inputs
+            int script_type = get_script_type(input.in_out.scriptPubKey,
+                                              input.in_out.scriptPubKey_len);
+            if (script_type == SCRIPT_TYPE_P2WPKH || script_type == SCRIPT_TYPE_P2WSH) {
+                segwit_version = 0;
+            } else if (script_type == SCRIPT_TYPE_P2TR) {
+                segwit_version = 1;
+            } else {
+                // if external, only SegWitV0 and SegWitV1 inputs are supported
+                PRINTF("Only SegWitV0 and SegWitV1 external inputs are supported\n");
+                SEND_SW(dc, SW_NOT_SUPPORTED);
+                return false;
+            }
+        }
 
         // For legacy inputs, the non-witness utxo must be present
         // and the witness utxo must be absent.
@@ -778,8 +799,13 @@ preprocess_inputs(dispatcher_context_t *dc,
         // For segwitv0 inputs, the non-witness utxo _should_ be present; we show a warning
         // to the user otherwise, but we continue nonetheless on approval
         if (segwit_version == 0 && !input.has_nonWitnessUtxo) {
-            PRINTF("Non-witness utxo missing for segwitv0 input. Will show a warning.\n");
+            PRINTF("Non-witness utxo missing for segwitv0 input. Not supported in derived apps.\n");
             st->warnings.missing_nonwitnessutxo = true;
+
+            // the Bitcoin app would just show a warning, but here we are more strict, since the
+            // UX is controlled by the derived app.
+            SEND_SW(dc, SW_NOT_SUPPORTED);
+            return false;
         }
 
         // For all segwit transactions, the witness utxo must be present
@@ -1095,11 +1121,6 @@ bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_context
                                                               uint8_t sighash_byte,
                                                               const uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
-
-    if (st->wallet_policy_map->type != TOKEN_TR) {
-        SEND_SW(dc, SW_BAD_STATE);  // should never happen
-        return false;
-    }
 
     uint8_t sig[64 + 1];  // extra byte for the appended sighash-type, possibly
     size_t sig_len = 0;

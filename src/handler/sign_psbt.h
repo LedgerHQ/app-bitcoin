@@ -146,7 +146,7 @@ typedef struct {
     // in that case, all inputs and outputs are assumed external
     bool has_no_wallet_policy;
 
-    // only relevante if has_no_wallet_policy is false
+    // only relevant if has_no_wallet_policy is false
     bool is_wallet_default;
 
     uint8_t protocol_version;
