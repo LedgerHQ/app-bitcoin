@@ -760,7 +760,7 @@ preprocess_inputs(dispatcher_context_t *dc,
             }
         }
 
-        int segwit_version = -1; 
+        int segwit_version = -1;
         if (is_internal) {
             // we get the SegWit version from the wallet policy; in this way, we correctly classify wrapped segwit inputs
             // (which are SegWitV0 even if the scriptPubKey is that of a legacy one)
