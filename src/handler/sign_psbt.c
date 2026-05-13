@@ -753,7 +753,8 @@ preprocess_inputs(dispatcher_context_t *dc,
                 ++st->n_external_inputs;
 
                 PRINTF("INPUT %d is external\n", cur_input_index);
-                // unlike the Bitcoin app, we still validate external outputs, as the derived app might sign for them
+                // unlike the Bitcoin app, we still validate external outputs, as the derived app
+                // might sign for them
             } else {
                 bitvector_set(internal_inputs, cur_input_index, 1);
                 st->internal_inputs_total_amount += input.prevout_amount;
@@ -762,14 +763,15 @@ preprocess_inputs(dispatcher_context_t *dc,
 
         int segwit_version = -1;
         if (is_internal) {
-            // we get the SegWit version from the wallet policy; in this way, we correctly classify wrapped segwit inputs
-            // (which are SegWitV0 even if the scriptPubKey is that of a legacy one)
+            // we get the SegWit version from the wallet policy; in this way, we correctly classify
+            // wrapped segwit inputs (which are SegWitV0 even if the scriptPubKey is that of a
+            // legacy one)
             segwit_version = get_policy_segwit_version(st->wallet_policy_map);
         } else {
             // deduce the segwit version from the scriptPubKey
             // we only support P2WPKH, P2WSH and P2TR for external inputs
-            int script_type = get_script_type(input.in_out.scriptPubKey,
-                                              input.in_out.scriptPubKey_len);
+            int script_type =
+                get_script_type(input.in_out.scriptPubKey, input.in_out.scriptPubKey_len);
             if (script_type == SCRIPT_TYPE_P2WPKH || script_type == SCRIPT_TYPE_P2WSH) {
                 segwit_version = 0;
             } else if (script_type == SCRIPT_TYPE_P2TR) {
