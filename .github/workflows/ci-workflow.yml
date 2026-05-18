@@ -180,7 +180,6 @@ jobs:
     with:
       package_name: ledger_bitcoin
       package_directory: ./bitcoin_client/
-      jfrog_deployment: true
       release: false
       publish: true
 
