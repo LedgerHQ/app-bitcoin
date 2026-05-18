@@ -377,6 +377,302 @@ static void test_get_merkle_preimage_corrupted_continuation(void **state) {
     assert_true(result < 0);
 }
 
+/**
+ * Adversarial: truncated response — buffer reads fail. Must return -2.
+ */
+static int tamper_truncate(uint8_t *response_buf,
+                           size_t *response_len,
+                           uint8_t cmd,
+                           int call_count,
+                           void *user_data) {
+    (void) response_buf;
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_PREIMAGE) {
+        *response_len = 0;
+    }
+    return 0;
+}
+
+static void test_get_merkle_preimage_truncated(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[10];
+    for (size_t i = 0; i < sizeof(element); i++) {
+        element[i] = (uint8_t) i;
+    }
+
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_truncate, NULL);
+
+    uint8_t out[64];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
+
+    assert_int_equal(result, -2);
+}
+
+/**
+ * Adversarial: preimage_len = 0 or partial_data_len = 0 — must return -3.
+ */
+static int tamper_zero_len(uint8_t *response_buf,
+                           size_t *response_len,
+                           uint8_t cmd,
+                           int call_count,
+                           void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_PREIMAGE) {
+        response_buf[0] = 0x00;
+        response_buf[1] = 0x00;
+        *response_len = 2;
+    }
+    return 0;
+}
+
+static void test_get_merkle_preimage_zero_len(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[5] = {1, 2, 3, 4, 5};
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_zero_len, NULL);
+
+    uint8_t out[64];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
+
+    assert_int_equal(result, -3);
+}
+
+/**
+ * Adversarial: partial_data_len > preimage_len with padded buffer.
+ * Must return -5.
+ */
+static int tamper_partial_len_over(uint8_t *response_buf,
+                                   size_t *response_len,
+                                   uint8_t cmd,
+                                   int call_count,
+                                   void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_PREIMAGE && *response_len >= 2) {
+        uint8_t preimage_len = response_buf[0];
+        response_buf[1] = preimage_len + 1;
+        response_buf[*response_len] = 0xCC;
+        (*response_len)++;
+    }
+    return 0;
+}
+
+static void test_get_merkle_preimage_partial_len_over(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[5] = {1, 2, 3, 4, 5};
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_partial_len_over, NULL);
+
+    uint8_t out[64];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
+
+    assert_int_equal(result, -5);
+}
+
+/**
+ * Adversarial: second-call communication failure during GET_MORE_ELEMENTS.
+ * Must return -6.
+ */
+static int tamper_fail_second(uint8_t *response_buf,
+                              size_t *response_len,
+                              uint8_t cmd,
+                              int call_count,
+                              void *user_data) {
+    (void) response_buf;
+    (void) response_len;
+    (void) cmd;
+    (void) user_data;
+
+    if (call_count >= 1) {
+        return -1;
+    }
+    return 0;
+}
+
+static void test_get_merkle_preimage_comm_failure(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[300];
+    for (size_t i = 0; i < sizeof(element); i++) {
+        element[i] = (uint8_t) i;
+    }
+
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_fail_second, NULL);
+
+    uint8_t out[512];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
+
+    assert_int_equal(result, -6);
+}
+
+/**
+ * Adversarial: truncated GET_MORE_ELEMENTS response — must return -7.
+ */
+static int tamper_truncate_more(uint8_t *response_buf,
+                                size_t *response_len,
+                                uint8_t cmd,
+                                int call_count,
+                                void *user_data) {
+    (void) response_buf;
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MORE_ELEMENTS) {
+        *response_len = 0;
+    }
+    return 0;
+}
+
+static void test_get_merkle_preimage_truncated_more(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[300];
+    for (size_t i = 0; i < sizeof(element); i++) {
+        element[i] = (uint8_t) i;
+    }
+
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_truncate_more, NULL);
+
+    uint8_t out[512];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
+
+    assert_int_equal(result, -7);
+}
+
+/**
+ * Adversarial: GET_MORE_ELEMENTS with elements_len != 1 — must return -8.
+ */
+static int tamper_more_bad_size(uint8_t *response_buf,
+                                size_t *response_len,
+                                uint8_t cmd,
+                                int call_count,
+                                void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MORE_ELEMENTS && *response_len >= 2) {
+        response_buf[0] = 0;
+        response_buf[1] = 4;
+    }
+    return 0;
+}
+
+static void test_get_merkle_preimage_bad_element_size(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[300];
+    for (size_t i = 0; i < sizeof(element); i++) {
+        element[i] = (uint8_t) i;
+    }
+
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_more_bad_size, NULL);
+
+    uint8_t out[512];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
+
+    assert_int_equal(result, -8);
+}
+
+/**
+ * Adversarial: GET_MORE_ELEMENTS with n_bytes > bytes_remaining (padded buffer).
+ * Must return -9.
+ */
+static int tamper_more_bytes(uint8_t *response_buf,
+                             size_t *response_len,
+                             uint8_t cmd,
+                             int call_count,
+                             void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MORE_ELEMENTS && *response_len >= 2) {
+        uint8_t orig_n = response_buf[0];
+        response_buf[0] = orig_n + 1;
+        response_buf[*response_len] = 0xAB;
+        (*response_len)++;
+    }
+    return 0;
+}
+
+static void test_get_merkle_preimage_more_bytes(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    /* element 253 → preimage 254 → spill 3 bytes */
+    uint8_t element[253];
+    for (size_t i = 0; i < sizeof(element); i++) {
+        element[i] = (uint8_t) (i * 7);
+    }
+
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_more_bytes, NULL);
+
+    uint8_t out[512];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
+
+    assert_int_equal(result, -9);
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -391,6 +687,13 @@ int main(void) {
         cmocka_unit_test(test_get_merkle_preimage_exact_buffer),
         cmocka_unit_test(test_get_merkle_preimage_corrupted_data),
         cmocka_unit_test(test_get_merkle_preimage_corrupted_continuation),
+        cmocka_unit_test(test_get_merkle_preimage_truncated),
+        cmocka_unit_test(test_get_merkle_preimage_zero_len),
+        cmocka_unit_test(test_get_merkle_preimage_partial_len_over),
+        cmocka_unit_test(test_get_merkle_preimage_comm_failure),
+        cmocka_unit_test(test_get_merkle_preimage_truncated_more),
+        cmocka_unit_test(test_get_merkle_preimage_bad_element_size),
+        cmocka_unit_test(test_get_merkle_preimage_more_bytes),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

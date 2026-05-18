@@ -408,6 +408,138 @@ static void test_get_leaf_index_oob_index(void **state) {
     assert_true(result < 0);
 }
 
+/**
+ * Adversarial: process_interruption fails on the initial
+ * CCMD_GET_MERKLE_LEAF_INDEX call — must return -3.
+ */
+static int tamper_fail_first(uint8_t *response_buf,
+                             size_t *response_len,
+                             uint8_t cmd,
+                             int call_count,
+                             void *user_data) {
+    (void) response_buf;
+    (void) response_len;
+    (void) cmd;
+    (void) user_data;
+    (void) call_count;
+    return -1;
+}
+
+static void test_get_leaf_index_initial_comm_failure(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    const uint8_t elem[] = {0xCA, 0xFE};
+    const uint8_t *elems[] = {elem};
+    size_t lens[] = {sizeof(elem)};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 1, root);
+
+    uint8_t leaf_hash[32];
+    compute_leaf_hash(elem, sizeof(elem), leaf_hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_fail_first, NULL);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_index(dc, 1, root, leaf_hash);
+
+    assert_int_equal(result, -3);
+}
+
+/**
+ * Adversarial: client returns `found` byte that is neither 0 nor 1 — must
+ * return -2.
+ */
+static int tamper_invalid_found(uint8_t *response_buf,
+                                size_t *response_len,
+                                uint8_t cmd,
+                                int call_count,
+                                void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MERKLE_LEAF_INDEX && *response_len >= 2) {
+        response_buf[0] = 7; /* invalid */
+        response_buf[1] = 0;
+    }
+    return 0;
+}
+
+static void test_get_leaf_index_invalid_found(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    const uint8_t elem[] = {0xCA, 0xFE};
+    const uint8_t *elems[] = {elem};
+    size_t lens[] = {sizeof(elem)};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 1, root);
+
+    uint8_t leaf_hash[32];
+    compute_leaf_hash(elem, sizeof(elem), leaf_hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_invalid_found, NULL);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_index(dc, 1, root, leaf_hash);
+
+    assert_int_equal(result, -2);
+}
+
+/**
+ * Adversarial: after a valid CCMD_GET_MERKLE_LEAF_INDEX reply, the follow-up
+ * CCMD_GET_MERKLE_LEAF_PROOF call (issued by call_get_merkle_leaf_hash) fails.
+ * call_get_merkle_leaf_index must surface this as -4.
+ */
+static int tamper_fail_second_call(uint8_t *response_buf,
+                                   size_t *response_len,
+                                   uint8_t cmd,
+                                   int call_count,
+                                   void *user_data) {
+    (void) response_buf;
+    (void) response_len;
+    (void) cmd;
+    (void) user_data;
+
+    if (call_count >= 1) {
+        return -1;
+    }
+    return 0;
+}
+
+static void test_get_leaf_index_verify_comm_failure(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    const uint8_t elem[] = {0xCA, 0xFE};
+    const uint8_t *elems[] = {elem};
+    size_t lens[] = {sizeof(elem)};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 1, root);
+
+    uint8_t leaf_hash[32];
+    compute_leaf_hash(elem, sizeof(elem), leaf_hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_fail_second_call, NULL);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_index(dc, 1, root, leaf_hash);
+
+    assert_int_equal(result, -4);
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -422,6 +554,9 @@ int main(void) {
         cmocka_unit_test(test_get_leaf_index_eight_elements),
         cmocka_unit_test(test_get_leaf_index_wrong_index),
         cmocka_unit_test(test_get_leaf_index_oob_index),
+        cmocka_unit_test(test_get_leaf_index_initial_comm_failure),
+        cmocka_unit_test(test_get_leaf_index_invalid_found),
+        cmocka_unit_test(test_get_leaf_index_verify_comm_failure),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

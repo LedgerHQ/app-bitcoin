@@ -388,6 +388,322 @@ static void test_stream_preimage_corrupted_continuation(void **state) {
 }
 
 /**
+ * Adversarial: response is truncated so buffer_read_varint already fails — must
+ * return -2.
+ */
+static int tamper_truncate_response(uint8_t *response_buf,
+                                    size_t *response_len,
+                                    uint8_t cmd,
+                                    int call_count,
+                                    void *user_data) {
+    (void) response_buf;
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_PREIMAGE) {
+        *response_len = 0;
+    }
+    return 0;
+}
+
+static void test_stream_preimage_truncated_response(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[20];
+    for (size_t i = 0; i < sizeof(element); i++) {
+        element[i] = (uint8_t) i;
+    }
+
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_truncate_response, NULL);
+
+    stream_accumulator_t acc;
+    memset(&acc, 0, sizeof(acc));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
+
+    assert_int_equal(result, -2);
+}
+
+/**
+ * Adversarial: client returns preimage_len > UINT32_MAX (9-byte varint).
+ * call_stream_preimage must reject with -10.
+ */
+static int tamper_overflow_len(uint8_t *response_buf,
+                               size_t *response_len,
+                               uint8_t cmd,
+                               int call_count,
+                               void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_PREIMAGE) {
+        response_buf[0] = 0xFF; /* 9-byte varint */
+        response_buf[1] = 0x00;
+        response_buf[2] = 0x00;
+        response_buf[3] = 0x00;
+        response_buf[4] = 0x00;
+        response_buf[5] = 0x01; /* 2^32 */
+        response_buf[6] = 0x00;
+        response_buf[7] = 0x00;
+        response_buf[8] = 0x00;
+        response_buf[9] = 0x00; /* partial_data_len */
+        *response_len = 10;
+    }
+    return 0;
+}
+
+static void test_stream_preimage_overflow_len(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[5] = {1, 2, 3, 4, 5};
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_overflow_len, NULL);
+
+    stream_accumulator_t acc;
+    memset(&acc, 0, sizeof(acc));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
+
+    assert_int_equal(result, -10);
+}
+
+/**
+ * Adversarial: client returns preimage_len = 0 — must return -3.
+ */
+static int tamper_zero_preimage_len(uint8_t *response_buf,
+                                    size_t *response_len,
+                                    uint8_t cmd,
+                                    int call_count,
+                                    void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_PREIMAGE) {
+        response_buf[0] = 0x00; /* preimage_len = 0 */
+        response_buf[1] = 0x00; /* partial_data_len = 0 */
+        *response_len = 2;
+    }
+    return 0;
+}
+
+static void test_stream_preimage_zero_len(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[5] = {1, 2, 3, 4, 5};
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_zero_preimage_len, NULL);
+
+    stream_accumulator_t acc;
+    memset(&acc, 0, sizeof(acc));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
+
+    assert_int_equal(result, -3);
+}
+
+/**
+ * Adversarial: client claims partial_data_len > preimage_len while padding the
+ * buffer so buffer_can_read(partial_data_len) passes — must return -4.
+ */
+static int tamper_partial_len_over(uint8_t *response_buf,
+                                   size_t *response_len,
+                                   uint8_t cmd,
+                                   int call_count,
+                                   void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_PREIMAGE && *response_len >= 2) {
+        uint8_t preimage_len = response_buf[0];
+        response_buf[1] = preimage_len + 1;
+        response_buf[*response_len] = 0xCC;
+        (*response_len)++;
+    }
+    return 0;
+}
+
+static void test_stream_preimage_partial_len_over(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[5] = {1, 2, 3, 4, 5};
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_partial_len_over, NULL);
+
+    stream_accumulator_t acc;
+    memset(&acc, 0, sizeof(acc));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
+
+    assert_int_equal(result, -4);
+}
+
+/**
+ * Adversarial: during GET_MORE_ELEMENTS, response is truncated so buffer_read_u8
+ * fails on n_bytes — must return -6.
+ */
+static int tamper_truncate_more_elements(uint8_t *response_buf,
+                                         size_t *response_len,
+                                         uint8_t cmd,
+                                         int call_count,
+                                         void *user_data) {
+    (void) response_buf;
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MORE_ELEMENTS) {
+        *response_len = 0;
+    }
+    return 0;
+}
+
+static void test_stream_preimage_truncated_more_elements(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[300];
+    for (size_t i = 0; i < sizeof(element); i++) {
+        element[i] = (uint8_t) i;
+    }
+
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_truncate_more_elements, NULL);
+
+    stream_accumulator_t acc;
+    memset(&acc, 0, sizeof(acc));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
+
+    assert_int_equal(result, -6);
+}
+
+/**
+ * Adversarial: during GET_MORE_ELEMENTS, set n_bytes=0 (so buffer_can_read(0)
+ * trivially passes) and elements_len != 1 — must return -7.
+ */
+static int tamper_more_elements_bad_size(uint8_t *response_buf,
+                                         size_t *response_len,
+                                         uint8_t cmd,
+                                         int call_count,
+                                         void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MORE_ELEMENTS && *response_len >= 2) {
+        response_buf[0] = 0;
+        response_buf[1] = 4; /* elements_len != 1 */
+    }
+    return 0;
+}
+
+static void test_stream_preimage_bad_element_size(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[300];
+    for (size_t i = 0; i < sizeof(element); i++) {
+        element[i] = (uint8_t) i;
+    }
+
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_more_elements_bad_size, NULL);
+
+    stream_accumulator_t acc;
+    memset(&acc, 0, sizeof(acc));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
+
+    assert_int_equal(result, -7);
+}
+
+/**
+ * Adversarial: during GET_MORE_ELEMENTS, claim n_bytes > bytes_remaining with
+ * the buffer extended so buffer_can_read still passes — must return -8.
+ */
+static int tamper_more_bytes_with_padding(uint8_t *response_buf,
+                                          size_t *response_len,
+                                          uint8_t cmd,
+                                          int call_count,
+                                          void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MORE_ELEMENTS && *response_len >= 2) {
+        uint8_t orig_n = response_buf[0];
+        response_buf[0] = orig_n + 1;
+        response_buf[*response_len] = 0xAB;
+        (*response_len)++;
+    }
+    return 0;
+}
+
+static void test_stream_preimage_more_bytes_than_remaining(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t element[253]; /* spill = 3 bytes */
+    for (size_t i = 0; i < sizeof(element); i++) {
+        element[i] = (uint8_t) (i * 7);
+    }
+
+    uint8_t hash[32];
+    add_merkle_preimage(&mock, element, sizeof(element), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_more_bytes_with_padding, NULL);
+
+    stream_accumulator_t acc;
+    memset(&acc, 0, sizeof(acc));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
+
+    assert_int_equal(result, -8);
+}
+
+/**
  * Adversarial: communication failure mid-stream (second interruption fails).
  */
 static int tamper_fail_on_second(uint8_t *response_buf,
@@ -445,6 +761,13 @@ int main(void) {
         cmocka_unit_test(test_stream_preimage_one_byte_overflow),
         cmocka_unit_test(test_stream_preimage_corrupted_data),
         cmocka_unit_test(test_stream_preimage_corrupted_continuation),
+        cmocka_unit_test(test_stream_preimage_truncated_response),
+        cmocka_unit_test(test_stream_preimage_overflow_len),
+        cmocka_unit_test(test_stream_preimage_zero_len),
+        cmocka_unit_test(test_stream_preimage_partial_len_over),
+        cmocka_unit_test(test_stream_preimage_truncated_more_elements),
+        cmocka_unit_test(test_stream_preimage_bad_element_size),
+        cmocka_unit_test(test_stream_preimage_more_bytes_than_remaining),
         cmocka_unit_test(test_stream_preimage_communication_failure),
     };
 
