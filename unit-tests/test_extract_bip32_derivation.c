@@ -29,6 +29,7 @@ unsigned int pic(unsigned int linked_address) {
 #include "cx_hash_mock.h"
 #include "psbt_parse.h"
 
+#include "client_commands.h"
 #include "handler/sign_psbt/extract_bip32_derivation.h"
 #include "common/psbt.h"
 
@@ -307,6 +308,265 @@ static void test_taproot_output_tap_bip32_derivation(void **state) {
     assert_int_equal(out[5], 2);
 }
 
+/* ===========================================================================
+ *  Edge-case tests: directly register a single value with a 1-element tree.
+ *  For a 1-element tree, the Merkle root equals the leaf hash, so
+ *  call_stream_merkle_leaf_element returns the registered value directly.
+ * =========================================================================== */
+
+static void register_single_value(mock_dispatcher_t *mock,
+                                  const uint8_t *value,
+                                  size_t len,
+                                  uint8_t root_out[32]) {
+    const uint8_t *elems[] = {value};
+    size_t lens[] = {len};
+    mock_dispatcher_add_list(mock, elems, lens, 1);
+    memcpy(root_out, mock->trees[mock->n_trees - 1].root, 32);
+}
+
+/**
+ * Non-taproot value longer than max_out_data_length (= 4 * (1 + MAX_BIP32_PATH_STEPS)).
+ * Exercises the early-reject branch in the data callback.
+ */
+static void test_extract_nontap_too_long(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    /* max_out_data_length = 4*(1+10) = 44 → 45 bytes is too long */
+    uint8_t value[45];
+    for (size_t i = 0; i < sizeof(value); i++) value[i] = (uint8_t) i;
+
+    uint8_t root[32];
+    register_single_value(&mock, value, sizeof(value), root);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    uint32_t out[1 + MAX_BIP32_PATH_STEPS];
+    int result = extract_bip32_derivation(dc, PSBT_IN_BIP32_DERIVATION, root, 1, 0, out);
+
+    assert_int_equal(result, -1);
+}
+
+/**
+ * Taproot value of 1 byte where n_hashes >= 1 — total_data_length is too short
+ * for the announced number of hashes.
+ */
+static void test_extract_tap_too_short(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t value[1] = {0x01}; /* n_hashes = 1, but no room for the hash */
+
+    uint8_t root[32];
+    register_single_value(&mock, value, sizeof(value), root);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    uint32_t out[1 + MAX_BIP32_PATH_STEPS];
+    int result = extract_bip32_derivation(dc, PSBT_IN_TAP_BIP32_DERIVATION, root, 1, 0, out);
+
+    assert_int_equal(result, -1);
+}
+
+/**
+ * Taproot value where, after removing the leaf hashes, the remaining bytes
+ * exceed max_out_data_length.
+ */
+static void test_extract_tap_out_too_long(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    /* n_hashes=0, 50 bytes of fingerprint+path → out_data_length = 49 > 44 */
+    uint8_t value[50];
+    memset(value, 0, sizeof(value));
+
+    uint8_t root[32];
+    register_single_value(&mock, value, sizeof(value), root);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    uint32_t out[1 + MAX_BIP32_PATH_STEPS];
+    int result = extract_bip32_derivation(dc, PSBT_IN_TAP_BIP32_DERIVATION, root, 1, 0, out);
+
+    assert_int_equal(result, -1);
+}
+
+/**
+ * Taproot value with n_hashes=7 and a 28-byte derivation, total 253 bytes.
+ * The 254-byte preimage spans two chunks (251 + 3); the second chunk is
+ * smaller than out_data_length (=28), exercising the "carry-over" path in
+ * the data callback (memmove + read into tail).
+ */
+static void test_extract_tap_multi_chunk(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t value[1 + 32 * 7 + 28];
+    memset(value, 0, sizeof(value));
+    value[0] = 7; /* n_hashes */
+    /* fingerprint (BE) at offset 225 */
+    value[1 + 32 * 7 + 0] = 0xAA;
+    value[1 + 32 * 7 + 1] = 0xBB;
+    value[1 + 32 * 7 + 2] = 0xCC;
+    value[1 + 32 * 7 + 3] = 0xDD;
+    /* 6 path steps (4 bytes each, LE) at offsets 229.. */
+    for (int s = 0; s < 6; s++) {
+        for (int b = 0; b < 4; b++) {
+            value[1 + 32 * 7 + 4 + 4 * s + b] = (uint8_t) (s * 4 + b + 1);
+        }
+    }
+
+    uint8_t root[32];
+    register_single_value(&mock, value, sizeof(value), root);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    uint32_t out[1 + MAX_BIP32_PATH_STEPS];
+    int result = extract_bip32_derivation(dc, PSBT_IN_TAP_BIP32_DERIVATION, root, 1, 0, out);
+
+    /* 28 bytes / 4 = 7 → n_steps = 6 (returned value = 7 - 1) */
+    assert_int_equal(result, 6);
+    assert_int_equal(out[0], 0xAABBCCDDu); /* fingerprint, BE */
+}
+
+/**
+ * Empty value (0 bytes) — the data callback is invoked with data->size == 0,
+ * exercising the empty-chunk early-return branch.  out_data_length is never
+ * set, so extract_bip32_derivation reports an error.
+ */
+static void test_extract_empty_value(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t value[1] = {0x00}; /* unused — register_single_value needs a non-NULL ptr */
+
+    uint8_t root[32];
+    register_single_value(&mock, value, 0, root);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    uint32_t out[1 + MAX_BIP32_PATH_STEPS];
+    int result = extract_bip32_derivation(dc, PSBT_IN_BIP32_DERIVATION, root, 1, 0, out);
+
+    assert_int_equal(result, -1);
+}
+
+/* ===========================================================================
+ *  Adversarial tests: tampering with the preimage length to trigger checks
+ *  that cannot be reached via well-formed values.
+ * =========================================================================== */
+
+/**
+ * Adversarial: tamper the GET_PREIMAGE response to claim a preimage length
+ * just past INT_MAX.  The len callback in extract_bip32_derivation then sees
+ * data_length > INT_MAX and rejects.
+ */
+static int tamper_huge_preimage_len(uint8_t *response_buf,
+                                    size_t *response_len,
+                                    uint8_t cmd,
+                                    int call_count,
+                                    void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_PREIMAGE && *response_len >= 2) {
+        /* Rewrite the varint header to claim preimage_len = 0x80000001
+         * (> INT_MAX, still < UINT32_MAX).  Then a 0-byte partial_data_len. */
+        /* Original layout: <varint preimage_len> <partial_data_len:1> <data...>
+         * Replace with: <0xFE><u32 LE = 0x80000001><partial_data_len=0>
+         * Note: this is interpreted by call_stream_preimage as preimage_len=0x80000001,
+         * partial_data_len=0 → caught by "preimage_len<1 OR partial_data_len==0" check
+         * (= -3). But we want to bypass that: set partial_data_len=1 instead. */
+        response_buf[0] = 0xFE; /* 5-byte varint */
+        response_buf[1] = 0x01;
+        response_buf[2] = 0x00;
+        response_buf[3] = 0x00;
+        response_buf[4] = 0x80; /* preimage_len = 0x80000001 */
+        response_buf[5] = 0x01; /* partial_data_len = 1 */
+        response_buf[6] = 0x00; /* one data byte (would-be 0x00 prefix) */
+        *response_len = 7;
+    }
+    return 0;
+}
+
+static void test_extract_huge_preimage_len(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t value[5] = {0, 0, 0, 0, 0};
+    uint8_t root[32];
+    register_single_value(&mock, value, sizeof(value), root);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_huge_preimage_len, NULL);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    uint32_t out[1 + MAX_BIP32_PATH_STEPS];
+    int result = extract_bip32_derivation(dc, PSBT_IN_BIP32_DERIVATION, root, 1, 0, out);
+
+    assert_int_equal(result, -1);
+}
+
+/**
+ * Adversarial: tamper to declare preimage_len much larger than what's actually
+ * sent, while keeping a valid first byte = 130 (claimed n_hashes).  Total
+ * declared length satisfies the early "too short" check but n_hashes > 128
+ * triggers the rejection.
+ */
+static int tamper_long_len_n_hashes(uint8_t *response_buf,
+                                    size_t *response_len,
+                                    uint8_t cmd,
+                                    int call_count,
+                                    void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_PREIMAGE && *response_len >= 2) {
+        /* Claim preimage_len = 5000 (= 0x1388), partial_data_len = 2,
+         * partial data = [0x00, 130]. */
+        response_buf[0] = 0xFD; /* 3-byte varint */
+        response_buf[1] = 0x88;
+        response_buf[2] = 0x13; /* 5000 LE */
+        response_buf[3] = 2;    /* partial_data_len */
+        response_buf[4] = 0x00; /* prefix */
+        response_buf[5] = 130;  /* n_hashes */
+        *response_len = 6;
+    }
+    return 0;
+}
+
+static void test_extract_tap_too_many_hashes(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t value[2] = {130, 0};
+    uint8_t root[32];
+    register_single_value(&mock, value, sizeof(value), root);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_long_len_n_hashes, NULL);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    uint32_t out[1 + MAX_BIP32_PATH_STEPS];
+    int result = extract_bip32_derivation(dc, PSBT_IN_TAP_BIP32_DERIVATION, root, 1, 0, out);
+
+    assert_int_equal(result, -1);
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -315,6 +575,13 @@ int main(void) {
         cmocka_unit_test(test_wpkh_output_bip32_derivation),
         cmocka_unit_test(test_taproot_input_tap_bip32_derivation),
         cmocka_unit_test(test_taproot_output_tap_bip32_derivation),
+        cmocka_unit_test(test_extract_nontap_too_long),
+        cmocka_unit_test(test_extract_tap_too_short),
+        cmocka_unit_test(test_extract_tap_out_too_long),
+        cmocka_unit_test(test_extract_tap_multi_chunk),
+        cmocka_unit_test(test_extract_empty_value),
+        cmocka_unit_test(test_extract_huge_preimage_len),
+        cmocka_unit_test(test_extract_tap_too_many_hashes),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

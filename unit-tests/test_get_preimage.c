@@ -522,6 +522,200 @@ static void test_get_preimage_corrupted_continuation(void **state) {
 }
 
 /**
+ * Adversarial: client returns a preimage_len > UINT32_MAX (in the 9-byte varint
+ * encoding).  call_get_preimage should reject it with -11.
+ */
+static int tamper_preimage_len_too_big(uint8_t *response_buf,
+                                       size_t *response_len,
+                                       uint8_t cmd,
+                                       int call_count,
+                                       void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_PREIMAGE) {
+        /* Rewrite the response with a 9-byte varint encoding 2^32 (overflow). */
+        response_buf[0] = 0xFF; /* 9-byte varint marker */
+        /* Little-endian uint64 = 0x0000000100000000 (= 2^32) */
+        response_buf[1] = 0x00;
+        response_buf[2] = 0x00;
+        response_buf[3] = 0x00;
+        response_buf[4] = 0x00;
+        response_buf[5] = 0x01;
+        response_buf[6] = 0x00;
+        response_buf[7] = 0x00;
+        response_buf[8] = 0x00;
+        response_buf[9] = 0x00; /* partial_data_len */
+        *response_len = 10;
+    }
+    return 0;
+}
+
+static void test_get_preimage_overflow_len(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t preimage[10] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A};
+    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+
+    uint8_t hash[32];
+    compute_sha256(preimage, sizeof(preimage), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_preimage_len_too_big, NULL);
+
+    uint8_t out[256];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_preimage(dc, hash, out, sizeof(out));
+
+    /* preimage_len_u64 > UINT32_MAX → return -11 */
+    assert_int_equal(result, -11);
+}
+
+/**
+ * Adversarial: client claims partial_data_len > preimage_len, while also
+ * supplying enough trailing bytes to satisfy buffer_can_read.  Must hit the
+ * `partial_data_len > preimage_len` check (return -4), not -2.
+ */
+static int tamper_partial_len_strictly_over(uint8_t *response_buf,
+                                            size_t *response_len,
+                                            uint8_t cmd,
+                                            int call_count,
+                                            void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_PREIMAGE && *response_len >= 2) {
+        uint8_t preimage_len = response_buf[0];
+        /* Claim one more byte than actually exists in the preimage. */
+        response_buf[1] = preimage_len + 1;
+        /* Append a single dummy byte so buffer_can_read(partial_data_len) passes. */
+        response_buf[*response_len] = 0xCC;
+        (*response_len)++;
+    }
+    return 0;
+}
+
+static void test_get_preimage_partial_len_strictly_over(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t preimage[5] = {0x10, 0x20, 0x30, 0x40, 0x50};
+    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+
+    uint8_t hash[32];
+    compute_sha256(preimage, sizeof(preimage), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_partial_len_strictly_over, NULL);
+
+    uint8_t out[256];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_preimage(dc, hash, out, sizeof(out));
+
+    assert_int_equal(result, -4);
+}
+
+/**
+ * Adversarial: during GET_MORE_ELEMENTS, client returns elements_len != 1 while
+ * setting n_bytes = 0 so buffer_can_read(0) trivially passes — exercises the
+ * `elements_len != 1` rejection (return -7).
+ */
+static int tamper_more_elements_bad_size_strict(uint8_t *response_buf,
+                                                size_t *response_len,
+                                                uint8_t cmd,
+                                                int call_count,
+                                                void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MORE_ELEMENTS && *response_len >= 2) {
+        response_buf[0] = 0; /* n_bytes = 0 → buffer_can_read(0) is true */
+        response_buf[1] = 2; /* elements_len = 2 (invalid) */
+    }
+    return 0;
+}
+
+static void test_get_preimage_bad_element_size_strict(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t preimage[300];
+    for (size_t i = 0; i < sizeof(preimage); i++) {
+        preimage[i] = (uint8_t) (i & 0xFF);
+    }
+
+    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+
+    uint8_t hash[32];
+    compute_sha256(preimage, sizeof(preimage), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_more_elements_bad_size_strict, NULL);
+
+    uint8_t out[512];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_preimage(dc, hash, out, sizeof(out));
+
+    assert_int_equal(result, -7);
+}
+
+/**
+ * Adversarial: during GET_MORE_ELEMENTS, client claims n_bytes > bytes_remaining
+ * but pads the buffer so buffer_can_read still passes — exercises the
+ * `n_bytes > bytes_remaining` rejection (return -8).
+ */
+static int tamper_more_bytes_with_padding(uint8_t *response_buf,
+                                          size_t *response_len,
+                                          uint8_t cmd,
+                                          int call_count,
+                                          void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MORE_ELEMENTS && *response_len >= 2) {
+        uint8_t orig_n = response_buf[0];
+        response_buf[0] = orig_n + 1;
+        /* Pad one extra byte so buffer_can_read((orig_n+1)*1) still passes. */
+        response_buf[*response_len] = 0xAB;
+        (*response_len)++;
+    }
+    return 0;
+}
+
+static void test_get_preimage_more_bytes_strict(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t preimage[254];
+    for (size_t i = 0; i < sizeof(preimage); i++) {
+        preimage[i] = (uint8_t) (i * 7);
+    }
+
+    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+
+    uint8_t hash[32];
+    compute_sha256(preimage, sizeof(preimage), hash);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_more_bytes_with_padding, NULL);
+
+    uint8_t out[512];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_preimage(dc, hash, out, sizeof(out));
+
+    assert_int_equal(result, -8);
+}
+
+/**
  * Adversarial: communication failure mid-transfer (process_interruption fails
  * on the second call).
  */
@@ -584,6 +778,10 @@ int main(void) {
         cmocka_unit_test(test_get_preimage_bad_element_size),
         cmocka_unit_test(test_get_preimage_more_bytes_than_remaining),
         cmocka_unit_test(test_get_preimage_corrupted_continuation),
+        cmocka_unit_test(test_get_preimage_overflow_len),
+        cmocka_unit_test(test_get_preimage_partial_len_strictly_over),
+        cmocka_unit_test(test_get_preimage_bad_element_size_strict),
+        cmocka_unit_test(test_get_preimage_more_bytes_strict),
         cmocka_unit_test(test_get_preimage_communication_failure),
     };
 

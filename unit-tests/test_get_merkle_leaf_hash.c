@@ -564,6 +564,207 @@ static void test_get_leaf_hash_bad_proof_element_size(void **state) {
     assert_true(result < 0);
 }
 
+/**
+ * Adversarial: claim n_proof_elements <= proof_size (no early reject), but
+ * truncate the response so buffer_can_read(32 * n_proof_elements) fails.
+ */
+static int tamper_truncate_proof_elements(uint8_t *response_buf,
+                                          size_t *response_len,
+                                          uint8_t cmd,
+                                          int call_count,
+                                          void *user_data) {
+    (void) response_buf;
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MERKLE_LEAF_PROOF && *response_len >= 34) {
+        /* keep header + 1 hash, but n_proof_elements still claims 2 → can't read 64 */
+        *response_len = 34 + 32;
+    }
+    return 0;
+}
+
+static void test_get_leaf_hash_truncated_proof_elements(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t e0[] = {0x00, 0x01};
+    uint8_t e1[] = {0x10, 0x11};
+    uint8_t e2[] = {0x20, 0x21};
+    uint8_t e3[] = {0x30, 0x31};
+
+    const uint8_t *elems[] = {e0, e1, e2, e3};
+    size_t lens[] = {sizeof(e0), sizeof(e1), sizeof(e2), sizeof(e3)};
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 4, root);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_truncate_proof_elements, NULL);
+
+    uint8_t out[32];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_hash(dc, root, 4, 0, out);
+
+    assert_true(result < 0);
+}
+
+/**
+ * Adversarial: cause process_interruption to fail on the GET_MORE_ELEMENTS
+ * continuation (second call_count).
+ */
+static int tamper_fail_more(uint8_t *response_buf,
+                            size_t *response_len,
+                            uint8_t cmd,
+                            int call_count,
+                            void *user_data) {
+    (void) response_buf;
+    (void) response_len;
+    (void) cmd;
+    (void) user_data;
+
+    if (call_count >= 1) {
+        return -1;
+    }
+    return 0;
+}
+
+static void test_get_leaf_hash_more_comm_failure(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    /* 128 elements so the proof has 7 hashes; first response fits 6, so 1
+     * goes via GET_MORE_ELEMENTS. */
+    uint8_t data[128][2];
+    const uint8_t *elems[128];
+    size_t lens[128];
+    for (size_t i = 0; i < 128; i++) {
+        data[i][0] = (uint8_t) (i >> 8);
+        data[i][1] = (uint8_t) (i & 0xFF);
+        elems[i] = data[i];
+        lens[i] = 2;
+    }
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 128, root);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_fail_more, NULL);
+
+    uint8_t out[32];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_hash(dc, root, 128, 0, out);
+
+    assert_true(result < 0);
+}
+
+/**
+ * Adversarial: truncate the GET_MORE_ELEMENTS response so buffer_can_read fails
+ * in the continuation.
+ */
+static int tamper_truncate_more(uint8_t *response_buf,
+                                size_t *response_len,
+                                uint8_t cmd,
+                                int call_count,
+                                void *user_data) {
+    (void) response_buf;
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MORE_ELEMENTS && *response_len >= 2) {
+        /* keep n_proof_elements and elements_len, drop the hash payload */
+        *response_len = 2;
+    }
+    return 0;
+}
+
+static void test_get_leaf_hash_truncated_more(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t data[128][2];
+    const uint8_t *elems[128];
+    size_t lens[128];
+    for (size_t i = 0; i < 128; i++) {
+        data[i][0] = (uint8_t) (i >> 8);
+        data[i][1] = (uint8_t) (i & 0xFF);
+        elems[i] = data[i];
+        lens[i] = 2;
+    }
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 128, root);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_truncate_more, NULL);
+
+    uint8_t out[32];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_hash(dc, root, 128, 0, out);
+
+    assert_true(result < 0);
+}
+
+/**
+ * Adversarial: during GET_MORE_ELEMENTS, claim n_proof_elements such that
+ * cur_step + n_proof_elements > proof_size, while keeping elements_len = 32 and
+ * extending the buffer so buffer_can_read still passes.
+ */
+static int tamper_more_proof_overflow(uint8_t *response_buf,
+                                      size_t *response_len,
+                                      uint8_t cmd,
+                                      int call_count,
+                                      void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MORE_ELEMENTS && *response_len >= 2) {
+        uint8_t orig_n = response_buf[0];
+        response_buf[0] = orig_n + 1;
+        /* Append a 32-byte hash so buffer_can_read((orig_n+1)*32) passes. */
+        for (int i = 0; i < 32; i++) {
+            response_buf[*response_len + i] = 0x00;
+        }
+        *response_len += 32;
+    }
+    return 0;
+}
+
+static void test_get_leaf_hash_more_proof_overflow(void **state) {
+    (void) state;
+
+    static mock_dispatcher_t mock;
+    mock_dispatcher_init(&mock);
+    mock_dispatcher_reset_hash_pool();
+
+    uint8_t data[128][2];
+    const uint8_t *elems[128];
+    size_t lens[128];
+    for (size_t i = 0; i < 128; i++) {
+        data[i][0] = (uint8_t) (i >> 8);
+        data[i][1] = (uint8_t) (i & 0xFF);
+        elems[i] = data[i];
+        lens[i] = 2;
+    }
+
+    uint8_t root[32];
+    build_tree(&mock, elems, lens, 128, root);
+
+    mock_dispatcher_set_tamper_hook(&mock, tamper_more_proof_overflow, NULL);
+
+    uint8_t out[32];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    int result = call_get_merkle_leaf_hash(dc, root, 128, 0, out);
+
+    assert_true(result < 0);
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -581,6 +782,10 @@ int main(void) {
         cmocka_unit_test(test_get_leaf_hash_proof_elements_overflow),
         cmocka_unit_test(test_get_leaf_hash_zero_proof_size),
         cmocka_unit_test(test_get_leaf_hash_bad_proof_element_size),
+        cmocka_unit_test(test_get_leaf_hash_truncated_proof_elements),
+        cmocka_unit_test(test_get_leaf_hash_more_comm_failure),
+        cmocka_unit_test(test_get_leaf_hash_truncated_more),
+        cmocka_unit_test(test_get_leaf_hash_more_proof_overflow),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
