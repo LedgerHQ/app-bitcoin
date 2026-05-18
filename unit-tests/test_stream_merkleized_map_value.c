@@ -58,11 +58,7 @@ static void acc_data_callback(buffer_t *data, void *state) {
  * Happy path: single key-value pair, look up by key and stream the value.
  */
 static void test_stream_map_value_single(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     const uint8_t key[] = {0x01, 0x02};
     const uint8_t value[] = {0xAA, 0xBB, 0xCC};
@@ -73,12 +69,12 @@ static void test_stream_map_value_single(void **state) {
     const size_t value_lens[] = {sizeof(value)};
 
     merkleized_map_commitment_t commitment;
-    mock_dispatcher_add_map(&mock, keys, key_lens, values, value_lens, 1, &commitment);
+    mock_dispatcher_add_map(mock, keys, key_lens, values, value_lens, 1, &commitment);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_merkleized_map_value(dc,
                                                   &commitment,
                                                   key,
@@ -99,11 +95,7 @@ static void test_stream_map_value_single(void **state) {
  * Keys must be in sorted order for the Merkle map to work.
  */
 static void test_stream_map_value_three_pairs(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* Keys are sorted lexicographically by mock_dispatcher_add_map */
     const uint8_t k0[] = {0x01};
@@ -119,9 +111,9 @@ static void test_stream_map_value_three_pairs(void **state) {
     const size_t value_lens[] = {sizeof(v0), sizeof(v1), sizeof(v2)};
 
     merkleized_map_commitment_t commitment;
-    mock_dispatcher_add_map(&mock, keys, key_lens, values, value_lens, 3, &commitment);
+    mock_dispatcher_add_map(mock, keys, key_lens, values, value_lens, 3, &commitment);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
 
     /* Look up each key-value pair */
     const uint8_t *test_keys[] = {k0, k1, k2};
@@ -153,11 +145,7 @@ static void test_stream_map_value_three_pairs(void **state) {
  * Error: key not found in the map.
  */
 static void test_stream_map_value_key_not_found(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     const uint8_t key[] = {0x01};
     const uint8_t value[] = {0xAA};
@@ -168,7 +156,7 @@ static void test_stream_map_value_key_not_found(void **state) {
     const size_t value_lens[] = {sizeof(value)};
 
     merkleized_map_commitment_t commitment;
-    mock_dispatcher_add_map(&mock, keys, key_lens, values, value_lens, 1, &commitment);
+    mock_dispatcher_add_map(mock, keys, key_lens, values, value_lens, 1, &commitment);
 
     /* Look up a key that doesn't exist */
     const uint8_t missing_key[] = {0xFF};
@@ -176,7 +164,7 @@ static void test_stream_map_value_key_not_found(void **state) {
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_merkleized_map_value(dc,
                                                   &commitment,
                                                   missing_key,
@@ -192,11 +180,7 @@ static void test_stream_map_value_key_not_found(void **state) {
  * Edge case: value of exactly 1 byte.
  */
 static void test_stream_map_value_one_byte_value(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     const uint8_t key[] = {0x42};
     const uint8_t value[] = {0x99};
@@ -207,12 +191,12 @@ static void test_stream_map_value_one_byte_value(void **state) {
     const size_t value_lens[] = {sizeof(value)};
 
     merkleized_map_commitment_t commitment;
-    mock_dispatcher_add_map(&mock, keys, key_lens, values, value_lens, 1, &commitment);
+    mock_dispatcher_add_map(mock, keys, key_lens, values, value_lens, 1, &commitment);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_merkleized_map_value(dc,
                                                   &commitment,
                                                   key,
@@ -232,11 +216,7 @@ static void test_stream_map_value_one_byte_value(void **state) {
  * Happy path: NULL len_callback should work (len_callback is optional).
  */
 static void test_stream_map_value_null_len_callback(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     const uint8_t key[] = {0x05};
     const uint8_t value[] = {0x10, 0x20, 0x30};
@@ -247,12 +227,12 @@ static void test_stream_map_value_null_len_callback(void **state) {
     const size_t value_lens[] = {sizeof(value)};
 
     merkleized_map_commitment_t commitment;
-    mock_dispatcher_add_map(&mock, keys, key_lens, values, value_lens, 1, &commitment);
+    mock_dispatcher_add_map(mock, keys, key_lens, values, value_lens, 1, &commitment);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_merkleized_map_value(dc,
                                                   &commitment,
                                                   key,
@@ -271,11 +251,7 @@ static void test_stream_map_value_null_len_callback(void **state) {
  * Happy path: keys provided in unsorted order (mock_dispatcher_add_map sorts them).
  */
 static void test_stream_map_value_unsorted_keys(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* Provide keys in reverse order; add_map will sort them */
     const uint8_t k0[] = {0x03};
@@ -291,9 +267,9 @@ static void test_stream_map_value_unsorted_keys(void **state) {
     const size_t value_lens[] = {sizeof(v0), sizeof(v1), sizeof(v2)};
 
     merkleized_map_commitment_t commitment;
-    mock_dispatcher_add_map(&mock, keys, key_lens, values, value_lens, 3, &commitment);
+    mock_dispatcher_add_map(mock, keys, key_lens, values, value_lens, 3, &commitment);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
 
     /* Look up each original key and verify it retrieves the correct value */
     for (size_t i = 0; i < 3; i++) {
@@ -319,14 +295,16 @@ static void test_stream_map_value_unsorted_keys(void **state) {
 /* ---------- Main ---------- */
 
 int main(void) {
+#define T(fn) cmocka_unit_test_setup_teardown(fn, mock_dispatcher_setup, mock_dispatcher_teardown)
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(test_stream_map_value_single),
-        cmocka_unit_test(test_stream_map_value_three_pairs),
-        cmocka_unit_test(test_stream_map_value_key_not_found),
-        cmocka_unit_test(test_stream_map_value_one_byte_value),
-        cmocka_unit_test(test_stream_map_value_null_len_callback),
-        cmocka_unit_test(test_stream_map_value_unsorted_keys),
+        T(test_stream_map_value_single),
+        T(test_stream_map_value_three_pairs),
+        T(test_stream_map_value_key_not_found),
+        T(test_stream_map_value_one_byte_value),
+        T(test_stream_map_value_null_len_callback),
+        T(test_stream_map_value_unsorted_keys),
     };
+#undef T
 
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

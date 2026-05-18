@@ -6,6 +6,7 @@
  */
 
 #include <string.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <stdio.h>
 
@@ -23,10 +24,6 @@ static mock_dispatcher_t *g_active_mock = NULL;
 
 /* ---- External: reset the cx_hash_mock pool ---- */
 extern int g_sha256_pool_next;
-
-void mock_dispatcher_reset_hash_pool(void) {
-    g_sha256_pool_next = 0;
-}
 
 /* ---- Helper: compute SHA-256 of a buffer ---- */
 static void mock_sha256(const uint8_t *data, size_t len, uint8_t out[32]) {
@@ -436,6 +433,32 @@ void mock_dispatcher_init(mock_dispatcher_t *mock) {
 
     /* Set global pointer so callbacks can find us */
     g_active_mock = mock;
+
+    /* Reset the cx_hash_mock pool so each test starts from a clean slate. */
+    g_sha256_pool_next = 0;
+}
+
+int mock_dispatcher_setup(void **state) {
+    mock_dispatcher_t *mock = malloc(sizeof(mock_dispatcher_t));
+    if (mock == NULL) {
+        return -1;
+    }
+    mock_dispatcher_init(mock);
+    *state = mock;
+    return 0;
+}
+
+int mock_dispatcher_teardown(void **state) {
+    mock_dispatcher_t *mock = *state;
+    if (mock == NULL) {
+        return 0;
+    }
+    if (g_active_mock == mock) {
+        g_active_mock = NULL;
+    }
+    free(mock);
+    *state = NULL;
+    return 0;
 }
 
 void mock_dispatcher_add_preimage(mock_dispatcher_t *mock, const uint8_t *data, size_t len) {

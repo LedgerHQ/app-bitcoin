@@ -63,11 +63,7 @@ static void add_merkle_preimage(mock_dispatcher_t *mock,
  * GET_MORE_ELEMENTS needed).
  */
 static void test_get_merkle_preimage_small(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[50];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -75,12 +71,12 @@ static void test_get_merkle_preimage_small(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
     uint8_t out[256];
     memset(out, 0xAA, sizeof(out));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     /* Returns element length (preimage_len - 1, stripping 0x00 prefix) */
@@ -93,11 +89,7 @@ static void test_get_merkle_preimage_small(void **state) {
  * all the bytes.
  */
 static void test_get_merkle_preimage_large(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* Element of 250 bytes; with the 0x00 prefix the preimage is 251 bytes,
      * which might not fully fit in the first response chunk. */
@@ -107,12 +99,12 @@ static void test_get_merkle_preimage_large(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
     uint8_t out[512];
     memset(out, 0, sizeof(out));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, (int) sizeof(element));
@@ -123,17 +115,13 @@ static void test_get_merkle_preimage_large(void **state) {
  * Error: requesting preimage of an unknown hash should return a negative value.
  */
 static void test_get_merkle_preimage_unknown_hash(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* Don't register any preimage; just call with a random hash */
     uint8_t hash[32] = {0xDE, 0xAD, 0xBE, 0xEF};
     uint8_t out[256];
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     /* process_interruption returns -1 → call_get_merkle_preimage returns -1 */
@@ -145,11 +133,7 @@ static void test_get_merkle_preimage_unknown_hash(void **state) {
  * call_get_merkle_preimage should return -4.
  */
 static void test_get_merkle_preimage_buffer_too_small(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[100];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -157,11 +141,11 @@ static void test_get_merkle_preimage_buffer_too_small(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
     uint8_t out[50]; /* Too small for 100-byte element */
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -4);
@@ -172,21 +156,17 @@ static void test_get_merkle_preimage_buffer_too_small(void **state) {
  * Preimage is (0x00 || 0x42) = 2 bytes, output should be just 0x42.
  */
 static void test_get_merkle_preimage_one_byte(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[1] = {0x42};
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, 1, hash);
+    add_merkle_preimage(mock, element, 1, hash);
 
     uint8_t out[64];
     memset(out, 0, sizeof(out));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, 1);
@@ -202,11 +182,7 @@ static void test_get_merkle_preimage_one_byte(void **state) {
  * So a preimage of 253 bytes fits in one chunk → element of 252 bytes.
  */
 static void test_get_merkle_preimage_exact_fit(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[252];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -214,12 +190,12 @@ static void test_get_merkle_preimage_exact_fit(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
     uint8_t out[512];
     memset(out, 0, sizeof(out));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, (int) sizeof(element));
@@ -235,11 +211,7 @@ static void test_get_merkle_preimage_exact_fit(void **state) {
  * Element length = 253.
  */
 static void test_get_merkle_preimage_one_byte_overflow(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[253];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -247,12 +219,12 @@ static void test_get_merkle_preimage_one_byte_overflow(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
     uint8_t out[512];
     memset(out, 0, sizeof(out));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, (int) sizeof(element));
@@ -263,11 +235,7 @@ static void test_get_merkle_preimage_one_byte_overflow(void **state) {
  * Edge case: output buffer exactly matches element length (no spare room).
  */
 static void test_get_merkle_preimage_exact_buffer(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[64];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -275,12 +243,12 @@ static void test_get_merkle_preimage_exact_buffer(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
     uint8_t out[64]; /* Exactly the element size */
     memset(out, 0, sizeof(out));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, (int) sizeof(element));
@@ -310,11 +278,7 @@ static int tamper_corrupt_data(uint8_t *response_buf,
 }
 
 static void test_get_merkle_preimage_corrupted_data(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[50];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -322,12 +286,12 @@ static void test_get_merkle_preimage_corrupted_data(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_corrupt_data, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_data, NULL);
 
     uint8_t out[256];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     /* Must detect hash mismatch */
@@ -352,11 +316,7 @@ static int tamper_corrupt_continuation(uint8_t *response_buf,
 }
 
 static void test_get_merkle_preimage_corrupted_continuation(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* Element large enough to require continuation (preimage = 0x00 || element) */
     uint8_t element[300];
@@ -365,12 +325,12 @@ static void test_get_merkle_preimage_corrupted_continuation(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_corrupt_continuation, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_continuation, NULL);
 
     uint8_t out[512];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     /* Must detect the corruption (hash mismatch or protocol error) */
@@ -396,11 +356,7 @@ static int tamper_truncate(uint8_t *response_buf,
 }
 
 static void test_get_merkle_preimage_truncated(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[10];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -408,12 +364,12 @@ static void test_get_merkle_preimage_truncated(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_truncate, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_truncate, NULL);
 
     uint8_t out[64];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -2);
@@ -439,20 +395,16 @@ static int tamper_zero_len(uint8_t *response_buf,
 }
 
 static void test_get_merkle_preimage_zero_len(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[5] = {1, 2, 3, 4, 5};
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_zero_len, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_zero_len, NULL);
 
     uint8_t out[64];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -3);
@@ -480,20 +432,16 @@ static int tamper_partial_len_over(uint8_t *response_buf,
 }
 
 static void test_get_merkle_preimage_partial_len_over(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[5] = {1, 2, 3, 4, 5};
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_partial_len_over, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_partial_len_over, NULL);
 
     uint8_t out[64];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -5);
@@ -520,11 +468,7 @@ static int tamper_fail_second(uint8_t *response_buf,
 }
 
 static void test_get_merkle_preimage_comm_failure(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[300];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -532,12 +476,12 @@ static void test_get_merkle_preimage_comm_failure(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_fail_second, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_fail_second, NULL);
 
     uint8_t out[512];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -6);
@@ -562,11 +506,7 @@ static int tamper_truncate_more(uint8_t *response_buf,
 }
 
 static void test_get_merkle_preimage_truncated_more(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[300];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -574,12 +514,12 @@ static void test_get_merkle_preimage_truncated_more(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_truncate_more, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_truncate_more, NULL);
 
     uint8_t out[512];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -7);
@@ -604,11 +544,7 @@ static int tamper_more_bad_size(uint8_t *response_buf,
 }
 
 static void test_get_merkle_preimage_bad_element_size(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[300];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -616,12 +552,12 @@ static void test_get_merkle_preimage_bad_element_size(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_more_bad_size, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_more_bad_size, NULL);
 
     uint8_t out[512];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -8);
@@ -649,11 +585,7 @@ static int tamper_more_bytes(uint8_t *response_buf,
 }
 
 static void test_get_merkle_preimage_more_bytes(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* element 253 → preimage 254 → spill 3 bytes */
     uint8_t element[253];
@@ -662,12 +594,12 @@ static void test_get_merkle_preimage_more_bytes(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_more_bytes, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_more_bytes, NULL);
 
     uint8_t out[512];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -9);
@@ -676,25 +608,27 @@ static void test_get_merkle_preimage_more_bytes(void **state) {
 /* ---------- Main ---------- */
 
 int main(void) {
+#define T(fn) cmocka_unit_test_setup_teardown(fn, mock_dispatcher_setup, mock_dispatcher_teardown)
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(test_get_merkle_preimage_small),
-        cmocka_unit_test(test_get_merkle_preimage_large),
-        cmocka_unit_test(test_get_merkle_preimage_unknown_hash),
-        cmocka_unit_test(test_get_merkle_preimage_buffer_too_small),
-        cmocka_unit_test(test_get_merkle_preimage_one_byte),
-        cmocka_unit_test(test_get_merkle_preimage_exact_fit),
-        cmocka_unit_test(test_get_merkle_preimage_one_byte_overflow),
-        cmocka_unit_test(test_get_merkle_preimage_exact_buffer),
-        cmocka_unit_test(test_get_merkle_preimage_corrupted_data),
-        cmocka_unit_test(test_get_merkle_preimage_corrupted_continuation),
-        cmocka_unit_test(test_get_merkle_preimage_truncated),
-        cmocka_unit_test(test_get_merkle_preimage_zero_len),
-        cmocka_unit_test(test_get_merkle_preimage_partial_len_over),
-        cmocka_unit_test(test_get_merkle_preimage_comm_failure),
-        cmocka_unit_test(test_get_merkle_preimage_truncated_more),
-        cmocka_unit_test(test_get_merkle_preimage_bad_element_size),
-        cmocka_unit_test(test_get_merkle_preimage_more_bytes),
+        T(test_get_merkle_preimage_small),
+        T(test_get_merkle_preimage_large),
+        T(test_get_merkle_preimage_unknown_hash),
+        T(test_get_merkle_preimage_buffer_too_small),
+        T(test_get_merkle_preimage_one_byte),
+        T(test_get_merkle_preimage_exact_fit),
+        T(test_get_merkle_preimage_one_byte_overflow),
+        T(test_get_merkle_preimage_exact_buffer),
+        T(test_get_merkle_preimage_corrupted_data),
+        T(test_get_merkle_preimage_corrupted_continuation),
+        T(test_get_merkle_preimage_truncated),
+        T(test_get_merkle_preimage_zero_len),
+        T(test_get_merkle_preimage_partial_len_over),
+        T(test_get_merkle_preimage_comm_failure),
+        T(test_get_merkle_preimage_truncated_more),
+        T(test_get_merkle_preimage_bad_element_size),
+        T(test_get_merkle_preimage_more_bytes),
     };
+#undef T
 
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
