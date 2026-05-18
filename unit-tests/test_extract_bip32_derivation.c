@@ -114,11 +114,7 @@ static int find_sorted_value_index(const psbt_map_t *map, uint8_t key_type) {
  * Expected: fingerprint=0xf5acc2fd, path=m/84'/1'/0'/1/8
  */
 static void test_wpkh_input_bip32_derivation(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     static uint8_t psbt_bin[MAX_PSBT_BIN];
     int psbt_len = base64_decode(psbt_wpkh_1to2_b64, psbt_bin, sizeof(psbt_bin));
@@ -128,14 +124,14 @@ static void test_wpkh_input_bip32_derivation(void **state) {
     assert_int_equal(psbt_parse(psbt_bin, (size_t) psbt_len, 1, 2, &parsed), 0);
 
     mock_psbt_t psbt_info;
-    assert_int_equal(mock_dispatcher_add_psbt(&mock, psbt_bin, (size_t) psbt_len, 1, 2, &psbt_info),
+    assert_int_equal(mock_dispatcher_add_psbt(mock, psbt_bin, (size_t) psbt_len, 1, 2, &psbt_info),
                      0);
 
     /* Find the PSBT_IN_BIP32_DERIVATION entry's sorted index */
     int idx = find_sorted_value_index(&parsed.input_maps[0], PSBT_IN_BIP32_DERIVATION);
     assert_true(idx >= 0);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     uint32_t out[1 + MAX_BIP32_PATH_STEPS];
     memset(out, 0, sizeof(out));
 
@@ -160,11 +156,7 @@ static void test_wpkh_input_bip32_derivation(void **state) {
  * Expected: fingerprint=0xf5acc2fd, path=m/84'/1'/0'/1/10
  */
 static void test_wpkh_output_bip32_derivation(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     static uint8_t psbt_bin[MAX_PSBT_BIN];
     int psbt_len = base64_decode(psbt_wpkh_1to2_b64, psbt_bin, sizeof(psbt_bin));
@@ -174,7 +166,7 @@ static void test_wpkh_output_bip32_derivation(void **state) {
     assert_int_equal(psbt_parse(psbt_bin, (size_t) psbt_len, 1, 2, &parsed), 0);
 
     mock_psbt_t psbt_info;
-    assert_int_equal(mock_dispatcher_add_psbt(&mock, psbt_bin, (size_t) psbt_len, 1, 2, &psbt_info),
+    assert_int_equal(mock_dispatcher_add_psbt(mock, psbt_bin, (size_t) psbt_len, 1, 2, &psbt_info),
                      0);
 
     /* Find which output has a BIP32 derivation entry */
@@ -189,7 +181,7 @@ static void test_wpkh_output_bip32_derivation(void **state) {
     }
     assert_true(out_idx >= 0);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     uint32_t out[1 + MAX_BIP32_PATH_STEPS];
     memset(out, 0, sizeof(out));
 
@@ -214,11 +206,7 @@ static void test_wpkh_output_bip32_derivation(void **state) {
  * Expected: 0 leaf hashes, fingerprint=0xf5acc2fd, path=m/86'/1'/0'/1/3
  */
 static void test_taproot_input_tap_bip32_derivation(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     static uint8_t psbt_bin[MAX_PSBT_BIN];
     int psbt_len = base64_decode(psbt_tr_1to2_b64, psbt_bin, sizeof(psbt_bin));
@@ -228,13 +216,13 @@ static void test_taproot_input_tap_bip32_derivation(void **state) {
     assert_int_equal(psbt_parse(psbt_bin, (size_t) psbt_len, 1, 2, &parsed), 0);
 
     mock_psbt_t psbt_info;
-    assert_int_equal(mock_dispatcher_add_psbt(&mock, psbt_bin, (size_t) psbt_len, 1, 2, &psbt_info),
+    assert_int_equal(mock_dispatcher_add_psbt(mock, psbt_bin, (size_t) psbt_len, 1, 2, &psbt_info),
                      0);
 
     int idx = find_sorted_value_index(&parsed.input_maps[0], PSBT_IN_TAP_BIP32_DERIVATION);
     assert_true(idx >= 0);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     uint32_t out[1 + MAX_BIP32_PATH_STEPS];
     memset(out, 0, sizeof(out));
 
@@ -259,11 +247,7 @@ static void test_taproot_input_tap_bip32_derivation(void **state) {
  * Expected: 0 leaf hashes, fingerprint=0xf5acc2fd, path=m/86'/1'/0'/1/2
  */
 static void test_taproot_output_tap_bip32_derivation(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     static uint8_t psbt_bin[MAX_PSBT_BIN];
     int psbt_len = base64_decode(psbt_tr_1to2_b64, psbt_bin, sizeof(psbt_bin));
@@ -273,7 +257,7 @@ static void test_taproot_output_tap_bip32_derivation(void **state) {
     assert_int_equal(psbt_parse(psbt_bin, (size_t) psbt_len, 1, 2, &parsed), 0);
 
     mock_psbt_t psbt_info;
-    assert_int_equal(mock_dispatcher_add_psbt(&mock, psbt_bin, (size_t) psbt_len, 1, 2, &psbt_info),
+    assert_int_equal(mock_dispatcher_add_psbt(mock, psbt_bin, (size_t) psbt_len, 1, 2, &psbt_info),
                      0);
 
     /* Find which output has a TAP_BIP32_DERIVATION entry */
@@ -288,7 +272,7 @@ static void test_taproot_output_tap_bip32_derivation(void **state) {
     }
     assert_true(out_idx >= 0);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     uint32_t out[1 + MAX_BIP32_PATH_STEPS];
     memset(out, 0, sizeof(out));
 
@@ -329,20 +313,16 @@ static void register_single_value(mock_dispatcher_t *mock,
  * Exercises the early-reject branch in the data callback.
  */
 static void test_extract_nontap_too_long(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* max_out_data_length = 4*(1+10) = 44 → 45 bytes is too long */
     uint8_t value[45];
     for (size_t i = 0; i < sizeof(value); i++) value[i] = (uint8_t) i;
 
     uint8_t root[32];
-    register_single_value(&mock, value, sizeof(value), root);
+    register_single_value(mock, value, sizeof(value), root);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     uint32_t out[1 + MAX_BIP32_PATH_STEPS];
     int result = extract_bip32_derivation(dc, PSBT_IN_BIP32_DERIVATION, root, 1, 0, out);
 
@@ -354,18 +334,14 @@ static void test_extract_nontap_too_long(void **state) {
  * for the announced number of hashes.
  */
 static void test_extract_tap_too_short(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t value[1] = {0x01}; /* n_hashes = 1, but no room for the hash */
 
     uint8_t root[32];
-    register_single_value(&mock, value, sizeof(value), root);
+    register_single_value(mock, value, sizeof(value), root);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     uint32_t out[1 + MAX_BIP32_PATH_STEPS];
     int result = extract_bip32_derivation(dc, PSBT_IN_TAP_BIP32_DERIVATION, root, 1, 0, out);
 
@@ -377,20 +353,16 @@ static void test_extract_tap_too_short(void **state) {
  * exceed max_out_data_length.
  */
 static void test_extract_tap_out_too_long(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* n_hashes=0, 50 bytes of fingerprint+path → out_data_length = 49 > 44 */
     uint8_t value[50];
     memset(value, 0, sizeof(value));
 
     uint8_t root[32];
-    register_single_value(&mock, value, sizeof(value), root);
+    register_single_value(mock, value, sizeof(value), root);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     uint32_t out[1 + MAX_BIP32_PATH_STEPS];
     int result = extract_bip32_derivation(dc, PSBT_IN_TAP_BIP32_DERIVATION, root, 1, 0, out);
 
@@ -404,11 +376,7 @@ static void test_extract_tap_out_too_long(void **state) {
  * the data callback (memmove + read into tail).
  */
 static void test_extract_tap_multi_chunk(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t value[1 + 32 * 7 + 28];
     memset(value, 0, sizeof(value));
@@ -426,9 +394,9 @@ static void test_extract_tap_multi_chunk(void **state) {
     }
 
     uint8_t root[32];
-    register_single_value(&mock, value, sizeof(value), root);
+    register_single_value(mock, value, sizeof(value), root);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     uint32_t out[1 + MAX_BIP32_PATH_STEPS];
     int result = extract_bip32_derivation(dc, PSBT_IN_TAP_BIP32_DERIVATION, root, 1, 0, out);
 
@@ -443,18 +411,14 @@ static void test_extract_tap_multi_chunk(void **state) {
  * set, so extract_bip32_derivation reports an error.
  */
 static void test_extract_empty_value(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t value[1] = {0x00}; /* unused — register_single_value needs a non-NULL ptr */
 
     uint8_t root[32];
-    register_single_value(&mock, value, 0, root);
+    register_single_value(mock, value, 0, root);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     uint32_t out[1 + MAX_BIP32_PATH_STEPS];
     int result = extract_bip32_derivation(dc, PSBT_IN_BIP32_DERIVATION, root, 1, 0, out);
 
@@ -500,19 +464,15 @@ static int tamper_huge_preimage_len(uint8_t *response_buf,
 }
 
 static void test_extract_huge_preimage_len(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t value[5] = {0, 0, 0, 0, 0};
     uint8_t root[32];
-    register_single_value(&mock, value, sizeof(value), root);
+    register_single_value(mock, value, sizeof(value), root);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_huge_preimage_len, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_huge_preimage_len, NULL);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     uint32_t out[1 + MAX_BIP32_PATH_STEPS];
     int result = extract_bip32_derivation(dc, PSBT_IN_BIP32_DERIVATION, root, 1, 0, out);
 
@@ -548,19 +508,15 @@ static int tamper_long_len_n_hashes(uint8_t *response_buf,
 }
 
 static void test_extract_tap_too_many_hashes(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t value[2] = {130, 0};
     uint8_t root[32];
-    register_single_value(&mock, value, sizeof(value), root);
+    register_single_value(mock, value, sizeof(value), root);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_long_len_n_hashes, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_long_len_n_hashes, NULL);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     uint32_t out[1 + MAX_BIP32_PATH_STEPS];
     int result = extract_bip32_derivation(dc, PSBT_IN_TAP_BIP32_DERIVATION, root, 1, 0, out);
 
@@ -570,19 +526,21 @@ static void test_extract_tap_too_many_hashes(void **state) {
 /* ---------- Main ---------- */
 
 int main(void) {
+#define T(fn) cmocka_unit_test_setup_teardown(fn, mock_dispatcher_setup, mock_dispatcher_teardown)
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(test_wpkh_input_bip32_derivation),
-        cmocka_unit_test(test_wpkh_output_bip32_derivation),
-        cmocka_unit_test(test_taproot_input_tap_bip32_derivation),
-        cmocka_unit_test(test_taproot_output_tap_bip32_derivation),
-        cmocka_unit_test(test_extract_nontap_too_long),
-        cmocka_unit_test(test_extract_tap_too_short),
-        cmocka_unit_test(test_extract_tap_out_too_long),
-        cmocka_unit_test(test_extract_tap_multi_chunk),
-        cmocka_unit_test(test_extract_empty_value),
-        cmocka_unit_test(test_extract_huge_preimage_len),
-        cmocka_unit_test(test_extract_tap_too_many_hashes),
+        T(test_wpkh_input_bip32_derivation),
+        T(test_wpkh_output_bip32_derivation),
+        T(test_taproot_input_tap_bip32_derivation),
+        T(test_taproot_output_tap_bip32_derivation),
+        T(test_extract_nontap_too_long),
+        T(test_extract_tap_too_short),
+        T(test_extract_tap_out_too_long),
+        T(test_extract_tap_multi_chunk),
+        T(test_extract_empty_value),
+        T(test_extract_huge_preimage_len),
+        T(test_extract_tap_too_many_hashes),
     };
+#undef T
 
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

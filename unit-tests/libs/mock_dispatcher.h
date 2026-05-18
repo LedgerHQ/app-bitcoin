@@ -11,12 +11,22 @@
  *   - CCMD_GET_MORE_ELEMENTS (0xA0)
  *   - CCMD_YIELD             (0x10)
  *
- * Usage:
+ * Usage (manual):
  *   mock_dispatcher_t mock;
  *   mock_dispatcher_init(&mock);
  *   mock_dispatcher_add_preimage(&mock, data, len);
  *   dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
  *   int result = call_get_preimage(dc, hash, out, out_len);
+ *
+ * Usage (cmocka fixture):
+ *   static void test_something(void **state) {
+ *       mock_dispatcher_t *mock = *state;
+ *       ...
+ *   }
+ *   ...
+ *   cmocka_unit_test_setup_teardown(test_something,
+ *                                   mock_dispatcher_setup,
+ *                                   mock_dispatcher_teardown);
  */
 
 #include <stdint.h>
@@ -125,10 +135,23 @@ typedef struct {
 /* ---- Public API ---- */
 
 /**
- * Initialize a mock dispatcher. Zero-initializes all state and wires up
- * the function pointers in mock->dc.
+ * Initialize a mock dispatcher. Zero-initializes all state, wires up
+ * the function pointers in mock->dc, and resets the cx_hash_mock pool so
+ * tests start from a clean slate.
  */
 void mock_dispatcher_init(mock_dispatcher_t *mock);
+
+/**
+ * cmocka setup fixture: allocates a mock_dispatcher_t on the heap, initializes
+ * it, and stores the pointer in *state.
+ */
+int mock_dispatcher_setup(void **state);
+
+/**
+ * cmocka teardown fixture: frees the mock_dispatcher_t allocated by
+ * mock_dispatcher_setup.
+ */
+int mock_dispatcher_teardown(void **state);
 
 /**
  * Register a known preimage. Computes sha256(data) and stores the mapping.
@@ -224,8 +247,3 @@ static inline dispatcher_context_t *mock_dispatcher_get_dc(mock_dispatcher_t *mo
     return &mock->dc;
 }
 
-/**
- * Reset the hash context pool (call between independent tests to avoid
- * exhausting the fixed-size pool in cx_hash_mock).
- */
-void mock_dispatcher_reset_hash_pool(void);

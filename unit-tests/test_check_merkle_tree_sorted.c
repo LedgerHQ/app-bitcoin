@@ -67,11 +67,7 @@ static void tracking_callback(dispatcher_context_t *dc,
  * Happy path: three elements in strict lexicographic order.
  */
 static void test_sorted_three_elements(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* Elements in sorted order: "aaa" < "bbb" < "ccc" */
     const uint8_t *elems[] = {(const uint8_t *) "aaa",
@@ -79,14 +75,14 @@ static void test_sorted_three_elements(void **state) {
                               (const uint8_t *) "ccc"};
     size_t lens[] = {3, 3, 3};
 
-    mock_dispatcher_add_list(&mock, elems, lens, 3);
+    mock_dispatcher_add_list(mock, elems, lens, 3);
     uint8_t root[32];
-    memcpy(root, mock.trees[mock.n_trees - 1].root, 32);
+    memcpy(root, mock->trees[mock->n_trees - 1].root, 32);
 
     callback_tracker_t tracker;
     memset(&tracker, 0, sizeof(tracker));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_check_merkle_tree_sorted_with_callback(dc,
                                                              &tracker,
                                                              root,
@@ -109,23 +105,19 @@ static void test_sorted_three_elements(void **state) {
  * Happy path: single element tree is always sorted.
  */
 static void test_sorted_single_element(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     const uint8_t *elems[] = {(const uint8_t *) "hello"};
     size_t lens[] = {5};
 
-    mock_dispatcher_add_list(&mock, elems, lens, 1);
+    mock_dispatcher_add_list(mock, elems, lens, 1);
     uint8_t root[32];
-    memcpy(root, mock.trees[mock.n_trees - 1].root, 32);
+    memcpy(root, mock->trees[mock->n_trees - 1].root, 32);
 
     callback_tracker_t tracker;
     memset(&tracker, 0, sizeof(tracker));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_check_merkle_tree_sorted_with_callback(dc,
                                                              &tracker,
                                                              root,
@@ -141,20 +133,16 @@ static void test_sorted_single_element(void **state) {
  * Happy path: NULL callback (no callback invoked, just order checking).
  */
 static void test_sorted_null_callback(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     const uint8_t *elems[] = {(const uint8_t *) "aa", (const uint8_t *) "bb"};
     size_t lens[] = {2, 2};
 
-    mock_dispatcher_add_list(&mock, elems, lens, 2);
+    mock_dispatcher_add_list(mock, elems, lens, 2);
     uint8_t root[32];
-    memcpy(root, mock.trees[mock.n_trees - 1].root, 32);
+    memcpy(root, mock->trees[mock->n_trees - 1].root, 32);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_check_merkle_tree_sorted_with_callback(dc,
                                                              NULL,
                                                              root,
@@ -168,18 +156,14 @@ static void test_sorted_null_callback(void **state) {
  * Happy path: empty tree (size=0) should succeed immediately.
  */
 static void test_sorted_empty_tree(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t root[32] = {0};
 
     callback_tracker_t tracker;
     memset(&tracker, 0, sizeof(tracker));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_check_merkle_tree_sorted_with_callback(dc,
                                                              &tracker,
                                                              root,
@@ -196,11 +180,7 @@ static void test_sorted_empty_tree(void **state) {
  * call_check_merkle_tree_sorted_with_callback should detect the unsorted order.
  */
 static void test_unsorted_descending(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* Elements in reverse order: "ccc" > "bbb" > "aaa" */
     const uint8_t *elems[] = {(const uint8_t *) "ccc",
@@ -208,11 +188,11 @@ static void test_unsorted_descending(void **state) {
                               (const uint8_t *) "aaa"};
     size_t lens[] = {3, 3, 3};
 
-    mock_dispatcher_add_list(&mock, elems, lens, 3);
+    mock_dispatcher_add_list(mock, elems, lens, 3);
     uint8_t root[32];
-    memcpy(root, mock.trees[mock.n_trees - 1].root, 32);
+    memcpy(root, mock->trees[mock->n_trees - 1].root, 32);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_check_merkle_tree_sorted_with_callback(dc,
                                                              NULL,
                                                              root,
@@ -226,22 +206,18 @@ static void test_unsorted_descending(void **state) {
  * Error: duplicate elements (equal keys are not strictly sorted).
  */
 static void test_unsorted_duplicates(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     const uint8_t *elems[] = {(const uint8_t *) "aaa",
                               (const uint8_t *) "aaa",
                               (const uint8_t *) "bbb"};
     size_t lens[] = {3, 3, 3};
 
-    mock_dispatcher_add_list(&mock, elems, lens, 3);
+    mock_dispatcher_add_list(mock, elems, lens, 3);
     uint8_t root[32];
-    memcpy(root, mock.trees[mock.n_trees - 1].root, 32);
+    memcpy(root, mock->trees[mock->n_trees - 1].root, 32);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_check_merkle_tree_sorted_with_callback(dc,
                                                              NULL,
                                                              root,
@@ -256,25 +232,21 @@ static void test_unsorted_duplicates(void **state) {
  * "a" < "aa" < "b" in lexicographic order (shorter prefix comes first).
  */
 static void test_sorted_different_lengths(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     const uint8_t *elems[] = {(const uint8_t *) "a",
                               (const uint8_t *) "aa",
                               (const uint8_t *) "b"};
     size_t lens[] = {1, 2, 1};
 
-    mock_dispatcher_add_list(&mock, elems, lens, 3);
+    mock_dispatcher_add_list(mock, elems, lens, 3);
     uint8_t root[32];
-    memcpy(root, mock.trees[mock.n_trees - 1].root, 32);
+    memcpy(root, mock->trees[mock->n_trees - 1].root, 32);
 
     callback_tracker_t tracker;
     memset(&tracker, 0, sizeof(tracker));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_check_merkle_tree_sorted_with_callback(dc,
                                                              &tracker,
                                                              root,
@@ -293,21 +265,17 @@ static void test_sorted_different_lengths(void **state) {
  * "aa" before "a" — the longer prefix comes first, violating order.
  */
 static void test_unsorted_prefix(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     const uint8_t *elems[] = {(const uint8_t *) "aa",
                               (const uint8_t *) "a"};
     size_t lens[] = {2, 1};
 
-    mock_dispatcher_add_list(&mock, elems, lens, 2);
+    mock_dispatcher_add_list(mock, elems, lens, 2);
     uint8_t root[32];
-    memcpy(root, mock.trees[mock.n_trees - 1].root, 32);
+    memcpy(root, mock->trees[mock->n_trees - 1].root, 32);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_check_merkle_tree_sorted_with_callback(dc,
                                                              NULL,
                                                              root,
@@ -322,11 +290,7 @@ static void test_unsorted_prefix(void **state) {
  * Verifies correctness with a larger tree that exercises multiple levels of merkle proofs.
  */
 static void test_sorted_many_elements(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* Generate 10 sorted elements: "\x00", "\x01", ..., "\x09" */
     uint8_t raw[10][1];
@@ -339,14 +303,14 @@ static void test_sorted_many_elements(void **state) {
         lens[i] = 1;
     }
 
-    mock_dispatcher_add_list(&mock, elems, lens, 10);
+    mock_dispatcher_add_list(mock, elems, lens, 10);
     uint8_t root[32];
-    memcpy(root, mock.trees[mock.n_trees - 1].root, 32);
+    memcpy(root, mock->trees[mock->n_trees - 1].root, 32);
 
     callback_tracker_t tracker;
     memset(&tracker, 0, sizeof(tracker));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_check_merkle_tree_sorted_with_callback(dc,
                                                              &tracker,
                                                              root,
@@ -369,20 +333,16 @@ static void test_sorted_many_elements(void **state) {
  * different number of elements.
  */
 static void test_wrong_tree_size(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     const uint8_t *elems[] = {(const uint8_t *) "a", (const uint8_t *) "b"};
     size_t lens[] = {1, 1};
 
-    mock_dispatcher_add_list(&mock, elems, lens, 2);
+    mock_dispatcher_add_list(mock, elems, lens, 2);
     uint8_t root[32];
-    memcpy(root, mock.trees[mock.n_trees - 1].root, 32);
+    memcpy(root, mock->trees[mock->n_trees - 1].root, 32);
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     /* Pass size=5 when actual tree has 2 elements */
     int result = call_check_merkle_tree_sorted_with_callback(dc,
                                                              NULL,
@@ -417,18 +377,14 @@ static void commitment_tracking_callback(dispatcher_context_t *dc,
 }
 
 static void test_map_commitment_passed(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     const uint8_t *elems[] = {(const uint8_t *) "x", (const uint8_t *) "y"};
     size_t lens[] = {1, 1};
 
-    mock_dispatcher_add_list(&mock, elems, lens, 2);
+    mock_dispatcher_add_list(mock, elems, lens, 2);
     uint8_t root[32];
-    memcpy(root, mock.trees[mock.n_trees - 1].root, 32);
+    memcpy(root, mock->trees[mock->n_trees - 1].root, 32);
 
     merkleized_map_commitment_t dummy_commitment;
     memset(&dummy_commitment, 0xAB, sizeof(dummy_commitment));
@@ -436,7 +392,7 @@ static void test_map_commitment_passed(void **state) {
     commitment_tracker_t tracker;
     memset(&tracker, 0, sizeof(tracker));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_check_merkle_tree_sorted_with_callback(dc,
                                                              &tracker,
                                                              root,
@@ -451,19 +407,21 @@ static void test_map_commitment_passed(void **state) {
 /* ---------- Main ---------- */
 
 int main(void) {
+#define T(fn) cmocka_unit_test_setup_teardown(fn, mock_dispatcher_setup, mock_dispatcher_teardown)
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(test_sorted_three_elements),
-        cmocka_unit_test(test_sorted_single_element),
-        cmocka_unit_test(test_sorted_null_callback),
-        cmocka_unit_test(test_sorted_empty_tree),
-        cmocka_unit_test(test_unsorted_descending),
-        cmocka_unit_test(test_unsorted_duplicates),
-        cmocka_unit_test(test_sorted_different_lengths),
-        cmocka_unit_test(test_unsorted_prefix),
-        cmocka_unit_test(test_sorted_many_elements),
-        cmocka_unit_test(test_wrong_tree_size),
-        cmocka_unit_test(test_map_commitment_passed),
+        T(test_sorted_three_elements),
+        T(test_sorted_single_element),
+        T(test_sorted_null_callback),
+        T(test_sorted_empty_tree),
+        T(test_unsorted_descending),
+        T(test_unsorted_duplicates),
+        T(test_sorted_different_lengths),
+        T(test_unsorted_prefix),
+        T(test_sorted_many_elements),
+        T(test_wrong_tree_size),
+        T(test_map_commitment_passed),
     };
+#undef T
 
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

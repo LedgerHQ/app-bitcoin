@@ -43,11 +43,7 @@ static void compute_sha256(const uint8_t *data, size_t len, uint8_t out[32]) {
  * GET_MORE_ELEMENTS needed).
  */
 static void test_get_preimage_small(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* A small preimage: 50 bytes */
     uint8_t preimage[50];
@@ -55,7 +51,7 @@ static void test_get_preimage_small(void **state) {
         preimage[i] = (uint8_t) (i & 0xFF);
     }
 
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
@@ -63,7 +59,7 @@ static void test_get_preimage_small(void **state) {
     uint8_t out[256];
     memset(out, 0xAA, sizeof(out));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, (int) sizeof(preimage));
@@ -75,11 +71,7 @@ static void test_get_preimage_small(void **state) {
  * all the bytes.
  */
 static void test_get_preimage_large(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* A larger preimage: 300 bytes */
     uint8_t preimage[300];
@@ -87,7 +79,7 @@ static void test_get_preimage_large(void **state) {
         preimage[i] = (uint8_t) ((i * 7 + 13) & 0xFF);
     }
 
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
@@ -95,7 +87,7 @@ static void test_get_preimage_large(void **state) {
     uint8_t out[512];
     memset(out, 0, sizeof(out));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, (int) sizeof(preimage));
@@ -106,17 +98,13 @@ static void test_get_preimage_large(void **state) {
  * Error: requesting preimage of an unknown hash should return a negative value.
  */
 static void test_get_preimage_unknown_hash(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* Don't register any preimage; just call with a random hash */
     uint8_t hash[32] = {0xDE, 0xAD, 0xBE, 0xEF};
     uint8_t out[256];
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     /* process_interruption returns -1 → call_get_preimage returns -1 */
@@ -128,25 +116,21 @@ static void test_get_preimage_unknown_hash(void **state) {
  * call_get_preimage should return -10.
  */
 static void test_get_preimage_buffer_too_small(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t preimage[100];
     for (size_t i = 0; i < sizeof(preimage); i++) {
         preimage[i] = (uint8_t) i;
     }
 
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
 
     uint8_t out[50]; /* Too small! */
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -10);
@@ -156,14 +140,10 @@ static void test_get_preimage_buffer_too_small(void **state) {
  * Edge case: minimal preimage of exactly 1 byte.
  */
 static void test_get_preimage_one_byte(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t preimage[1] = {0x42};
-    mock_dispatcher_add_preimage(&mock, preimage, 1);
+    mock_dispatcher_add_preimage(mock, preimage, 1);
 
     uint8_t hash[32];
     compute_sha256(preimage, 1, hash);
@@ -171,7 +151,7 @@ static void test_get_preimage_one_byte(void **state) {
     uint8_t out[64];
     memset(out, 0, sizeof(out));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, 1);
@@ -188,18 +168,14 @@ static void test_get_preimage_one_byte(void **state) {
  * So a 253-byte preimage should fit exactly with no GET_MORE_ELEMENTS.
  */
 static void test_get_preimage_exact_fit(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t preimage[253];
     for (size_t i = 0; i < sizeof(preimage); i++) {
         preimage[i] = (uint8_t) (i ^ 0xA5);
     }
 
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
@@ -207,7 +183,7 @@ static void test_get_preimage_exact_fit(void **state) {
     uint8_t out[512];
     memset(out, 0, sizeof(out));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, (int) sizeof(preimage));
@@ -219,11 +195,7 @@ static void test_get_preimage_exact_fit(void **state) {
  * so a few bytes go through GET_MORE_ELEMENTS).
  */
 static void test_get_preimage_one_byte_overflow(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* Varint encodings above 253 bytes (and less than 65536) take 3 bytes,
      * therefore max_payload = 255 - 3 - 1 = 251.
@@ -234,7 +206,7 @@ static void test_get_preimage_one_byte_overflow(void **state) {
         preimage[i] = (uint8_t) (i * 3);
     }
 
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
@@ -242,7 +214,7 @@ static void test_get_preimage_one_byte_overflow(void **state) {
     uint8_t out[512];
     memset(out, 0, sizeof(out));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, (int) sizeof(preimage));
@@ -273,26 +245,22 @@ static int tamper_corrupt_preimage_data(uint8_t *response_buf,
 }
 
 static void test_get_preimage_corrupted_data(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t preimage[50];
     for (size_t i = 0; i < sizeof(preimage); i++) {
         preimage[i] = (uint8_t) (i & 0xFF);
     }
 
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_corrupt_preimage_data, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_preimage_data, NULL);
 
     uint8_t out[256];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     /* Must detect the hash mismatch */
@@ -320,26 +288,22 @@ static int tamper_partial_len_overflow(uint8_t *response_buf,
 }
 
 static void test_get_preimage_partial_len_overflow(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t preimage[20];
     for (size_t i = 0; i < sizeof(preimage); i++) {
         preimage[i] = (uint8_t) i;
     }
 
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_partial_len_overflow, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_partial_len_overflow, NULL);
 
     uint8_t out[256];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     /* Detected via buffer_can_read or partial_data_len > preimage_len */
@@ -367,22 +331,18 @@ static int tamper_zero_preimage_len(uint8_t *response_buf,
 }
 
 static void test_get_preimage_zero_len(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t preimage[10] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A};
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_zero_preimage_len, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_zero_preimage_len, NULL);
 
     uint8_t out[256];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_true(result < 0);
@@ -406,26 +366,22 @@ static int tamper_more_elements_bad_size(uint8_t *response_buf,
 }
 
 static void test_get_preimage_bad_element_size(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t preimage[300];
     for (size_t i = 0; i < sizeof(preimage); i++) {
         preimage[i] = (uint8_t) (i & 0xFF);
     }
 
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_more_elements_bad_size, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_more_elements_bad_size, NULL);
 
     uint8_t out[512];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     /* Detected via buffer_can_read or elements_len != 1 */
@@ -450,11 +406,7 @@ static int tamper_more_bytes_than_remaining(uint8_t *response_buf,
 }
 
 static void test_get_preimage_more_bytes_than_remaining(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* 254 bytes: varint=3 bytes, max_payload = 255-3-1 = 251, spill = 3 bytes */
     uint8_t preimage[254];
@@ -462,15 +414,15 @@ static void test_get_preimage_more_bytes_than_remaining(void **state) {
         preimage[i] = (uint8_t) (i * 7);
     }
 
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_more_bytes_than_remaining, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_more_bytes_than_remaining, NULL);
 
     uint8_t out[512];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     /* n_bytes > bytes_remaining → -8, or buffer_can_read fails → -6 */
@@ -496,26 +448,22 @@ static int tamper_corrupt_continuation(uint8_t *response_buf,
 }
 
 static void test_get_preimage_corrupted_continuation(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t preimage[300];
     for (size_t i = 0; i < sizeof(preimage); i++) {
         preimage[i] = (uint8_t) (i & 0xFF);
     }
 
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_corrupt_continuation, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_continuation, NULL);
 
     uint8_t out[512];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_true(result < 0);
@@ -552,22 +500,18 @@ static int tamper_preimage_len_too_big(uint8_t *response_buf,
 }
 
 static void test_get_preimage_overflow_len(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t preimage[10] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A};
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_preimage_len_too_big, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_preimage_len_too_big, NULL);
 
     uint8_t out[256];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     /* preimage_len_u64 > UINT32_MAX → return -11 */
@@ -599,22 +543,18 @@ static int tamper_partial_len_strictly_over(uint8_t *response_buf,
 }
 
 static void test_get_preimage_partial_len_strictly_over(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t preimage[5] = {0x10, 0x20, 0x30, 0x40, 0x50};
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_partial_len_strictly_over, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_partial_len_strictly_over, NULL);
 
     uint8_t out[256];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -4);
@@ -641,26 +581,22 @@ static int tamper_more_elements_bad_size_strict(uint8_t *response_buf,
 }
 
 static void test_get_preimage_bad_element_size_strict(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t preimage[300];
     for (size_t i = 0; i < sizeof(preimage); i++) {
         preimage[i] = (uint8_t) (i & 0xFF);
     }
 
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_more_elements_bad_size_strict, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_more_elements_bad_size_strict, NULL);
 
     uint8_t out[512];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -7);
@@ -690,26 +626,22 @@ static int tamper_more_bytes_with_padding(uint8_t *response_buf,
 }
 
 static void test_get_preimage_more_bytes_strict(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t preimage[254];
     for (size_t i = 0; i < sizeof(preimage); i++) {
         preimage[i] = (uint8_t) (i * 7);
     }
 
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_more_bytes_with_padding, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_more_bytes_with_padding, NULL);
 
     uint8_t out[512];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -8);
@@ -736,26 +668,22 @@ static int tamper_fail_second_call(uint8_t *response_buf,
 }
 
 static void test_get_preimage_communication_failure(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t preimage[300];
     for (size_t i = 0; i < sizeof(preimage); i++) {
         preimage[i] = (uint8_t) (i * 3);
     }
 
-    mock_dispatcher_add_preimage(&mock, preimage, sizeof(preimage));
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
 
     uint8_t hash[32];
     compute_sha256(preimage, sizeof(preimage), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_fail_second_call, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_fail_second_call, NULL);
 
     uint8_t out[512];
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_true(result < 0);
@@ -764,26 +692,28 @@ static void test_get_preimage_communication_failure(void **state) {
 /* ---------- Main ---------- */
 
 int main(void) {
+#define T(fn) cmocka_unit_test_setup_teardown(fn, mock_dispatcher_setup, mock_dispatcher_teardown)
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(test_get_preimage_small),
-        cmocka_unit_test(test_get_preimage_large),
-        cmocka_unit_test(test_get_preimage_unknown_hash),
-        cmocka_unit_test(test_get_preimage_buffer_too_small),
-        cmocka_unit_test(test_get_preimage_one_byte),
-        cmocka_unit_test(test_get_preimage_exact_fit),
-        cmocka_unit_test(test_get_preimage_one_byte_overflow),
-        cmocka_unit_test(test_get_preimage_corrupted_data),
-        cmocka_unit_test(test_get_preimage_partial_len_overflow),
-        cmocka_unit_test(test_get_preimage_zero_len),
-        cmocka_unit_test(test_get_preimage_bad_element_size),
-        cmocka_unit_test(test_get_preimage_more_bytes_than_remaining),
-        cmocka_unit_test(test_get_preimage_corrupted_continuation),
-        cmocka_unit_test(test_get_preimage_overflow_len),
-        cmocka_unit_test(test_get_preimage_partial_len_strictly_over),
-        cmocka_unit_test(test_get_preimage_bad_element_size_strict),
-        cmocka_unit_test(test_get_preimage_more_bytes_strict),
-        cmocka_unit_test(test_get_preimage_communication_failure),
+        T(test_get_preimage_small),
+        T(test_get_preimage_large),
+        T(test_get_preimage_unknown_hash),
+        T(test_get_preimage_buffer_too_small),
+        T(test_get_preimage_one_byte),
+        T(test_get_preimage_exact_fit),
+        T(test_get_preimage_one_byte_overflow),
+        T(test_get_preimage_corrupted_data),
+        T(test_get_preimage_partial_len_overflow),
+        T(test_get_preimage_zero_len),
+        T(test_get_preimage_bad_element_size),
+        T(test_get_preimage_more_bytes_than_remaining),
+        T(test_get_preimage_corrupted_continuation),
+        T(test_get_preimage_overflow_len),
+        T(test_get_preimage_partial_len_strictly_over),
+        T(test_get_preimage_bad_element_size_strict),
+        T(test_get_preimage_more_bytes_strict),
+        T(test_get_preimage_communication_failure),
     };
+#undef T
 
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

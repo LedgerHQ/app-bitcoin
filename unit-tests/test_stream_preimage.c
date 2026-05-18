@@ -85,11 +85,7 @@ static void acc_data_callback(buffer_t *data, void *state) {
  * GET_MORE_ELEMENTS needed).
  */
 static void test_stream_preimage_small(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[50];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -97,12 +93,12 @@ static void test_stream_preimage_small(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_int_equal(result, (int) sizeof(element));
@@ -117,11 +113,7 @@ static void test_stream_preimage_small(void **state) {
  * all the bytes.
  */
 static void test_stream_preimage_large(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[300];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -129,12 +121,12 @@ static void test_stream_preimage_large(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_int_equal(result, (int) sizeof(element));
@@ -148,18 +140,14 @@ static void test_stream_preimage_large(void **state) {
  * Error: requesting preimage of an unknown hash should return a negative value.
  */
 static void test_stream_preimage_unknown_hash(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t hash[32] = {0xDE, 0xAD, 0xBE, 0xEF};
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_true(result < 0);
@@ -170,21 +158,17 @@ static void test_stream_preimage_unknown_hash(void **state) {
  * Preimage is (0x00 || 0x42) = 2 bytes, streamed output should be just 0x42.
  */
 static void test_stream_preimage_one_byte(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[1] = {0x42};
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, 1, hash);
+    add_merkle_preimage(mock, element, 1, hash);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_int_equal(result, 1);
@@ -198,11 +182,7 @@ static void test_stream_preimage_one_byte(void **state) {
  * Happy path: NULL len_callback should work (len_callback is optional).
  */
 static void test_stream_preimage_null_len_callback(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[30];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -210,12 +190,12 @@ static void test_stream_preimage_null_len_callback(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, NULL, acc_data_callback, &acc);
 
     assert_int_equal(result, (int) sizeof(element));
@@ -233,11 +213,7 @@ static void test_stream_preimage_null_len_callback(void **state) {
  * A preimage of 253 bytes means element of 252 bytes (253 - 1 for 0x00 prefix).
  */
 static void test_stream_preimage_exact_fit(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[252];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -245,12 +221,12 @@ static void test_stream_preimage_exact_fit(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_int_equal(result, (int) sizeof(element));
@@ -265,11 +241,7 @@ static void test_stream_preimage_exact_fit(void **state) {
  * go through GET_MORE_ELEMENTS.
  */
 static void test_stream_preimage_one_byte_overflow(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     /* Preimage length = 254 (element 253 + prefix 1).
      * Varint for 254 takes 3 bytes, so max_payload = 255 - 3 - 1 = 251.
@@ -281,12 +253,12 @@ static void test_stream_preimage_one_byte_overflow(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_int_equal(result, (int) sizeof(element));
@@ -319,11 +291,7 @@ static int tamper_corrupt_stream_data(uint8_t *response_buf,
 }
 
 static void test_stream_preimage_corrupted_data(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[50];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -331,14 +299,14 @@ static void test_stream_preimage_corrupted_data(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_corrupt_stream_data, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_stream_data, NULL);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_true(result < 0);
@@ -362,11 +330,7 @@ static int tamper_corrupt_stream_continuation(uint8_t *response_buf,
 }
 
 static void test_stream_preimage_corrupted_continuation(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[300];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -374,14 +338,14 @@ static void test_stream_preimage_corrupted_continuation(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_corrupt_stream_continuation, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_stream_continuation, NULL);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_true(result < 0);
@@ -407,11 +371,7 @@ static int tamper_truncate_response(uint8_t *response_buf,
 }
 
 static void test_stream_preimage_truncated_response(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[20];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -419,14 +379,14 @@ static void test_stream_preimage_truncated_response(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_truncate_response, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_truncate_response, NULL);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_int_equal(result, -2);
@@ -461,22 +421,18 @@ static int tamper_overflow_len(uint8_t *response_buf,
 }
 
 static void test_stream_preimage_overflow_len(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[5] = {1, 2, 3, 4, 5};
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_overflow_len, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_overflow_len, NULL);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_int_equal(result, -10);
@@ -502,22 +458,18 @@ static int tamper_zero_preimage_len(uint8_t *response_buf,
 }
 
 static void test_stream_preimage_zero_len(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[5] = {1, 2, 3, 4, 5};
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_zero_preimage_len, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_zero_preimage_len, NULL);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_int_equal(result, -3);
@@ -545,22 +497,18 @@ static int tamper_partial_len_over(uint8_t *response_buf,
 }
 
 static void test_stream_preimage_partial_len_over(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[5] = {1, 2, 3, 4, 5};
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_partial_len_over, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_partial_len_over, NULL);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_int_equal(result, -4);
@@ -586,11 +534,7 @@ static int tamper_truncate_more_elements(uint8_t *response_buf,
 }
 
 static void test_stream_preimage_truncated_more_elements(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[300];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -598,14 +542,14 @@ static void test_stream_preimage_truncated_more_elements(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_truncate_more_elements, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_truncate_more_elements, NULL);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_int_equal(result, -6);
@@ -631,11 +575,7 @@ static int tamper_more_elements_bad_size(uint8_t *response_buf,
 }
 
 static void test_stream_preimage_bad_element_size(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[300];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -643,14 +583,14 @@ static void test_stream_preimage_bad_element_size(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_more_elements_bad_size, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_more_elements_bad_size, NULL);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_int_equal(result, -7);
@@ -678,11 +618,7 @@ static int tamper_more_bytes_with_padding(uint8_t *response_buf,
 }
 
 static void test_stream_preimage_more_bytes_than_remaining(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[253]; /* spill = 3 bytes */
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -690,14 +626,14 @@ static void test_stream_preimage_more_bytes_than_remaining(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_more_bytes_with_padding, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_more_bytes_with_padding, NULL);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_int_equal(result, -8);
@@ -723,11 +659,7 @@ static int tamper_fail_on_second(uint8_t *response_buf,
 }
 
 static void test_stream_preimage_communication_failure(void **state) {
-    (void) state;
-
-    static mock_dispatcher_t mock;
-    mock_dispatcher_init(&mock);
-    mock_dispatcher_reset_hash_pool();
+    mock_dispatcher_t *mock = *state;
 
     uint8_t element[300];
     for (size_t i = 0; i < sizeof(element); i++) {
@@ -735,14 +667,14 @@ static void test_stream_preimage_communication_failure(void **state) {
     }
 
     uint8_t hash[32];
-    add_merkle_preimage(&mock, element, sizeof(element), hash);
+    add_merkle_preimage(mock, element, sizeof(element), hash);
 
-    mock_dispatcher_set_tamper_hook(&mock, tamper_fail_on_second, NULL);
+    mock_dispatcher_set_tamper_hook(mock, tamper_fail_on_second, NULL);
 
     stream_accumulator_t acc;
     memset(&acc, 0, sizeof(acc));
 
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(&mock);
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
 
     assert_true(result < 0);
@@ -751,25 +683,27 @@ static void test_stream_preimage_communication_failure(void **state) {
 /* ---------- Main ---------- */
 
 int main(void) {
+#define T(fn) cmocka_unit_test_setup_teardown(fn, mock_dispatcher_setup, mock_dispatcher_teardown)
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(test_stream_preimage_small),
-        cmocka_unit_test(test_stream_preimage_large),
-        cmocka_unit_test(test_stream_preimage_unknown_hash),
-        cmocka_unit_test(test_stream_preimage_one_byte),
-        cmocka_unit_test(test_stream_preimage_null_len_callback),
-        cmocka_unit_test(test_stream_preimage_exact_fit),
-        cmocka_unit_test(test_stream_preimage_one_byte_overflow),
-        cmocka_unit_test(test_stream_preimage_corrupted_data),
-        cmocka_unit_test(test_stream_preimage_corrupted_continuation),
-        cmocka_unit_test(test_stream_preimage_truncated_response),
-        cmocka_unit_test(test_stream_preimage_overflow_len),
-        cmocka_unit_test(test_stream_preimage_zero_len),
-        cmocka_unit_test(test_stream_preimage_partial_len_over),
-        cmocka_unit_test(test_stream_preimage_truncated_more_elements),
-        cmocka_unit_test(test_stream_preimage_bad_element_size),
-        cmocka_unit_test(test_stream_preimage_more_bytes_than_remaining),
-        cmocka_unit_test(test_stream_preimage_communication_failure),
+        T(test_stream_preimage_small),
+        T(test_stream_preimage_large),
+        T(test_stream_preimage_unknown_hash),
+        T(test_stream_preimage_one_byte),
+        T(test_stream_preimage_null_len_callback),
+        T(test_stream_preimage_exact_fit),
+        T(test_stream_preimage_one_byte_overflow),
+        T(test_stream_preimage_corrupted_data),
+        T(test_stream_preimage_corrupted_continuation),
+        T(test_stream_preimage_truncated_response),
+        T(test_stream_preimage_overflow_len),
+        T(test_stream_preimage_zero_len),
+        T(test_stream_preimage_partial_len_over),
+        T(test_stream_preimage_truncated_more_elements),
+        T(test_stream_preimage_bad_element_size),
+        T(test_stream_preimage_more_bytes_than_remaining),
+        T(test_stream_preimage_communication_failure),
     };
+#undef T
 
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
