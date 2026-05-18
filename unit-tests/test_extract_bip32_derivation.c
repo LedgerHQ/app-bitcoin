@@ -18,13 +18,6 @@
 
 #include <cmocka.h>
 
-/* SDK mock stubs */
-unsigned int pic(unsigned int linked_address) {
-    return linked_address;
-}
-#undef PIC
-#define PIC(x) (x)
-
 #include "mock_dispatcher.h"
 #include "cx_hash_mock.h"
 #include "psbt_parse.h"

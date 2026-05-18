@@ -9,10 +9,6 @@
 #include <cmocka.h>
 
 // missing definitions to make it compile without the SDK
-unsigned int pic(unsigned int linked_address) {
-    return linked_address;
-}
-
 #define PRINTF(...) printf
 #define PIC(x)      (x)
 
