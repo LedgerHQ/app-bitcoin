@@ -1,3 +1,7 @@
+/**
+ * Unit tests for the functions defined in src/crypto.c.
+ */
+
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -6,47 +10,143 @@
 #include <setjmp.h>
 #include <cmocka.h>
 
-#include "../src/crypto.h"
+#include "speculos_bridge.h"
+#include "crypto.h"
+
+/* ---------------------------------------------------------------- */
+/* bip32_CKDpub                                                     */
+/*                                                                  */
+/* Test vectors come from BIP32 Test Vector 2 (m and m/0).          */
+/*   https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki */
+/* ---------------------------------------------------------------- */
+
+/* m: depth=0, parent_fp=0, child=0
+ *   chain_code: 60499f801b896d83179a4374aeb7822aaeaceaa0db1f85ee3e904c4defbd9689
+ *   key:        03cbcaa9c98c877a26977d00825c956a238e8dddfbd322cce4f74b0b5bd6ace4a7
+ */
+static const serialized_extended_pubkey_t tv2_m = {
+    .version = {0x04, 0x88, 0xB2, 0x1E},
+    .depth = 0x00,
+    .parent_fingerprint = {0x00, 0x00, 0x00, 0x00},
+    .child_number = {0x00, 0x00, 0x00, 0x00},
+    .chain_code =
+        {
+            0x60, 0x49, 0x9f, 0x80, 0x1b, 0x89, 0x6d, 0x83, 0x17, 0x9a, 0x43,
+            0x74, 0xae, 0xb7, 0x82, 0x2a, 0xae, 0xac, 0xea, 0xa0, 0xdb, 0x1f,
+            0x85, 0xee, 0x3e, 0x90, 0x4c, 0x4d, 0xef, 0xbd, 0x96, 0x89,
+        },
+    .compressed_pubkey =
+        {
+            0x03, 0xcb, 0xca, 0xa9, 0xc9, 0x8c, 0x87, 0x7a, 0x26, 0x97, 0x7d,
+            0x00, 0x82, 0x5c, 0x95, 0x6a, 0x23, 0x8e, 0x8d, 0xdd, 0xfb, 0xd3,
+            0x22, 0xcc, 0xe4, 0xf7, 0x4b, 0x0b, 0x5b, 0xd6, 0xac, 0xe4, 0xa7,
+        },
+};
+
+/* m/0: depth=1, parent_fp=bd16bee5, child=0
+ *   chain_code: f0909affaa7ee7abe5dd4e100598d4dc53cd709d5a5c2cac40e7412f232f7c9c
+ *   key:        02fc9e5af0ac8d9b3cecfe2a888e2117ba3d089d8585886c9c826b6b22a98d12ea
+ */
+static const serialized_extended_pubkey_t tv2_m_0_expected = {
+    .version = {0x04, 0x88, 0xB2, 0x1E},
+    .depth = 0x01,
+    .parent_fingerprint = {0xbd, 0x16, 0xbe, 0xe5},
+    .child_number = {0x00, 0x00, 0x00, 0x00},
+    .chain_code =
+        {
+            0xf0, 0x90, 0x9a, 0xff, 0xaa, 0x7e, 0xe7, 0xab, 0xe5, 0xdd, 0x4e,
+            0x10, 0x05, 0x98, 0xd4, 0xdc, 0x53, 0xcd, 0x70, 0x9d, 0x5a, 0x5c,
+            0x2c, 0xac, 0x40, 0xe7, 0x41, 0x2f, 0x23, 0x2f, 0x7c, 0x9c,
+        },
+    .compressed_pubkey =
+        {
+            0x02, 0xfc, 0x9e, 0x5a, 0xf0, 0xac, 0x8d, 0x9b, 0x3c, 0xec, 0xfe,
+            0x2a, 0x88, 0x8e, 0x21, 0x17, 0xba, 0x3d, 0x08, 0x9d, 0x85, 0x85,
+            0x88, 0x6c, 0x9c, 0x82, 0x6b, 0x6b, 0x22, 0xa9, 0x8d, 0x12, 0xea,
+        },
+};
+
+static void test_ckdpub_tv2_m_to_m0(void **state) {
+    (void) state;
+
+    serialized_extended_pubkey_t child = {0};
+    uint8_t tweak[32];
+
+    int ret = bip32_CKDpub(&tv2_m, 0, &child, tweak);
+    assert_int_equal(ret, 0);
+
+    assert_memory_equal(child.version, tv2_m_0_expected.version, 4);
+    assert_int_equal(child.depth, tv2_m_0_expected.depth);
+    assert_memory_equal(child.parent_fingerprint, tv2_m_0_expected.parent_fingerprint, 4);
+    assert_memory_equal(child.child_number, tv2_m_0_expected.child_number, 4);
+    assert_memory_equal(child.chain_code, tv2_m_0_expected.chain_code, 32);
+    assert_memory_equal(child.compressed_pubkey, tv2_m_0_expected.compressed_pubkey, 33);
+}
+
+static void test_ckdpub_in_place(void **state) {
+    (void) state;
+
+    /* child == parent must be allowed per the docstring. */
+    serialized_extended_pubkey_t buf = tv2_m;
+
+    int ret = bip32_CKDpub(&buf, 0, &buf, NULL);
+    assert_int_equal(ret, 0);
+    assert_memory_equal(buf.chain_code, tv2_m_0_expected.chain_code, 32);
+    assert_memory_equal(buf.compressed_pubkey, tv2_m_0_expected.compressed_pubkey, 33);
+}
+
+static void test_ckdpub_rejects_hardened(void **state) {
+    (void) state;
+
+    serialized_extended_pubkey_t child = {0};
+    /* 0x80000000 is the first hardened index. */
+    int ret = bip32_CKDpub(&tv2_m, 0x80000000u, &child, NULL);
+    assert_int_equal(ret, -1);
+}
+
+static void test_ckdpub_rejects_max_depth(void **state) {
+    (void) state;
+
+    serialized_extended_pubkey_t parent = tv2_m;
+    parent.depth = 255;
+    serialized_extended_pubkey_t child = {0};
+
+    int ret = bip32_CKDpub(&parent, 0, &child, NULL);
+    assert_int_equal(ret, -1);
+}
+
+/* ---------------------------------------------------------------- */
+/* crypto_get_compressed_pubkey                                     */
+/* ---------------------------------------------------------------- */
 
 // clang-format off
-// HACK: define empty functions for the expected imports in cx.h and os.h.
-int cx_ecfp_generate_pair ( cx_curve_t curve, cx_ecfp_public_key_t * pubkey, cx_ecfp_private_key_t * privkey, int keepprivate ){return 0;}
-int cx_hash_sha256 ( const unsigned char * in, unsigned int len, unsigned char * out, unsigned int out_len ){return 0;}
-int cx_hash ( cx_hash_t * hash, int mode, const unsigned char * in, unsigned int len, unsigned char * out, unsigned int out_len ){return 0;}
-int cx_ecfp_init_private_key ( cx_curve_t curve, const unsigned char * rawkey, unsigned int key_len, cx_ecfp_private_key_t * pvkey ){return 0;}
-int cx_ripemd160_init ( cx_ripemd160_t * hash ){return 0;}
-void os_memmove(void * dst, const void * src, unsigned int length){}
-void os_perso_derive_node_bip32 ( cx_curve_t curve, const unsigned int * path, unsigned int pathLength, unsigned char * privateKey, unsigned char * chain ){}
-
-const uint8_t uncompressed_key_02[] = {
+static const uint8_t uncompressed_key_02[] = {
     0x04,
     0xee,0x86,0x08,0x20,0x7e,0x21,0x02,0x84,0x26,0xf6,0x9e,0x76,0x44,0x7d,0x7e,0x3d,
     0x5e,0x07,0x70,0x49,0xf5,0xe6,0x83,0xc3,0x13,0x6c,0x23,0x14,0x76,0x2a,0x47,0x18,
     0xb4,0x5f,0x52,0x24,0xb0,0x5e,0xbb,0xad,0x09,0xf4,0x35,0x94,0xb7,0xbd,0x8d,0xc0,
     0xef,0xf4,0x51,0x9a,0x07,0xcb,0xab,0x37,0xec,0xc6,0x6e,0x00,0x01,0xab,0x95,0x9a  // even
 };
-const uint8_t compressed_key_02[] = {
+static const uint8_t compressed_key_02[] = {
     0x02,
     0xee,0x86,0x08,0x20,0x7e,0x21,0x02,0x84,0x26,0xf6,0x9e,0x76,0x44,0x7d,0x7e,0x3d,
     0x5e,0x07,0x70,0x49,0xf5,0xe6,0x83,0xc3,0x13,0x6c,0x23,0x14,0x76,0x2a,0x47,0x18
 };
 
-
-const uint8_t uncompressed_key_03[] = {
+static const uint8_t uncompressed_key_03[] = {
     0x04,
     0xdf,0x94,0x6e,0x0b,0x3f,0x6a,0xd7,0xf3,0x55,0x6b,0x53,0x71,0x62,0xf3,0x9f,0x07,
     0xfa,0x04,0x60,0x63,0x41,0x26,0x5f,0xe9,0x95,0xf3,0xfa,0x51,0x1f,0x7f,0xc2,0x13,
     0x1d,0x5e,0x56,0x4f,0xc5,0x1b,0x4f,0xb9,0x1a,0x83,0x67,0x73,0x3b,0x97,0xc7,0x6a,
     0x5c,0x99,0x70,0x5d,0x7e,0x99,0x12,0x59,0xb7,0x9d,0x8c,0xa3,0x65,0x35,0x09,0xcb // odd
 };
-const uint8_t compressed_key_03[] = {
+static const uint8_t compressed_key_03[] = {
     0x03,
     0xdf,0x94,0x6e,0x0b,0x3f,0x6a,0xd7,0xf3,0x55,0x6b,0x53,0x71,0x62,0xf3,0x9f,0x07,
     0xfa,0x04,0x60,0x63,0x41,0x26,0x5f,0xe9,0x95,0xf3,0xfa,0x51,0x1f,0x7f,0xc2,0x13
 };
 
-
-const uint8_t uncompressed_key_invalid[] = {
+static const uint8_t uncompressed_key_invalid[] = {
     0x05, // does not start with 0x04; invalid
     0xdf,0x94,0x6e,0x0b,0x3f,0x6a,0xd7,0xf3,0x55,0x6b,0x53,0x71,0x62,0xf3,0x9f,0x07,
     0xfa,0x04,0x60,0x63,0x41,0x26,0x5f,0xe9,0x95,0xf3,0xfa,0x51,0x1f,0x7f,0xc2,0x13,
@@ -104,11 +204,17 @@ static void test_get_compressed_pubkey_invalid(void **state) {
     assert_int_equal(ret, -1);
 }
 
-int main() {
-    const struct CMUnitTest tests[] = {cmocka_unit_test(test_get_compressed_pubkey_02),
-                                       cmocka_unit_test(test_get_compressed_pubkey_03),
-                                       cmocka_unit_test(test_get_compressed_pubkey_in_place),
-                                       cmocka_unit_test(test_get_compressed_pubkey_invalid)};
-
+int main(void) {
+    speculos_bridge_init();
+    const struct CMUnitTest tests[] = {
+        cmocka_unit_test(test_ckdpub_tv2_m_to_m0),
+        cmocka_unit_test(test_ckdpub_in_place),
+        cmocka_unit_test(test_ckdpub_rejects_hardened),
+        cmocka_unit_test(test_ckdpub_rejects_max_depth),
+        cmocka_unit_test(test_get_compressed_pubkey_02),
+        cmocka_unit_test(test_get_compressed_pubkey_03),
+        cmocka_unit_test(test_get_compressed_pubkey_in_place),
+        cmocka_unit_test(test_get_compressed_pubkey_invalid),
+    };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

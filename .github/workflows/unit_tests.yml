@@ -15,3 +15,7 @@ jobs:
     secrets: inherit
     with:
       test_directory: unit-tests
+      # OpenSSL is needed by the speculos-backed crypto tests. The
+      # speculos sources themselves are fetched at cmake configure time
+      # by unit-tests/CMakeLists.txt (FetchContent, pinned tag).
+      additional_packages: libssl-dev
