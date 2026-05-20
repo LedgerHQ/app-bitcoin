@@ -66,7 +66,7 @@ static const serialized_extended_pubkey_t tv2_m_0_expected = {
         },
 };
 
-static void test_ckdpub_tv2_m_to_m0(void **state) {
+static void test_bip32_CKDpub_tv2_m_to_m0(void **state) {
     (void) state;
 
     serialized_extended_pubkey_t child = {0};
@@ -83,7 +83,7 @@ static void test_ckdpub_tv2_m_to_m0(void **state) {
     assert_memory_equal(child.compressed_pubkey, tv2_m_0_expected.compressed_pubkey, 33);
 }
 
-static void test_ckdpub_in_place(void **state) {
+static void test_bip32_CKDpub_in_place(void **state) {
     (void) state;
 
     /* child == parent must be allowed per the docstring. */
@@ -95,7 +95,7 @@ static void test_ckdpub_in_place(void **state) {
     assert_memory_equal(buf.compressed_pubkey, tv2_m_0_expected.compressed_pubkey, 33);
 }
 
-static void test_ckdpub_rejects_hardened(void **state) {
+static void test_bip32_CKDpub_rejects_hardened(void **state) {
     (void) state;
 
     serialized_extended_pubkey_t child = {0};
@@ -104,7 +104,7 @@ static void test_ckdpub_rejects_hardened(void **state) {
     assert_int_equal(ret, -1);
 }
 
-static void test_ckdpub_rejects_max_depth(void **state) {
+static void test_bip32_CKDpub_rejects_max_depth(void **state) {
     (void) state;
 
     serialized_extended_pubkey_t parent = tv2_m;
@@ -113,6 +113,96 @@ static void test_ckdpub_rejects_max_depth(void **state) {
 
     int ret = bip32_CKDpub(&parent, 0, &child, NULL);
     assert_int_equal(ret, -1);
+}
+
+/* ---------------------------------------------------------------- */
+/* crypto_ripemd160                                                 */
+/* ---------------------------------------------------------------- */
+
+static void test_crypto_ripemd160_empty(void **state) {
+    (void) state;
+    /* Standard RIPEMD-160 test vector for the empty input. */
+    static const uint8_t expected[20] = {
+        0x9c, 0x11, 0x85, 0xa5, 0xc5, 0xe9, 0xfc, 0x54, 0x61, 0x28,
+        0x08, 0x97, 0x7e, 0xe8, 0xf5, 0x48, 0xb2, 0x25, 0x8d, 0x31,
+    };
+    uint8_t out[20];
+    crypto_ripemd160((const uint8_t *) "", 0, out);
+    assert_memory_equal(out, expected, 20);
+}
+
+static void test_crypto_ripemd160_abc(void **state) {
+    (void) state;
+    /* RIPEMD-160 of "abc". */
+    static const uint8_t expected[20] = {
+        0x8e, 0xb2, 0x08, 0xf7, 0xe0, 0x5d, 0x98, 0x7a, 0x9b, 0x04,
+        0x4a, 0x8e, 0x98, 0xc6, 0xb0, 0x87, 0xf1, 0x5a, 0x0b, 0xfc,
+    };
+    uint8_t out[20];
+    crypto_ripemd160((const uint8_t *) "abc", 3, out);
+    assert_memory_equal(out, expected, 20);
+}
+
+static void test_crypto_ripemd160_1000_a(void **state) {
+    (void) state;
+    /* RIPEMD-160 of 1000 repetitions of 'a' — exercises multi-block input. */
+    static const uint8_t expected[20] = {
+        0xaa, 0x69, 0xde, 0xee, 0x9a, 0x89, 0x22, 0xe9, 0x2f, 0x81,
+        0x05, 0xe0, 0x07, 0xf7, 0x61, 0x10, 0xf3, 0x81, 0xe9, 0xcf,
+    };
+    uint8_t input[1000];
+    memset(input, 'a', sizeof(input));
+    uint8_t out[20];
+    crypto_ripemd160(input, sizeof(input), out);
+    assert_memory_equal(out, expected, 20);
+}
+
+/* ---------------------------------------------------------------- */
+/* crypto_hash160                                                   */
+/* ---------------------------------------------------------------- */
+
+static void test_crypto_hash160_empty(void **state) {
+    (void) state;
+    /* RIPEMD160(SHA256("")) */
+    static const uint8_t expected[20] = {
+        0xb4, 0x72, 0xa2, 0x66, 0xd0, 0xbd, 0x89, 0xc1, 0x37, 0x06,
+        0xa4, 0x13, 0x2c, 0xcf, 0xb1, 0x6f, 0x7c, 0x3b, 0x9f, 0xcb,
+    };
+    uint8_t out[20];
+    crypto_hash160((const uint8_t *) "", 0, out);
+    assert_memory_equal(out, expected, 20);
+}
+
+static void test_crypto_hash160_abc(void **state) {
+    (void) state;
+    /* RIPEMD160(SHA256("abc")) */
+    static const uint8_t expected[20] = {
+        0xbb, 0x1b, 0xe9, 0x8c, 0x14, 0x24, 0x44, 0xd7, 0xa5, 0x6a,
+        0xa3, 0x98, 0x1c, 0x39, 0x42, 0xa9, 0x78, 0xe4, 0xdc, 0x33,
+    };
+    uint8_t out[20];
+    crypto_hash160((const uint8_t *) "abc", 3, out);
+    assert_memory_equal(out, expected, 20);
+}
+
+static void test_crypto_hash160_secp256k1_generator(void **state) {
+    (void) state;
+    /* HASH160 of the uncompressed secp256k1 generator point (04 || Gx || Gy).
+     * Sanity check that bitcoin-style HASH160 of a pubkey works as expected. */
+    static const uint8_t G_uncompressed[65] = {
+        0x04, 0x79, 0xbe, 0x66, 0x7e, 0xf9, 0xdc, 0xbb, 0xac, 0x55, 0xa0, 0x62, 0x95,
+        0xce, 0x87, 0x0b, 0x07, 0x02, 0x9b, 0xfc, 0xdb, 0x2d, 0xce, 0x28, 0xd9, 0x59,
+        0xf2, 0x81, 0x5b, 0x16, 0xf8, 0x17, 0x98, 0x48, 0x3a, 0xda, 0x77, 0x26, 0xa3,
+        0xc4, 0x65, 0x5d, 0xa4, 0xfb, 0xfc, 0x0e, 0x11, 0x08, 0xa8, 0xfd, 0x17, 0xb4,
+        0x48, 0xa6, 0x85, 0x54, 0x19, 0x9c, 0x47, 0xd0, 0x8f, 0xfb, 0x10, 0xd4, 0xb8,
+    };
+    static const uint8_t expected[20] = {
+        0x91, 0xb2, 0x4b, 0xf9, 0xf5, 0x28, 0x85, 0x32, 0x96, 0x0a,
+        0xc6, 0x87, 0xab, 0xb0, 0x35, 0x12, 0x7b, 0x1d, 0x28, 0xa5,
+    };
+    uint8_t out[20];
+    crypto_hash160(G_uncompressed, sizeof(G_uncompressed), out);
+    assert_memory_equal(out, expected, 20);
 }
 
 /* ---------------------------------------------------------------- */
@@ -155,7 +245,7 @@ static const uint8_t uncompressed_key_invalid[] = {
 };
 // clang-format on
 
-static void test_get_compressed_pubkey_02(void **state) {
+static void test_crypto_get_compressed_pubkey_02(void **state) {
     (void) state;
 
     uint8_t key_in[65], key_out[33];
@@ -168,7 +258,7 @@ static void test_get_compressed_pubkey_02(void **state) {
     assert_memory_equal(key_in, uncompressed_key_02, 65);
 }
 
-static void test_get_compressed_pubkey_03(void **state) {
+static void test_crypto_get_compressed_pubkey_03(void **state) {
     (void) state;
 
     uint8_t key_in[65], key_out[33];
@@ -182,7 +272,7 @@ static void test_get_compressed_pubkey_03(void **state) {
 }
 
 // Test that it also works if key_out == key_in
-static void test_get_compressed_pubkey_in_place(void **state) {
+static void test_crypto_get_compressed_pubkey_in_place(void **state) {
     (void) state;
 
     uint8_t key_in_out[65];
@@ -194,7 +284,7 @@ static void test_get_compressed_pubkey_in_place(void **state) {
     assert_memory_equal(key_in_out, compressed_key_02, 33);
 }
 
-static void test_get_compressed_pubkey_invalid(void **state) {
+static void test_crypto_get_compressed_pubkey_invalid(void **state) {
     (void) state;
 
     uint8_t key_in[65], key_out[33];
@@ -204,17 +294,47 @@ static void test_get_compressed_pubkey_invalid(void **state) {
     assert_int_equal(ret, -1);
 }
 
+/* ---------------------------------------------------------------- */
+/* crypto_get_checksum                                              */
+/* ---------------------------------------------------------------- */
+
+static void test_crypto_get_checksum_empty(void **state) {
+    (void) state;
+    /* First 4 bytes of SHA256(SHA256("")). */
+    static const uint8_t expected[4] = {0x5d, 0xf6, 0xe0, 0xe2};
+    uint8_t out[4];
+    crypto_get_checksum((const uint8_t *) "", 0, out);
+    assert_memory_equal(out, expected, 4);
+}
+
+static void test_crypto_get_checksum_hello(void **state) {
+    (void) state;
+    /* First 4 bytes of SHA256(SHA256("hello")). */
+    static const uint8_t expected[4] = {0x95, 0x95, 0xc9, 0xdf};
+    uint8_t out[4];
+    crypto_get_checksum((const uint8_t *) "hello", 5, out);
+    assert_memory_equal(out, expected, 4);
+}
+
 int main(void) {
     speculos_bridge_init();
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(test_ckdpub_tv2_m_to_m0),
-        cmocka_unit_test(test_ckdpub_in_place),
-        cmocka_unit_test(test_ckdpub_rejects_hardened),
-        cmocka_unit_test(test_ckdpub_rejects_max_depth),
-        cmocka_unit_test(test_get_compressed_pubkey_02),
-        cmocka_unit_test(test_get_compressed_pubkey_03),
-        cmocka_unit_test(test_get_compressed_pubkey_in_place),
-        cmocka_unit_test(test_get_compressed_pubkey_invalid),
+        cmocka_unit_test(test_bip32_CKDpub_tv2_m_to_m0),
+        cmocka_unit_test(test_bip32_CKDpub_in_place),
+        cmocka_unit_test(test_bip32_CKDpub_rejects_hardened),
+        cmocka_unit_test(test_bip32_CKDpub_rejects_max_depth),
+        cmocka_unit_test(test_crypto_ripemd160_empty),
+        cmocka_unit_test(test_crypto_ripemd160_abc),
+        cmocka_unit_test(test_crypto_ripemd160_1000_a),
+        cmocka_unit_test(test_crypto_hash160_empty),
+        cmocka_unit_test(test_crypto_hash160_abc),
+        cmocka_unit_test(test_crypto_hash160_secp256k1_generator),
+        cmocka_unit_test(test_crypto_get_compressed_pubkey_02),
+        cmocka_unit_test(test_crypto_get_compressed_pubkey_03),
+        cmocka_unit_test(test_crypto_get_compressed_pubkey_in_place),
+        cmocka_unit_test(test_crypto_get_compressed_pubkey_invalid),
+        cmocka_unit_test(test_crypto_get_checksum_empty),
+        cmocka_unit_test(test_crypto_get_checksum_hello),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
