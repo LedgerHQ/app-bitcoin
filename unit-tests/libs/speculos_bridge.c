@@ -321,23 +321,47 @@ end:
     return error;
 }
 
-cx_err_t cx_ecdsa_sign_no_throw(const void *pvkey,
+/* sys_cx_ecdsa_sign / sys_cx_ecdsa_verify are declared by speculos's
+ * cx_ec.h, pulled in transitively via bolos/cxlib.h above. They use
+ * unsigned int for the signature length (speculos returns the written
+ * length via the function's return value), while the SDK's _no_throw
+ * wrappers use size_t* in-out. Bridge the calling convention here. */
+
+cx_err_t cx_ecdsa_sign_no_throw(const cx_ecfp_private_key_t *pvkey,
                                 uint32_t mode,
-                                uint32_t hashID,
+                                cx_md_t hashID,
                                 const uint8_t *hash,
                                 size_t hash_len,
                                 uint8_t *sig,
                                 size_t *sig_len,
                                 uint32_t *info) {
-    (void) pvkey;
-    (void) mode;
-    (void) hashID;
-    (void) hash;
-    (void) hash_len;
-    (void) sig;
-    (void) sig_len;
-    (void) info;
-    STUB_ABORT("cx_ecdsa_sign_no_throw");
+    unsigned int info_local = 0;
+    int n = sys_cx_ecdsa_sign(pvkey,
+                              (int) mode,
+                              hashID,
+                              hash,
+                              (unsigned int) hash_len,
+                              sig,
+                              (unsigned int) *sig_len,
+                              &info_local);
+    if (n < 0) return 0xFFFFFF85; /* CX_INTERNAL_ERROR */
+    *sig_len = (size_t) n;
+    if (info != NULL) *info = info_local;
+    return 0; /* CX_OK */
+}
+
+bool cx_ecdsa_verify_no_throw(const cx_ecfp_public_key_t *pukey,
+                              const uint8_t *hash,
+                              size_t hash_len,
+                              const uint8_t *sig,
+                              size_t sig_len) {
+    return sys_cx_ecdsa_verify(pukey,
+                               0,
+                               CX_SHA256,
+                               hash,
+                               (unsigned int) hash_len,
+                               sig,
+                               (unsigned int) sig_len) == 1;
 }
 
 /* ------------------------------------------------------------------
