@@ -1,0 +1,338 @@
+# Bitcoin fuzz manifest.
+#
+# Bitcoin uses a custom harness and a custom seed generator. The promoted base
+# corpus lives under fuzzing/base-corpus/ and is loaded automatically by the
+# SDK campaign script when present.
+
+[target]
+fuzzer = "fuzz_app"
+harness_version = "6"
+
+[layout]
+extra_args = [
+    "--ctrl-name", "psbt_entropy",
+    "--global", "psbt_entropy:SCEN_ENTROPY_OFF",
+    "--global", "G_swap_state:SCEN_G_SWAP_OFF",
+    "--global", "fuzz_ui_approve:SCEN_UI_APPROVE_OFF",
+    "--global", "G_called_from_swap:SCEN_G_CALLED_FROM_SWAP_OFF",
+]
+
+[coverage]
+key_files = [
+    "src/handler/sign_psbt.c",
+    "src/handler/lib/policy.c",
+    "src/handler/lib/psbt_parse_rawtx.c",
+    "src/common/wallet.c",
+    "src/handler/get_wallet_address.c",
+    "src/handler/sign_psbt/txhashes.c",
+    "src/common/segwit_addr.c",
+    "src/swap/handle_check_address.c",
+    "src/swap/handle_swap_sign_transaction.c",
+    "src/handler/register_wallet.c",
+    "src/handler/sign_message.c",
+    "src/handler/sign_psbt/amount_from_psbt.c",
+    "src/handler/sign_psbt/extract_bip32_derivation.c",
+    "src/common/script.c",
+    "src/handler/sign_psbt/musig_signing.c",
+    "src/musig/musig.c",
+    "src/handler/get_extended_pubkey.c",
+    "src/handler/get_master_fingerprint.c",
+    "src/handler/lib/stream_merkleized_map_value.c",
+    "src/musig/musig_sessions.c",
+]
+exclude_regexes = [
+    '.*ledger-secure-sdk.*',
+    '.*fuzz_dispatcher\.c',
+    '.*fuzzer\.c',
+    '.*fuzzing/mock/.*',
+    '.*src/main\.c',
+    '.*src/ui/menu_nbgl\.c',
+    '.*src/ui/display_nbgl\.c',
+    '.*src/boilerplate/io\.c',
+    '.*src/common/format\.c',
+]
+
+[dictionary]
+# Dictionary tokens for libFuzzer magic-bytes matching.  Organised into
+# domain-grouped bands so Absolution can bias mutations toward grammar-
+# correct content.  Adding tokens is zero-cost: they do not grow the
+# prefix and only help when libFuzzer's strncmp/memcmp instrumentation
+# sees a near-match.  Conversely, redundant tokens are harmless.
+#
+# Adding new token ideas:
+#   - miniscript parser keywords (KNOWN_TOKENS in wallet.c)
+#   - TLV/type byte constants (PsbtGlobalType/PsbtInputType/PsbtOutputType)
+#   - Bitcoin opcode bytes (OP_*)
+#   - Address HRP strings (COIN_NATIVE_SEGWIT_PREFIX etc.)
+#   - BIP32 path fragments that parsers compare (e.g. "/0h", "/**")
+tokens = [
+    # ── APDU CLAs/INSs ───────────────────────────────────────────────────
+    { name = "cla_app", value = "\\xE1" },
+    { name = "get_extended_pubkey", value = "\\xE1\\x00\\x00\\x01" },
+    { name = "register_wallet", value = "\\xE1\\x02\\x00\\x01" },
+    { name = "get_wallet_address", value = "\\xE1\\x03\\x00\\x01" },
+    { name = "sign_psbt", value = "\\xE1\\x04\\x00\\x01" },
+    { name = "get_master_fingerprint", value = "\\xE1\\x05\\x00\\x01" },
+    { name = "sign_message", value = "\\xE1\\x10\\x00\\x01" },
+
+    # ── Wallet-policy descriptors (top-level) ────────────────────────────
+    { name = "descriptor_wpkh", value = "wpkh(@0/**)" },
+    { name = "descriptor_tr", value = "tr(@0/**)" },
+    { name = "descriptor_sh_wpkh", value = "sh(wpkh(@0/**))" },
+    { name = "descriptor_sh", value = "sh(" },
+    { name = "descriptor_wsh", value = "wsh(" },
+    { name = "descriptor_wsh_multi", value = "wsh(multi(" },
+    { name = "descriptor_musig", value = "musig(" },
+    { name = "descriptor_sortedmulti", value = "sortedmulti(" },
+    { name = "descriptor_sortedmulti_a", value = "sortedmulti_a(" },
+    { name = "descriptor_multi", value = "multi(" },
+    { name = "descriptor_multi_a", value = "multi_a(" },
+    { name = "descriptor_thresh", value = "thresh(" },
+    { name = "descriptor_after", value = "after(" },
+    { name = "descriptor_older", value = "older(" },
+    { name = "descriptor_sha256", value = "sha256(" },
+    { name = "descriptor_hash256", value = "hash256(" },
+    { name = "descriptor_ripemd160", value = "ripemd160(" },
+    { name = "descriptor_hash160", value = "hash160(" },
+    { name = "descriptor_pk", value = "pk(" },
+    { name = "descriptor_pkh", value = "pkh(" },
+    { name = "descriptor_pk_k", value = "pk_k(" },
+    { name = "descriptor_pk_h", value = "pk_h(" },
+    { name = "descriptor_and_v", value = "and_v(" },
+    { name = "descriptor_and_b", value = "and_b(" },
+    { name = "descriptor_and_n", value = "and_n(" },
+    { name = "descriptor_or_b", value = "or_b(" },
+    { name = "descriptor_or_c", value = "or_c(" },
+    { name = "descriptor_or_d", value = "or_d(" },
+    { name = "descriptor_or_i", value = "or_i(" },
+    { name = "descriptor_andor", value = "andor(" },
+
+    # ── Miniscript wrappers (single-char prefixes) ───────────────────────
+    # See wallet.c parse_wrappers() — apps match these one character at a
+    # time followed by `:`.  Give libFuzzer grammar-valid combos for both
+    # unary and common stacks.
+    { name = "wrap_a", value = "a:" },
+    { name = "wrap_s", value = "s:" },
+    { name = "wrap_c", value = "c:" },
+    { name = "wrap_t", value = "t:" },
+    { name = "wrap_d", value = "d:" },
+    { name = "wrap_v", value = "v:" },
+    { name = "wrap_j", value = "j:" },
+    { name = "wrap_n", value = "n:" },
+    { name = "wrap_l", value = "l:" },
+    { name = "wrap_u", value = "u:" },
+    { name = "wrap_vc", value = "vc:" },
+    { name = "wrap_sc", value = "sc:" },
+    { name = "wrap_tv", value = "tv:" },
+    { name = "wrap_dv", value = "dv:" },
+    { name = "wrap_jc", value = "jc:" },
+    { name = "wrap_sj", value = "sj:" },
+    { name = "wrap_vdv", value = "vdv:" },
+
+    # ── Miniscript leaf numerals (no-paren) ──────────────────────────────
+    # `0` and `1` are valid no-paren miniscript fragments that reach
+    # compute_miniscript_policy_ext_info via l:/u: wrappers.
+    { name = "ms_zero", value = "0)" },
+    { name = "ms_one", value = "1)" },
+    { name = "wrap_l_zero", value = "l:0" },
+    { name = "wrap_u_zero", value = "u:0" },
+
+    # ── Common miniscript sub-expressions ────────────────────────────────
+    # Full sub-expressions that mutators can splice in to reach
+    # is_miniscript_sane (requires wsh(...) wrapper around them).
+    { name = "ms_and_v_vpk_pk", value = "and_v(v:pk(@0),pk(@1))" },
+    { name = "ms_or_b_pk_spk", value = "or_b(pk(@0),s:pk(@1))" },
+    { name = "ms_or_i_pk_pk", value = "or_i(pk(@0),pk(@1))" },
+    { name = "ms_andor_pk_pk_pk", value = "andor(pk(@0),pk(@1),pk(@2))" },
+    { name = "ms_thresh", value = "thresh(2,pk(@0),s:pk(@1),s:pk(@2))" },
+    { name = "ms_older_v_pk", value = "and_v(v:older(10),pk(@0))" },
+    { name = "ms_after_v_pk", value = "and_v(v:after(100),pk(@0))" },
+    { name = "ms_sha256", value = "and_v(v:sha256(e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855),pk(@0))" },
+
+    # ── Key expressions & BIP32 paths ────────────────────────────────────
+    { name = "key_ref_0", value = "@0" },
+    { name = "key_ref_1", value = "@1" },
+    { name = "key_ref_2", value = "@2" },
+    { name = "key_ref_3", value = "@3" },
+    { name = "key_ref_4", value = "@4" },
+    { name = "wildcard", value = "/**" },
+    { name = "bip32_separator", value = "/" },
+    { name = "bip32_hardened", value = "'" },
+    { name = "bip32_hardened_h", value = "h" },
+    { name = "bip32_step_0", value = "/0" },
+    { name = "bip32_step_1", value = "/1" },
+    { name = "bip32_step_2", value = "/2" },
+    { name = "bip32_step_0h", value = "/0h" },
+    { name = "bip32_step_1h", value = "/1h" },
+    { name = "path_purpose_44h", value = "44'" },
+    { name = "path_purpose_48h", value = "48'" },
+    { name = "path_purpose_49h", value = "49'" },
+    { name = "path_purpose_84h", value = "84'" },
+    { name = "path_purpose_86h", value = "86'" },
+    { name = "xpub_tb_prefix", value = "tpub" },
+    { name = "xpub_bc_prefix", value = "xpub" },
+    { name = "key_origin_start", value = "[" },
+    { name = "key_origin_end", value = "]" },
+
+    # ── Wallet-name charset sentinels ────────────────────────────────────
+    # is_policy_name_acceptable rejects names with leading/trailing spaces
+    # or chars outside 0x20..0x7E.  Tokens below help libFuzzer discover
+    # those boundary predicates.
+    { name = "name_space", value = " " },
+    { name = "name_leading_space", value = " A" },
+    { name = "name_trailing_space", value = "A " },
+    { name = "name_ctrl_byte", value = "\\x1F" },
+    { name = "name_tilde", value = "~" },
+
+    # ── Varints & TLV length escapes ─────────────────────────────────────
+    { name = "varint_1", value = "\\x01" },
+    { name = "varint_2", value = "\\x02" },
+    { name = "varint_3", value = "\\x03" },
+    { name = "varint_4", value = "\\x04" },
+    { name = "varint_fc_boundary", value = "\\xFC" },
+    { name = "varint_fd", value = "\\xFD" },
+    { name = "varint_fe", value = "\\xFE" },
+    { name = "varint_ff", value = "\\xFF" },
+
+    # ── PSBT framing ─────────────────────────────────────────────────────
+    { name = "psbt_magic", value = "psbt\\xff" },
+    { name = "psbt_separator", value = "\\x00" },
+    { name = "psbt_global_xpub", value = "\\x01" },
+    { name = "psbt_global_unsigned_tx", value = "\\x00" },
+    { name = "psbt_global_tx_version", value = "\\x02" },
+    { name = "psbt_global_input_count", value = "\\x04" },
+    { name = "psbt_global_output_count", value = "\\x05" },
+    { name = "psbt_global_tx_modifiable", value = "\\x06" },
+    { name = "psbt_global_version", value = "\\xFB" },
+    { name = "psbt_in_non_witness_utxo", value = "\\x00" },
+    { name = "witness_utxo", value = "\\x01" },
+    { name = "psbt_in_partial_sig", value = "\\x02" },
+    { name = "psbt_in_sighash", value = "\\x03" },
+    { name = "psbt_in_redeem_script", value = "\\x04" },
+    { name = "psbt_in_witness_script", value = "\\x05" },
+    { name = "bip32_derivation", value = "\\x06" },
+    { name = "previous_txid", value = "\\x0E" },
+    { name = "output_index", value = "\\x0F" },
+    { name = "sequence", value = "\\x10" },
+    { name = "psbt_in_req_time_locktime", value = "\\x11" },
+    { name = "psbt_in_req_height_locktime", value = "\\x12" },
+    { name = "tap_key_sig", value = "\\x13" },
+    { name = "tap_script_sig", value = "\\x14" },
+    { name = "tap_leaf_script", value = "\\x15" },
+    { name = "tap_bip32_derivation", value = "\\x16" },
+    { name = "tap_internal_key", value = "\\x17" },
+    { name = "tap_merkle_root", value = "\\x18" },
+    { name = "musig2_participants", value = "\\x1A" },
+    { name = "musig2_pub_nonce", value = "\\x1B" },
+    { name = "musig2_partial_sig", value = "\\x1C" },
+    { name = "psbt_proprietary", value = "\\xFC" },
+    { name = "psbt_out_redeem_script", value = "\\x00" },
+    { name = "psbt_out_witness_script", value = "\\x01" },
+    { name = "psbt_out_bip32_derivation", value = "\\x02" },
+    { name = "psbt_out_amount", value = "\\x03" },
+    { name = "psbt_out_script", value = "\\x04" },
+    { name = "psbt_out_tap_internal_key", value = "\\x05" },
+    { name = "psbt_out_tap_tree", value = "\\x06" },
+    { name = "psbt_out_tap_bip32", value = "\\x07" },
+
+    # ── SIGHASH flags ────────────────────────────────────────────────────
+    # execute_swap_checks() and txhashes use sighash bytes for branching.
+    { name = "sighash_all", value = "\\x01" },
+    { name = "sighash_none", value = "\\x02" },
+    { name = "sighash_single", value = "\\x03" },
+    { name = "sighash_anyonecanpay_all", value = "\\x81" },
+    { name = "sighash_anyonecanpay_none", value = "\\x82" },
+    { name = "sighash_anyonecanpay_single", value = "\\x83" },
+    { name = "sighash_default_tap", value = "\\x00" },
+
+    # ── Bitcoin script opcodes ───────────────────────────────────────────
+    # script.c recognizes several opcodes when computing descriptors.
+    { name = "op_0", value = "\\x00" },
+    { name = "op_pushdata1", value = "\\x4C" },
+    { name = "op_pushdata2", value = "\\x4D" },
+    { name = "op_pushdata4", value = "\\x4E" },
+    { name = "op_1negate", value = "\\x4F" },
+    { name = "op_1", value = "\\x51" },
+    { name = "op_2", value = "\\x52" },
+    { name = "op_3", value = "\\x53" },
+    { name = "op_16", value = "\\x60" },
+    { name = "op_nop", value = "\\x61" },
+    { name = "op_return", value = "\\x6A" },
+    { name = "op_drop", value = "\\x75" },
+    { name = "op_dup", value = "\\x76" },
+    { name = "op_equal", value = "\\x87" },
+    { name = "op_equalverify", value = "\\x88" },
+    { name = "op_ripemd160", value = "\\xA6" },
+    { name = "op_sha1", value = "\\xA7" },
+    { name = "op_sha256", value = "\\xA8" },
+    { name = "op_hash160", value = "\\xA9" },
+    { name = "op_hash256", value = "\\xAA" },
+    { name = "op_checksig", value = "\\xAC" },
+    { name = "op_checksigverify", value = "\\xAD" },
+    { name = "op_checkmultisig", value = "\\xAE" },
+    { name = "op_checkmultisigverify", value = "\\xAF" },
+    { name = "op_checklocktimeverify", value = "\\xB1" },
+    { name = "op_checksequenceverify", value = "\\xB2" },
+
+    # ── Script push lengths ──────────────────────────────────────────────
+    { name = "push20_p2pkh", value = "\\x14" },
+    { name = "push32_p2wsh", value = "\\x20" },
+    { name = "push33_pubkey_compressed", value = "\\x21" },
+    { name = "push65_pubkey_uncompressed", value = "\\x41" },
+
+    # ── P2TR / witness version prefixes ──────────────────────────────────
+    # Common 2-byte witness program prefixes that head witness scripts.
+    { name = "witver_p2wpkh", value = "\\x00\\x14" },
+    { name = "witver_p2wsh", value = "\\x00\\x20" },
+    { name = "witver_p2tr", value = "\\x51\\x20" },
+    { name = "taproot_leaf_version", value = "\\xC0" },
+
+    # ── P2PKH/P2SH standard wrapper prefixes (COIN_* in handle_check_*) ──
+    { name = "script_p2pkh_prefix", value = "\\x76\\xA9\\x14" },
+    { name = "script_p2pkh_suffix", value = "\\x88\\xAC" },
+    { name = "script_p2sh_prefix", value = "\\xA9\\x14" },
+    { name = "script_p2sh_suffix", value = "\\x87" },
+
+    # ── Bech32/Bech32m HRPs (segwit_addr.c) ──────────────────────────────
+    # COIN_NATIVE_SEGWIT_PREFIX is "tb" in the fuzz build (testnet).
+    # Mainnet "bc" and regtest "bcrt" tokens let libFuzzer discover the
+    # HRP-validity predicate cheaply when it mutates nearby bytes.
+    { name = "bech32_hrp_tb", value = "tb" },
+    { name = "bech32_hrp_bc", value = "bc" },
+    { name = "bech32_hrp_bcrt", value = "bcrt" },
+    { name = "bech32_separator", value = "1" },
+    { name = "bech32_addr_tb_p2wpkh", value = "tb1q" },
+    { name = "bech32_addr_tb_p2tr", value = "tb1p" },
+    { name = "bech32_addr_bc_p2wpkh", value = "bc1q" },
+    { name = "bech32_addr_bc_p2tr", value = "bc1p" },
+    { name = "bech32_addr_bcrt_p2wpkh", value = "bcrt1q" },
+    { name = "bech32_charset_prefix", value = "qpzry9x8" },
+
+    # ── Swap APDU payload tokens (handle_check_address) ──────────────────
+    # P2 byte selects format: P2PKH=0x00, P2SH=0x01, P2WPKH=0x02,
+    # P2WSH=0x03, TAPROOT=0x04.
+    { name = "swap_p2_p2pkh", value = "\\x00" },
+    { name = "swap_p2_p2sh", value = "\\x01" },
+    { name = "swap_p2_p2wpkh", value = "\\x02" },
+    { name = "swap_p2_p2wsh", value = "\\x03" },
+    { name = "swap_p2_taproot", value = "\\x04" },
+
+    # ── sign_message framing (BIP-137) ───────────────────────────────────
+    # Note: newline encoded as \x0A because libFuzzer's dictionary parser
+    # does not support C-style escapes other than \", \\, and \xHH.
+    { name = "magic_bitcoin_signed_message", value = "Bitcoin Signed Message:\\x0A" },
+]
+
+[seeds]
+cla = 0xE1
+ins = [0x00, 0x02, 0x03, 0x04, 0x05, 0x10]
+
+[seeds.generic]
+enabled = false
+
+[seeds.custom]
+enabled = true
+script = "scripts/generate-seed-corpus.py"
+
+[mocks]
+override_sources = []

@@ -1,0 +1,92 @@
+# Bitcoin-specific symbols to zero out (in addition to framework SDK list).
+#
+# These are app-level globals and mock state that are irrelevant to
+# Bitcoin's core protocol fuzzing and would bloat the Absolution prefix.
+# Zeroing removes a symbol from the prefix entirely (zero-cost fixed 0).
+
+# ══════════════════════════════════════════════════════════════════════
+# App runtime state — overwritten during dispatch, not branch-gating
+# ══════════════════════════════════════════════════════════════════════
+G_output_len
+G_dispatcher_state
+G_dispatcher_context
+g_ui_state
+G_sign_psbt_cache
+pairs
+
+# ── Pointers overwritten by harness every iteration ──────────────────
+# Random prefix bytes in pointer slots crash; harness sets correct values.
+G_processing_screen_text
+G_swap_sign_return_value_address@handle_swap_sign_transaction.c
+
+# ── SDK swap return-value pointer (lib_standard_app/swap_utils.h) ────
+# Only dereferenced under #ifdef HAVE_SWAP in io.c, which is NOT compiled
+# in the bitcoin fuzz build.  Zero it so the 8-byte pointer slot is
+# eliminated from the prefix (zero-cost) and any future swap enablement
+# starts from a defined NULL state.
+G_swap_signing_return_value_address@lib_standard_app
+
+# ── Timeout bookkeeping (io_ext.c) ───────────────────────────────────
+# G_ticks and the two timeout-start ticks are set by the SDK ticker
+# callback/timeout-start helpers.  None of them gates parser branches
+# (only app_ticker_event_callback reads them, and that path is bounded
+# by G_is_timeout_active which starts false).  Zero them so ~6 prefix
+# bytes are reclaimed and spurious EXCEPTION_IO_RESET paths never fire.
+G_ticks@io_ext.c
+G_interruption_timeout_start_tick@io_ext.c
+G_processing_timeout_start_tick@io_ext.c
+G_is_timeout_active@io_ext.c
+
+# ── Stack canary (constant, never mutated) ───────────────────────────
+app_stack_canary
+
+# ── Crypto context (920B internal to mock, no app branches) ─────────
+G_cx
+
+# ══════════════════════════════════════════════════════════════════════
+# UI display state — set by display functions, no pre-condition branches
+# ══════════════════════════════════════════════════════════════════════
+confirmed_status@display_nbgl.c
+rejected_status@display_nbgl.c
+n_pairs@display_nbgl.c
+pairList@display_nbgl.c
+g_current_streaming_index@display.c
+nbTicks@ux.c
+pos@ux.c
+
+# ══════════════════════════════════════════════════════════════════════
+# Linker/OS symbols (meaningless to mutate)
+# ══════════════════════════════════════════════════════════════════════
+_bss
+_ebss
+
+# ══════════════════════════════════════════════════════════════════════
+# Mock/harness state — programmatically controlled or reset each iteration
+# ══════════════════════════════════════════════════════════════════════
+g_semantic_host
+fuzz_continuation_host
+fuzz_continuation_idx
+
+# Mangled aliases of file-static booleans already overridden via their
+# canonical names (g_ux_flow_ended, g_ux_flow_response in display.c).
+___src_ui_display_c_g_ux_flow_ended
+___src_ui_display_c_g_ux_flow_response
+
+# ══════════════════════════════════════════════════════════════════════
+# Continuation data — moved from prefix to fuzz tail so libFuzzer has
+# direct mutation control over builder slot bytes.
+# ══════════════════════════════════════════════════════════════════════
+mock_continuation_data
+
+# ══════════════════════════════════════════════════════════════════════
+# PSBT model mock state
+# ══════════════════════════════════════════════════════════════════════
+g_derived_xpub
+g_pm_desc_idx
+g_musig_round2
+pm_force_sign_mode
+
+# ══════════════════════════════════════════════════════════════════════
+# G_swap_state is NOT zeroed — Absolution drives it directly.
+# Field-level domain overrides in domain-overrides.txt.
+# ══════════════════════════════════════════════════════════════════════

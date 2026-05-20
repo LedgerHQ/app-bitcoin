@@ -1,0 +1,69 @@
+# Domain overrides for Bitcoin fuzzer.
+#
+# Constrain enum/state fields to valid values so Absolution explores
+# meaningful combinations instead of wasting cycles on invalid byte
+# patterns.  These are applied AFTER sync-invariant.py by
+# tune-invariant-domains.py (see scripts/app-common.sh).
+#
+# Format:
+#   GLOBAL.field = values \xHH [\xHH ...]   (enumerated values)
+#   GLOBAL.field = top                        (fully fuzzable)
+#   GLOBAL. = values ...                      (flat globals with unnamed field)
+
+# ══════════════════════════════════════════════════════════════════════
+# Real app globals — Absolution drives these directly in the prefix
+# ══════════════════════════════════════════════════════════════════════
+
+# ── G_swap_state (swap_globals_t, swap_globals.h) ────────────────────
+# Boolean/enum fields constrained to valid values.  Large comparison
+# fields (amount, fees, destination_address, payin_extra_id) are fully
+# fuzzable so Absolution explores equality-check pass/fail paths in
+# execute_swap_checks (sign_psbt.c).
+# NOTE: `called_from_swap` is NOT a field of swap_globals_t — it lives
+# in the SDK's swap_utils.h as the standalone `G_called_from_swap` byte.
+# See its dedicated override below.
+G_swap_state.should_exit = values \x00 \x01
+G_swap_state.mode = values \x00 \x01 \xFF
+G_swap_state.amount = top
+G_swap_state.fees = top
+G_swap_state.destination_address = top
+G_swap_state.payin_extra_id = top
+
+# ── G_called_from_swap (SDK swap_utils.h) ────────────────────────────
+# Standalone byte that gates `if (G_called_from_swap)` in sign_psbt.c,
+# get_wallet_address.c, io_ext.c, and main.c.  Keep as 0/1 so both the
+# normal and swap-called execution paths are reachable.
+G_called_from_swap. = values \x00 \x01
+# G_swap_response_ready gates the response short-circuit in io.c; both
+# values must be reachable so swap-mode completion is exercised.
+G_swap_response_ready. = values \x00 \x01
+
+# ── G_was_processing_screen_shown (bool, dispatcher.c) ──────────────
+# Gates UX spinner display in io.c:80 and termination callback in
+# dispatcher.c:178.  Auto-discovered as 0/1; made explicit.
+G_was_processing_screen_shown. = values \x00 \x01
+
+# ── g_ux_flow_ended / g_ux_flow_response (bool, display.c) ──────────
+# Control UI flow termination loop (while(!g_ux_flow_ended)) and the
+# approval result returned from io_ui_process().  Auto-discovered as
+# 0/1; made explicit.
+g_ux_flow_ended. = values \x00 \x01
+g_ux_flow_response. = values \x00 \x01
+
+# ══════════════════════════════════════════════════════════════════════
+# Mock / harness controls — no real app global equivalent
+# ══════════════════════════════════════════════════════════════════════
+
+# ── UI / approval toggle ─────────────────────────────────────────────
+# Drives io_seproxyhal_io_heartbeat() mock; 0 = approve, 1 = reject.
+fuzz_ui_approve. = values \x00 \x01
+
+# ── g_xpub_derived (bool, psbt_model.c) ─────────────────────────────
+# Gates cached-xpub path in psbt_model.c.  Auto-discovered as only
+# \x00 (degenerate); unlock to explore both cached and fresh paths.
+g_xpub_derived. = values \x00 \x01
+
+# ── SDK mock toggles ────────────────────────────────────────────────
+# Unlock both values so the fuzzer explores success and failure paths.
+fuzz_mock_nbgl_reject. = values \x00 \x01
+fuzz_mock_crypto_fail. = values \x00 \x01
