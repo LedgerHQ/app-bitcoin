@@ -249,6 +249,7 @@ if(SPECULOS AND SPECULOS_SRC)
     ${SPECULOS_SRC}/src/bolos/cx_utils.c
     ${SPECULOS_SRC}/src/bolos/cx_weierstrass.c
     ${SPECULOS_SRC}/src/bolos/cxlib.c
+    ${SPECULOS_SRC}/src/bolos/os_bip32.c
   )
 
   add_library(speculos_bolos STATIC ${SPECULOS_BOLOS_SOURCES})
@@ -258,7 +259,10 @@ if(SPECULOS AND SPECULOS_SRC)
   target_compile_definitions(speculos_bolos PRIVATE
     OS_LITTLE_ENDIAN NATIVE_64BITS HAVE_BOLOS=1
   )
-  target_include_directories(speculos_bolos PRIVATE
+  # BEFORE: speculos ships its own appflags.h (with `extern app_flags`)
+  # that must shadow the Ledger SDK's stripped-down appflags.h added
+  # at global scope above.
+  target_include_directories(speculos_bolos BEFORE PRIVATE
     ${SPECULOS_SRC}/sdk
     ${SPECULOS_SRC}/src
     ${SPECULOS_SRC}/src/bolos
@@ -267,7 +271,8 @@ if(SPECULOS AND SPECULOS_SRC)
   target_link_libraries(speculos_bolos PUBLIC OpenSSL::Crypto)
 
   add_library(speculos_bridge STATIC libs/speculos_bridge.c)
-  target_include_directories(speculos_bridge PRIVATE
+  target_compile_definitions(speculos_bridge PRIVATE HAVE_BOLOS=1)
+  target_include_directories(speculos_bridge BEFORE PRIVATE
     ${SPECULOS_SRC}/sdk
     ${SPECULOS_SRC}/src
     ${SPECULOS_SRC}/src/bolos

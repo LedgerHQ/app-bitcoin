@@ -316,6 +316,101 @@ static void test_crypto_get_checksum_hello(void **state) {
     assert_memory_equal(out, expected, 4);
 }
 
+/* ---------------------------------------------------------------- */
+/* crypto_get_compressed_pubkey_at_path                             */
+/*                                                                  */
+/* Expected values were precomputed from the BIP32 master seed used */
+/* by speculos when no SPECULOS_SEED override is set (the speculos  */
+/* default test seed, mirrored in libs/speculos_bridge.c).          */
+/* ---------------------------------------------------------------- */
+
+#define BIP32_HARDENED 0x80000000u
+
+static void test_crypto_get_compressed_pubkey_at_path_master(void **state) {
+    (void) state;
+    /* m — passes a non-NULL but empty path. speculos rejects NULL path
+     * with an exception regardless of length; this matches what real
+     * app callers do. */
+    static const uint32_t path[1] = {0};
+    static const uint8_t expected_pubkey[33] = {
+        0x02, 0x51, 0xec, 0x84, 0xe3, 0x3a, 0x31, 0x19, 0x48, 0x64, 0x61,
+        0xa4, 0x42, 0x40, 0xe9, 0x06, 0xff, 0x94, 0xbf, 0x40, 0xcf, 0x80,
+        0x7b, 0x02, 0x5b, 0x1c, 0xa4, 0x33, 0x32, 0xb8, 0x0d, 0xc9, 0xdb,
+    };
+    static const uint8_t expected_chain[32] = {
+        0xeb, 0x47, 0x3a, 0x0f, 0xa0, 0xaf, 0x50, 0x31, 0xf1, 0x4d, 0xb9,
+        0xfe, 0x7c, 0x37, 0xbb, 0x84, 0x16, 0xa4, 0xff, 0x01, 0xbb, 0x69,
+        0xda, 0xe9, 0x96, 0x6d, 0xc8, 0x3b, 0x5e, 0x5b, 0xf9, 0x21,
+    };
+    uint8_t pubkey[33];
+    uint8_t chain[32];
+
+    cx_err_t err = crypto_get_compressed_pubkey_at_path(path, 0, pubkey, chain);
+    assert_int_equal(err, CX_OK);
+    assert_memory_equal(pubkey, expected_pubkey, 33);
+    assert_memory_equal(chain, expected_chain, 32);
+}
+
+static void test_crypto_get_compressed_pubkey_at_path_unhardened(void **state) {
+    (void) state;
+    /* m/0 */
+    static const uint32_t path[] = {0};
+    static const uint8_t expected_pubkey[33] = {
+        0x02, 0x6f, 0x76, 0x0e, 0x57, 0x38, 0x3e, 0x3b, 0x59, 0x00, 0xf7,
+        0xc2, 0x3b, 0x78, 0xa4, 0x24, 0xe7, 0x4b, 0xeb, 0xbe, 0x9b, 0x7b,
+        0x46, 0x31, 0x6d, 0xa7, 0xc0, 0xb4, 0xb9, 0xc2, 0xc9, 0x30, 0x1c,
+    };
+    static const uint8_t expected_chain[32] = {
+        0x7b, 0x45, 0xad, 0x96, 0xc9, 0x4b, 0x30, 0xc4, 0x29, 0x4c, 0x28,
+        0x04, 0x7f, 0xf3, 0x94, 0x6d, 0x28, 0x42, 0x04, 0x4d, 0xe1, 0x00,
+        0xd7, 0x0f, 0xc3, 0xa6, 0xad, 0x9c, 0x0e, 0xcc, 0x82, 0x42,
+    };
+    uint8_t pubkey[33];
+    uint8_t chain[32];
+
+    cx_err_t err = crypto_get_compressed_pubkey_at_path(path, 1, pubkey, chain);
+    assert_int_equal(err, CX_OK);
+    assert_memory_equal(pubkey, expected_pubkey, 33);
+    assert_memory_equal(chain, expected_chain, 32);
+}
+
+static void test_crypto_get_compressed_pubkey_at_path_bip44_account(void **state) {
+    (void) state;
+    /* m/44'/0'/0' — BIP44 Bitcoin mainnet account 0 */
+    static const uint32_t path[] = {BIP32_HARDENED | 44, BIP32_HARDENED | 0, BIP32_HARDENED | 0};
+    static const uint8_t expected_pubkey[33] = {
+        0x03, 0x85, 0xe8, 0xc0, 0xcf, 0x6e, 0xed, 0x65, 0x2d, 0xc1, 0x23,
+        0x85, 0x8b, 0xc1, 0x5a, 0xd3, 0x03, 0x83, 0xef, 0x08, 0x80, 0x66,
+        0x22, 0xcb, 0x2e, 0x06, 0x2d, 0x32, 0xad, 0xca, 0x36, 0x08, 0x56,
+    };
+    uint8_t pubkey[33];
+
+    cx_err_t err = crypto_get_compressed_pubkey_at_path(path, 3, pubkey, NULL);
+    assert_int_equal(err, CX_OK);
+    assert_memory_equal(pubkey, expected_pubkey, 33);
+}
+
+static void test_crypto_get_compressed_pubkey_at_path_bip44_first_address(void **state) {
+    (void) state;
+    /* m/44'/0'/0'/0/0 — first receive address of the first BIP44 account.
+     * Also exercises chain_code == NULL. */
+    static const uint32_t path[] = {BIP32_HARDENED | 44,
+                                    BIP32_HARDENED | 0,
+                                    BIP32_HARDENED | 0,
+                                    0,
+                                    0};
+    static const uint8_t expected_pubkey[33] = {
+        0x03, 0x42, 0x51, 0x35, 0x8d, 0xa2, 0x06, 0xb3, 0xd5, 0x49, 0xf5,
+        0xc5, 0x38, 0xa7, 0xbc, 0x46, 0x64, 0x27, 0xee, 0x81, 0x09, 0x9a,
+        0xa8, 0xb4, 0x0d, 0xd0, 0xf5, 0xd4, 0xbf, 0xac, 0x5f, 0x5f, 0x15,
+    };
+    uint8_t pubkey[33];
+
+    cx_err_t err = crypto_get_compressed_pubkey_at_path(path, 5, pubkey, NULL);
+    assert_int_equal(err, CX_OK);
+    assert_memory_equal(pubkey, expected_pubkey, 33);
+}
+
 int main(void) {
     speculos_bridge_init();
     const struct CMUnitTest tests[] = {
@@ -335,6 +430,10 @@ int main(void) {
         cmocka_unit_test(test_crypto_get_compressed_pubkey_invalid),
         cmocka_unit_test(test_crypto_get_checksum_empty),
         cmocka_unit_test(test_crypto_get_checksum_hello),
+        cmocka_unit_test(test_crypto_get_compressed_pubkey_at_path_master),
+        cmocka_unit_test(test_crypto_get_compressed_pubkey_at_path_unhardened),
+        cmocka_unit_test(test_crypto_get_compressed_pubkey_at_path_bip44_account),
+        cmocka_unit_test(test_crypto_get_compressed_pubkey_at_path_bip44_first_address),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
