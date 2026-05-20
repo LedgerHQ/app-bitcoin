@@ -20,6 +20,11 @@
 #include <stdint.h>
 #include <stddef.h>
 
+/* Re-export the SDK's cx_err_t error codes (CX_OK, CX_INTERNAL_ERROR,
+ * ...) so tests can use the symbolic names instead of magic numbers
+ * when asserting against return values from speculos-backed code. */
+#include "cx_errors.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
