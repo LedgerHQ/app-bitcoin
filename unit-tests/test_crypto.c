@@ -12,6 +12,14 @@
 
 #include "speculos_bridge.h"
 #include "crypto.h"
+#include "xpub.h"
+
+/* Helper: decode an xpub string, abort the test on any decoding error. */
+static serialized_extended_pubkey_t decode_xpub(const char *str) {
+    serialized_extended_pubkey_t out;
+    assert_true(xpub_from_base58(str, &out));
+    return out;
+}
 
 /* ---------------------------------------------------------------- */
 /* bip32_CKDpub                                                     */
@@ -20,94 +28,52 @@
 /*   https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki */
 /* ---------------------------------------------------------------- */
 
-/* m: depth=0, parent_fp=0, child=0
- *   chain_code: 60499f801b896d83179a4374aeb7822aaeaceaa0db1f85ee3e904c4defbd9689
- *   key:        03cbcaa9c98c877a26977d00825c956a238e8dddfbd322cce4f74b0b5bd6ace4a7
- */
-static const serialized_extended_pubkey_t tv2_m = {
-    .version = {0x04, 0x88, 0xB2, 0x1E},
-    .depth = 0x00,
-    .parent_fingerprint = {0x00, 0x00, 0x00, 0x00},
-    .child_number = {0x00, 0x00, 0x00, 0x00},
-    .chain_code =
-        {
-            0x60, 0x49, 0x9f, 0x80, 0x1b, 0x89, 0x6d, 0x83, 0x17, 0x9a, 0x43,
-            0x74, 0xae, 0xb7, 0x82, 0x2a, 0xae, 0xac, 0xea, 0xa0, 0xdb, 0x1f,
-            0x85, 0xee, 0x3e, 0x90, 0x4c, 0x4d, 0xef, 0xbd, 0x96, 0x89,
-        },
-    .compressed_pubkey =
-        {
-            0x03, 0xcb, 0xca, 0xa9, 0xc9, 0x8c, 0x87, 0x7a, 0x26, 0x97, 0x7d,
-            0x00, 0x82, 0x5c, 0x95, 0x6a, 0x23, 0x8e, 0x8d, 0xdd, 0xfb, 0xd3,
-            0x22, 0xcc, 0xe4, 0xf7, 0x4b, 0x0b, 0x5b, 0xd6, 0xac, 0xe4, 0xa7,
-        },
-};
+// clang-format off
+static const char tv2_m_xpub[] = "xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB";
 
-/* m/0: depth=1, parent_fp=bd16bee5, child=0
- *   chain_code: f0909affaa7ee7abe5dd4e100598d4dc53cd709d5a5c2cac40e7412f232f7c9c
- *   key:        02fc9e5af0ac8d9b3cecfe2a888e2117ba3d089d8585886c9c826b6b22a98d12ea
- */
-static const serialized_extended_pubkey_t tv2_m_0_expected = {
-    .version = {0x04, 0x88, 0xB2, 0x1E},
-    .depth = 0x01,
-    .parent_fingerprint = {0xbd, 0x16, 0xbe, 0xe5},
-    .child_number = {0x00, 0x00, 0x00, 0x00},
-    .chain_code =
-        {
-            0xf0, 0x90, 0x9a, 0xff, 0xaa, 0x7e, 0xe7, 0xab, 0xe5, 0xdd, 0x4e,
-            0x10, 0x05, 0x98, 0xd4, 0xdc, 0x53, 0xcd, 0x70, 0x9d, 0x5a, 0x5c,
-            0x2c, 0xac, 0x40, 0xe7, 0x41, 0x2f, 0x23, 0x2f, 0x7c, 0x9c,
-        },
-    .compressed_pubkey =
-        {
-            0x02, 0xfc, 0x9e, 0x5a, 0xf0, 0xac, 0x8d, 0x9b, 0x3c, 0xec, 0xfe,
-            0x2a, 0x88, 0x8e, 0x21, 0x17, 0xba, 0x3d, 0x08, 0x9d, 0x85, 0x85,
-            0x88, 0x6c, 0x9c, 0x82, 0x6b, 0x6b, 0x22, 0xa9, 0x8d, 0x12, 0xea,
-        },
-};
+static const char tv2_m_0_xpub[] = "xpub69H7F5d8KSRgmmdJg2KhpAK8SR3DjMwAdkxj3ZuxV27CprR9LgpeyGmXUbC6wb7ERfvrnKZjXoUmmDznezpbZb7ap6r1D3tgFxHmwMkQTPH";
+// clang-format on
 
 static void test_bip32_CKDpub_tv2_m_to_m0(void **state) {
     (void) state;
 
+    serialized_extended_pubkey_t parent = decode_xpub(tv2_m_xpub);
+    serialized_extended_pubkey_t expected = decode_xpub(tv2_m_0_xpub);
+
     serialized_extended_pubkey_t child = {0};
     uint8_t tweak[32];
 
-    int ret = bip32_CKDpub(&tv2_m, 0, &child, tweak);
+    int ret = bip32_CKDpub(&parent, 0, &child, tweak);
     assert_int_equal(ret, 0);
-
-    assert_memory_equal(child.version, tv2_m_0_expected.version, 4);
-    assert_int_equal(child.depth, tv2_m_0_expected.depth);
-    assert_memory_equal(child.parent_fingerprint, tv2_m_0_expected.parent_fingerprint, 4);
-    assert_memory_equal(child.child_number, tv2_m_0_expected.child_number, 4);
-    assert_memory_equal(child.chain_code, tv2_m_0_expected.chain_code, 32);
-    assert_memory_equal(child.compressed_pubkey, tv2_m_0_expected.compressed_pubkey, 33);
+    assert_memory_equal(&child, &expected, sizeof(child));
 }
 
 static void test_bip32_CKDpub_in_place(void **state) {
     (void) state;
 
     /* child == parent must be allowed per the docstring. */
-    serialized_extended_pubkey_t buf = tv2_m;
+    serialized_extended_pubkey_t buf = decode_xpub(tv2_m_xpub);
+    serialized_extended_pubkey_t expected = decode_xpub(tv2_m_0_xpub);
 
     int ret = bip32_CKDpub(&buf, 0, &buf, NULL);
     assert_int_equal(ret, 0);
-    assert_memory_equal(buf.chain_code, tv2_m_0_expected.chain_code, 32);
-    assert_memory_equal(buf.compressed_pubkey, tv2_m_0_expected.compressed_pubkey, 33);
+    assert_memory_equal(&buf, &expected, sizeof(buf));
 }
 
 static void test_bip32_CKDpub_rejects_hardened(void **state) {
     (void) state;
 
+    serialized_extended_pubkey_t parent = decode_xpub(tv2_m_xpub);
     serialized_extended_pubkey_t child = {0};
     /* 0x80000000 is the first hardened index. */
-    int ret = bip32_CKDpub(&tv2_m, 0x80000000u, &child, NULL);
+    int ret = bip32_CKDpub(&parent, 0x80000000u, &child, NULL);
     assert_int_equal(ret, -1);
 }
 
 static void test_bip32_CKDpub_rejects_max_depth(void **state) {
     (void) state;
 
-    serialized_extended_pubkey_t parent = tv2_m;
+    serialized_extended_pubkey_t parent = decode_xpub(tv2_m_xpub);
     parent.depth = 255;
     serialized_extended_pubkey_t child = {0};
 
@@ -319,12 +285,34 @@ static void test_crypto_get_checksum_hello(void **state) {
 /* ---------------------------------------------------------------- */
 /* crypto_get_compressed_pubkey_at_path                             */
 /*                                                                  */
-/* Expected values were precomputed from the BIP32 master seed used */
+/* Expected xpubs are precomputed from the BIP32 master seed used   */
 /* by speculos when no SPECULOS_SEED override is set (the speculos  */
 /* default test seed, mirrored in libs/speculos_bridge.c).          */
 /* ---------------------------------------------------------------- */
 
 #define BIP32_HARDENED 0x80000000u
+
+/* Decode the expected xpub and assert that the speculos-backed
+ * derivation produces the same compressed pubkey and chain code. */
+static void check_pubkey_at_path(const uint32_t *path,
+                                 size_t path_len,
+                                 const char *expected_xpub,
+                                 bool with_chain_code) {
+    serialized_extended_pubkey_t expected = decode_xpub(expected_xpub);
+
+    uint8_t pubkey[33];
+    uint8_t chain[32];
+    cx_err_t err = crypto_get_compressed_pubkey_at_path(path,
+                                                        path_len,
+                                                        pubkey,
+                                                        with_chain_code ? chain : NULL);
+
+    assert_int_equal(err, CX_OK);
+    assert_memory_equal(pubkey, expected.compressed_pubkey, 33);
+    if (with_chain_code) {
+        assert_memory_equal(chain, expected.chain_code, 32);
+    }
+}
 
 static void test_crypto_get_compressed_pubkey_at_path_master(void **state) {
     (void) state;
@@ -332,62 +320,30 @@ static void test_crypto_get_compressed_pubkey_at_path_master(void **state) {
      * with an exception regardless of length; this matches what real
      * app callers do. */
     static const uint32_t path[1] = {0};
-    static const uint8_t expected_pubkey[33] = {
-        0x02, 0x51, 0xec, 0x84, 0xe3, 0x3a, 0x31, 0x19, 0x48, 0x64, 0x61,
-        0xa4, 0x42, 0x40, 0xe9, 0x06, 0xff, 0x94, 0xbf, 0x40, 0xcf, 0x80,
-        0x7b, 0x02, 0x5b, 0x1c, 0xa4, 0x33, 0x32, 0xb8, 0x0d, 0xc9, 0xdb,
-    };
-    static const uint8_t expected_chain[32] = {
-        0xeb, 0x47, 0x3a, 0x0f, 0xa0, 0xaf, 0x50, 0x31, 0xf1, 0x4d, 0xb9,
-        0xfe, 0x7c, 0x37, 0xbb, 0x84, 0x16, 0xa4, 0xff, 0x01, 0xbb, 0x69,
-        0xda, 0xe9, 0x96, 0x6d, 0xc8, 0x3b, 0x5e, 0x5b, 0xf9, 0x21,
-    };
-    uint8_t pubkey[33];
-    uint8_t chain[32];
-
-    cx_err_t err = crypto_get_compressed_pubkey_at_path(path, 0, pubkey, chain);
-    assert_int_equal(err, CX_OK);
-    assert_memory_equal(pubkey, expected_pubkey, 33);
-    assert_memory_equal(chain, expected_chain, 32);
+    // clang-format off
+    static const char xpub[] = "xpub661MyMwAqRbcGtJ6aNMHg7WyD3FoeAUoeoQ2SnqsqjgPaeL8KML8nDLH2c6cFk1EhVDzaFSCDgtLSua2dW7k7Z8hYvbXDRgHmr32jBV1S12";
+    // clang-format on
+    check_pubkey_at_path(path, 0, xpub, true);
 }
 
 static void test_crypto_get_compressed_pubkey_at_path_unhardened(void **state) {
     (void) state;
     /* m/0 */
     static const uint32_t path[] = {0};
-    static const uint8_t expected_pubkey[33] = {
-        0x02, 0x6f, 0x76, 0x0e, 0x57, 0x38, 0x3e, 0x3b, 0x59, 0x00, 0xf7,
-        0xc2, 0x3b, 0x78, 0xa4, 0x24, 0xe7, 0x4b, 0xeb, 0xbe, 0x9b, 0x7b,
-        0x46, 0x31, 0x6d, 0xa7, 0xc0, 0xb4, 0xb9, 0xc2, 0xc9, 0x30, 0x1c,
-    };
-    static const uint8_t expected_chain[32] = {
-        0x7b, 0x45, 0xad, 0x96, 0xc9, 0x4b, 0x30, 0xc4, 0x29, 0x4c, 0x28,
-        0x04, 0x7f, 0xf3, 0x94, 0x6d, 0x28, 0x42, 0x04, 0x4d, 0xe1, 0x00,
-        0xd7, 0x0f, 0xc3, 0xa6, 0xad, 0x9c, 0x0e, 0xcc, 0x82, 0x42,
-    };
-    uint8_t pubkey[33];
-    uint8_t chain[32];
-
-    cx_err_t err = crypto_get_compressed_pubkey_at_path(path, 1, pubkey, chain);
-    assert_int_equal(err, CX_OK);
-    assert_memory_equal(pubkey, expected_pubkey, 33);
-    assert_memory_equal(chain, expected_chain, 32);
+    // clang-format off
+    static const char xpub[] = "xpub69hEPYcyraCnMhNKGGNy4tgCorxg8HhVkCfMHjf7N769AzVqu94hakMtZGuNANFda6qLfHNZ9mLQewRg9zbp2S9QRyyPkHSht1Ua8dKZzJQ";
+    // clang-format on
+    check_pubkey_at_path(path, 1, xpub, true);
 }
 
 static void test_crypto_get_compressed_pubkey_at_path_bip44_account(void **state) {
     (void) state;
     /* m/44'/0'/0' — BIP44 Bitcoin mainnet account 0 */
     static const uint32_t path[] = {BIP32_HARDENED | 44, BIP32_HARDENED | 0, BIP32_HARDENED | 0};
-    static const uint8_t expected_pubkey[33] = {
-        0x03, 0x85, 0xe8, 0xc0, 0xcf, 0x6e, 0xed, 0x65, 0x2d, 0xc1, 0x23,
-        0x85, 0x8b, 0xc1, 0x5a, 0xd3, 0x03, 0x83, 0xef, 0x08, 0x80, 0x66,
-        0x22, 0xcb, 0x2e, 0x06, 0x2d, 0x32, 0xad, 0xca, 0x36, 0x08, 0x56,
-    };
-    uint8_t pubkey[33];
-
-    cx_err_t err = crypto_get_compressed_pubkey_at_path(path, 3, pubkey, NULL);
-    assert_int_equal(err, CX_OK);
-    assert_memory_equal(pubkey, expected_pubkey, 33);
+    // clang-format off
+    static const char xpub[] = "xpub6Cak8u8nU1evR4eMoz5UX12bU9Ws5RjEgq2Kq1RKZrsEQF6Cvecoyr19ZYRikWoJo16SXeft5fhkzbXcmuPfCzQKKB9RDPWT8XnUM62ieB9";
+    // clang-format on
+    check_pubkey_at_path(path, 3, xpub, false);
 }
 
 static void test_crypto_get_compressed_pubkey_at_path_bip44_first_address(void **state) {
@@ -399,16 +355,10 @@ static void test_crypto_get_compressed_pubkey_at_path_bip44_first_address(void *
                                     BIP32_HARDENED | 0,
                                     0,
                                     0};
-    static const uint8_t expected_pubkey[33] = {
-        0x03, 0x42, 0x51, 0x35, 0x8d, 0xa2, 0x06, 0xb3, 0xd5, 0x49, 0xf5,
-        0xc5, 0x38, 0xa7, 0xbc, 0x46, 0x64, 0x27, 0xee, 0x81, 0x09, 0x9a,
-        0xa8, 0xb4, 0x0d, 0xd0, 0xf5, 0xd4, 0xbf, 0xac, 0x5f, 0x5f, 0x15,
-    };
-    uint8_t pubkey[33];
-
-    cx_err_t err = crypto_get_compressed_pubkey_at_path(path, 5, pubkey, NULL);
-    assert_int_equal(err, CX_OK);
-    assert_memory_equal(pubkey, expected_pubkey, 33);
+    // clang-format off
+    static const char xpub[] = "xpub6GnNWkuKTn5pBczcx8fvSS37i42kfZkoTZo9y7gZeEmv1JZYH1DLmmYL36oJDSnJwcPaGX1Y7ZW2gtR1VPkLG6ce6XizxeSq3iV6vyw6p7X";
+    // clang-format on
+    check_pubkey_at_path(path, 5, xpub, false);
 }
 
 int main(void) {
