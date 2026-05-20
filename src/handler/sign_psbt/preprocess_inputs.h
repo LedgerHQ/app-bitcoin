@@ -40,7 +40,7 @@ typedef struct {
  * to match the derivation to one of the internal key expressions.
  */
 void input_keys_callback(dispatcher_context_t *dc,
-                         input_keys_callback_data_t *callback_data,
+                         void *callback_data_ptr,
                          const merkleized_map_commitment_t *map_commitment,
                          int index,
                          buffer_t *data);

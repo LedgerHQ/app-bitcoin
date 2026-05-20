@@ -44,10 +44,11 @@
  * Keeps track if the current input has a witness_utxo and/or a redeemScript.
  */
 void input_keys_callback(dispatcher_context_t *dc,
-                         input_keys_callback_data_t *callback_data,
+                         void *callback_data_ptr,
                          const merkleized_map_commitment_t *map_commitment,
                          int index,
                          buffer_t *data) {
+    input_keys_callback_data_t *callback_data = (input_keys_callback_data_t *) callback_data_ptr;
     size_t data_len = data->size - data->offset;
     if (data_len >= 1) {
         uint8_t key_type;
@@ -119,14 +120,13 @@ preprocess_inputs(dispatcher_context_t *dc,
         memset(&input, 0, sizeof(input));
 
         input_keys_callback_data_t callback_data = {.input = &input, .state = st};
-        int res = call_get_merkleized_map_with_callback(
-            dc,
-            (void *) &callback_data,
-            st->inputs_root,
-            st->n_inputs,
-            cur_input_index,
-            (merkle_tree_elements_callback_t) input_keys_callback,
-            &input.in_out.map);
+        int res = call_get_merkleized_map_with_callback(dc,
+                                                        (void *) &callback_data,
+                                                        st->inputs_root,
+                                                        st->n_inputs,
+                                                        cur_input_index,
+                                                        input_keys_callback,
+                                                        &input.in_out.map);
         if (res < 0) {
             PRINTF("Failed to process input map\n");
             SEND_SW(dc, SW_INCORRECT_DATA);

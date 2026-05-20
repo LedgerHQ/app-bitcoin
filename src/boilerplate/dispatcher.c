@@ -51,11 +51,11 @@ static void finalize_response(uint16_t sw) {
     ioe_finalize_response(sw);
 }
 
-static void send_response() {
+static void send_response(void) {
     ioe_send_response();
 }
 
-static void set_ui_dirty() {
+static void set_ui_dirty(void) {
     // signals that the screen was changed while processing a command handler
     G_dispatcher_state.had_ux_flow = true;
 }

@@ -19,33 +19,33 @@ typedef struct {
     uint8_t c;
 } parse_ABC_state_t;
 
-static int parse_A(parse_ABC_state_t *state, buffer_t *buffers[2]) {
+static int parse_A(void *state_ptr, buffer_t *buffers[2]) {
+    parse_ABC_state_t *state = (parse_ABC_state_t *) state_ptr;
     return dbuffer_read_u32(buffers, &state->a, BE);
 }
 
-static int parse_B(parse_ABC_state_t *state, buffer_t *buffers[2]) {
+static int parse_B(void *state_ptr, buffer_t *buffers[2]) {
+    parse_ABC_state_t *state = (parse_ABC_state_t *) state_ptr;
     return dbuffer_read_bytes(buffers, state->b, 8);
 }
 
-static int parse_C(parse_ABC_state_t *state, buffer_t *buffers[2]) {
+static int parse_C(void *state_ptr, buffer_t *buffers[2]) {
+    parse_ABC_state_t *state = (parse_ABC_state_t *) state_ptr;
     return dbuffer_read_u8(buffers, &state->c);
 }
 
-const parsing_step_t parse_ABC_steps[] = {(parsing_step_t) parse_A,
-                                          (parsing_step_t) parse_B,
-                                          (parsing_step_t) parse_C};
+const parsing_step_t parse_ABC_steps[] = {parse_A, parse_B, parse_C};
 
 const int n_ABC_STEPS = sizeof(parse_ABC_steps) / sizeof(parse_ABC_steps[0]);
 
 // A function that simulates a parsing error while parsing B
-static int parse_B_error(parse_ABC_state_t *state, buffer_t *buffers[2]) {
+static int parse_B_error(void *state_ptr, buffer_t *buffers[2]) {
+    (void) state_ptr;
     return -1;
 }
 
 // A parser similar to parse_ABC, but always generates an error in the second parsing step
-const parsing_step_t parse_ABC_error_steps[] = {(parsing_step_t) parse_A,
-                                                (parsing_step_t) parse_B_error,
-                                                (parsing_step_t) parse_C};
+const parsing_step_t parse_ABC_error_steps[] = {parse_A, parse_B_error, parse_C};
 
 static void test_parser_init_context(void **state) {
     (void) state;

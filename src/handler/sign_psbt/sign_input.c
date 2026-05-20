@@ -572,14 +572,13 @@ bool __attribute__((noinline)) produce_musig2_pubnonces(
         memset(&input, 0, sizeof(input));
 
         input_keys_callback_data_t callback_data = {.input = &input, .state = st};
-        int res = call_get_merkleized_map_with_callback(
-            dc,
-            (void *) &callback_data,
-            st->inputs_root,
-            st->n_inputs,
-            i,
-            (merkle_tree_elements_callback_t) input_keys_callback,
-            &input.in_out.map);
+        int res = call_get_merkleized_map_with_callback(dc,
+                                                        (void *) &callback_data,
+                                                        st->inputs_root,
+                                                        st->n_inputs,
+                                                        i,
+                                                        input_keys_callback,
+                                                        &input.in_out.map);
         if (res < 0) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
@@ -664,14 +663,13 @@ sign_transaction(dispatcher_context_t *dc,
         memset(&input, 0, sizeof(input));
 
         input_keys_callback_data_t callback_data = {.input = &input, .state = st};
-        int res = call_get_merkleized_map_with_callback(
-            dc,
-            (void *) &callback_data,
-            st->inputs_root,
-            st->n_inputs,
-            i,
-            (merkle_tree_elements_callback_t) input_keys_callback,
-            &input.in_out.map);
+        int res = call_get_merkleized_map_with_callback(dc,
+                                                        (void *) &callback_data,
+                                                        st->inputs_root,
+                                                        st->n_inputs,
+                                                        i,
+                                                        input_keys_callback,
+                                                        &input.in_out.map);
         if (res < 0) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;

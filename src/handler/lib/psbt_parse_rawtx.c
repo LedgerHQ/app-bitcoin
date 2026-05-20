@@ -80,7 +80,8 @@ typedef struct psbt_parse_rawtx_state_s {
 /*   PARSER FOR A RAWTX INPUT */
 
 // parses the 32-bytes txid of an input in a rawtx
-static int parse_rawtxinput_txid(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtxinput_txid(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtxinput_state_t *state = (parse_rawtxinput_state_t *) state_ptr;
     uint8_t txid[32];
     bool result = dbuffer_read_bytes(buffers, txid, 32);
     if (result) {
@@ -91,7 +92,8 @@ static int parse_rawtxinput_txid(parse_rawtxinput_state_t *state, buffer_t *buff
 
 // parses the 4-bytes vout of an input in a rawtx
 // TODO: shares logic with the previous method; try to factor out the shared code
-static int parse_rawtxinput_vout(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtxinput_vout(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtxinput_state_t *state = (parse_rawtxinput_state_t *) state_ptr;
     uint8_t vout_bytes[4];
     bool result = dbuffer_read_bytes(buffers, vout_bytes, 4);
     if (result) {
@@ -100,7 +102,8 @@ static int parse_rawtxinput_vout(parse_rawtxinput_state_t *state, buffer_t *buff
     return result;
 }
 
-static int parse_rawtxinput_scriptsig_size(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtxinput_scriptsig_size(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtxinput_state_t *state = (parse_rawtxinput_state_t *) state_ptr;
     uint64_t scriptsig_size;
     bool result = dbuffer_read_varint(buffers, &scriptsig_size);
 
@@ -113,7 +116,8 @@ static int parse_rawtxinput_scriptsig_size(parse_rawtxinput_state_t *state, buff
 }
 
 // Does not read any bytes; only initializing the state before the next step
-static int parse_rawtxinput_scriptsig_init(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtxinput_scriptsig_init(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtxinput_state_t *state = (parse_rawtxinput_state_t *) state_ptr;
     (void) buffers;
 
     state->scriptsig_counter = 0;
@@ -121,7 +125,8 @@ static int parse_rawtxinput_scriptsig_init(parse_rawtxinput_state_t *state, buff
     return 1;
 }
 
-static int parse_rawtxinput_scriptsig(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtxinput_scriptsig(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtxinput_state_t *state = (parse_rawtxinput_state_t *) state_ptr;
     uint8_t data[32];
 
     while (true) {
@@ -133,7 +138,7 @@ static int parse_rawtxinput_scriptsig(parse_rawtxinput_state_t *state, buffer_t 
 
         bool read_result = dbuffer_read_bytes(buffers, data, data_len);
         if (!read_result) {
-            return 0;  // could not read enough data
+            return 0;
         }
 
         crypto_hash_update(&state->parent_state->hash_context->header, data, data_len);
@@ -141,12 +146,13 @@ static int parse_rawtxinput_scriptsig(parse_rawtxinput_state_t *state, buffer_t 
         state->scriptsig_counter += data_len;
 
         if (state->scriptsig_counter == state->scriptsig_size) {
-            return 1;  // done
+            return 1;
         }
     }
 }
 
-static int parse_rawtxinput_sequence(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtxinput_sequence(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtxinput_state_t *state = (parse_rawtxinput_state_t *) state_ptr;
     uint8_t sequence_bytes[4];
 
     bool result = dbuffer_read_bytes(buffers, sequence_bytes, 4);
@@ -157,12 +163,12 @@ static int parse_rawtxinput_sequence(parse_rawtxinput_state_t *state, buffer_t *
 }
 
 static const parsing_step_t parse_rawtxinput_steps[] = {
-    (parsing_step_t) parse_rawtxinput_txid,
-    (parsing_step_t) parse_rawtxinput_vout,
-    (parsing_step_t) parse_rawtxinput_scriptsig_size,
-    (parsing_step_t) parse_rawtxinput_scriptsig_init,
-    (parsing_step_t) parse_rawtxinput_scriptsig,
-    (parsing_step_t) parse_rawtxinput_sequence,
+    parse_rawtxinput_txid,
+    parse_rawtxinput_vout,
+    parse_rawtxinput_scriptsig_size,
+    parse_rawtxinput_scriptsig_init,
+    parse_rawtxinput_scriptsig,
+    parse_rawtxinput_sequence,
 };
 
 const int n_parse_rawtxinput_steps =
@@ -170,7 +176,8 @@ const int n_parse_rawtxinput_steps =
 
 /*   PARSER FOR A RAWTX OUTPUT */
 
-static int parse_rawtxoutput_value(parse_rawtxoutput_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtxoutput_value(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtxoutput_state_t *state = (parse_rawtxoutput_state_t *) state_ptr;
     uint8_t value_bytes[8];
     bool result = dbuffer_read_bytes(buffers, value_bytes, 8);
     if (result) {
@@ -188,8 +195,8 @@ static int parse_rawtxoutput_value(parse_rawtxoutput_state_t *state, buffer_t *b
     return result;
 }
 
-static int parse_rawtxoutput_scriptpubkey_size(parse_rawtxoutput_state_t *state,
-                                               buffer_t *buffers[2]) {
+static int parse_rawtxoutput_scriptpubkey_size(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtxoutput_state_t *state = (parse_rawtxoutput_state_t *) state_ptr;
     uint64_t scriptpubkey_size;
     bool result = dbuffer_read_varint(buffers, &scriptpubkey_size);
     if (result) {
@@ -209,15 +216,16 @@ static int parse_rawtxoutput_scriptpubkey_size(parse_rawtxoutput_state_t *state,
 }
 
 // Does not read any bytes; only initializing the state before the next step
-static int parse_rawtxoutput_scriptpubkey_init(parse_rawtxoutput_state_t *state,
-                                               buffer_t *buffers[2]) {
+static int parse_rawtxoutput_scriptpubkey_init(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtxoutput_state_t *state = (parse_rawtxoutput_state_t *) state_ptr;
     (void) buffers;
 
     state->scriptpubkey_counter = 0;
     return 1;
 }
 
-static int parse_rawtxoutput_scriptpubkey(parse_rawtxoutput_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtxoutput_scriptpubkey(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtxoutput_state_t *state = (parse_rawtxoutput_state_t *) state_ptr;
     uint8_t data[32];
 
     while (true) {
@@ -229,7 +237,7 @@ static int parse_rawtxoutput_scriptpubkey(parse_rawtxoutput_state_t *state, buff
 
         bool read_result = dbuffer_read_bytes(buffers, data, data_len);
         if (!read_result) {
-            return 0;  // could not read enough data
+            return 0;
         }
 
         crypto_hash_update(&state->parent_state->hash_context->header, data, data_len);
@@ -240,13 +248,11 @@ static int parse_rawtxoutput_scriptpubkey(parse_rawtxoutput_state_t *state, buff
                 unsigned int scriptpubkey_len =
                     state->parent_state->parser_outputs->vout_scriptpubkey_len;
                 if (scriptpubkey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
-                    return -1;  // not expecting any scriptPubkey larger than
-                                // MAX_PREVOUT_SCRIPTPUBKEY_LEN
+                    return -1;
                 }
 
                 if (state->scriptpubkey_counter + data_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
-                    return -1;  // exceeding MAX_PREVOUT_SCRIPTPUBKEY_LEN with scriptpubkey_counter
-                                // offset
+                    return -1;
                 }
 
                 memcpy(state->parent_state->parser_outputs->vout_scriptpubkey +
@@ -259,16 +265,16 @@ static int parse_rawtxoutput_scriptpubkey(parse_rawtxoutput_state_t *state, buff
         state->scriptpubkey_counter += data_len;
 
         if (state->scriptpubkey_counter == state->scriptpubkey_size) {
-            return 1;  // done
+            return 1;
         }
     }
 }
 
 static const parsing_step_t parse_rawtxoutput_steps[] = {
-    (parsing_step_t) parse_rawtxoutput_value,
-    (parsing_step_t) parse_rawtxoutput_scriptpubkey_size,
-    (parsing_step_t) parse_rawtxoutput_scriptpubkey_init,
-    (parsing_step_t) parse_rawtxoutput_scriptpubkey,
+    parse_rawtxoutput_value,
+    parse_rawtxoutput_scriptpubkey_size,
+    parse_rawtxoutput_scriptpubkey_init,
+    parse_rawtxoutput_scriptpubkey,
 };
 
 const int n_parse_rawtxoutput_steps =
@@ -276,7 +282,8 @@ const int n_parse_rawtxoutput_steps =
 
 /*   PARSER FOR A FULL RAWTX */
 
-static int parse_rawtx_version(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtx_version(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtx_state_t *state = (parse_rawtx_state_t *) state_ptr;
     uint8_t version_bytes[4];
 
     bool result = dbuffer_read_bytes(buffers, version_bytes, 4);
@@ -291,7 +298,8 @@ static int parse_rawtx_version(parse_rawtx_state_t *state, buffer_t *buffers[2])
 // serialization. The marker and flag are read from the buffers. Does not read any bytes from the
 // buffers if the transaction is in the legacy serialization format. The marker and flag (if
 // present) are not added to the hash computation.
-static int parse_rawtx_check_segwit(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtx_check_segwit(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtx_state_t *state = (parse_rawtx_state_t *) state_ptr;
     if (!dbuffer_can_read(buffers, 1)) {
         return 0;
     }
@@ -322,7 +330,8 @@ static int parse_rawtx_check_segwit(parse_rawtx_state_t *state, buffer_t *buffer
     }
 }
 
-static int parse_rawtx_input_count(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtx_input_count(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtx_state_t *state = (parse_rawtx_state_t *) state_ptr;
     uint64_t n_inputs;
     bool result = dbuffer_read_varint(buffers, &n_inputs);
     if (result) {
@@ -333,7 +342,8 @@ static int parse_rawtx_input_count(parse_rawtx_state_t *state, buffer_t *buffers
     return result;
 }
 
-static int parse_rawtx_inputs_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtx_inputs_init(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtx_state_t *state = (parse_rawtx_state_t *) state_ptr;
     (void) buffers;
 
     state->in_counter = 0;
@@ -344,7 +354,8 @@ static int parse_rawtx_inputs_init(parse_rawtx_state_t *state, buffer_t *buffers
     return 1;
 }
 
-static int parse_rawtx_inputs(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtx_inputs(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtx_state_t *state = (parse_rawtx_state_t *) state_ptr;
     while (state->in_counter < state->n_inputs) {
         while (true) {
             int result = parser_run(parse_rawtxinput_steps,
@@ -365,7 +376,8 @@ static int parse_rawtx_inputs(parse_rawtx_state_t *state, buffer_t *buffers[2]) 
     return 1;
 }
 
-static int parse_rawtx_output_count(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtx_output_count(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtx_state_t *state = (parse_rawtx_state_t *) state_ptr;
     uint64_t n_outputs;
     bool result = dbuffer_read_varint(buffers, &n_outputs);
     if (result) {
@@ -376,7 +388,8 @@ static int parse_rawtx_output_count(parse_rawtx_state_t *state, buffer_t *buffer
     return result;
 }
 
-static int parse_rawtx_outputs_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtx_outputs_init(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtx_state_t *state = (parse_rawtx_state_t *) state_ptr;
     (void) buffers;
 
     state->out_counter = 0;
@@ -386,7 +399,8 @@ static int parse_rawtx_outputs_init(parse_rawtx_state_t *state, buffer_t *buffer
     return 1;
 }
 
-static int parse_rawtx_outputs(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtx_outputs(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtx_state_t *state = (parse_rawtx_state_t *) state_ptr;
     while (state->out_counter < state->n_outputs) {
         while (true) {
             int result = parser_run(parse_rawtxoutput_steps,
@@ -407,7 +421,8 @@ static int parse_rawtx_outputs(parse_rawtx_state_t *state, buffer_t *buffers[2])
     return 1;
 }
 
-static int parse_rawtx_witnesses_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtx_witnesses_init(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtx_state_t *state = (parse_rawtx_state_t *) state_ptr;
     (void) buffers;
 
     // only relevant for segwit txs
@@ -418,7 +433,8 @@ static int parse_rawtx_witnesses_init(parse_rawtx_state_t *state, buffer_t *buff
 
 // Parses the witness data; currently, no use is made of that data.
 
-static int parse_rawtx_witnesses(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtx_witnesses(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtx_state_t *state = (parse_rawtx_state_t *) state_ptr;
     if (!state->is_segwit) {
         return 1;  // no witnesses to parse
     }
@@ -477,7 +493,8 @@ static int parse_rawtx_witnesses(parse_rawtx_state_t *state, buffer_t *buffers[2
     return 1;
 }
 
-static int parse_rawtx_locktime(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+static int parse_rawtx_locktime(void *state_ptr, buffer_t *buffers[2]) {
+    parse_rawtx_state_t *state = (parse_rawtx_state_t *) state_ptr;
     uint8_t locktime_bytes[4];
     bool result = dbuffer_read_bytes(buffers, locktime_bytes, 4);
     if (result) {
@@ -486,17 +503,17 @@ static int parse_rawtx_locktime(parse_rawtx_state_t *state, buffer_t *buffers[2]
     return result;
 }
 
-static const parsing_step_t parse_rawtx_steps[] = {(parsing_step_t) parse_rawtx_version,
-                                                   (parsing_step_t) parse_rawtx_check_segwit,
-                                                   (parsing_step_t) parse_rawtx_input_count,
-                                                   (parsing_step_t) parse_rawtx_inputs_init,
-                                                   (parsing_step_t) parse_rawtx_inputs,
-                                                   (parsing_step_t) parse_rawtx_output_count,
-                                                   (parsing_step_t) parse_rawtx_outputs_init,
-                                                   (parsing_step_t) parse_rawtx_outputs,
-                                                   (parsing_step_t) parse_rawtx_witnesses_init,
-                                                   (parsing_step_t) parse_rawtx_witnesses,
-                                                   (parsing_step_t) parse_rawtx_locktime};
+static const parsing_step_t parse_rawtx_steps[] = {parse_rawtx_version,
+                                                   parse_rawtx_check_segwit,
+                                                   parse_rawtx_input_count,
+                                                   parse_rawtx_inputs_init,
+                                                   parse_rawtx_inputs,
+                                                   parse_rawtx_output_count,
+                                                   parse_rawtx_outputs_init,
+                                                   parse_rawtx_outputs,
+                                                   parse_rawtx_witnesses_init,
+                                                   parse_rawtx_witnesses,
+                                                   parse_rawtx_locktime};
 
 const int n_parse_rawtx_steps = sizeof(parse_rawtx_steps) / sizeof(parse_rawtx_steps[0]);
 

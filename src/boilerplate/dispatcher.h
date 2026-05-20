@@ -19,7 +19,7 @@ typedef void (*command_handler_t)(dispatcher_context_t *, uint8_t p2);
 struct dispatcher_context_s {
     buffer_t read_buffer;
 
-    void (*set_ui_dirty)();
+    void (*set_ui_dirty)(void);
     void (*add_to_response)(const void *rdata, size_t rdata_len);
     void (*finalize_response)(uint16_t sw);
     void (*send_response)(void);

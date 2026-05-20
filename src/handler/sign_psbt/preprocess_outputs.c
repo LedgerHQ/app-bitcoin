@@ -40,10 +40,11 @@
  * Callback to process all the keys of the current output map.
  */
 static void output_keys_callback(dispatcher_context_t *dc,
-                                 output_keys_callback_data_t *callback_data,
+                                 void *callback_data_ptr,
                                  const merkleized_map_commitment_t *map_commitment,
                                  int index,
                                  buffer_t *data) {
+    output_keys_callback_data_t *callback_data = (output_keys_callback_data_t *) callback_data_ptr;
     size_t data_len = data->size - data->offset;
     if (data_len >= 1) {
         uint8_t key_type;
@@ -111,14 +112,13 @@ preprocess_outputs(dispatcher_context_t *dc,
         memset(&output, 0, sizeof(output));
 
         output_keys_callback_data_t callback_data = {.output = &output, .state = st};
-        int res = call_get_merkleized_map_with_callback(
-            dc,
-            (void *) &callback_data,
-            st->outputs_root,
-            st->n_outputs,
-            cur_output_index,
-            (merkle_tree_elements_callback_t) output_keys_callback,
-            &output.in_out.map);
+        int res = call_get_merkleized_map_with_callback(dc,
+                                                        (void *) &callback_data,
+                                                        st->outputs_root,
+                                                        st->n_outputs,
+                                                        cur_output_index,
+                                                        output_keys_callback,
+                                                        &output.in_out.map);
 
         if (res < 0) {
             SEND_SW(dc, SW_INCORRECT_DATA);
