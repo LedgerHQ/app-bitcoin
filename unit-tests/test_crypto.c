@@ -516,6 +516,76 @@ static void test_base58_encode_address_four_byte_version(void **state) {
     assert_memory_equal(out, expected, sizeof(expected) - 1);
 }
 
+/* ---------------------------------------------------------------- */
+/* crypto_ecdsa_sign_sha256_hash_with_key                           */
+/*                                                                  */
+/* Signs SHA256("hello") with the private key derived at            */
+/* m/44'/0'/0'/0/0 against the speculos default seed. ECDSA over    */
+/* secp256k1 with RFC6979 is deterministic, so the expected DER     */
+/* signature is precomputed and asserted byte-for-byte.             */
+/* ---------------------------------------------------------------- */
+
+static void test_crypto_ecdsa_sign_sha256_hash_with_key_known_vector(void **state) {
+    (void) state;
+    /* SHA256("hello"). */
+    static const uint8_t hash[32] = {
+        0x2c, 0xf2, 0x4d, 0xba, 0x5f, 0xb0, 0xa3, 0x0e, 0x26, 0xe8,
+        0x3b, 0x2a, 0xc5, 0xb9, 0xe2, 0x9e, 0x1b, 0x16, 0x1e, 0x5c,
+        0x1f, 0xa7, 0x42, 0x5e, 0x73, 0x04, 0x33, 0x62, 0x93, 0x8b,
+        0x98, 0x24,
+    };
+    static const uint32_t path[] = {
+        BIP32_HARDENED | 44, BIP32_HARDENED | 0, BIP32_HARDENED | 0, 0, 0};
+
+    /* Expected DER signature: the deterministic RFC6979 output the
+     * device produces for (privkey @ m/44'/0'/0'/0/0, SHA256("hello")).
+     * Captured directly from speculos and pinned here to catch any
+     * future regression in the sign code path. */
+    static const uint8_t expected_sig[] = {
+        0x30, 0x45, 0x02, 0x21, 0x00, 0xc4, 0x44, 0xd1, 0xf2, 0x19, 0x1c, 0xa8,
+        0x71, 0x39, 0xf7, 0x8f, 0x4f, 0x24, 0x1e, 0x42, 0x75, 0x96, 0xd0, 0x03,
+        0x17, 0xd1, 0x2a, 0x49, 0xf7, 0xcb, 0x38, 0xb1, 0xd6, 0x13, 0xcd, 0x65,
+        0x67, 0x02, 0x20, 0x1c, 0x51, 0x5c, 0x5e, 0x78, 0x84, 0x67, 0x31, 0x93,
+        0x18, 0xaa, 0x33, 0xe0, 0x2c, 0x0d, 0x97, 0x4e, 0x33, 0x06, 0x47, 0x10,
+        0x55, 0xc8, 0xbc, 0x56, 0xc4, 0x0a, 0x00, 0x03, 0x4b, 0x0a, 0x8c,
+    };
+    /* The compressed pubkey at the same path (also tested separately by
+     * test_crypto_get_compressed_pubkey_at_path_bip44_first_address). */
+    static const uint8_t expected_pubkey[33] = {
+        0x03, 0x42, 0x51, 0x35, 0x8d, 0xa2, 0x06, 0xb3, 0xd5, 0x49, 0xf5,
+        0xc5, 0x38, 0xa7, 0xbc, 0x46, 0x64, 0x27, 0xee, 0x81, 0x09, 0x9a,
+        0xa8, 0xb4, 0x0d, 0xd0, 0xf5, 0xd4, 0xbf, 0xac, 0x5f, 0x5f, 0x15,
+    };
+
+    uint8_t sig[MAX_DER_SIG_LEN];
+    uint8_t pubkey[33];
+    uint32_t info = 0;
+
+    int sig_len = crypto_ecdsa_sign_sha256_hash_with_key(
+        path, sizeof(path) / sizeof(*path), hash, pubkey, sig, &info);
+    assert_int_equal(sig_len, (int) sizeof(expected_sig));
+    assert_memory_equal(sig, expected_sig, sizeof(expected_sig));
+    assert_memory_equal(pubkey, expected_pubkey, 33);
+}
+
+static void test_crypto_ecdsa_sign_sha256_hash_with_key_no_optional_outputs(
+    void **state) {
+    (void) state;
+    /* pubkey and info are documented as optional. */
+    static const uint8_t hash[32] = {0};
+    static const uint32_t path[] = {BIP32_HARDENED | 44,
+                                    BIP32_HARDENED | 0,
+                                    BIP32_HARDENED | 0,
+                                    0,
+                                    0};
+
+    uint8_t sig[MAX_DER_SIG_LEN];
+    int sig_len = crypto_ecdsa_sign_sha256_hash_with_key(
+        path, sizeof(path) / sizeof(*path), hash, NULL, sig, NULL);
+    assert_true(sig_len > 0);
+    assert_true(sig_len <= MAX_DER_SIG_LEN);
+}
+
 int main(void) {
     speculos_bridge_init();
     const struct CMUnitTest tests[] = {
@@ -550,6 +620,8 @@ int main(void) {
         cmocka_unit_test(test_base58_encode_address_p2pkh_testnet),
         cmocka_unit_test(test_base58_encode_address_two_byte_version),
         cmocka_unit_test(test_base58_encode_address_four_byte_version),
+        cmocka_unit_test(test_crypto_ecdsa_sign_sha256_hash_with_key_known_vector),
+        cmocka_unit_test(test_crypto_ecdsa_sign_sha256_hash_with_key_no_optional_outputs),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
