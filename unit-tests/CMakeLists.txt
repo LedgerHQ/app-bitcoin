@@ -109,6 +109,7 @@ add_library(sha256 SHARED libs/sha-256.c)
 add_library(cx_hash_mock SHARED libs/cx_hash_mock.c)
 add_library(mock_dispatcher SHARED libs/mock_dispatcher.c)
 add_library(psbt_parse SHARED libs/psbt_parse.c)
+add_library(xpub SHARED libs/xpub.c)
 
 # App's libraries
 add_library(base58 SHARED $ENV{BOLOS_SDK}/lib_standard_app/base58.c)
@@ -170,6 +171,7 @@ target_include_directories(test_get_merkleized_map_value PRIVATE ../src/handler 
 target_link_libraries(crypto_mocks PUBLIC sha256)
 target_link_libraries(cx_hash_mock PUBLIC sha256)
 target_link_libraries(mock_dispatcher PUBLIC psbt_parse)
+target_link_libraries(xpub PUBLIC base58 sha256)
 
 # App's libraries
 target_link_libraries(test_bitvector PUBLIC cmocka gcov)
@@ -317,6 +319,7 @@ if(SPECULOS AND SPECULOS_SRC)
     app_crypto
     base58 read write
     speculos_bridge
+    xpub
   )
   add_test(test_crypto test_crypto)
 endif()
