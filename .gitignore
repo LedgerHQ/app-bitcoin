@@ -17,6 +17,15 @@ tests/.test_bitcoin
 
 # Fuzzing
 fuzzing/build/
+.fuzz-artifacts/
+# Per-build Absolution invariant snapshot — see ledger-secure-sdk
+# fuzzing/docs/APP_CONTRACT.md ("fuzz_globals.zon is a machine-local artefact").
+fuzzing/invariants/fuzz_globals.zon
+
+# Build artefacts
+compile_commands.json
+*.profraw
+*.profdata
 
 # Editors
 .idea/
