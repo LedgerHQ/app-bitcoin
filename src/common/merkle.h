@@ -61,7 +61,7 @@ void merkle_combine_hashes(const uint8_t left[static 32],
 static inline uint8_t ceil_lg(uint32_t n) {
     uint8_t r = 0;
     uint32_t t = 1;
-    while (t < n) {
+    while (t < n && r < 32) {
         t = 2 * t;
         ++r;
     }
