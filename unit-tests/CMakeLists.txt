@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.14)  # FetchContent_MakeAvailable
 
-if(${CMAKE_VERSION} VERSION_LESS 3.10)
+if(${CMAKE_VERSION} VERSION_LESS 3.14)
   cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
 endif()
 
@@ -36,6 +36,42 @@ if(NOT DEFINED ENV{BOLOS_SDK})
     message(FATAL_ERROR "BOLOS_SDK is not defined.")
 endif()
 
+# Speculos is used by the speculos-backed crypto tests as the pure-C
+# implementation of the BOLOS syscalls, so we can link the real
+# application crypto code against it instead of writing per-syscall mocks.
+#
+# By default the source tree is fetched from upstream at configure time,
+# pinned to a known-good tag. To override (e.g. for offline builds or to
+# test against a local speculos checkout), pass -DSPECULOS_SRC=<path>
+# or set the SPECULOS_SRC environment variable.
+#
+# To skip the speculos-backed targets entirely, pass -DSPECULOS=OFF.
+option(SPECULOS "Build the speculos-backed crypto tests" ON)
+set(SPECULOS_GIT_TAG "v0.25.13" CACHE STRING
+    "Tag/branch/commit of speculos to fetch when SPECULOS_SRC is not set.")
+
+if(SPECULOS)
+  if(NOT DEFINED SPECULOS_SRC AND DEFINED ENV{SPECULOS_SRC})
+    set(SPECULOS_SRC $ENV{SPECULOS_SRC})
+  endif()
+  if(NOT SPECULOS_SRC)
+    include(FetchContent)
+    FetchContent_Declare(speculos
+      GIT_REPOSITORY https://github.com/LedgerHQ/speculos.git
+      GIT_TAG        ${SPECULOS_GIT_TAG}
+      GIT_SHALLOW    TRUE
+    )
+    # Populate without running speculos's own CMakeLists.txt — that one
+    # is configured for an ARM cross-compile and is not relevant here.
+    # We only want the source tree.
+    FetchContent_GetProperties(speculos)
+    if(NOT speculos_POPULATED)
+      FetchContent_Populate(speculos)
+    endif()
+    set(SPECULOS_SRC "${speculos_SOURCE_DIR}")
+  endif()
+endif()
+
 add_compile_definitions(TEST DEBUG=0 SKIP_FOR_CMOCKA PRINTF=printf COIN_NATIVE_SEGWIT_PREFIX=\"tb\")
 
 include_directories(../src)
@@ -66,8 +102,6 @@ add_executable(test_stream_merkle_leaf_element test_stream_merkle_leaf_element.c
 add_executable(test_stream_merkleized_map_value test_stream_merkleized_map_value.c)
 add_executable(test_get_merkleized_map test_get_merkleized_map.c)
 add_executable(test_get_merkleized_map_value test_get_merkleized_map_value.c)
-
-# add_executable(test_crypto test_crypto.c)
 
 # Mock libraries
 add_library(crypto_mocks SHARED libs/crypto_mocks.c)
@@ -179,4 +213,105 @@ add_test(test_stream_merkleized_map_value test_stream_merkleized_map_value)
 add_test(test_get_merkleized_map test_get_merkleized_map)
 add_test(test_get_merkleized_map_value test_get_merkleized_map_value)
 
-# add_test(test_crypto test_crypto)
+# ---------------------------------------------------------------------------
+# Speculos-backed crypto tests
+# ---------------------------------------------------------------------------
+# test_crypto exercises the real app crypto code (src/crypto.c) by
+# linking against the C implementation of the BOLOS syscalls provided by
+# speculos. Enabled by default (see the SPECULOS option above). Requires
+# OpenSSL development headers on the host (libssl-dev on Debian/Ubuntu).
+
+if(SPECULOS AND SPECULOS_SRC)
+  find_package(OpenSSL REQUIRED)
+
+  message(STATUS "Building speculos-backed crypto tests from ${SPECULOS_SRC}")
+
+  set(SPECULOS_BOLOS_SOURCES
+    ${SPECULOS_SRC}/src/bolos/cx_bn.c
+    ${SPECULOS_SRC}/src/bolos/cx_blake2b.c
+    ${SPECULOS_SRC}/src/bolos/cx_curve25519.c
+    ${SPECULOS_SRC}/src/bolos/cx_ec.c
+    ${SPECULOS_SRC}/src/bolos/cx_ec_domain.c
+    ${SPECULOS_SRC}/src/bolos/cx_ecpoint.c
+    ${SPECULOS_SRC}/src/bolos/cx_ed25519.c
+    ${SPECULOS_SRC}/src/bolos/cx_hash.c
+    ${SPECULOS_SRC}/src/bolos/cx_hmac.c
+    ${SPECULOS_SRC}/src/bolos/cx_math.c
+    ${SPECULOS_SRC}/src/bolos/cx_montgomery.c
+    ${SPECULOS_SRC}/src/bolos/cx_mpi.c
+    ${SPECULOS_SRC}/src/bolos/cx_ripemd160.c
+    ${SPECULOS_SRC}/src/bolos/cx_rng_rfc6979.c
+    ${SPECULOS_SRC}/src/bolos/cx_scc.c
+    ${SPECULOS_SRC}/src/bolos/cx_sha256.c
+    ${SPECULOS_SRC}/src/bolos/cx_sha3.c
+    ${SPECULOS_SRC}/src/bolos/cx_sha512.c
+    ${SPECULOS_SRC}/src/bolos/cx_twisted_edwards.c
+    ${SPECULOS_SRC}/src/bolos/cx_utils.c
+    ${SPECULOS_SRC}/src/bolos/cx_weierstrass.c
+    ${SPECULOS_SRC}/src/bolos/cxlib.c
+  )
+
+  add_library(speculos_bolos STATIC ${SPECULOS_BOLOS_SOURCES})
+  target_compile_options(speculos_bolos PRIVATE
+    -w  # speculos sources emit warnings that are not our concern
+  )
+  target_compile_definitions(speculos_bolos PRIVATE
+    OS_LITTLE_ENDIAN NATIVE_64BITS HAVE_BOLOS=1
+  )
+  target_include_directories(speculos_bolos PRIVATE
+    ${SPECULOS_SRC}/sdk
+    ${SPECULOS_SRC}/src
+    ${SPECULOS_SRC}/src/bolos
+    ${SPECULOS_SRC}/src/bolos/io/sdk/include
+  )
+  target_link_libraries(speculos_bolos PUBLIC OpenSSL::Crypto)
+
+  add_library(speculos_bridge STATIC libs/speculos_bridge.c)
+  target_include_directories(speculos_bridge PRIVATE
+    ${SPECULOS_SRC}/sdk
+    ${SPECULOS_SRC}/src
+    ${SPECULOS_SRC}/src/bolos
+  )
+  target_link_libraries(speculos_bridge PUBLIC speculos_bolos OpenSSL::Crypto)
+
+  # Build the application's crypto.c against the real SDK headers
+  # (not the per-test mock_includes) so it sees the same syscall
+  # signatures the speculos bridge implements.
+  add_library(app_crypto STATIC
+    ../src/crypto.c
+    ../src/secp256k1.c
+  )
+  target_compile_options(app_crypto PRIVATE -fno-stack-protector)
+  target_compile_definitions(app_crypto PRIVATE
+    HAVE_HASH HAVE_RIPEMD160 HAVE_SHA256 HAVE_SHA512 HAVE_HMAC HAVE_MATH
+    HAVE_ECC HAVE_ECC_WEIERSTRASS HAVE_SECP256K1_CURVE HAVE_ECDSA
+    API_LEVEL=22 OS_IO_SEPH_BUFFER_SIZE=272 IO_USB_MAX_ENDPOINTS=6
+  )
+  # BEFORE: SDK headers take precedence over the mock_includes added at
+  # global scope above. The whole point of this target is to compile
+  # crypto.c against the REAL SDK declarations.
+  target_include_directories(app_crypto BEFORE PRIVATE
+    ../src
+    ../src/debug-helpers
+    ../src/boilerplate
+    $ENV{BOLOS_SDK}/target/nanox/include
+    $ENV{BOLOS_SDK}/include
+    $ENV{BOLOS_SDK}/io/include
+    $ENV{BOLOS_SDK}/io_legacy/include
+    $ENV{BOLOS_SDK}/protocol/include
+    $ENV{BOLOS_SDK}/lib_standard_app
+    $ENV{BOLOS_SDK}/lib_cxng/include
+    $ENV{BOLOS_SDK}/lib_cxng/src
+    $ENV{BOLOS_SDK}/lib_stusb/include
+  )
+
+  add_executable(test_crypto test_crypto.c)
+  target_include_directories(test_crypto PRIVATE libs)
+  target_link_libraries(test_crypto PRIVATE
+    cmocka gcov
+    app_crypto
+    base58 read write
+    speculos_bridge
+  )
+  add_test(test_crypto test_crypto)
+endif()
