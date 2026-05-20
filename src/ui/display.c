@@ -64,6 +64,17 @@ void decrease_streaming_index(void) {
 
 // Process UI events until the current flow terminates; does not handle any APDU exchange
 // Returns true/false depending if the user accepted in the corresponding UX flow.
+//
+// Under HAVE_AUTOAPPROVE_FOR_PERF_TESTS (the fuzzing/perf build) the NBGL
+// layer is mocked: choice callbacks fire synchronously inside the
+// ui_*_flow() call that runs right before io_ui_process().  By the time
+// we get here `g_ux_flow_response` already holds the decision, so we skip
+// the hardware SPI wait-loop entirely — previously every ui_* caller in
+// this file had its own `#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS return
+// true;` short-circuit; collapsing the decision into this single spot
+// keeps the public UI entry points honest (flow setup still runs, so
+// state mutations for snapshots/streaming remain intact) while removing
+// 13 app-source conditional returns.
 static bool io_ui_process(dispatcher_context_t *context) {
     UNUSED(context);
     G_was_processing_screen_shown = false;
@@ -72,6 +83,15 @@ static bool io_ui_process(dispatcher_context_t *context) {
     // This is now UI/NBGL that is responsible to return to Home screen
     G_dispatcher_context.set_ui_dirty();
 
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    // Fuzzing auto-approve. The ui_*_flow() call still runs so the
+    // rendering path is exercised, but the harness always accepts to keep
+    // the signing and streaming paths reachable. Skip the hardware SPI
+    // loop either way (it would deadlock: g_ux_flow_ended is reset here
+    // and the heartbeat mock never refires it).
+    ioe_start_processing_timeout();
+    return true;
+#else
     g_ux_flow_ended = false;
 
     // We are not waiting for the client's input, nor we are doing computations on the device
@@ -85,15 +105,12 @@ static bool io_ui_process(dispatcher_context_t *context) {
     ioe_start_processing_timeout();
 
     return g_ux_flow_response;
+#endif  // HAVE_AUTOAPPROVE_FOR_PERF_TESTS
 }
 
 bool ui_display_pubkey(dispatcher_context_t *context,
                        const char *bip32_path_str,
                        const char *pubkey) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
     ui_path_and_pubkey_state_t *state = (ui_path_and_pubkey_state_t *) &g_ui_state;
 
     strncpy(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
@@ -108,10 +125,6 @@ bool ui_display_message_and_confirm(dispatcher_context_t *context,
                                     const char *path_str,
                                     const char *message,
                                     bool is_hash) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
     ui_path_and_message_state_t *state = (ui_path_and_message_state_t *) &g_ui_state;
     strncpy(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
     strncpy(state->message, message, sizeof(state->message));
@@ -127,10 +140,6 @@ bool ui_display_register_wallet_policy(
     const char *descriptor_template,
     const char (*keys_info)[MAX_N_KEYS_IN_WALLET_POLICY][MAX_POLICY_KEY_INFO_LEN + 1],
     const key_type_e (*keys_type)[MAX_N_KEYS_IN_WALLET_POLICY]) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
     LEDGER_ASSERT(wallet_header->n_keys <= MAX_N_KEYS_IN_WALLET_POLICY, "Too many keys");
 
     ui_register_wallet_policy_state_t *state = (ui_register_wallet_policy_state_t *) &g_ui_state;
@@ -173,10 +182,6 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
                                const char *address) {
     ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
     strncpy(state->address, address, sizeof(state->address));
 
     if (wallet_name == NULL) {
@@ -200,37 +205,21 @@ void ui_prepare_authorize_wallet_spend(const char *wallet_name) {
 }
 
 bool ui_warn_external_inputs(dispatcher_context_t *context) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
     ui_display_warning_external_inputs_flow();
     return io_ui_process(context);
 }
 
 bool ui_warn_unverified_segwit_inputs(dispatcher_context_t *context) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
     ui_display_unverified_segwit_inputs_flows();
     return io_ui_process(context);
 }
 
 bool ui_warn_nondefault_sighash(dispatcher_context_t *context) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
     ui_display_nondefault_sighash_flow();
     return io_ui_process(context);
 }
 
 bool ui_transaction_streaming_prompt(dispatcher_context_t *context) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
     ui_display_transaction_streaming_prompt();
     return io_ui_process(context);
 }
@@ -240,10 +229,6 @@ bool ui_transaction_streaming_validate_output(dispatcher_context_t *context,
                                               int total_count,
                                               const char *address_or_description,
                                               uint64_t amount) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     format_output_index(index, total_count, state->output_index_str[0]);
@@ -262,10 +247,6 @@ bool ui_transaction_streaming_validate(dispatcher_context_t *context,
                                        uint64_t fee,
                                        tx_ux_warning_t warnings,
                                        bool is_self_transfer) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     format_sats_amount(COIN_COINID_SHORT, fee, state->fee);
@@ -315,9 +296,6 @@ void ui_transaction_simplified_add(uint64_t amount, const char *address_or_descr
 }
 
 bool ui_transaction_simplified_show(dispatcher_context_t *context, uint64_t fee) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     format_sats_amount(COIN_COINID_SHORT, fee, state->fee);
@@ -328,10 +306,6 @@ bool ui_transaction_simplified_show(dispatcher_context_t *context, uint64_t fee)
 }
 
 bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool success) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
     UNUSED(context);
     ui_display_post_processing_confirm_transaction(success);
 
@@ -339,10 +313,6 @@ bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool 
 }
 
 bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool success) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
     UNUSED(context);
     ui_display_post_processing_confirm_message(success);
 

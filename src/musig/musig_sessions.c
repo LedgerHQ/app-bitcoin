@@ -26,11 +26,12 @@ static bool musigsession_pop(const uint8_t psbt_session_id[static 32], musig_psb
                        (const void *) &N_musig_storage.sessions[i],
                        sizeof(musig_psbt_session_t));
             }
+#ifndef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
             uint8_t zeros[sizeof(musig_psbt_session_t)] = {0};
             nvm_write((void *) &N_musig_storage.sessions[i],
                       (void *) zeros,
                       sizeof(musig_psbt_session_t));
-
+#endif
             return true;
         }
     }
@@ -43,8 +44,13 @@ static void musigsession_init_randomness(musig_psbt_session_t *session) {
     cx_get_random_bytes(session->_rand_root, 32);
 }
 
+#ifndef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
 static void musigsession_store(const uint8_t psbt_session_id[static 32],
                                const musig_psbt_session_t *session) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    (void) psbt_session_id;
+    (void) session;
+#else
     // make sure that no session with the same id exists; delete it otherwise
     musigsession_pop(psbt_session_id, NULL);
 
@@ -64,7 +70,9 @@ static void musigsession_store(const uint8_t psbt_session_id[static 32],
     nvm_write((void *) &N_musig_storage.sessions[i],
               (void *) session,
               sizeof(musig_psbt_session_t));
+#endif
 }
+#endif
 
 void compute_rand_i_j(const musig_psbt_session_t *psbt_session,
                       int i,
@@ -114,11 +122,19 @@ const musig_psbt_session_t *musigsession_round2_initialize(
     if (memcmp(musig_signing_state->_round2._id, psbt_session_id, 32) != 0) {
         // get and delete the musig session from permanent storage
         if (!musigsession_pop(psbt_session_id, &musig_signing_state->_round2)) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+            // Fuzz mode: provide synthetic session so round-2 code paths are exercised.
+            // The _rand_root won't match a real round-1 output, but it lets the fuzzer
+            // explore musig_nonce_agg, musig_sign, and related functions.
+            memcpy(musig_signing_state->_round2._id, psbt_session_id, 32);
+            cx_get_random_bytes(musig_signing_state->_round2._rand_root, 32);
+#else
             // The PSBT contains a partial nonce, but we do not have the corresponding psbt
             // session in storage. Either it was deleted, or the pubnonces were not real. Either
             // way, we cannot continue.
             PRINTF("Missing MuSig2 session\n");
             return NULL;
+#endif
         }
     }
 
@@ -126,6 +142,11 @@ const musig_psbt_session_t *musigsession_round2_initialize(
 }
 
 void musigsession_commit(musig_signing_state_t *musig_signing_state) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    // Fuzz mode: N_musig_storage is in a NVRAM region that the nvm_write mock
+    // cannot safely write to. Skip persistence — the session is not reused.
+    (void) musig_signing_state;
+#else
     // If round 1 was not executed, then there is nothing to store.
     // This assumes that musigsession_initialize_signing_state zeroes the id, therefore the field is
     // zeroed out if and only if it wasn't used.
@@ -133,4 +154,5 @@ void musigsession_commit(musig_signing_state_t *musig_signing_state) {
                             sizeof(musig_signing_state->_round1._id))) {
         musigsession_store(musig_signing_state->_round1._id, &musig_signing_state->_round1);
     }
+#endif
 }

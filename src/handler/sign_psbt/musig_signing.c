@@ -368,15 +368,24 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
         memcpy(musig_my_psbt_id + 33 + 33, keyexpr_info->tapleaf_hash, 32);
     }
     musig_pubnonce_t my_pubnonce;
-    if (sizeof(musig_pubnonce_t) != call_get_merkleized_map_value(dc,
-                                                                  &input->in_out.map,
-                                                                  musig_my_psbt_id_key,
-                                                                  1 + psbt_id_len,
-                                                                  my_pubnonce.raw,
-                                                                  sizeof(musig_pubnonce_t))) {
+    int my_pubnonce_len = call_get_merkleized_map_value(dc,
+                                                        &input->in_out.map,
+                                                        musig_my_psbt_id_key,
+                                                        1 + psbt_id_len,
+                                                        my_pubnonce.raw,
+                                                        sizeof(musig_pubnonce_t));
+    if (my_pubnonce_len != (int) sizeof(musig_pubnonce_t)) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+        // Fuzz mode: the PSBT model may store the nonce under a different (pre-tweak)
+        // aggregate key. Synthesize a pubnonce so round-2 code paths can execute.
+        memset(my_pubnonce.raw, 0x02, sizeof(my_pubnonce.raw));
+        memcpy(my_pubnonce.raw + 1, keyexpr_info->internal_pubkey.compressed_pubkey + 1, 32);
+        memcpy(my_pubnonce.raw + 34, keyexpr_info->internal_pubkey.compressed_pubkey + 1, 32);
+#else
         PRINTF("Missing or erroneous pubnonce in PSBT\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
+#endif
     }
     /**
      * Round 2 of the MuSig2 protocol
@@ -408,15 +417,22 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
         memcpy(musig_ith_psbt_id_key, musig_my_psbt_id_key, sizeof(musig_my_psbt_id_key));
         memcpy(musig_ith_psbt_id, musig_per_input_info.keys[i], sizeof(plain_pk_t));
 
-        if (sizeof(musig_pubnonce_t) != call_get_merkleized_map_value(dc,
-                                                                      &input->in_out.map,
-                                                                      musig_ith_psbt_id_key,
-                                                                      1 + psbt_id_len,
-                                                                      nonces[i].raw,
-                                                                      sizeof(musig_pubnonce_t))) {
+        int ith_nonce_len = call_get_merkleized_map_value(dc,
+                                                          &input->in_out.map,
+                                                          musig_ith_psbt_id_key,
+                                                          1 + psbt_id_len,
+                                                          nonces[i].raw,
+                                                          sizeof(musig_pubnonce_t));
+        if (ith_nonce_len != (int) sizeof(musig_pubnonce_t)) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+            // Fuzz mode: use our own pubnonce for missing cosigner nonces so
+            // musig_nonce_agg and the rest of the round-2 path can execute.
+            memcpy(nonces[i].raw, my_pubnonce.raw, sizeof(musig_pubnonce_t));
+#else
             PRINTF("Missing or incorrect pubnonce for a MuSig2 cosigner\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
+#endif
         }
     }
 
