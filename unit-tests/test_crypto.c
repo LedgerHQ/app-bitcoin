@@ -361,6 +361,161 @@ static void test_crypto_get_compressed_pubkey_at_path_bip44_first_address(void *
     check_pubkey_at_path(path, 5, xpub, false);
 }
 
+/* ---------------------------------------------------------------- */
+/* crypto_get_key_fingerprint                                       */
+/* ---------------------------------------------------------------- */
+
+static void test_crypto_get_key_fingerprint_bip32_tv2_m0(void **state) {
+    (void) state;
+    /* Fingerprint of the m/0 pubkey from BIP32 Test Vector 2. The
+     * fingerprint is the big-endian first 4 bytes of HASH160(pubkey). */
+    serialized_extended_pubkey_t xpub = decode_xpub(tv2_m_0_xpub);
+    assert_int_equal(crypto_get_key_fingerprint(xpub.compressed_pubkey),
+                     0x5a61ff8eu);
+}
+
+/* ---------------------------------------------------------------- */
+/* crypto_get_master_key_fingerprint                                */
+/* ---------------------------------------------------------------- */
+
+static void test_crypto_get_master_key_fingerprint(void **state) {
+    (void) state;
+    /* Master fingerprint for the speculos default test seed. */
+    assert_int_equal(crypto_get_master_key_fingerprint(), 0xf5acc2fdu);
+}
+
+/* ---------------------------------------------------------------- */
+/* crypto_derive_symmetric_key                                      */
+/*                                                                  */
+/* SLIP-0021 derivation against the speculos default test seed.     */
+/* ---------------------------------------------------------------- */
+
+static void test_crypto_derive_symmetric_key_slip21(void **state) {
+    (void) state;
+    /* SLIP-0021 labels must start with a 0x00 byte. */
+    static const char label[] = "\x00LEDGER-Wallet policy";
+    static const uint8_t expected[32] = {
+        0x74, 0x63, 0xd6, 0xd1, 0xa8, 0x2f, 0x46, 0x47,
+        0xea, 0xd0, 0x48, 0xc6, 0x25, 0xae, 0x0c, 0x27,
+        0xfe, 0x40, 0xb6, 0xd0, 0xd5, 0xf2, 0xd2, 0x41,
+        0x04, 0x00, 0x9a, 0xe9, 0xd3, 0xb7, 0x96, 0x3c,
+    };
+    uint8_t key[32];
+    assert_true(crypto_derive_symmetric_key(label, sizeof(label) - 1, key));
+    assert_memory_equal(key, expected, 32);
+}
+
+static void test_crypto_derive_symmetric_key_label_too_long(void **state) {
+    (void) state;
+    /* The implementation rejects labels longer than 32 bytes. */
+    uint8_t long_label[33] = {0};
+    uint8_t key[32];
+    assert_false(crypto_derive_symmetric_key((const char *) long_label,
+                                             sizeof(long_label), key));
+}
+
+/* ---------------------------------------------------------------- */
+/* get_extended_pubkey_at_path                                      */
+/*                                                                  */
+/* Same expected xpubs as the crypto_get_compressed_pubkey_at_path  */
+/* tests, but here the full struct (version/depth/parent_fp/child   */
+/* /chain/pubkey) is compared.                                      */
+/* ---------------------------------------------------------------- */
+
+#define BIP32_MAINNET_PUBKEY_VERSION 0x0488B21Eu
+
+static void check_extended_pubkey_at_path(const uint32_t *path,
+                                          uint8_t path_len,
+                                          const char *expected_xpub) {
+    serialized_extended_pubkey_t expected = decode_xpub(expected_xpub);
+    serialized_extended_pubkey_t out = {0};
+
+    cx_err_t err = get_extended_pubkey_at_path(path, path_len,
+                                               BIP32_MAINNET_PUBKEY_VERSION,
+                                               &out);
+    assert_int_equal(err, CX_OK);
+    assert_memory_equal(&out, &expected, sizeof(out));
+}
+
+static void test_get_extended_pubkey_at_path_master(void **state) {
+    (void) state;
+    static const uint32_t path[1] = {0};
+    // clang-format off
+    static const char xpub[] = "xpub661MyMwAqRbcGtJ6aNMHg7WyD3FoeAUoeoQ2SnqsqjgPaeL8KML8nDLH2c6cFk1EhVDzaFSCDgtLSua2dW7k7Z8hYvbXDRgHmr32jBV1S12";
+    // clang-format on
+    check_extended_pubkey_at_path(path, 0, xpub);
+}
+
+static void test_get_extended_pubkey_at_path_unhardened(void **state) {
+    (void) state;
+    /* m/0 — covers the bip32_path_len == 1 branch (parent is the master). */
+    static const uint32_t path[] = {0};
+    // clang-format off
+    static const char xpub[] = "xpub69hEPYcyraCnMhNKGGNy4tgCorxg8HhVkCfMHjf7N769AzVqu94hakMtZGuNANFda6qLfHNZ9mLQewRg9zbp2S9QRyyPkHSht1Ua8dKZzJQ";
+    // clang-format on
+    check_extended_pubkey_at_path(path, 1, xpub);
+}
+
+static void test_get_extended_pubkey_at_path_bip44_account(void **state) {
+    (void) state;
+    /* m/44'/0'/0' — covers the bip32_path_len > 1 branch (parent is derived). */
+    static const uint32_t path[] = {BIP32_HARDENED | 44, BIP32_HARDENED | 0, BIP32_HARDENED | 0};
+    // clang-format off
+    static const char xpub[] = "xpub6Cak8u8nU1evR4eMoz5UX12bU9Ws5RjEgq2Kq1RKZrsEQF6Cvecoyr19ZYRikWoJo16SXeft5fhkzbXcmuPfCzQKKB9RDPWT8XnUM62ieB9";
+    // clang-format on
+    check_extended_pubkey_at_path(path, 3, xpub);
+}
+
+/* ---------------------------------------------------------------- */
+/* base58_encode_address                                            */
+/* ---------------------------------------------------------------- */
+
+/* HASH160 of Satoshi's genesis-coinbase pubkey. The Bitcoin mainnet
+ * P2PKH address encoded from this is the well-known
+ * "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa". */
+static const uint8_t genesis_hash160[20] = {
+    0x62, 0xe9, 0x07, 0xb1, 0x5c, 0xbf, 0x27, 0xd5, 0x42, 0x53,
+    0x99, 0xeb, 0xf6, 0xf0, 0xfb, 0x50, 0xeb, 0xb8, 0x8f, 0x18,
+};
+
+static void test_base58_encode_address_p2pkh_mainnet(void **state) {
+    (void) state;
+    static const char expected[] = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa";
+    char out[64] = {0};
+    int n = base58_encode_address(genesis_hash160, 0x00, out, sizeof(out));
+    assert_int_equal(n, (int) (sizeof(expected) - 1));
+    assert_memory_equal(out, expected, sizeof(expected) - 1);
+}
+
+static void test_base58_encode_address_p2pkh_testnet(void **state) {
+    (void) state;
+    static const char expected[] = "mpXwg4jMtRhuSpVq4xS3HFHmCmWp9NyGKt";
+    char out[64] = {0};
+    int n = base58_encode_address(genesis_hash160, 0x6f, out, sizeof(out));
+    assert_int_equal(n, (int) (sizeof(expected) - 1));
+    assert_memory_equal(out, expected, sizeof(expected) - 1);
+}
+
+static void test_base58_encode_address_two_byte_version(void **state) {
+    (void) state;
+    /* Versions < 65536 are written as 2 big-endian bytes. */
+    static const char expected[] = "4CFVTJxkugPRgs6A4cNgGX1HKrpS2DJd3HW";
+    char out[64] = {0};
+    int n = base58_encode_address(genesis_hash160, 460, out, sizeof(out));
+    assert_int_equal(n, (int) (sizeof(expected) - 1));
+    assert_memory_equal(out, expected, sizeof(expected) - 1);
+}
+
+static void test_base58_encode_address_four_byte_version(void **state) {
+    (void) state;
+    /* Versions >= 65536 are written as 4 big-endian bytes. */
+    static const char expected[] = "3HqbfPDaGJjZTNGpbNfenRnTRFdUBPa3T72meJW";
+    char out[64] = {0};
+    int n = base58_encode_address(genesis_hash160, 0xDEADBEEFu, out, sizeof(out));
+    assert_int_equal(n, (int) (sizeof(expected) - 1));
+    assert_memory_equal(out, expected, sizeof(expected) - 1);
+}
+
 int main(void) {
     speculos_bridge_init();
     const struct CMUnitTest tests[] = {
@@ -384,6 +539,17 @@ int main(void) {
         cmocka_unit_test(test_crypto_get_compressed_pubkey_at_path_unhardened),
         cmocka_unit_test(test_crypto_get_compressed_pubkey_at_path_bip44_account),
         cmocka_unit_test(test_crypto_get_compressed_pubkey_at_path_bip44_first_address),
+        cmocka_unit_test(test_crypto_get_key_fingerprint_bip32_tv2_m0),
+        cmocka_unit_test(test_crypto_get_master_key_fingerprint),
+        cmocka_unit_test(test_crypto_derive_symmetric_key_slip21),
+        cmocka_unit_test(test_crypto_derive_symmetric_key_label_too_long),
+        cmocka_unit_test(test_get_extended_pubkey_at_path_master),
+        cmocka_unit_test(test_get_extended_pubkey_at_path_unhardened),
+        cmocka_unit_test(test_get_extended_pubkey_at_path_bip44_account),
+        cmocka_unit_test(test_base58_encode_address_p2pkh_mainnet),
+        cmocka_unit_test(test_base58_encode_address_p2pkh_testnet),
+        cmocka_unit_test(test_base58_encode_address_two_byte_version),
+        cmocka_unit_test(test_base58_encode_address_four_byte_version),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
