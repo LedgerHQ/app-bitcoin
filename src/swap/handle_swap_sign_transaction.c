@@ -93,7 +93,9 @@ bool swap_copy_transaction_parameters(create_transaction_parameters_t* sign_tran
 }
 
 void __attribute__((noreturn)) finalize_exchange_sign_transaction(bool is_success) {
-    *G_swap_sign_return_value_address = is_success;
+    if (G_swap_sign_return_value_address != NULL) {
+        *G_swap_sign_return_value_address = is_success;
+    }
     os_lib_end();
 }
 

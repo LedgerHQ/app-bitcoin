@@ -44,7 +44,15 @@ static uint32_t bech32_final_constant(bech32_encoding enc) {
     return 0; // suppress compiler warning on missing return value
 }
 
-static const char* charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+/*
+ * Bech32 encoding alphabet. Declared as a `const` array (not a pointer to
+ * string literal) so the symbol lands in .rodata instead of .data. This
+ * matches the neighbouring `charset_rev` table and keeps the alphabet out
+ * of the fuzzer's state-driven prefix (Absolution skips `.rodata`), which
+ * both saves 8 prefix bytes and eliminates a theoretical random-pointer
+ * dereference vector.
+ */
+static const char charset[] = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
 static const int8_t charset_rev[128] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -60,6 +68,9 @@ static const int8_t charset_rev[128] = {
 int bech32_encode(char *output, const char *hrp, const uint8_t *data, size_t data_len, bech32_encoding enc) {
     uint32_t chk = 1;
     size_t i = 0;
+    if (output == NULL || hrp == NULL || data == NULL) {
+        return 0;
+    }
     while (hrp[i] != 0) {
         int ch = hrp[i];
         if (ch < 33 || ch > 126) {
@@ -182,6 +193,7 @@ int segwit_addr_encode(char *output, const char *hrp, int witver, const uint8_t 
     uint8_t data[65];
     size_t datalen = 0;
     bech32_encoding enc = BECH32_ENCODING_BECH32;
+    if (output == NULL || hrp == NULL || witprog == NULL) return 0;
     if (witver > 16) return 0;
     if (witver == 0 && witprog_len != 20 && witprog_len != 32) return 0;
     if (witprog_len < 2 || witprog_len > 40) return 0;
@@ -196,6 +208,7 @@ int segwit_addr_decode(int* witver, uint8_t* witdata, size_t* witdata_len, const
     uint8_t data[84];
     char hrp_actual[84];
     size_t data_len;
+    if (witver == NULL || witdata == NULL || witdata_len == NULL || hrp == NULL || addr == NULL) return 0;
     bech32_encoding enc = bech32_decode(hrp_actual, data, &data_len, addr);
     if (enc == BECH32_ENCODING_NONE) return 0;
     if (data_len == 0 || data_len > 65) return 0;
