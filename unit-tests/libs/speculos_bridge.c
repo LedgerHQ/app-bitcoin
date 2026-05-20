@@ -240,31 +240,50 @@ cx_err_t cx_ripemd160_hash_iovec(const cx_iovec_t_local *iovec,
             name);                                                        \
     abort()
 
-cx_err_t cx_hash_no_throw(void *hash,
+extern unsigned long sys_cx_hash(cx_hash_t *hash,
+                                 int mode,
+                                 const uint8_t *in,
+                                 size_t len,
+                                 uint8_t *out,
+                                 size_t out_len);
+
+cx_err_t cx_hash_no_throw(cx_hash_t *hash,
                           int mode,
                           const unsigned char *in,
                           size_t len,
                           unsigned char *out,
                           size_t out_len) {
-    (void) hash;
-    (void) mode;
-    (void) in;
-    (void) len;
-    (void) out;
-    (void) out_len;
-    STUB_ABORT("cx_hash_no_throw");
+    /* speculos's sys_cx_hash returns digest_len on CX_LAST success and 0
+     * otherwise; the SDK function returns CX_OK on success regardless.
+     * speculos THROWs on any error (mapped to abort by the bridge), so
+     * if we get here at all, treat it as success. */
+    (void) sys_cx_hash(hash, mode, in, len, out, out_len);
+    return 0; /* CX_OK */
 }
 
-cx_err_t cx_sha256_init_no_throw(void *hash) {
-    (void) hash;
-    STUB_ABORT("cx_sha256_init_no_throw");
+/* cx_sha256_init is exposed directly by speculos (no sys_ prefix). */
+extern int cx_sha256_init(cx_sha256_t *hash);
+
+cx_err_t cx_sha256_init_no_throw(cx_sha256_t *hash) {
+    /* Per the SDK header, this function always returns CX_OK. */
+    cx_sha256_init(hash);
+    return 0;
 }
 
-cx_err_t cx_sha256_hash_iovec(const void *iovec, size_t iovec_count, uint8_t *out) {
-    (void) iovec;
-    (void) iovec_count;
-    (void) out;
-    STUB_ABORT("cx_sha256_hash_iovec");
+/* Reuses cx_iovec_t_local from the RIPEMD-160 forwarder above; same
+ * layout as the SDK / mock cx_iovec_t. */
+cx_err_t cx_sha256_hash_iovec(const cx_iovec_t_local *iovec, size_t iovec_count,
+                              uint8_t *out) {
+    cx_sha256_t ctx;
+    cx_sha256_init(&ctx);
+    for (size_t i = 0; i < iovec_count; i++) {
+        if (iovec[i].iov_len > 0) {
+            sys_cx_hash(&ctx.header, 0, iovec[i].iov_base, iovec[i].iov_len,
+                        NULL, 0);
+        }
+    }
+    sys_cx_hash(&ctx.header, CX_LAST, NULL, 0, out, 32);
+    return 0;
 }
 
 cx_err_t cx_math_addm_no_throw(uint8_t *r,
