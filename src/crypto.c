@@ -226,7 +226,6 @@ int crypto_get_uncompressed_pubkey(const uint8_t compressed_key[static 33],
     return 0;
 }
 
-// TODO: missing unit tests
 void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 4]) {
     uint8_t buffer[32];
     size_t res;
