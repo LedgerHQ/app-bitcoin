@@ -209,8 +209,10 @@ int setjmp(jmp_buf __jmpb);
 // depending on the execution address. Can be used even if code is executing at
 // the same place where it had been linked.
 #ifndef PIC
-#define PIC(x) pic((unsigned int)x)
-unsigned int pic(unsigned int linked_address);
+#define PIC(x) pic((unsigned int) x)
+static inline __attribute__((always_inline)) unsigned int pic(unsigned int linked_address) {
+    return linked_address;
+}
 #endif
 
 #ifndef SYSCALL

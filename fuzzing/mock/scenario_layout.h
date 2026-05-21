@@ -14,7 +14,7 @@
 
 /* Current generated prefix size — updated after Absolution rebuild.
  * mock_continuation_data is zeroed; builders read from the fuzz tail. */
-#define SCEN_PREFIX_SIZE                188
+#define SCEN_PREFIX_SIZE                469
 
 /*
  * psbt_entropy: the 16-byte framework control header.

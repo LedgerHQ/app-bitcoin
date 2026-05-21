@@ -180,11 +180,8 @@ jobs:
     with:
       package_name: ledger_bitcoin
       package_directory: ./bitcoin_client/
-      jfrog_deployment: true
       release: false
       publish: true
-    secrets:
-      pypi_token: ${{ secrets.PYPI_PUBLIC_API_TOKEN }}
 
   job_test_js_lib:
     name: Tests with the JS library
