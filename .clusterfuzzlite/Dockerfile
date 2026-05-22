@@ -4,7 +4,7 @@ RUN pip3 install --break-system-packages --no-cache-dir pillow>=3.4.0
 RUN apt update && apt install -y ninja-build zip libbsd-dev pkg-config git
 
 ARG LEDGER_SECURE_SDK_REPO=https://github.com/LedgerHQ/ledger-secure-sdk.git
-ARG LEDGER_SECURE_SDK_REF=09c67f3b6d7f51306266a1b26e154dff5b65e634
+ARG LEDGER_SECURE_SDK_REF=86bc16516e2acf8644d20f40ad8cf2a6012b1cc5
 RUN git init /ledger-secure-sdk \
     && cd /ledger-secure-sdk \
     && git remote add origin "${LEDGER_SECURE_SDK_REPO}" \
