@@ -108,6 +108,14 @@ add_library(mock_dispatcher SHARED libs/mock_dispatcher.c)
 add_library(psbt_parse SHARED libs/psbt_parse.c)
 add_library(xpub SHARED libs/xpub.c)
 
+# Vendored TOML parser (cktan/tomlc17, MIT). Used by the data-driven
+# unit tests that load test vectors from a .toml file.
+add_library(tomlc17 STATIC libs/tomlc17.c)
+target_include_directories(tomlc17 PUBLIC libs)
+# tomlc17 is a third-party source we don't intend to maintain locally —
+# silence warnings on it without affecting the rest of the tree.
+target_compile_options(tomlc17 PRIVATE -w)
+
 # App's libraries
 add_library(base58 SHARED $ENV{BOLOS_SDK}/lib_standard_app/base58.c)
 add_library(bip32 SHARED $ENV{BOLOS_SDK}/lib_standard_app/bip32.c)
@@ -278,6 +286,15 @@ if(SPECULOS AND SPECULOS_SRC)
     ../src/common/wallet.c
     ../src/common/script.c
     ../src/common/segwit_addr.c
+    ../src/common/merkle.c
+    ../src/handler/lib/policy.c
+    ../src/handler/lib/get_merkle_leaf_element.c
+    ../src/handler/lib/get_merkle_leaf_hash.c
+    ../src/handler/lib/get_merkle_preimage.c
+    ../src/handler/lib/stream_preimage.c
+    ../src/handler/lib/get_preimage.c
+    ../src/handler/sign_psbt/sign_psbt_cache.c
+    ../src/musig/musig.c
   )
   target_compile_options(app_crypto PRIVATE -fno-stack-protector)
   target_compile_definitions(app_crypto PRIVATE
@@ -296,6 +313,10 @@ if(SPECULOS AND SPECULOS_SRC)
     ../src/common
     ../src/debug-helpers
     ../src/boilerplate
+    ../src/handler
+    ../src/handler/lib
+    ../src/handler/sign_psbt
+    ../src/musig
     $ENV{BOLOS_SDK}/target/nanox/include
     $ENV{BOLOS_SDK}/include
     $ENV{BOLOS_SDK}/io/include
@@ -325,4 +346,19 @@ if(SPECULOS AND SPECULOS_SRC)
   add_executable(test_wallet test_wallet.c)
   target_link_libraries(test_wallet PRIVATE cmocka gcov app_crypto buffer buffer_ext)
   add_test(test_wallet test_wallet)
+
+  # test_get_wallet_address exercises get_wallet_script + get_script_address
+  # end-to-end against a mock dispatcher; vectors come from a separate
+  # text file (see test_get_wallet_address_vectors.txt for the format).
+  add_executable(test_get_wallet_address test_get_wallet_address.c)
+  target_include_directories(test_get_wallet_address PRIVATE
+    ../src/common ../src/handler ../src/handler/lib ../src/handler/sign_psbt
+  )
+  target_compile_definitions(test_get_wallet_address PRIVATE
+    TEST_VECTORS_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}/test_get_wallet_address_vectors.toml\"
+  )
+  target_link_libraries(test_get_wallet_address PRIVATE
+    cmocka gcov app_crypto mock_dispatcher buffer buffer_ext sha256 tomlc17
+  )
+  add_test(test_get_wallet_address test_get_wallet_address)
 endif()
