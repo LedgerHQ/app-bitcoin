@@ -4,7 +4,7 @@
 
 Be sure to have installed:
 
-- CMake >= 3.10
+- CMake >= 3.14
 - CMocka >= 1.1.5
 
 and for code coverage generation:

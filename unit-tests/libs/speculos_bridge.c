@@ -1,18 +1,24 @@
 /**
- * Speculos bridge: SDK-name → speculos-name forwarders, and host-side
- * implementations of the lib_cxng high-level wrappers that the
- * application uses.
+ * Speculos bridge: bind the SDK symbol names called by the application
+ * to speculos's sys_cx_* / spec_cx_* primitives.
  *
  * The application is written against the Ledger SDK API (cx_bn_lock,
  * cx_ecpoint_alloc, cx_hmac_sha512, cx_ecfp_add_point_no_throw, ...).
+ * Speculos provides a pure-C implementation of the underlying syscalls,
+ * but under sys_-prefixed symbol names because on the device they're
+ * reached through an SVC dispatcher.
  *
- * Speculos provides the *pure-C* implementation of the underlying
- * primitives, but under sys_-prefixed symbol names because on the
- * device they're reached through an SVC dispatcher.
+ * This file is mostly thin forwarders: the SDK name calls into the
+ * corresponding sys_cx_* / spec_cx_*, with a calling-convention adapter
+ * where the signatures diverge. Two higher-level wrappers
+ * (cx_ecfp_scalar_mult_no_throw, cx_ecfp_add_point_no_throw) are
+ * reimplemented because speculos's flat variants drop semantics the
+ * app relies on. The SDK's bip32_derive_with_seed_* helpers come from
+ * compiling lib_standard_app/crypto_helpers.c directly into app_crypto
+ * via CMakeLists.txt — they are NOT reimplemented here.
  *
  * Functions not used by code-under-test are stubbed with explicit
- * aborts, in order to keep the linker happy but fail loudly if
- * called. Stubs can be replaced with real implementations as needed.
+ * aborts: they keep the linker happy and fail loudly if called.
  */
 
 #include <stdint.h>
@@ -27,9 +33,26 @@
 
 /* Pull in the speculos type/prototype definitions. We use the speculos
  * header chain rather than the SDK one to avoid double-defining
- * cx_bn_t / cx_ecpoint_t. */
-#define _SDK_2_0_
+ * cx_bn_t / cx_ecpoint_t. cxlib.h itself defines _SDK_2_0_ before
+ * pulling in cx.h, so no pre-define is needed here. */
 #include "bolos/cxlib.h"
+
+/* SDK header that defines cx_iovec_t. Speculos does NOT define this
+ * type, so we can pull the SDK definition in unconditionally; it has
+ * no other shared symbols to clash with the speculos headers above. */
+#include "lcx_common.h"
+
+/* Loudly abort from a stub for a syscall the test target doesn't
+ * exercise. Wrapped as a do/while(0) so the macro is statement-safe in
+ * any context. */
+#define STUB_ABORT(name)                                                      \
+    do {                                                                      \
+        fprintf(stderr,                                                       \
+                "speculos_bridge: %s called but not implemented in this test" \
+                " harness.\n",                                                \
+                name);                                                        \
+        abort();                                                              \
+    } while (0)
 
 /* ------------------------------------------------------------------
  * Forwarders: SDK name -> sys_cx_* implementation
@@ -102,24 +125,12 @@ cx_err_t cx_ecpoint_rnd_scalarmul(cx_ecpoint_t *p, const uint8_t *k, size_t k_le
 /* ------------------------------------------------------------------
  * High-level lib_cxng wrappers, re-implemented here for the host.
  *
- * These are literal copies of the SDK source (lib_cxng/src/cx_math.c
- * and cx_ecfp.c). We re-implement instead of compiling the SDK file
- * because the SDK source pulls in a large set of headers that conflict
- * with the unit-test mock environment.
+ * cx_ecfp_scalar_mult_no_throw and cx_ecfp_add_point_no_throw are
+ * literal copies of the SDK source (lib_cxng/src/cx_ecfp.c) — the
+ * speculos sys_cx_ecfp_* variants either errx-abort on SECP256K1 input
+ * (add_point) or fail to surface CX_EC_INFINITE_POINT to the caller
+ * (scalar_mult), so we keep the bn-based composition for those.
  * ------------------------------------------------------------------ */
-
-cx_err_t cx_math_cmp_no_throw(const uint8_t *a, const uint8_t *b, size_t length, int *diff) {
-    cx_err_t error;
-    cx_bn_t bn_a, bn_b;
-
-    if ((error = sys_cx_bn_lock(length, 0))) return error;
-    if ((error = sys_cx_bn_alloc_init(&bn_a, length, a, length))) goto end;
-    if ((error = sys_cx_bn_alloc_init(&bn_b, length, b, length))) goto end;
-    error = sys_cx_bn_cmp(bn_a, bn_b, diff);
-end:
-    sys_cx_bn_unlock();
-    return error;
-}
 
 cx_err_t cx_ecfp_scalar_mult_no_throw(cx_curve_t curve,
                                       uint8_t *P,
@@ -166,14 +177,12 @@ end:
     return error;
 }
 
-/* HMAC-SHA256 is implemented directly by speculos under a spec_ prefix. */
-extern int spec_cx_hmac_sha256(const unsigned char *key,
-                               unsigned int key_len,
-                               const unsigned char *in,
-                               unsigned int len,
-                               unsigned char *out,
-                               unsigned int out_len);
+/* ------------------------------------------------------------------
+ * One-shot hash & HMAC wrappers
+ * ------------------------------------------------------------------ */
 
+/* HMAC-SHA256 / HMAC-SHA512 are implemented directly by speculos under
+ * a spec_ prefix. */
 size_t cx_hmac_sha256(const uint8_t *key,
                       size_t key_len,
                       const uint8_t *in,
@@ -187,14 +196,6 @@ size_t cx_hmac_sha256(const uint8_t *key,
                                         out,
                                         (unsigned int) out_len);
 }
-
-/* HMAC-SHA512 is implemented directly by speculos under a spec_ prefix. */
-extern int spec_cx_hmac_sha512(const unsigned char *key,
-                               unsigned int key_len,
-                               const unsigned char *in,
-                               unsigned int len,
-                               unsigned char *out,
-                               unsigned int out_len);
 
 size_t cx_hmac_sha512(const uint8_t *key,
                       size_t key_len,
@@ -211,34 +212,22 @@ size_t cx_hmac_sha512(const uint8_t *key,
 }
 
 /* SHA-256 one-shot. */
-extern int sys_cx_hash_sha256(const uint8_t *in, size_t len, uint8_t *out, size_t out_len);
-
 int cx_hash_sha256(const uint8_t *in, size_t len, uint8_t *out, size_t out_len) {
     return sys_cx_hash_sha256(in, len, out, out_len);
 }
 
-/* RIPEMD-160 one-shot, forwarded as iovec wrapper. */
-extern int sys_cx_hash_ripemd160(const uint8_t *in, size_t in_len, uint8_t *out, size_t out_len);
-
-typedef struct {
-    const uint8_t *iov_base;
-    size_t iov_len;
-} cx_iovec_t_local;
-
-cx_err_t cx_ripemd160_hash_iovec(const cx_iovec_t_local *iovec,
-                                 size_t iovec_count,
-                                 uint8_t digest[20]) {
-    /* The app currently uses a single-iovec call. Concatenate if needed. */
-    if (iovec_count == 1) {
-        return (sys_cx_hash_ripemd160(iovec[0].iov_base, iovec[0].iov_len, digest, 20) == 20)
-                   ? 0
-                   : 0xFFFFFF85;
-    }
-
+/* RIPEMD-160 one-shot, forwarded as iovec wrapper. Concatenates first
+ * since speculos only exposes a flat (in, len) entry point. */
+cx_err_t cx_ripemd160_hash_iovec(const cx_iovec_t *iovec, size_t iovec_count, uint8_t digest[20]) {
     size_t total = 0;
     for (size_t i = 0; i < iovec_count; i++) total += iovec[i].iov_len;
+    if (total == 0) {
+        uint8_t dummy = 0;
+        int rc = sys_cx_hash_ripemd160(&dummy, 0, digest, 20);
+        return (rc == 20) ? CX_OK : CX_INTERNAL_ERROR;
+    }
     uint8_t *buf = malloc(total);
-    if (!buf) return 0xFFFFFF8B; /* CX_MEMORY_FULL */
+    if (!buf) return CX_MEMORY_FULL;
     size_t off = 0;
     for (size_t i = 0; i < iovec_count; i++) {
         memcpy(buf + off, iovec[i].iov_base, iovec[i].iov_len);
@@ -246,22 +235,14 @@ cx_err_t cx_ripemd160_hash_iovec(const cx_iovec_t_local *iovec,
     }
     int rc = sys_cx_hash_ripemd160(buf, total, digest, 20);
     free(buf);
-    return (rc == 20) ? 0 : 0xFFFFFF85;
+    return (rc == 20) ? CX_OK : CX_INTERNAL_ERROR;
 }
 
 /* ------------------------------------------------------------------
- * Stubs for syscalls referenced by other parts of crypto.c that this
- * test target never exercises. Calling any of them is a programming
- * error in the test, so we abort loudly.
+ * Streaming-hash wrappers (cx_hash / cx_sha256)
  * ------------------------------------------------------------------ */
 
-#define STUB_ABORT(name)                                                  \
-    fprintf(stderr,                                                       \
-            "speculos_bridge: %s called but not implemented in this test" \
-            " harness.\n",                                                \
-            name);                                                        \
-    abort()
-
+/* sys_cx_hash isn't declared in any speculos public header. */
 extern unsigned long sys_cx_hash(cx_hash_t *hash,
                                  int mode,
                                  const uint8_t *in,
@@ -280,51 +261,43 @@ cx_err_t cx_hash_no_throw(cx_hash_t *hash,
      * speculos THROWs on any error (mapped to abort by the bridge), so
      * if we get here at all, treat it as success. */
     (void) sys_cx_hash(hash, mode, in, len, out, out_len);
-    return 0; /* CX_OK */
+    return CX_OK;
 }
-
-/* cx_sha256_init is exposed directly by speculos (no sys_ prefix). */
-extern int cx_sha256_init(cx_sha256_t *hash);
 
 cx_err_t cx_sha256_init_no_throw(cx_sha256_t *hash) {
     /* Per the SDK header, this function always returns CX_OK. */
     cx_sha256_init(hash);
-    return 0;
+    return CX_OK;
 }
 
-/* Reuses cx_iovec_t_local from the RIPEMD-160 forwarder above; same
- * layout as the SDK / mock cx_iovec_t. */
-cx_err_t cx_sha256_hash_iovec(const cx_iovec_t_local *iovec, size_t iovec_count,
-                              uint8_t *out) {
+cx_err_t cx_sha256_hash_iovec(const cx_iovec_t *iovec, size_t iovec_count, uint8_t *out) {
     cx_sha256_t ctx;
     cx_sha256_init(&ctx);
     for (size_t i = 0; i < iovec_count; i++) {
         if (iovec[i].iov_len > 0) {
-            sys_cx_hash(&ctx.header, 0, iovec[i].iov_base, iovec[i].iov_len,
-                        NULL, 0);
+            sys_cx_hash(&ctx.header, 0, iovec[i].iov_base, iovec[i].iov_len, NULL, 0);
         }
     }
     sys_cx_hash(&ctx.header, CX_LAST, NULL, 0, out, 32);
-    return 0;
+    return CX_OK;
 }
+
+/* ------------------------------------------------------------------
+ * Math wrappers
+ *
+ * The sys_cx_math_* primitives have useless return values (some return
+ * 0xdeadbeef, some return 0 unconditionally — see the speculos source).
+ * Treat any path through them as success; failure in speculos is
+ * signaled by an errx(1, ...) that aborts the process.
+ * ------------------------------------------------------------------ */
 
 cx_err_t cx_math_addm_no_throw(uint8_t *r,
                                const uint8_t *a,
                                const uint8_t *b,
                                const uint8_t *m,
                                size_t len) {
-    cx_bn_t bn_r, bn_a, bn_b, bn_m;
-    cx_err_t error;
-    if ((error = sys_cx_bn_lock(len, 0))) return error;
-    if ((error = sys_cx_bn_alloc(&bn_r, len))) goto end;
-    if ((error = sys_cx_bn_alloc_init(&bn_a, len, a, len))) goto end;
-    if ((error = sys_cx_bn_alloc_init(&bn_b, len, b, len))) goto end;
-    if ((error = sys_cx_bn_alloc_init(&bn_m, len, m, len))) goto end;
-    if ((error = sys_cx_bn_mod_add(bn_r, bn_a, bn_b, bn_m))) goto end;
-    error = sys_cx_bn_export(bn_r, r, len);
-end:
-    sys_cx_bn_unlock();
-    return error;
+    (void) sys_cx_math_addm(r, a, b, m, (unsigned int) len);
+    return CX_OK;
 }
 
 cx_err_t cx_math_powm_no_throw(uint8_t *r,
@@ -333,46 +306,39 @@ cx_err_t cx_math_powm_no_throw(uint8_t *r,
                                size_t len_e,
                                const uint8_t *m,
                                size_t len) {
-    cx_bn_t bn_r, bn_a, bn_m;
-    cx_err_t error;
-    if ((error = sys_cx_bn_lock(len, 0))) return error;
-    if ((error = sys_cx_bn_alloc(&bn_r, len))) goto end;
-    if ((error = sys_cx_bn_alloc_init(&bn_a, len, a, len))) goto end;
-    if ((error = sys_cx_bn_alloc_init(&bn_m, len, m, len))) goto end;
-    if ((error = sys_cx_bn_mod_pow(bn_r, bn_a, e, (uint32_t) len_e, bn_m))) goto end;
-    error = sys_cx_bn_export(bn_r, r, len);
-end:
-    sys_cx_bn_unlock();
-    return error;
+    (void) sys_cx_math_powm(r, a, e, len_e, m, len);
+    return CX_OK;
 }
-
-extern int sys_cx_math_multm(uint8_t *r,
-                             const uint8_t *a,
-                             const uint8_t *b,
-                             const uint8_t *m,
-                             unsigned int len);
 
 cx_err_t cx_math_multm_no_throw(uint8_t *r,
                                 const uint8_t *a,
                                 const uint8_t *b,
                                 const uint8_t *m,
                                 size_t len) {
-    /* sys_cx_math_multm has a useless return value (a leftover marker
-     * value, see the speculos source). Treat any path through it as
-     * success. */
     (void) sys_cx_math_multm(r, a, b, m, (unsigned int) len);
-    return 0; /* CX_OK */
+    return CX_OK;
 }
-
-extern int sys_cx_math_modm(uint8_t *v,
-                            unsigned int len_v,
-                            const uint8_t *m,
-                            unsigned int len_m);
 
 cx_err_t cx_math_modm_no_throw(uint8_t *v, size_t len_v, const uint8_t *m, size_t len_m) {
     (void) sys_cx_math_modm(v, (unsigned int) len_v, m, (unsigned int) len_m);
-    return 0; /* CX_OK */
+    return CX_OK;
 }
+
+cx_err_t cx_math_sub_no_throw(uint8_t *r, const uint8_t *a, const uint8_t *b, size_t len) {
+    (void) sys_cx_math_sub(r, a, b, len);
+    return CX_OK;
+}
+
+/* sys_cx_math_cmp returns the int comparison result; the SDK wrapper
+ * passes it through a diff out-param. */
+cx_err_t cx_math_cmp_no_throw(const uint8_t *a, const uint8_t *b, size_t length, int *diff) {
+    *diff = sys_cx_math_cmp(a, b, (unsigned int) length);
+    return CX_OK;
+}
+
+/* ------------------------------------------------------------------
+ * Misc utilities
+ * ------------------------------------------------------------------ */
 
 /* Constant-time memcmp, matching the SDK char convention (0 on equal,
  * nonzero otherwise). XOR-accumulate every byte pair so the loop's data
@@ -388,27 +354,14 @@ char os_secure_memcmp(const void *src1, const void *src2, size_t length) {
     return diff == 0 ? 0 : 1;
 }
 
-cx_err_t cx_math_sub_no_throw(uint8_t *r, const uint8_t *a, const uint8_t *b, size_t len) {
-    cx_bn_t bn_r, bn_a, bn_b;
-    cx_err_t error;
-    if ((error = sys_cx_bn_lock(len, 0))) return error;
-    if ((error = sys_cx_bn_alloc(&bn_r, len))) goto end;
-    if ((error = sys_cx_bn_alloc_init(&bn_a, len, a, len))) goto end;
-    if ((error = sys_cx_bn_alloc_init(&bn_b, len, b, len))) goto end;
-    /* CX_CARRY is expected for sub when a < b; treat as ok. */
-    error = sys_cx_bn_sub(bn_r, bn_a, bn_b);
-    if (error && error != 0xFFFFFF21) goto end;
-    error = sys_cx_bn_export(bn_r, r, len);
-end:
-    sys_cx_bn_unlock();
-    return error;
-}
-
-/* sys_cx_ecdsa_sign / sys_cx_ecdsa_verify are declared by speculos's
- * cx_ec.h, pulled in transitively via bolos/cxlib.h above. They use
- * unsigned int for the signature length (speculos returns the written
- * length via the function's return value), while the SDK's _no_throw
- * wrappers use size_t* in-out. Bridge the calling convention here. */
+/* ------------------------------------------------------------------
+ * ECDSA wrappers
+ *
+ * sys_cx_ecdsa_sign / sys_cx_ecdsa_verify use unsigned int for the
+ * signature length (speculos returns the written length via the
+ * function's return value), while the SDK's _no_throw wrappers use
+ * size_t* in-out. We bridge the calling convention here.
+ * ------------------------------------------------------------------ */
 
 cx_err_t cx_ecdsa_sign_no_throw(const cx_ecfp_private_key_t *pvkey,
                                 uint32_t mode,
@@ -427,10 +380,10 @@ cx_err_t cx_ecdsa_sign_no_throw(const cx_ecfp_private_key_t *pvkey,
                               sig,
                               (unsigned int) *sig_len,
                               &info_local);
-    if (n < 0) return 0xFFFFFF85; /* CX_INTERNAL_ERROR */
+    if (n < 0) return CX_INTERNAL_ERROR;
     *sig_len = (size_t) n;
     if (info != NULL) *info = info_local;
-    return 0; /* CX_OK */
+    return CX_OK;
 }
 
 bool cx_ecdsa_verify_no_throw(const cx_ecfp_public_key_t *pukey,
@@ -438,6 +391,8 @@ bool cx_ecdsa_verify_no_throw(const cx_ecfp_public_key_t *pukey,
                               size_t hash_len,
                               const uint8_t *sig,
                               size_t sig_len) {
+    /* sys_cx_ecdsa_verify ignores its hashID and mode parameters; we
+     * pass CX_SHA256 / 0 only to satisfy the signature. */
     return sys_cx_ecdsa_verify(pukey,
                                0,
                                CX_SHA256,
@@ -450,21 +405,13 @@ bool cx_ecdsa_verify_no_throw(const cx_ecfp_public_key_t *pukey,
 /* ------------------------------------------------------------------
  * BIP32 seed derivation — forwarders to speculos's os_bip32.c.
  *
- * Speculos exposes:
- *   sys_os_perso_derive_node_with_seed_key(mode, curve, path, len,
- *                                          privkey, chain, seed_key, seed_key_len)
- *   sys_os_perso_get_master_key_identifier(identifier, length)
- *   sys_cx_ecfp_init_private_key(curve, raw_key, key_len, privkey)
- *   sys_cx_ecfp_generate_pair(curve, pubkey, privkey, keep_private)
- *
  * The seed itself is read by os_bip32.c through env_get_seed(); we
  * provide a deterministic stub for env_get_seed below.
+ *
+ * sys_os_perso_* aren't exposed by any speculos public header, so
+ * declare them here.
  * ------------------------------------------------------------------ */
 
-/* sys_cx_ecfp_init_private_key and sys_cx_ecfp_generate_pair are
- * already declared by speculos's cx_ec.h, pulled in transitively via
- * bolos/cxlib.h above. Declare here only what isn't exposed in a
- * speculos public header. */
 extern unsigned long sys_os_perso_derive_node_with_seed_key(unsigned int mode,
                                                             cx_curve_t curve,
                                                             const unsigned int *path,
@@ -510,19 +457,23 @@ cx_err_t os_derive_bip32_with_seed_no_throw(unsigned int mode,
                                            chain,
                                            seed_key,
                                            (unsigned int) seed_key_len);
-    return 0; /* CX_OK; THROW path is fatal in our test harness. */
+    return CX_OK; /* THROW path is fatal in our test harness. */
 }
 
 unsigned long os_perso_get_master_key_identifier(uint8_t *id, size_t id_len) {
     return sys_os_perso_get_master_key_identifier(id, id_len);
 }
 
+/* ------------------------------------------------------------------
+ * EC key init / generation
+ * ------------------------------------------------------------------ */
+
 cx_err_t cx_ecfp_generate_pair_no_throw(cx_curve_t curve,
                                         cx_ecfp_public_key_t *pubkey,
                                         cx_ecfp_private_key_t *privkey,
                                         int keepprivate) {
     int rc = sys_cx_ecfp_generate_pair(curve, pubkey, privkey, keepprivate);
-    return rc == 0 ? 0 : 0xFFFFFF85;
+    return rc == 0 ? CX_OK : CX_INTERNAL_ERROR;
 }
 
 cx_err_t cx_ecfp_generate_pair2_no_throw(cx_curve_t curve,
@@ -540,62 +491,54 @@ cx_err_t cx_ecfp_init_private_key_no_throw(cx_curve_t curve,
                                            size_t raw_len,
                                            cx_ecfp_private_key_t *privkey) {
     int rc = sys_cx_ecfp_init_private_key(curve, raw, (unsigned int) raw_len, privkey);
-    return rc >= 0 ? 0 : 0xFFFFFF85;
+    return rc >= 0 ? CX_OK : CX_INTERNAL_ERROR;
 }
 
-/* SDK helpers, reimplemented inline. Equivalent to
- * lib_standard_app/crypto_helpers.c — but rewritten here because that
- * file pulls in the full SDK header chain (incompatible with the
- * unit-test mock environment). */
+/* ------------------------------------------------------------------
+ * Stubs for unused crypto_helpers.c entry points.
+ *
+ * bip32_derive_with_seed_* are provided by compiling
+ * lib_standard_app/crypto_helpers.c directly into app_crypto (see
+ * CMakeLists.txt). The signing-helper variants in that file
+ * (ecdsa_sign_rs / eddsa_sign) reference syscalls the app doesn't
+ * exercise; these stubs keep the linker happy and abort loudly if a
+ * test ever reaches them.
+ * ------------------------------------------------------------------ */
 
-cx_err_t bip32_derive_with_seed_init_privkey_256(unsigned int derivation_mode,
-                                                 cx_curve_t curve,
-                                                 const uint32_t *path,
-                                                 size_t path_len,
-                                                 cx_ecfp_private_key_t *privkey,
-                                                 uint8_t *chain_code,
-                                                 unsigned char *seed,
-                                                 size_t seed_len) {
-    uint8_t raw[64] = {0};
-    cx_err_t err = os_derive_bip32_with_seed_no_throw(derivation_mode,
-                                                      curve,
-                                                      path,
-                                                      path_len,
-                                                      raw,
-                                                      chain_code,
-                                                      seed,
-                                                      seed_len);
-    if (err != 0) return err;
-    return cx_ecfp_init_private_key_no_throw(curve, raw, 32, privkey);
+cx_err_t cx_ecdsa_sign_rs_no_throw(const cx_ecfp_private_key_t *key,
+                                   uint32_t mode,
+                                   cx_md_t hashID,
+                                   const uint8_t *hash,
+                                   size_t hash_len,
+                                   size_t rs_len,
+                                   uint8_t *sig_r,
+                                   uint8_t *sig_s,
+                                   uint32_t *info) {
+    (void) key;
+    (void) mode;
+    (void) hashID;
+    (void) hash;
+    (void) hash_len;
+    (void) rs_len;
+    (void) sig_r;
+    (void) sig_s;
+    (void) info;
+    STUB_ABORT("cx_ecdsa_sign_rs_no_throw");
 }
 
-cx_err_t bip32_derive_with_seed_get_pubkey_256(unsigned int derivation_mode,
-                                               cx_curve_t curve,
-                                               const uint32_t *path,
-                                               size_t path_len,
-                                               uint8_t raw_pubkey[65],
-                                               uint8_t *chain_code,
-                                               cx_md_t hashID,
-                                               unsigned char *seed,
-                                               size_t seed_len) {
-    cx_ecfp_private_key_t privkey = {0};
-    cx_ecfp_public_key_t pubkey = {0};
-
-    cx_err_t err = bip32_derive_with_seed_init_privkey_256(derivation_mode,
-                                                           curve,
-                                                           path,
-                                                           path_len,
-                                                           &privkey,
-                                                           chain_code,
-                                                           seed,
-                                                           seed_len);
-    if (err != 0) return err;
-
-    err = cx_ecfp_generate_pair2_no_throw(curve, &pubkey, &privkey, 1, hashID);
-    if (err != 0) return err;
-    if (pubkey.W_len != 65) return 0xFFFFFFA3; /* CX_EC_INVALID_CURVE */
-    memcpy(raw_pubkey, pubkey.W, 65);
-    return 0;
+cx_err_t cx_eddsa_sign_no_throw(const cx_ecfp_private_key_t *pvkey,
+                                cx_md_t hashID,
+                                const uint8_t *hash,
+                                size_t hash_len,
+                                uint8_t *sig,
+                                size_t sig_len) {
+    (void) pvkey;
+    (void) hashID;
+    (void) hash;
+    (void) hash_len;
+    (void) sig;
+    (void) sig_len;
+    STUB_ABORT("cx_eddsa_sign_no_throw");
 }
 
 /* ------------------------------------------------------------------
@@ -609,10 +552,10 @@ cx_err_t bip32_derive_with_seed_get_pubkey_256(unsigned int derivation_mode,
  * derivation-path restriction.
  * ------------------------------------------------------------------ */
 
-// NOTE: the app does not have this flag, but allowing any derivation simplifies unit test
-// by allowing the use of any BIP32 test vector.
-/* 0x10 = APPLICATION_FLAG_DERIVE_MASTER — required by speculos's
- * os_bip32 to allow non-hardened derivation paths from the master. */
+/* 0x10 = APPLICATION_FLAG_DERIVE_MASTER. Required by speculos's
+ * os_bip32 to allow non-hardened derivation from the master key.
+ * The real app does not set this flag — we enable it here so unit
+ * tests can use any BIP32 test vector, hardened or not. */
 uint64_t app_flags = 0x10u;
 
 unsigned long get_app_derivation_path(uint8_t **derivationPath) {
@@ -641,7 +584,11 @@ size_t env_get_seed(uint8_t *seed, size_t max_size) {
 }
 
 /* ------------------------------------------------------------------
- * BOLOS runtime stubs
+ * BOLOS runtime: host-side glue and stubs
+ *
+ * On-device, these entry points are BOLOS primitives (exception stack,
+ * RNG, PIC relocation, ...). On the host we either short-circuit them
+ * (THROW → abort) or wire them to a host-equivalent (TRNG → OpenSSL).
  * ------------------------------------------------------------------ */
 
 /* Custom setjmp/longjmp are ARM-asm in speculos. On the host we don't
@@ -652,15 +599,22 @@ void os_longjmp(unsigned int exception) {
     abort();
 }
 
-/* sys_try_context_get is referenced by os_longjmp inside speculos's
- * exception.c, but on the host we redefine os_longjmp above, so this
- * is dead code. Provide a stub anyway. */
+/* sys_try_context_* are referenced by os_longjmp inside speculos's
+ * exception.c, but on the host we redefine os_longjmp above, so they
+ * are dead code. The application code calls the non-sys_ names via the
+ * SDK header; we forward them so a THROW-free path stays inert. */
 void *sys_try_context_set(void *ctx) {
     (void) ctx;
     return NULL;
 }
 void *sys_try_context_get(void) {
     return NULL;
+}
+void *try_context_set(void *ctx) {
+    return sys_try_context_set(ctx);
+}
+void *try_context_get(void) {
+    return sys_try_context_get();
 }
 
 void __attribute__((noreturn)) assert_exit(bool confirm) {
@@ -676,6 +630,20 @@ unsigned long sys_cx_rng(uint8_t *buffer, unsigned int length) {
     if (RAND_bytes(buffer, (int) length) != 1) abort();
     return (unsigned long) buffer;
 }
+
+/* The SDK's PIC() macro forwards to a `pic()` function that on the device
+ * translates a link-time address into the runtime address used after the
+ * loader has applied the application's relocations. On the host we run a
+ * normal ELF so addresses don't change; the identity function suffices. */
+void *pic(void *link_address) {
+    return link_address;
+}
+
+/* mock_dispatcher.c resets cx_hash_mock's pool counter on every init. When
+ * the dispatcher is wired to the speculos-backed cx_ primitives instead,
+ * this global is never actually consulted — but it still has to be defined
+ * for the linker. */
+int g_sha256_pool_next = 0;
 
 /* ED25519 entry points from libcrypto are not directly available on
  * modern OpenSSL; speculos references them from libsodium. Our test
@@ -708,30 +676,9 @@ int ED25519_verify(const uint8_t *msg,
     STUB_ABORT("ED25519_verify");
 }
 
-/* The application code references `try_context_get` / `try_context_set`
- * via the SDK header. On the device these are the BOLOS exception-stack
- * primitives. On the host we redirect THROW to abort, so these never
- * fire; provide trivial forwarders. */
-void *try_context_set(void *ctx) {
-    return sys_try_context_set(ctx);
-}
-void *try_context_get(void) {
-    return sys_try_context_get();
-}
-
-/* The SDK's PIC() macro forwards to a `pic()` function that on the device
- * translates a link-time address into the runtime address used after the
- * loader has applied the application's relocations. On the host we run a
- * normal ELF so addresses don't change; the identity function suffices. */
-void *pic(void *link_address) {
-    return link_address;
-}
-
-/* mock_dispatcher.c resets cx_hash_mock's pool counter on every init. When
- * the dispatcher is wired to the speculos-backed cx_ primitives instead,
- * this global is never actually consulted — but it still has to be defined
- * for the linker. */
-int g_sha256_pool_next = 0;
+/* ------------------------------------------------------------------
+ * Bridge init
+ * ------------------------------------------------------------------ */
 
 void speculos_bridge_init(void) {
     /* Deterministic OpenSSL RNG seed for reproducible test runs. */
