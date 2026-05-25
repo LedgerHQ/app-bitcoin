@@ -655,6 +655,14 @@ void *try_context_get(void) {
     return sys_try_context_get();
 }
 
+/* The SDK's PIC() macro forwards to a `pic()` function that on the device
+ * translates a link-time address into the runtime address used after the
+ * loader has applied the application's relocations. On the host we run a
+ * normal ELF so addresses don't change; the identity function suffices. */
+void *pic(void *link_address) {
+    return link_address;
+}
+
 void speculos_bridge_init(void) {
     /* Deterministic OpenSSL RNG seed for reproducible test runs. */
     static const uint8_t seed[32] = {

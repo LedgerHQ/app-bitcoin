@@ -12,10 +12,8 @@
 #include "constants.h"
 #include "crypto.h"
 
-#ifndef SKIP_FOR_CMOCKA
 #include "os.h"
 #include "cx.h"
-#endif
 
 // The maximum number of keys supported for CHECKMULTISIG{VERIFY}
 // bitcoin-core supports up to 20, but we limit to 16 as bigger pushes require special handling.
@@ -532,8 +530,6 @@ int traverse_policy_dfs(const policy_node_t *policy_node,
                         policy_node_callback_t callback,
                         void *callback_state);
 
-#ifndef SKIP_FOR_CMOCKA
-
 /**
  * Computes the id of the policy map wallet (commitment to header + policy map + keys_info), as per
  * specifications.
@@ -542,5 +538,3 @@ int traverse_policy_dfs(const policy_node_t *policy_node,
  * @param out a pointer to a 32-byte array for the output
  */
 void get_policy_wallet_id(policy_map_wallet_header_t *wallet_header, uint8_t out[static 32]);
-
-#endif
