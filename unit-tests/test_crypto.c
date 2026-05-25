@@ -298,6 +298,10 @@ static void check_pubkey_at_path(const uint32_t *path,
                                  size_t path_len,
                                  const char *expected_xpub,
                                  bool with_chain_code) {
+    if (path_len > 255) {
+        fail_msg("path_len must fit in a uint8_t");
+    }
+
     serialized_extended_pubkey_t expected = decode_xpub(expected_xpub);
 
     uint8_t pubkey[33];
@@ -591,13 +595,7 @@ static void test_crypto_ecdsa_sign_sha256_hash_with_key_no_optional_outputs(
 /*                                                                  */
 /* Test vectors verified against test_utils/taproot.py.             */
 /*                                                                  */
-/* The streaming-init helpers take a cx_sha256_t*. The mock_includes */
-/* layout of that struct is a few bytes smaller than the real SDK   */
-/* one used by app_crypto, so the tests allocate an oversized       */
-/* aligned buffer and cast through it.                              */
 /* ---------------------------------------------------------------- */
-
-#define CX_SHA256_T_STORAGE_BYTES 128
 
 static void test_crypto_tr_tagged_hash_init_custom_tag(void **state) {
     (void) state;
@@ -610,13 +608,12 @@ static void test_crypto_tr_tagged_hash_init_custom_tag(void **state) {
         0x20, 0xd9,
     };
 
-    uint8_t ctx_storage[CX_SHA256_T_STORAGE_BYTES] __attribute__((aligned(8)));
-    cx_sha256_t *ctx = (cx_sha256_t *) ctx_storage;
-    crypto_tr_tagged_hash_init(ctx, tag, sizeof(tag) - 1);
-    assert_int_equal(crypto_hash_update(&ctx->header, "hello", 5), 0);
-    assert_int_equal(crypto_hash_update(&ctx->header, "world", 5), 0);
+    cx_sha256_t ctx;
+    crypto_tr_tagged_hash_init(&ctx, tag, sizeof(tag) - 1);
+    assert_int_equal(crypto_hash_update(&ctx.header, "hello", 5), 0);
+    assert_int_equal(crypto_hash_update(&ctx.header, "world", 5), 0);
     uint8_t out[32];
-    assert_int_equal(crypto_hash_digest(&ctx->header, out, sizeof(out)), 0);
+    assert_int_equal(crypto_hash_digest(&ctx.header, out, sizeof(out)), 0);
     assert_memory_equal(out, expected, 32);
 }
 
@@ -630,12 +627,11 @@ static void test_crypto_tr_tapleaf_hash_init(void **state) {
         0xc2, 0x30,
     };
 
-    uint8_t ctx_storage[CX_SHA256_T_STORAGE_BYTES] __attribute__((aligned(8)));
-    cx_sha256_t *ctx = (cx_sha256_t *) ctx_storage;
-    crypto_tr_tapleaf_hash_init(ctx);
-    assert_int_equal(crypto_hash_update(&ctx->header, "abc", 3), 0);
+    cx_sha256_t ctx;
+    crypto_tr_tapleaf_hash_init(&ctx);
+    assert_int_equal(crypto_hash_update(&ctx.header, "abc", 3), 0);
     uint8_t out[32];
-    assert_int_equal(crypto_hash_digest(&ctx->header, out, sizeof(out)), 0);
+    assert_int_equal(crypto_hash_digest(&ctx.header, out, sizeof(out)), 0);
     assert_memory_equal(out, expected, 32);
 }
 
