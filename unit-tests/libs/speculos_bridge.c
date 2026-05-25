@@ -166,6 +166,28 @@ end:
     return error;
 }
 
+/* HMAC-SHA256 is implemented directly by speculos under a spec_ prefix. */
+extern int spec_cx_hmac_sha256(const unsigned char *key,
+                               unsigned int key_len,
+                               const unsigned char *in,
+                               unsigned int len,
+                               unsigned char *out,
+                               unsigned int out_len);
+
+size_t cx_hmac_sha256(const uint8_t *key,
+                      size_t key_len,
+                      const uint8_t *in,
+                      size_t len,
+                      uint8_t *out,
+                      size_t out_len) {
+    return (size_t) spec_cx_hmac_sha256(key,
+                                        (unsigned int) key_len,
+                                        in,
+                                        (unsigned int) len,
+                                        out,
+                                        (unsigned int) out_len);
+}
+
 /* HMAC-SHA512 is implemented directly by speculos under a spec_ prefix. */
 extern int spec_cx_hmac_sha512(const unsigned char *key,
                                unsigned int key_len,
@@ -322,6 +344,48 @@ cx_err_t cx_math_powm_no_throw(uint8_t *r,
 end:
     sys_cx_bn_unlock();
     return error;
+}
+
+extern int sys_cx_math_multm(uint8_t *r,
+                             const uint8_t *a,
+                             const uint8_t *b,
+                             const uint8_t *m,
+                             unsigned int len);
+
+cx_err_t cx_math_multm_no_throw(uint8_t *r,
+                                const uint8_t *a,
+                                const uint8_t *b,
+                                const uint8_t *m,
+                                size_t len) {
+    /* sys_cx_math_multm has a useless return value (a leftover marker
+     * value, see the speculos source). Treat any path through it as
+     * success. */
+    (void) sys_cx_math_multm(r, a, b, m, (unsigned int) len);
+    return 0; /* CX_OK */
+}
+
+extern int sys_cx_math_modm(uint8_t *v,
+                            unsigned int len_v,
+                            const uint8_t *m,
+                            unsigned int len_m);
+
+cx_err_t cx_math_modm_no_throw(uint8_t *v, size_t len_v, const uint8_t *m, size_t len_m) {
+    (void) sys_cx_math_modm(v, (unsigned int) len_v, m, (unsigned int) len_m);
+    return 0; /* CX_OK */
+}
+
+/* Constant-time memcmp, matching the SDK char convention (0 on equal,
+ * nonzero otherwise). XOR-accumulate every byte pair so the loop's data
+ * access pattern and branch behavior don't depend on where the first
+ * mismatch occurs. */
+char os_secure_memcmp(const void *src1, const void *src2, size_t length) {
+    const uint8_t *a = (const uint8_t *) src1;
+    const uint8_t *b = (const uint8_t *) src2;
+    uint8_t diff = 0;
+    for (size_t i = 0; i < length; i++) {
+        diff |= a[i] ^ b[i];
+    }
+    return diff == 0 ? 0 : 1;
 }
 
 cx_err_t cx_math_sub_no_throw(uint8_t *r, const uint8_t *a, const uint8_t *b, size_t len) {
@@ -662,6 +726,12 @@ void *try_context_get(void) {
 void *pic(void *link_address) {
     return link_address;
 }
+
+/* mock_dispatcher.c resets cx_hash_mock's pool counter on every init. When
+ * the dispatcher is wired to the speculos-backed cx_ primitives instead,
+ * this global is never actually consulted — but it still has to be defined
+ * for the linker. */
+int g_sha256_pool_next = 0;
 
 void speculos_bridge_init(void) {
     /* Deterministic OpenSSL RNG seed for reproducible test runs. */

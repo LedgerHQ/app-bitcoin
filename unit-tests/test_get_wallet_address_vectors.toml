@@ -1,0 +1,226 @@
+# Test vectors for get_wallet_script + get_script_address.
+#
+# Each test case is a `[[case]]` entry with the following keys:
+#   name              - human-readable label
+#   descriptor_template - the V2 descriptor template
+#   keys_info         - list of key info strings, in the order referenced
+#                       by @0, @1, ...
+#   change            - 0 (receive) or 1 (change)
+#   address_index     - non-negative integer
+#   expected_address  - the address the device must produce
+#
+# Vectors below are taken from tests/test_get_wallet_address.py.
+# All segwit addresses use the "tb" HRP (testnet); base58 versions are
+# COIN_P2PKH_VERSION=111 / COIN_P2SH_VERSION=196 (testnet/regtest).
+
+
+# ---- Singlesig P2PKH (BIP-44) ----
+
+[[case]]
+name = "singlesig_legacy_recv_0"
+descriptor_template = "pkh(@0/**)"
+keys_info = [
+    "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+]
+change = 0
+address_index = 0
+expected_address = "mz5vLWdM1wHVGSmXUkhKVvZbJ2g4epMXSm"
+
+[[case]]
+name = "singlesig_legacy_change_15"
+descriptor_template = "pkh(@0/**)"
+keys_info = [
+    "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+]
+change = 1
+address_index = 15
+expected_address = "myFCUBRCKFjV7292HnZtiHqMzzHrApobpT"
+
+
+# ---- Singlesig P2WPKH (BIP-84) ----
+
+[[case]]
+name = "singlesig_wit_recv_0"
+descriptor_template = "wpkh(@0/**)"
+keys_info = [
+    "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P",
+]
+change = 0
+address_index = 0
+expected_address = "tb1qzdr7s2sr0dwmkwx033r4nujzk86u0cy6fmzfjk"
+
+[[case]]
+name = "singlesig_wit_change_15"
+descriptor_template = "wpkh(@0/**)"
+keys_info = [
+    "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P",
+]
+change = 1
+address_index = 15
+expected_address = "tb1qlrvzyx8jcjfj2xuy69du9trtxnsvjuped7e289"
+
+
+# ---- Singlesig P2SH-P2WPKH (BIP-49) ----
+
+[[case]]
+name = "singlesig_sh_wit_recv_0"
+descriptor_template = "sh(wpkh(@0/**))"
+keys_info = [
+    "[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3",
+]
+change = 0
+address_index = 0
+expected_address = "2MyHkbusvLomaarGYMqyq7q9pSBYJRwWcsw"
+
+[[case]]
+name = "singlesig_sh_wit_change_15"
+descriptor_template = "sh(wpkh(@0/**))"
+keys_info = [
+    "[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3",
+]
+change = 1
+address_index = 15
+expected_address = "2NAbM4FSeBQG4o85kbXw2YNfKypcnEZS9MR"
+
+
+# ---- Singlesig P2TR (BIP-86) ----
+
+[[case]]
+name = "singlesig_taproot_recv_0"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+]
+change = 0
+address_index = 0
+expected_address = "tb1pws8wvnj99ca6acf8kq7pjk7vyxknah0d9mexckh5s0vu2ccy68js9am6u7"
+
+[[case]]
+name = "singlesig_taproot_recv_9"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+]
+change = 0
+address_index = 9
+expected_address = "tb1psl7eyk2jyjzq6evqvan854fts7a5j65rth25yqahkd2a765yvj0qggs5ne"
+
+[[case]]
+name = "singlesig_taproot_change_0"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+]
+change = 1
+address_index = 0
+expected_address = "tb1pmr60r5vfjmdkrwcu4a2z8h39mzs7a6wf2rfhuml6qgcp940x9cxs7t9pdy"
+
+[[case]]
+name = "singlesig_taproot_change_9"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+]
+change = 1
+address_index = 9
+expected_address = "tb1p98d6s9jkf0la8ras4nnm72zme5r03fexn29e3pgz4qksdy84ndpqgjak72"
+
+
+# ---- 2-of-2 sortedmulti, legacy P2SH ----
+
+[[case]]
+name = "multisig_legacy_2of2"
+descriptor_template = "sh(sortedmulti(2,@0/**,@1/**))"
+keys_info = [
+    "[5c9e228d/48'/1'/0'/0']tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW",
+    "[f5acc2fd/48'/1'/0'/0']tpubDFAqEGNyad35WQAZMmPD4vgBXnjH16RGciLdWekPe4f4d5JzoHVu1PS86Sy4Tm63vDf8rfV3UjifhrRuSUDfiZj5KPffTPyZ4ZXBKvjD8jm",
+]
+change = 0
+address_index = 0
+expected_address = "2Mx69MjHC4ViZAH1koVXPvVgaazbBCdr89j"
+
+
+# ---- 2-of-2 sortedmulti, P2SH-P2WSH ----
+
+[[case]]
+name = "multisig_sh_wit_2of2"
+descriptor_template = "sh(wsh(sortedmulti(2,@0/**,@1/**)))"
+keys_info = [
+    "[76223a6e/48'/1'/0'/1']tpubDE7NQymr4AFtcJXi9TaWZtrhAdy8QyKmT4U6b9qYByAxCzoyMJ8zw5d8xVLVpbTRAEqP8pVUxjLE2vDt1rSFjaiS8DSz1QcNZ8D1qxUMx1g",
+    "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+]
+change = 0
+address_index = 0
+expected_address = "2MxAUTJh27foYtyp9dcSxP7RgaSwkkVCHTU"
+
+
+# ---- 2-of-2 sortedmulti, native P2WSH ----
+
+[[case]]
+name = "multisig_wit_2of2"
+descriptor_template = "wsh(sortedmulti(2,@0/**,@1/**))"
+keys_info = [
+    "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+change = 0
+address_index = 0
+expected_address = "tb1qmyauyzn08cduzdqweexgna2spwd0rndj55fsrkefry2cpuyt4cpsn2pg28"
+
+
+# ---- Taproot with script path: pk leaf ----
+
+[[case]]
+name = "tr_script_pk"
+descriptor_template = "tr(@0/**,pk(@1/**))"
+keys_info = [
+    "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+change = 0
+address_index = 0
+expected_address = "tb1pls9pp5cgcljpkjauxep03lv2c2yc2wcuua26p3ks6j2lq0vl9kjqf5rgm2"
+
+
+# ---- Taproot with script path: sortedmulti_a leaf ----
+
+[[case]]
+name = "tr_script_sortedmulti_a"
+descriptor_template = "tr(@0/**,sortedmulti_a(2,@1/**,@2/**))"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+    "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+change = 0
+address_index = 0
+expected_address = "tb1pdzk72dnvz3246474p4m5a97u43h6ykt2qcjrrhk6y0fkg8hx2mvswwgvv7"
+
+
+# ---- Taproot with musig in the key path ----
+
+[[case]]
+name = "tr_musig_keypath"
+descriptor_template = "tr(musig(@0,@1)/**)"
+keys_info = [
+    "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+    "tpubDCwYjpDhUdPGQWG6wG6hkBJuWFZEtrn7j3xwG3i8XcQabcGC53xWZm1hSXrUPFS5UvZ3QhdPSjXWNfWmFGTioARHuG5J7XguEjgg7p8PxAm",
+]
+change = 0
+address_index = 3
+expected_address = "tb1pc87la0ksvw4pfq6qc3gn9en33kx7s9rx4c4epy578kfjsdjv6mks7u7dgn"
+
+
+# ---- Taproot with musig in a script path leaf ----
+
+[[case]]
+name = "tr_musig_scriptpath"
+descriptor_template = "tr(@0/**,pk(musig(@1,@2)/**))"
+keys_info = [
+    "tpubD6NzVbkrYhZ4WLczPJWReQycCJdd6YVWXubbVUFnJ5KgU5MDQrD998ZJLSmaB7GVcCnJSDWprxmrGkJ6SvgQC6QAffVpqSvonXmeizXcrkN",
+    "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+    "tpubDCwYjpDhUdPGQWG6wG6hkBJuWFZEtrn7j3xwG3i8XcQabcGC53xWZm1hSXrUPFS5UvZ3QhdPSjXWNfWmFGTioARHuG5J7XguEjgg7p8PxAm",
+]
+change = 0
+address_index = 3
+expected_address = "tb1pa423acwcjc8jgt36muavyun8e2hz3t5qwptsr3wr8afmdfk3wchswf9ntp"
