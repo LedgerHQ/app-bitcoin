@@ -16,13 +16,7 @@
 #include "segwit_addr.h"
 #include "sw.h"
 
-#ifndef SKIP_FOR_CMOCKA
 #include "../crypto.h"
-#else
-// disable problematic macros when compiling unit tests with CMOCKA
-#define PRINTF(...)
-#define PIC(x) (x)
-#endif
 
 typedef struct {
     PolicyNodeType type;
@@ -3041,8 +3035,6 @@ int traverse_policy_dfs(const policy_node_t *policy_node,
     }
 }
 
-#ifndef SKIP_FOR_CMOCKA
-
 void get_policy_wallet_id(policy_map_wallet_header_t *wallet_header, uint8_t out[static 32]) {
     cx_sha256_t wallet_hash_context;
     cx_sha256_init(&wallet_hash_context);
@@ -3069,5 +3061,3 @@ void get_policy_wallet_id(policy_map_wallet_header_t *wallet_header, uint8_t out
 
     crypto_hash_digest(&wallet_hash_context.header, out, 32);
 }
-
-#endif

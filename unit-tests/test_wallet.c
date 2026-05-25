@@ -10,10 +10,6 @@
 
 #include "common/buffer_ext.h"
 
-// missing definitions to make it compile without the SDK
-#define PRINTF(...) printf
-#define PIC(x)      (x)
-
 #include "common/wallet.h"
 
 static int parse_policy(const char *descriptor_template, uint8_t *out, size_t out_size) {

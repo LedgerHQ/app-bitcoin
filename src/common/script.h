@@ -189,8 +189,6 @@ size_t get_push_script_size(uint32_t n);
  */
 int get_script_type(const uint8_t script[], size_t script_len);
 
-#ifndef SKIP_FOR_CMOCKA
-
 /**
  * Computes the address corresponding to the given script, if it has one.
  * The termination character is added.
@@ -204,8 +202,6 @@ int get_script_type(const uint8_t script[], size_t script_len);
  * out.
  */
 int get_script_address(const uint8_t script[], size_t script_len, char *out, size_t out_len);
-
-#endif
 
 // the longest OP_RETURN description is upper bounded by:
 // - 9 bytes for "OP_RETURN"
