@@ -15,6 +15,7 @@
 #include "script.h"
 #include "sw.h"
 #include "wallet.h"
+#include "common/cleartext.h"
 
 #define MESSAGE_CHUNK_SIZE 64  // Protocol specific
 // Displayed message length - if the message is too long we will not display it
@@ -88,6 +89,11 @@ typedef struct {
 typedef struct {
     const char *wallet_name;
     const char *descriptor_template;
+    // Cleartext spending-path lines, displayed before the descriptor template.
+    // Pointer to caller-owned memory (the register-wallet handler's stack).
+    // `n_cleartext_lines == 0` means "no cleartext to display".
+    const char (*cleartext_lines)[CT_MAX_LINE_LEN + 1];
+    size_t n_cleartext_lines;
     size_t n_keys;
     char keys_label[MAX_N_KEYS_IN_WALLET_POLICY][MAX_KEY_LABEL_LENGTH];
     const char *keys_info[MAX_N_KEYS_IN_WALLET_POLICY];
@@ -149,6 +155,8 @@ bool ui_display_register_wallet_policy(
     dispatcher_context_t *context,
     const policy_map_wallet_header_t *wallet_header,
     const char *descriptor_template,
+    const char (*cleartext_lines)[CT_MAX_LINES][CT_MAX_LINE_LEN + 1],
+    size_t n_cleartext_lines,
     const char (*keys_info)[MAX_N_KEYS_IN_WALLET_POLICY][MAX_POLICY_KEY_INFO_LEN + 1],
     const key_type_e (*keys_type)[MAX_N_KEYS_IN_WALLET_POLICY]);
 

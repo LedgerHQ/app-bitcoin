@@ -319,7 +319,7 @@ void ui_display_receive_in_wallet_flow(void) {
 }
 
 void ui_display_register_wallet_policy_flow(void) {
-    _Static_assert(N_UX_PAIRS >= 3 + MAX_N_KEYS_IN_WALLET_POLICY,
+    _Static_assert(N_UX_PAIRS >= 3 + MAX_N_KEYS_IN_WALLET_POLICY + CT_MAX_LINES,
                    "Insufficient pairs for this flow");
 
     confirmed_status = "Account registered";
@@ -331,6 +331,28 @@ void ui_display_register_wallet_policy_flow(void) {
         .item = "Account name",
         .value = g_ui_state.register_wallet_policy.wallet_name,
     };
+
+    // Cleartext spending-path block, when available.
+    if (g_ui_state.register_wallet_policy.n_cleartext_lines > 0 &&
+        g_ui_state.register_wallet_policy.cleartext_lines != NULL) {
+        static char path_labels[CT_MAX_LINES][sizeof("Spending path #99")];
+        size_t n = g_ui_state.register_wallet_policy.n_cleartext_lines;
+        for (size_t i = 0; i < n; i++) {
+            const char *label;
+            if (n == 1) {
+                label = "Spending policy";
+            } else if (i == 0) {
+                label = "Primary spending path";
+            } else {
+                snprintf(path_labels[i], sizeof(path_labels[i]), "Spending path #%u", (unsigned) i);
+                label = path_labels[i];
+            }
+            pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
+                .item = label,
+                .value = g_ui_state.register_wallet_policy.cleartext_lines[i],
+            };
+        }
+    }
 
     pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
 #ifdef SCREEN_SIZE_WALLET

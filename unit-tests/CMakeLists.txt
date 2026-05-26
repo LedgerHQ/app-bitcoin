@@ -246,6 +246,8 @@ if(SPECULOS AND SPECULOS_SRC)
     ../src/common/script.c
     ../src/common/segwit_addr.c
     ../src/common/merkle.c
+    ../src/common/cleartext.c
+    ../src/common/cleartext_specs.c
     ../src/handler/lib/policy.c
     ../src/handler/lib/check_merkle_tree_sorted.c
     ../src/handler/lib/get_merkle_leaf_element.c
@@ -330,6 +332,11 @@ if(SPECULOS AND SPECULOS_SRC)
   app_apply_real_sdk_config(test_wallet)
   target_link_libraries(test_wallet PRIVATE cmocka app_crypto buffer buffer_ext)
   add_test(test_wallet test_wallet)
+
+  add_executable(test_cleartext test_cleartext.c)
+  app_apply_real_sdk_config(test_cleartext)
+  target_link_libraries(test_cleartext PRIVATE cmocka app_crypto buffer buffer_ext)
+  add_test(test_cleartext test_cleartext)
 
   # test_get_wallet_address exercises get_wallet_script + get_script_address
   # end-to-end against a mock dispatcher; vectors come from a separate

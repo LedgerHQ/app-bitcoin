@@ -1,0 +1,613 @@
+# Test vectors for BIP388 cleartext display.
+#
+# This file is intended to be shared with other implementations of the BIP388
+# cleartext-display logic (possibly in different languages). The Rust test
+# harness in `cleartext/mod.rs` consumes it; reuse the same data in other
+# implementations by parsing this TOML and running equivalent assertions.
+#
+# Schema for each `[[vector]]` entry:
+#   template         (required, string)
+#       The BIP388 descriptor template under test.
+#   confusion_score  (optional, u64)
+#       The expected upper bound on the number of structurally distinct
+#       descriptor templates that share this cleartext rendering.
+#   cleartext        (optional, array of strings)
+#       The expected output of the encoder. For taproot descriptors the first
+#       element describes the key-path spending; the remaining elements
+#       describe the leaves in canonical display order. When `has_cleartext`
+#       is `false`, `cleartext[0]` is the raw descriptor template -- the
+#       fallback rendering used when no cleartext form is available.
+#   has_cleartext    (optional, bool)
+#       `true` when every part of the descriptor has a cleartext description.
+#       `false` for descriptors with non-canonical key derivations or with
+#       tapleaves that don't match any recognised pattern.
+#
+# An implementation should run these checks for each entry:
+#   1. when `confusion_score` is set: the encoder's confusion-score function
+#      returns exactly that value.
+#   2. when `cleartext` and `has_cleartext` are both set: encoding `template`
+#      produces exactly `(cleartext, has_cleartext)`.
+#   3. when only `has_cleartext` is set: the boolean part of the encoder's
+#      output matches.
+#   4. when `has_cleartext == true` AND both `confusion_score` and `cleartext`
+#      are set: decoding `cleartext` yields exactly `confusion_score`
+#      structurally distinct descriptor templates, each of which re-encodes
+#      to `cleartext`, and no two of which are equal.
+
+# =============================================================================
+# Legacy / SegWit single-signature
+# =============================================================================
+
+[[vector]]
+template = "pkh(@0/**)"
+confusion_score = 1
+cleartext = ["Legacy single-signature (@0)"]
+has_cleartext = true
+
+[[vector]]
+template = "wpkh(@0/**)"
+confusion_score = 2
+cleartext = ["Segwit single-signature (@0)"]
+has_cleartext = true
+
+[[vector]]
+template = "sh(wpkh(@0/**))"
+confusion_score = 2
+cleartext = ["Segwit single-signature (@0)"]
+has_cleartext = true
+
+# =============================================================================
+# SegWit multisig (wsh + multi/sortedmulti, optionally wrapped in sh)
+# =============================================================================
+
+[[vector]]
+template = "wsh(sortedmulti(2,@0/**,@1/**))"
+confusion_score = 4
+cleartext = ["2 of @0 and @1 (SegWit)"]
+has_cleartext = true
+
+[[vector]]
+template = "wsh(sortedmulti(2,@0/**,@1/**,@2/**))"
+confusion_score = 4
+cleartext = ["2 of @0, @1 and @2 (SegWit)"]
+has_cleartext = true
+
+[[vector]]
+template = "wsh(sortedmulti(3,@0/**,@1/**,@2/**))"
+confusion_score = 4
+cleartext = ["3 of @0, @1 and @2 (SegWit)"]
+has_cleartext = true
+
+[[vector]]
+template = "wsh(multi(2,@0/**,@1/**))"
+confusion_score = 4
+cleartext = ["2 of @0 and @1 (SegWit)"]
+has_cleartext = true
+
+[[vector]]
+template = "sh(wsh(multi(2,@0/**,@1/**)))"
+confusion_score = 4
+cleartext = ["2 of @0 and @1 (SegWit)"]
+has_cleartext = true
+
+[[vector]]
+template = "sh(wsh(sortedmulti(2,@0/**,@1/**)))"
+confusion_score = 4
+cleartext = ["2 of @0 and @1 (SegWit)"]
+has_cleartext = true
+
+[[vector]]
+template = "sh(wsh(multi(2,@0/**,@1/**,@2/**)))"
+confusion_score = 4
+cleartext = ["2 of @0, @1 and @2 (SegWit)"]
+has_cleartext = true
+
+[[vector]]
+template = "sh(wsh(sortedmulti(3,@0/**,@1/**,@2/**)))"
+confusion_score = 4
+cleartext = ["3 of @0, @1 and @2 (SegWit)"]
+has_cleartext = true
+
+# =============================================================================
+# Taproot (no musig); key-path only
+# =============================================================================
+
+[[vector]]
+template = "tr(@0/**)"
+confusion_score = 1
+cleartext = ["Primary path: @0"]
+has_cleartext = true
+
+# =============================================================================
+# Taproot (no musig); script-path leaves
+# =============================================================================
+
+[[vector]]
+template = "tr(@0/**,pk(@1/**))"
+confusion_score = 1
+cleartext = ["Primary path: @0", "Single-signature (@1)"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,{pk(@1/**),pk(@2/**)})"
+confusion_score = 1
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1)",
+    "Single-signature (@2)",
+]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,{sortedmulti_a(2,@1/**,@2/**),pk(@3/**)})"
+confusion_score = 1
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@3)",
+    "2 of @1 and @2 (sorted)",
+]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,{{pk(@1/**),pk(@2/**)},pk(@3/**)})"
+confusion_score = 3
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1)",
+    "Single-signature (@2)",
+    "Single-signature (@3)",
+]
+has_cleartext = true
+
+# Tie-break: two SingleSig leaves given in reverse key_index order
+[[vector]]
+template = "tr(@0/**,{pk(@2/**),pk(@1/**)})"
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1)",
+    "Single-signature (@2)",
+]
+has_cleartext = true
+
+# Tie-break: two RelativeHeightlockSingleSig leaves -- sort by key_index, then blocks
+[[vector]]
+template = "tr(@0/**,{and_v(v:pk(@2/<0;1>/*),older(2000)),and_v(v:pk(@1/<0;1>/*),older(1000))})"
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1) after 1000 blocks",
+    "Single-signature (@2) after 2000 blocks",
+]
+has_cleartext = true
+
+# Tie-break: two Multisig leaves -- fewer keys first, then smaller threshold
+[[vector]]
+template = "tr(@0/**,{multi_a(2,@1/**,@2/**,@3/**),multi_a(2,@4/**,@5/**)})"
+cleartext = [
+    "Primary path: @0",
+    "2 of @4 and @5",
+    "2 of @1, @2 and @3",
+]
+has_cleartext = true
+
+# Recognised first leaf + unrecognised second leaf (complex miniscript)
+[[vector]]
+template = "tr(@0/**,{and_v(v:pk(@1/**),older(960)),t:or_c(pk(@2/**),and_v(v:pk(@3/**),or_c(pk(@4/**),v:ripemd160(907cd521fff981ce4063a4dc43c6f3fd28e08995))))})"
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1) after 960 blocks",
+    "t:or_c(pk(@2/**),and_v(v:pk(@3/**),or_c(pk(@4/**),v:ripemd160(907cd521fff981ce4063a4dc43c6f3fd28e08995))))",
+]
+has_cleartext = false
+
+# =============================================================================
+# Taproot relative-heightlock leaves
+# =============================================================================
+
+[[vector]]
+template = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),older(52560)))"
+cleartext = ["Primary path: @0", "Single-signature (@1) after 52560 blocks"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/<0;1>/*),older(52560))})"
+confusion_score = 1
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1)",
+    "Single-signature (@2) after 52560 blocks",
+]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/<0;1>/*),older(1008))})"
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1)",
+    "Single-signature (@2) after 1008 blocks",
+]
+has_cleartext = true
+
+# =============================================================================
+# Taproot relative-timelock leaves (older() with the SEQUENCE flag set)
+# =============================================================================
+
+[[vector]]
+template = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),older(4194305)))"
+cleartext = ["Primary path: @0", "Single-signature (@1) after 8m 32s"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/<0;1>/*),older(4194305))})"
+confusion_score = 1
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1)",
+    "Single-signature (@2) after 8m 32s",
+]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/<0;1>/*),older(4194484))})"
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1)",
+    "Single-signature (@2) after 1d 1h 36m",
+]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,{pk(@1/**),and_v(v:multi_a(2,@2/<0;1>/*,@3/<0;1>/*),older(4194484))})"
+confusion_score = 2
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1)",
+    "2 of @2 and @3 after 1d 1h 36m",
+]
+has_cleartext = true
+
+# =============================================================================
+# Taproot absolute-heightlock / -timelock leaves (after())
+# =============================================================================
+
+[[vector]]
+template = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),after(840000)))"
+cleartext = ["Primary path: @0", "Single-signature (@1) after block height 840000"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,{pk(@1/**),and_v(v:multi_a(2,@2/<0;1>/*,@3/<0;1>/*),after(840000))})"
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1)",
+    "2 of @2 and @3 after block height 840000",
+]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),after(500000000)))"
+cleartext = ["Primary path: @0", "Single-signature (@1) after date 1985-11-05 00:53:20"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,{pk(@1/**),and_v(v:multi_a(2,@2/<0;1>/*,@3/<0;1>/*),after(1700000000))})"
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1)",
+    "2 of @2 and @3 after date 2023-11-14 22:13:20",
+]
+has_cleartext = true
+
+# =============================================================================
+# Taproot BothMustSign + locks
+# =============================================================================
+
+[[vector]]
+template = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),older(1008)))"
+cleartext = ["Primary path: @0", "Both @1 and @2 must sign after 1008 blocks"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,{pk(@1/**),and_v(v:and_v(v:pk(@2/<0;1>/*),pk(@3/<0;1>/*)),older(1008))})"
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1)",
+    "Both @2 and @3 must sign after 1008 blocks",
+]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),older(4194484)))"
+cleartext = ["Primary path: @0", "Both @1 and @2 must sign after 1d 1h 36m"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),after(840000)))"
+cleartext = ["Primary path: @0", "Both @1 and @2 must sign after block height 840000"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),after(1700000000)))"
+cleartext = ["Primary path: @0", "Both @1 and @2 must sign after date 2023-11-14 22:13:20"]
+has_cleartext = true
+
+# =============================================================================
+# Taproot with musig() as internal key
+# =============================================================================
+
+[[vector]]
+template = "tr(musig(@0,@1)/**)"
+confusion_score = 1
+cleartext = ["Primary path: 2 of @0 and @1"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(musig(@0,@1,@2)/**)"
+confusion_score = 1
+cleartext = ["Primary path: 3 of @0, @1 and @2"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(musig(@0,@1)/**,pk(@2/**))"
+confusion_score = 1
+cleartext = ["Primary path: 2 of @0 and @1", "Single-signature (@2)"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(musig(@0,@1)/**,{pk(@2/**),pk(@3/**)})"
+confusion_score = 1
+cleartext = [
+    "Primary path: 2 of @0 and @1",
+    "Single-signature (@2)",
+    "Single-signature (@3)",
+]
+has_cleartext = true
+
+[[vector]]
+template = "tr(musig(@0,@1)/**,{{pk(@2/**),pk(@3/**)},pk(@4/**)})"
+confusion_score = 3
+cleartext = [
+    "Primary path: 2 of @0 and @1",
+    "Single-signature (@2)",
+    "Single-signature (@3)",
+    "Single-signature (@4)",
+]
+has_cleartext = true
+
+[[vector]]
+template = "tr(musig(@0,@1)/**,and_v(v:pk(@2/<0;1>/*),older(1008)))"
+cleartext = ["Primary path: 2 of @0 and @1", "Single-signature (@2) after 1008 blocks"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(musig(@0,@1)/**,{pk(@2/**),and_v(v:pk(@3/<0;1>/*),after(840000))})"
+cleartext = [
+    "Primary path: 2 of @0 and @1",
+    "Single-signature (@2)",
+    "Single-signature (@3) after block height 840000",
+]
+has_cleartext = true
+
+# =============================================================================
+# Taproot with musig() inside a tapleaf (pk(musig(...)) -> Multisig)
+# =============================================================================
+
+[[vector]]
+template = "tr(@0/**,pk(musig(@1,@2)/**))"
+confusion_score = 2
+cleartext = ["Primary path: @0", "2 of @1 and @2"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,pk(musig(@1,@2,@3)/**))"
+confusion_score = 2
+cleartext = ["Primary path: @0", "3 of @1, @2 and @3"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,and_v(v:pk(musig(@1,@2)/**),older(1008)))"
+confusion_score = 2
+cleartext = ["Primary path: @0", "2 of @1 and @2 after 1008 blocks"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,and_v(v:pk(musig(@1,@2)/**),older(4194484)))"
+confusion_score = 2
+cleartext = ["Primary path: @0", "2 of @1 and @2 after 1d 1h 36m"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,and_v(v:pk(musig(@1,@2)/**),after(840000)))"
+confusion_score = 2
+cleartext = ["Primary path: @0", "2 of @1 and @2 after block height 840000"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,and_v(v:pk(musig(@1,@2)/**),after(1700000000)))"
+confusion_score = 2
+cleartext = ["Primary path: @0", "2 of @1 and @2 after date 2023-11-14 22:13:20"]
+has_cleartext = true
+
+[[vector]]
+template = "tr(@0/**,{pk(@1/**),pk(musig(@2,@3)/**)})"
+confusion_score = 2
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1)",
+    "2 of @2 and @3",
+]
+has_cleartext = true
+
+# multi_a(threshold < n) alongside pk(musig)
+[[vector]]
+template = "tr(@0/**,{multi_a(2,@1/**,@2/**,@3/**),pk(musig(@4,@5)/**)})"
+confusion_score = 2
+cleartext = [
+    "Primary path: @0",
+    "2 of @4 and @5",
+    "2 of @1, @2 and @3",
+]
+has_cleartext = true
+
+# =============================================================================
+# Key derivation orderings: same key appears multiple times with canonical
+# derivations (0;1), (2;3), (4;5), ... in some order. The confusion score
+# picks up an extra factor of k! per key (where k is its multiplicity).
+# =============================================================================
+
+# @1 appears twice (<0;1>, <2;3>) -> factor 2! = 2
+[[vector]]
+template = "tr(@0/<0;1>/*,{and_v(v:pk(@1/<0;1>/*),older(4383)),and_v(v:pk(@2/<0;1>/*),pk(@1/<2;3>/*))})"
+cleartext = [
+    "Primary path: @0",
+    "Both @2 and @1 must sign",
+    "Single-signature (@1) after 4383 blocks",
+]
+has_cleartext = true
+
+# Leaves are unambiguous but @1 and @2 each appear twice -> 2! * 2! = 4
+[[vector]]
+template = "tr(@0/<0;1>/*,{and_v(v:multi_a(2,@1/<0;1>/*,@2/<0;1>/*,@3/<0;1>/*),older(144)),and_v(v:pk(@1/<2;3>/*),pk(@2/<2;3>/*))})"
+confusion_score = 4
+cleartext = [
+    "Primary path: @0",
+    "Both @1 and @2 must sign",
+    "2 of @1, @2 and @3 after 144 blocks",
+]
+has_cleartext = true
+
+# @0 appears twice (key path + leaf) -> 2! = 2
+[[vector]]
+template = "tr(@0/<0;1>/*,pk(@0/<2;3>/*))"
+cleartext = ["Primary path: @0", "Single-signature (@0)"]
+has_cleartext = true
+
+# @0 appears three times -> 3! = 6
+[[vector]]
+template = "tr(@0/<0;1>/*,{pk(@0/<2;3>/*),pk(@0/<4;5>/*)})"
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@0)",
+    "Single-signature (@0)",
+]
+has_cleartext = true
+
+# @1 appears twice in two leaves -> 2! = 2
+[[vector]]
+template = "tr(@0/**,{pk(@1/<0;1>/*),pk(@1/<2;3>/*)})"
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1)",
+    "Single-signature (@1)",
+]
+has_cleartext = true
+
+# @1 appears twice across distinct leaf shapes -> 2! = 2
+[[vector]]
+template = "tr(@0/**,{and_v(v:pk(@1/<0;1>/*),older(4383)),pk(@1/<2;3>/*)})"
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1)",
+    "Single-signature (@1) after 4383 blocks",
+]
+has_cleartext = true
+
+# @0 twice, @1 twice -> 2! * 2! = 4
+[[vector]]
+template = "tr(@0/<0;1>/*,{pk(@0/<2;3>/*),and_v(v:pk(@1/<0;1>/*),pk(@1/<2;3>/*))})"
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@0)",
+    "Both @1 and @1 must sign",
+]
+has_cleartext = true
+
+# =============================================================================
+# Taproot AndV leaves: and_v(v:SUBPOLICY_1, SUBPOLICY_2)
+# =============================================================================
+
+# SingleSig AND Multisig (plain multisig): score = 1 * 2 = 2
+[[vector]]
+template = "tr(@0/**,and_v(v:pk(@1/**),multi_a(2,@2/**,@3/**)))"
+confusion_score = 2
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1), and 2 of @2 and @3",
+]
+has_cleartext = true
+
+# SingleSig AND Multisig (using Musig2): score = 1 * 2 = 2
+[[vector]]
+template = "tr(@0/**,and_v(v:pk(@1/**),pk(musig(@2,@3)/**)))"
+confusion_score = 2
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1), and 2 of @2 and @3",
+]
+has_cleartext = true
+
+
+# SingleSig AND Multisig (threshold == keys): score = 1 * 2 = 2
+[[vector]]
+template = "tr(@0/**,and_v(v:pk(@1/**),multi_a(2,@2/**,@3/**)))"
+confusion_score = 2
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1), and 2 of @2 and @3",
+]
+has_cleartext = true
+
+# Multisig AND Multisig (both threshold == keys): score = 2 * 2 = 4
+[[vector]]
+template = "tr(@0/**,and_v(v:multi_a(2,@1/**,@2/**),multi_a(2,@3/**,@4/**)))"
+confusion_score = 4
+cleartext = [
+    "Primary path: @0",
+    "2 of @1 and @2, and 2 of @3 and @4",
+]
+has_cleartext = true
+
+# BothMustSign AND Multisig: score = 1 * 2 = 2
+[[vector]]
+template = "tr(@0/**,and_v(v:and_v(v:pk(@1/**),pk(@2/**)),multi_a(2,@3/**,@4/**)))"
+confusion_score = 2
+cleartext = [
+    "Primary path: @0",
+    "Both @1 and @2 must sign, and 2 of @3 and @4",
+]
+has_cleartext = true
+
+# AndV leaf alongside a normal leaf: SingleSig sorts before AndV
+[[vector]]
+template = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/**),multi_a(2,@3/**,@4/**))})"
+confusion_score = 2
+cleartext = [
+    "Primary path: @0",
+    "Single-signature (@1)",
+    "Single-signature (@2), and 2 of @3 and @4",
+]
+has_cleartext = true
+
+# =============================================================================
+# Non-canonical key derivations: no cleartext is produced and the encoder
+# falls back to the raw descriptor template (with `has_cleartext = false`).
+# =============================================================================
+
+[[vector]]
+template = "pkh(@0/<2;3>/*)"
+cleartext = ["pkh(@0/<2;3>/*)"]
+has_cleartext = false
+
+[[vector]]
+template = "wpkh(@0/<0;2>/*)"
+cleartext = ["wpkh(@0/<0;2>/*)"]
+has_cleartext = false
+
+[[vector]]
+template = "tr(@0/<4;5>/*)"
+cleartext = ["tr(@0/<4;5>/*)"]
+has_cleartext = false
+
+[[vector]]
+template = "tr(@0/**,pk(@1/<2;3>/*))"
+cleartext = ["tr(@0/**,pk(@1/<2;3>/*))"]
+has_cleartext = false

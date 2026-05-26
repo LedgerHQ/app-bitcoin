@@ -1,0 +1,106 @@
+# Cleartext-display specification for BIP388 descriptor templates.
+#
+# This file is the single source of truth for:
+#   - Which descriptor template shapes have a cleartext display
+#   - The cleartext template (literals + dynamic fields) for each shape
+#   - The score (number of structurally distinct templates that share a shape's
+#     cleartext rendering)
+#   - The reverse-direction reconstruction (cleartext -> all DescriptorTemplate
+#     candidates)
+#
+# A build script (`build.rs`) parses this file and generates Rust code that
+# implements all of the above. See `cleartext.rs` for how the generated code is
+# integrated.
+#
+# Two tables here:
+#   - `[[top_level]]` -- shapes for the root DescriptorTemplate
+#   - `[[tapleaf]]`   -- shapes for the leaves of a taproot tree
+#
+# Each entry has:
+#   - `name`     : variant name in the generated DescriptorClass / TapleafClass
+#   - `patterns` : list of pattern strings; the generated classifier tries each
+#                  in order. The score equals the number of patterns that admit
+#                  a class instance (including round-trip checks performed by
+#                  primitives such as `musig`).
+#   - `cleartext`: list of literal strings and `$field` references. The
+#                  field's display kind is derived from its binding-name kind.
+#
+# Tapleaf entries also carry their position in this file as their display
+# `order` (used to group leaves when rendering a taptree).
+
+# =============================================================================
+# Top-level patterns
+# =============================================================================
+
+[[top_level]]
+name = "LegacySingleSig"
+patterns = ["pkh($key)"]
+cleartext = ["Legacy single-signature (", "$key", ")"]
+
+[[top_level]]
+name = "SegwitSingleSig"
+patterns = ["wpkh($key)", "sh(wpkh($key))"]
+cleartext = ["Segwit single-signature (", "$key", ")"]
+
+[[top_level]]
+name = "SegwitMultisig"
+patterns = [
+    "wsh(multi($threshold, $keys))",
+    "wsh(sortedmulti($threshold, $keys))",
+    "sh(wsh(multi($threshold, $keys)))",
+    "sh(wsh(sortedmulti($threshold, $keys)))",
+]
+cleartext = ["$threshold", " of ", "$keys", " (SegWit)"]
+
+[[top_level]]
+name = "Taproot"
+patterns = ["tr($internal_key, $leaves)"]
+cleartext = ["Primary path: ", "$internal_key"]
+
+[[top_level]]
+name = "TaprootMusig"
+patterns = ["tr(musig($threshold, $keys), $leaves)"]
+cleartext = ["Primary path: ", "$threshold", " of ", "$keys"]
+
+# =============================================================================
+# Tapleaf patterns
+# =============================================================================
+
+[[tapleaf]]
+name = "SingleSig"
+patterns = ["pk($key)"]
+cleartext = ["Single-signature (", "$key", ")"]
+
+[[tapleaf]]
+name = "BothMustSign"
+patterns = ["and_v(v:pk($key1), pk($key2))"]
+cleartext = ["Both ", "$key1", " and ", "$key2", " must sign"]
+
+[[tapleaf]]
+name = "SortedMultisig"
+patterns = ["sortedmulti_a($threshold, $keys)"]
+cleartext = ["$threshold", " of ", "$keys", " (sorted)"]
+
+[[tapleaf]]
+name = "Multisig"
+patterns = [
+    "multi_a($threshold, $keys)",
+    "pk(musig($threshold, $keys))",
+]
+cleartext = ["$threshold", " of ", "$keys"]
+
+# Timelocked leaves are `and_v(v:SIGNER, LOCK)`. The signer is a `$sub`
+# sub-policy (classified recursively as a non-combinator leaf: SingleSig,
+# BothMustSign, SortedMultisig or Multisig). The lock is a single `$timelock`
+# binding that matches both `older(...)` (relative) and `after(...)` (absolute);
+# the four display forms (blocks / duration / block height / date) are produced
+# by the `$timelock` value itself.
+[[tapleaf]]
+name = "Timelocked"
+patterns = ["and_v(v:$sub, $timelock)"]
+cleartext = ["$sub", " after ", "$timelock"]
+
+[[tapleaf]]
+name = "AndV"
+patterns = ["and_v(v:$sub1, $sub2)"]
+cleartext = ["$sub1", ", and ", "$sub2"]
