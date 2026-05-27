@@ -31,7 +31,35 @@ from embit.script import Script
 
 from bitcoin_client.ledger_bitcoin.embit.descriptor.miniscript import Miniscript
 from test_utils import bip0340, sha256, hash160
-from test_utils.wallet_policy import DescriptorTemplate, KeyPlaceholder, PlainKeyPlaceholder, TrDescriptorTemplate, WshDescriptorTemplate, WpkhDescriptorTemplate, PkhDescriptorTemplate, derive_plain_descriptor, tapleaf_hash
+from test_utils.bip0327 import cbytes, key_agg
+from test_utils.wallet_policy import DescriptorTemplate, KeyPlaceholder, MuSig2KeyPlaceholder, PlainKeyPlaceholder, ShDescriptorTemplate, ShWpkhDescriptorTemplate, ShWshDescriptorTemplate, TrDescriptorTemplate, WshDescriptorTemplate, WpkhDescriptorTemplate, PkhDescriptorTemplate, derive_plain_descriptor, tapleaf_hash
+
+
+# BIP-328 chaincode used by BIP-388 to derive a synthetic xpub from an
+# aggregated musig2 public key. Pinned constant; see the reference
+# implementation in bitcoin_client.ledger_bitcoin.client.aggr_xpub.
+_BIP328_CHAINCODE = bytes.fromhex(
+    "868087ca02a6f974c4598924c36b57762d32cb45717167e300622c7167e38965"
+)
+
+
+def _musig_root_aggregate(placeholder: MuSig2KeyPlaceholder, keys_info: List[str]) -> Tuple[bytes, List[bytes]]:
+    """Returns `(aggregate_pubkey, sorted_root_participants)` for a musig
+    placeholder. The aggregate is the 33-byte compressed result of BIP-327
+    KeyAgg over the sorted participant root pubkeys — i.e. the input to the
+    BIP-328 synthetic-xpub derivation, before any BIP-32 or taproot tweaks.
+    This is the form expected by BIP-373's MUSIG2_PARTICIPANT_PUBKEYS field.
+    """
+    participant_pubkeys: List[bytes] = []
+    for idx in placeholder.key_indexes:
+        key_info = keys_info[idx]
+        origin_end = key_info.find("]")
+        xpub_str = key_info if origin_end == -1 else key_info[origin_end + 1:]
+        participant_pubkeys.append(ExtendedKey.deserialize(xpub_str).pubkey)
+
+    sorted_participants = sorted(participant_pubkeys)
+    aggregate = cbytes(key_agg(sorted_participants).Q)
+    return aggregate, sorted_participants
 
 
 SPECULOS_SEED = "glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin"
@@ -132,6 +160,13 @@ def getScriptPubkeyFromWallet(wallet: WalletPolicy, change: bool, address_index:
         pubkey = _derive_key(desc_tmpl.key)
         return Script(b'\x00\x14' + hash160(pubkey))
 
+    elif isinstance(desc_tmpl, ShWpkhDescriptorTemplate):
+        # BIP-49 wrapped segwit: scriptPubKey = OP_HASH160 <hash160(redeemScript)> OP_EQUAL
+        # where redeemScript = OP_0 <hash160(pubkey)>
+        pubkey = _derive_key(desc_tmpl.key)
+        redeem_script = b'\x00\x14' + hash160(pubkey)
+        return Script(b'\xa9\x14' + hash160(redeem_script) + b'\x87')
+
     elif isinstance(desc_tmpl, PkhDescriptorTemplate):
         pubkey = _derive_key(desc_tmpl.key)
         return Script(b'\x76\xa9\x14' + hash160(pubkey) + b'\x88\xac')
@@ -207,10 +242,30 @@ def get_placeholder_root_key(placeholder: KeyPlaceholder, keys_info: List[str]) 
             root_key_origin = KeyOriginInfo.from_string(
                 key_info[1:key_origin_end_pos])
         root_pubkey = ExtendedKey.deserialize(xpub)
-    else:
-        raise ValueError("Unsupported placeholder type")
+        return root_pubkey, root_key_origin
+    elif isinstance(placeholder, MuSig2KeyPlaceholder):
+        aggregated_pubkey, _ = _musig_root_aggregate(placeholder, keys_info)
 
-    return root_pubkey, root_key_origin
+        # get the version from the first participant's key info
+        first_key_info = keys_info[placeholder.key_indexes[0]]
+        origin_end = first_key_info.find("]")
+        first_xpub_str = first_key_info if origin_end == -1 else first_key_info[origin_end + 1:]
+        version = ExtendedKey.deserialize(first_xpub_str).version
+
+        synthetic = ExtendedKey(
+            version,
+            0,
+            b"\x00\x00\x00\x00",
+            0,
+            _BIP328_CHAINCODE,
+            None,
+            aggregated_pubkey,
+        )
+        # Aggregated keys have no single origin; return None and let
+        # callers compute a fingerprint from the aggregate pubkey if needed.
+        return synthetic, None
+    else:
+        raise ValueError(f"Unsupported placeholder type: {type(placeholder).__name__}")
 
 
 def fill_inout(wallet_policy: WalletPolicy, inout: Union[PartiallySignedInput, PartiallySignedOutput], is_change: bool, address_index: int):
@@ -234,6 +289,13 @@ def fill_inout(wallet_policy: WalletPolicy, inout: Union[PartiallySignedInput, P
                 wallet_policy.keys_info, is_change, address_index)
 
         for placeholder, tapleaf_desc in desc_tmpl.placeholders():
+            if isinstance(placeholder, MuSig2KeyPlaceholder):
+                # BIP-373: emit PSBT_IN_MUSIG2_PARTICIPANT_PUBKEYS mapping the
+                # aggregate key to the sorted root participants.
+                aggregate, sorted_participants = _musig_root_aggregate(
+                    placeholder, wallet_policy.keys_info)
+                inout.musig2_participant_pubkeys[aggregate] = sorted_participants
+
             root_pubkey, root_pubkey_origin = get_placeholder_root_key(
                 placeholder, wallet_policy.keys_info)
 
@@ -284,6 +346,34 @@ def fill_inout(wallet_policy: WalletPolicy, inout: Union[PartiallySignedInput, P
             s = BytesIO(desc_str.encode())
             desc: Descriptor = Descriptor.read_from(s)
             inout.witness_script = desc.witness_script().data
+        elif isinstance(desc_tmpl, ShWpkhDescriptorTemplate):
+            # BIP-49 wrapped segwit: redeemScript = OP_0 <hash160(pubkey)>
+            root_pubkey, _ = get_placeholder_root_key(
+                desc_tmpl.key, wallet_policy.keys_info)
+            der_subpath = [
+                desc_tmpl.key.num1 if not is_change else desc_tmpl.key.num2,
+                address_index,
+            ]
+            derived_pubkey = root_pubkey.derive_pub_path(der_subpath).pubkey
+            inout.redeem_script = b"\x00\x14" + hash160(derived_pubkey)
+        elif isinstance(desc_tmpl, ShWshDescriptorTemplate):
+            # sh(wsh(SCRIPT)): redeemScript = OP_0 <sha256(witnessScript)>, witnessScript = compiled inner
+            inner_desc_str = derive_plain_descriptor(
+                desc_tmpl.inner_script, wallet_policy.keys_info, is_change, address_index)
+            # technically incorrect to use miniscript here, as this might both work for non-standard or unsafe scripts,
+            # and not work for some descriptors that are not miniscript, like things with sortedmulti.
+            # Good enough for the purposes of this tool.
+            witness_script = Miniscript.read_from(
+                BytesIO(inner_desc_str.encode()), taproot=False).compile()
+            inout.witness_script = witness_script
+            inout.redeem_script = b'\x00\x20' + sha256(witness_script)
+        elif isinstance(desc_tmpl, ShDescriptorTemplate):
+            # sh(SCRIPT): redeemScript = compiled inner script
+            inner_desc_str = derive_plain_descriptor(
+                desc_tmpl.inner_script, wallet_policy.keys_info, is_change, address_index)
+            # As above, technically incorrect to use miniscript here.
+            inout.redeem_script = Miniscript.read_from(
+                BytesIO(inner_desc_str.encode()), taproot=False).compile()
 
         for placeholder, _ in desc_tmpl.placeholders():
             root_pubkey, root_pubkey_origin = get_placeholder_root_key(
