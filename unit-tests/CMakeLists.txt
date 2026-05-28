@@ -76,7 +76,6 @@ add_compile_definitions(TEST DEBUG=0 PRINTF=printf COIN_NATIVE_SEGWIT_PREFIX=\"t
 include_directories(../src)
 include_directories(../src/debug-helpers)
 include_directories(../src/boilerplate)
-include_directories(mock_includes)
 include_directories(libs)
 include_directories($ENV{BOLOS_SDK})
 include_directories($ENV{BOLOS_SDK}/include)
@@ -86,18 +85,9 @@ include_directories($ENV{BOLOS_SDK}/lib_standard_app)
 set(HANDLER_INCLUDES ../src/handler ../src/handler/lib ../src/common)
 
 # ---------------------------------------------------------------------------
-# Mock libraries
+# Mock libraries (no-crypto, available to all tests)
 # ---------------------------------------------------------------------------
-add_library(sha256          SHARED libs/sha-256.c)
-add_library(cx_hash_mock    SHARED libs/cx_hash_mock.c)
-add_library(mock_dispatcher SHARED libs/mock_dispatcher.c)
-add_library(psbt_parse      SHARED libs/psbt_parse.c)
-add_library(xpub            SHARED libs/xpub.c)
-
-target_include_directories(mock_dispatcher PRIVATE ${HANDLER_INCLUDES})
-
-target_link_libraries(cx_hash_mock    PUBLIC sha256)
-target_link_libraries(mock_dispatcher PUBLIC psbt_parse)
+add_library(psbt_parse SHARED libs/psbt_parse.c)
 
 # Vendored TOML parser (cktan/tomlc17, MIT). Used by the data-driven
 # unit tests that load test vectors from a .toml file.
@@ -110,63 +100,22 @@ target_compile_options(tomlc17 PRIVATE -w)
 # ---------------------------------------------------------------------------
 # App libraries (built standalone for the non-speculos tests)
 # ---------------------------------------------------------------------------
-add_library(base58                      SHARED $ENV{BOLOS_SDK}/lib_standard_app/base58.c)
-add_library(bip32                       SHARED $ENV{BOLOS_SDK}/lib_standard_app/bip32.c)
-add_library(buffer                      SHARED $ENV{BOLOS_SDK}/lib_standard_app/buffer.c)
-add_library(read                        SHARED $ENV{BOLOS_SDK}/lib_standard_app/read.c)
-add_library(varint                      SHARED $ENV{BOLOS_SDK}/lib_standard_app/varint.c)
-add_library(write                       SHARED $ENV{BOLOS_SDK}/lib_standard_app/write.c)
-add_library(buffer_ext                  SHARED ../src/common/buffer_ext.c)
-add_library(merkle                      SHARED ../src/common/merkle.c)
-add_library(parser                      SHARED ../src/common/parser_ext.c)
-add_library(display_utils               SHARED ../src/ui/display_utils.c)
-add_library(extract_bip32_derivation    SHARED ../src/handler/sign_psbt/extract_bip32_derivation.c)
-add_library(check_merkle_tree_sorted    SHARED ../src/handler/lib/check_merkle_tree_sorted.c)
-add_library(get_merkle_leaf_element     SHARED ../src/handler/lib/get_merkle_leaf_element.c)
-add_library(get_merkle_leaf_hash        SHARED ../src/handler/lib/get_merkle_leaf_hash.c)
-add_library(get_merkle_leaf_index       SHARED ../src/handler/lib/get_merkle_leaf_index.c)
-add_library(get_merkle_preimage         SHARED ../src/handler/lib/get_merkle_preimage.c)
-add_library(get_merkleized_map          SHARED ../src/handler/lib/get_merkleized_map.c)
-add_library(get_merkleized_map_value    SHARED ../src/handler/lib/get_merkleized_map_value.c)
-add_library(get_preimage                SHARED ../src/handler/lib/get_preimage.c)
-add_library(stream_merkle_leaf_element  SHARED ../src/handler/lib/stream_merkle_leaf_element.c)
-add_library(stream_merkleized_map_value SHARED ../src/handler/lib/stream_merkleized_map_value.c)
-add_library(stream_preimage             SHARED ../src/handler/lib/stream_preimage.c)
-
-target_include_directories(check_merkle_tree_sorted    PRIVATE ${HANDLER_INCLUDES})
-target_include_directories(extract_bip32_derivation    PRIVATE ${HANDLER_INCLUDES} ../src/handler/sign_psbt)
-target_include_directories(get_merkle_leaf_element     PRIVATE ${HANDLER_INCLUDES})
-target_include_directories(get_merkle_leaf_hash        PRIVATE ${HANDLER_INCLUDES})
-target_include_directories(get_merkle_leaf_index       PRIVATE ${HANDLER_INCLUDES})
-target_include_directories(get_merkle_preimage         PRIVATE ${HANDLER_INCLUDES})
-target_include_directories(get_merkleized_map          PRIVATE ${HANDLER_INCLUDES})
-target_include_directories(get_merkleized_map_value    PRIVATE ${HANDLER_INCLUDES})
-target_include_directories(get_preimage                PRIVATE ../src/handler ../src/handler/lib)
-target_include_directories(stream_merkle_leaf_element  PRIVATE ${HANDLER_INCLUDES})
-target_include_directories(stream_merkleized_map_value PRIVATE ${HANDLER_INCLUDES})
-target_include_directories(stream_preimage             PRIVATE ../src/handler ../src/handler/lib)
-
-target_link_libraries(get_merkle_leaf_index PUBLIC get_merkle_leaf_hash)
-target_link_libraries(xpub                  PUBLIC base58 sha256)
+add_library(base58      SHARED $ENV{BOLOS_SDK}/lib_standard_app/base58.c)
+add_library(bip32       SHARED $ENV{BOLOS_SDK}/lib_standard_app/bip32.c)
+add_library(buffer      SHARED $ENV{BOLOS_SDK}/lib_standard_app/buffer.c)
+add_library(read        SHARED $ENV{BOLOS_SDK}/lib_standard_app/read.c)
+add_library(varint      SHARED $ENV{BOLOS_SDK}/lib_standard_app/varint.c)
+add_library(write       SHARED $ENV{BOLOS_SDK}/lib_standard_app/write.c)
+add_library(buffer_ext  SHARED ../src/common/buffer_ext.c)
+add_library(parser      SHARED ../src/common/parser_ext.c)
+add_library(display_utils SHARED ../src/ui/display_utils.c)
 
 # ---------------------------------------------------------------------------
 # Test executables (non-speculos)
 # ---------------------------------------------------------------------------
-# Common dependency bundles, exposed as INTERFACE libraries so each test
-# only has to list its own extras.
-
 # Bare minimum every cmocka-based test needs.
 add_library(test_common INTERFACE)
 target_link_libraries(test_common INTERFACE cmocka)
-
-# Adds the mock dispatcher + SDK helpers needed by every handler/merkle
-# test. mock_dispatcher transitively pulls in psbt_parse.
-add_library(test_merkle_common INTERFACE)
-target_link_libraries(test_merkle_common INTERFACE
-  test_common
-  mock_dispatcher cx_hash_mock sha256
-  buffer buffer_ext varint read write bip32 merkle)
-target_include_directories(test_merkle_common INTERFACE ${HANDLER_INCLUDES})
 
 function(add_unit_test name)
   cmake_parse_arguments(T "" "" "LIBS;INCLUDES" ${ARGN})
@@ -183,33 +132,6 @@ add_unit_test(test_buffer        LIBS test_common buffer buffer_ext varint read 
 add_unit_test(test_display_utils LIBS test_common display_utils)
 add_unit_test(test_parser        LIBS test_common parser buffer buffer_ext varint read write bip32)
 add_unit_test(test_psbt_parse    LIBS test_common psbt_parse)
-
-add_unit_test(test_get_preimage
-  LIBS     test_merkle_common get_preimage
-  INCLUDES ../src/handler ../src/handler/lib)
-add_unit_test(test_get_merkle_preimage
-  LIBS test_merkle_common get_merkle_preimage)
-add_unit_test(test_extract_bip32_derivation
-  LIBS     test_merkle_common extract_bip32_derivation stream_merkle_leaf_element get_merkle_leaf_hash stream_preimage
-  INCLUDES ${HANDLER_INCLUDES} ../src/handler/sign_psbt)
-add_unit_test(test_check_merkle_tree_sorted
-  LIBS test_merkle_common check_merkle_tree_sorted get_merkle_leaf_element get_merkle_leaf_hash get_merkle_preimage stream_preimage)
-add_unit_test(test_get_merkle_leaf_element
-  LIBS test_merkle_common get_merkle_leaf_element get_merkle_leaf_hash get_merkle_preimage stream_preimage)
-add_unit_test(test_get_merkle_leaf_hash
-  LIBS test_merkle_common get_merkle_leaf_hash stream_preimage)
-add_unit_test(test_get_merkle_leaf_index
-  LIBS test_merkle_common get_merkle_leaf_hash get_merkle_leaf_index stream_preimage)
-add_unit_test(test_stream_preimage
-  LIBS test_merkle_common stream_preimage)
-add_unit_test(test_stream_merkle_leaf_element
-  LIBS test_merkle_common stream_merkle_leaf_element get_merkle_leaf_hash stream_preimage)
-add_unit_test(test_stream_merkleized_map_value
-  LIBS test_merkle_common stream_merkleized_map_value stream_merkle_leaf_element get_merkle_leaf_hash get_merkle_leaf_index stream_preimage)
-add_unit_test(test_get_merkleized_map
-  LIBS test_merkle_common get_merkleized_map check_merkle_tree_sorted get_merkle_leaf_element get_merkle_leaf_hash get_merkle_preimage stream_preimage)
-add_unit_test(test_get_merkleized_map_value
-  LIBS test_merkle_common get_merkleized_map_value get_merkle_leaf_element get_merkle_leaf_hash get_merkle_leaf_index get_merkle_preimage stream_preimage)
 
 # ---------------------------------------------------------------------------
 # Speculos-backed crypto tests
@@ -283,16 +205,10 @@ if(SPECULOS AND SPECULOS_SRC)
   )
   target_link_libraries(speculos_bridge PUBLIC speculos_bolos OpenSSL::Crypto)
 
-  # Build the application code against the real SDK headers (not the
-  # per-test mock_includes) so it sees the same syscall signatures the
-  # speculos bridge implements. crypto.c can now be compiled this way,
-  # which removes the need to mock it for tests that depend on it.
-  # Compile flags shared between app_crypto and any test that needs to
-  # see the real SDK declarations (so e.g. sizeof(cx_sha256_t) matches
-  # the size app_crypto was built against, not the mock_includes one).
-  #
-  # The include paths are added with BEFORE PRIVATE so they take
-  # precedence over the mock_includes added at global scope above.
+  # Build the application code against the real SDK headers so it sees the
+  # same syscall signatures the speculos bridge implements. The include
+  # paths are added with BEFORE PRIVATE so they take precedence over the
+  # global paths set above.
   function(app_apply_real_sdk_config target)
     target_compile_definitions(${target} PRIVATE
       HAVE_HASH HAVE_RIPEMD160 HAVE_SHA256 HAVE_SHA512 HAVE_HMAC HAVE_MATH
@@ -331,11 +247,18 @@ if(SPECULOS AND SPECULOS_SRC)
     ../src/common/segwit_addr.c
     ../src/common/merkle.c
     ../src/handler/lib/policy.c
+    ../src/handler/lib/check_merkle_tree_sorted.c
     ../src/handler/lib/get_merkle_leaf_element.c
     ../src/handler/lib/get_merkle_leaf_hash.c
+    ../src/handler/lib/get_merkle_leaf_index.c
     ../src/handler/lib/get_merkle_preimage.c
-    ../src/handler/lib/stream_preimage.c
+    ../src/handler/lib/get_merkleized_map.c
+    ../src/handler/lib/get_merkleized_map_value.c
     ../src/handler/lib/get_preimage.c
+    ../src/handler/lib/stream_merkle_leaf_element.c
+    ../src/handler/lib/stream_merkleized_map_value.c
+    ../src/handler/lib/stream_preimage.c
+    ../src/handler/sign_psbt/extract_bip32_derivation.c
     ../src/handler/sign_psbt/sign_psbt_cache.c
     ../src/musig/musig.c
     $ENV{BOLOS_SDK}/lib_standard_app/crypto_helpers.c
@@ -349,6 +272,47 @@ if(SPECULOS AND SPECULOS_SRC)
     base58 bip32 read write varint
   )
 
+  # mock_dispatcher and xpub need real SDK headers (cx_hash_sha256, crypto.h)
+  # and are only used in the speculos-backed tests.
+  add_library(mock_dispatcher STATIC libs/mock_dispatcher.c)
+  app_apply_real_sdk_config(mock_dispatcher)
+  target_link_libraries(mock_dispatcher PUBLIC psbt_parse)
+
+  add_library(xpub STATIC libs/xpub.c)
+  app_apply_real_sdk_config(xpub)
+  target_link_libraries(xpub PUBLIC base58)
+
+  # Shared dependency bundle for all speculos-backed merkle/handler tests.
+  # mock_dispatcher must come before app_crypto so its unresolved refs to
+  # merkle_combine_hashes etc. are resolved from app_crypto.a by the linker.
+  add_library(test_merkle_common INTERFACE)
+  target_link_libraries(test_merkle_common INTERFACE
+    cmocka
+    mock_dispatcher app_crypto
+    buffer buffer_ext varint read write bip32)
+
+  add_unit_test(test_get_preimage              LIBS test_merkle_common)
+  add_unit_test(test_get_merkle_preimage       LIBS test_merkle_common)
+  add_unit_test(test_extract_bip32_derivation  LIBS test_merkle_common)
+  add_unit_test(test_check_merkle_tree_sorted  LIBS test_merkle_common)
+  add_unit_test(test_get_merkle_leaf_element   LIBS test_merkle_common)
+  add_unit_test(test_get_merkle_leaf_hash      LIBS test_merkle_common)
+  add_unit_test(test_get_merkle_leaf_index     LIBS test_merkle_common)
+  add_unit_test(test_stream_preimage           LIBS test_merkle_common)
+  add_unit_test(test_stream_merkle_leaf_element   LIBS test_merkle_common)
+  add_unit_test(test_stream_merkleized_map_value  LIBS test_merkle_common)
+  add_unit_test(test_get_merkleized_map        LIBS test_merkle_common)
+  add_unit_test(test_get_merkleized_map_value  LIBS test_merkle_common)
+
+  foreach(t
+    test_get_preimage test_get_merkle_preimage test_extract_bip32_derivation
+    test_check_merkle_tree_sorted test_get_merkle_leaf_element
+    test_get_merkle_leaf_hash test_get_merkle_leaf_index test_stream_preimage
+    test_stream_merkle_leaf_element test_stream_merkleized_map_value
+    test_get_merkleized_map test_get_merkleized_map_value)
+    app_apply_real_sdk_config(${t})
+  endforeach()
+
   add_executable(test_crypto test_crypto.c)
   # Compile the test against the real SDK headers too, so that types
   # exposed by crypto.h (e.g. cx_sha256_t) have the same layout the
@@ -358,10 +322,12 @@ if(SPECULOS AND SPECULOS_SRC)
   add_test(test_crypto test_crypto)
 
   add_executable(test_script test_script.c)
+  app_apply_real_sdk_config(test_script)
   target_link_libraries(test_script PRIVATE cmocka app_crypto)
   add_test(test_script test_script)
 
   add_executable(test_wallet test_wallet.c)
+  app_apply_real_sdk_config(test_wallet)
   target_link_libraries(test_wallet PRIVATE cmocka app_crypto buffer buffer_ext)
   add_test(test_wallet test_wallet)
 
@@ -369,14 +335,12 @@ if(SPECULOS AND SPECULOS_SRC)
   # end-to-end against a mock dispatcher; vectors come from a separate
   # TOML file (see test_get_wallet_address_vectors.toml).
   add_executable(test_get_wallet_address test_get_wallet_address.c)
-  target_include_directories(test_get_wallet_address PRIVATE
-    ../src/common ../src/handler ../src/handler/lib ../src/handler/sign_psbt
-  )
+  app_apply_real_sdk_config(test_get_wallet_address)
   target_compile_definitions(test_get_wallet_address PRIVATE
     TEST_VECTORS_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}/test_get_wallet_address_vectors.toml\"
   )
   target_link_libraries(test_get_wallet_address PRIVATE
-    cmocka app_crypto mock_dispatcher buffer buffer_ext sha256 tomlc17
+    cmocka mock_dispatcher app_crypto buffer buffer_ext tomlc17
   )
   add_test(test_get_wallet_address test_get_wallet_address)
 endif()

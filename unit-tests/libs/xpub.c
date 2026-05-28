@@ -2,14 +2,13 @@
 
 #include "xpub.h"
 #include "base58.h"
-#include "sha-256.h"
 
 #define XPUB_BIN_LEN  78
 #define XPUB_FULL_LEN 82 /* 78 payload bytes + 4 checksum bytes */
 
 static void double_sha256(const uint8_t *in, size_t len, uint8_t out[32]) {
-    calc_sha_256(out, in, len);
-    calc_sha_256(out, out, 32);
+    cx_hash_sha256(in, len, out, 32);
+    cx_hash_sha256(out, 32, out, 32);
 }
 
 bool xpub_from_base58(const char *str, serialized_extended_pubkey_t *out) {

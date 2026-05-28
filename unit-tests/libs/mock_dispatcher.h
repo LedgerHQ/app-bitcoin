@@ -135,9 +135,8 @@ typedef struct {
 /* ---- Public API ---- */
 
 /**
- * Initialize a mock dispatcher. Zero-initializes all state, wires up
- * the function pointers in mock->dc, and resets the cx_hash_mock pool so
- * tests start from a clean slate.
+ * Initialize a mock dispatcher. Zero-initializes all state and wires up
+ * the function pointers in mock->dc.
  */
 void mock_dispatcher_init(mock_dispatcher_t *mock);
 

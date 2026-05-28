@@ -17,8 +17,6 @@
 #include <cmocka.h>
 
 #include "mock_dispatcher.h"
-#include "cx_hash_mock.h"
-#include "sha-256.h"
 
 #include "handler/lib/stream_merkle_leaf_element.h"
 
