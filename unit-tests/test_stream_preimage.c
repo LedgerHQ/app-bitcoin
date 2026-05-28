@@ -18,8 +18,6 @@
 #include <cmocka.h>
 
 #include "mock_dispatcher.h"
-#include "cx_hash_mock.h"
-#include "sha-256.h"
 
 #include "client_commands.h"
 #include "handler/lib/stream_preimage.h"
@@ -27,7 +25,7 @@
 /* ---------- Helpers ---------- */
 
 static void compute_sha256(const uint8_t *data, size_t len, uint8_t out[32]) {
-    calc_sha_256(out, data, len);
+    cx_hash_sha256(data, len, out, 32);
 }
 
 /**

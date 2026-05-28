@@ -11,8 +11,7 @@
 #include <stdio.h>
 
 #include "mock_dispatcher.h"
-#include "cx_hash_mock.h"
-#include "sha-256.h"
+#include "cx.h"
 
 #include "buffer.h"
 #include "varint.h"
@@ -22,12 +21,9 @@
 /* ---- Global pointer to active mock (needed for function-pointer callbacks) ---- */
 static mock_dispatcher_t *g_active_mock = NULL;
 
-/* ---- External: reset the cx_hash_mock pool ---- */
-extern int g_sha256_pool_next;
-
 /* ---- Helper: compute SHA-256 of a buffer ---- */
 static void mock_sha256(const uint8_t *data, size_t len, uint8_t out[32]) {
-    calc_sha_256(out, data, len);
+    cx_hash_sha256(data, len, out, 32);
 }
 
 /* ===========================================================================
@@ -433,9 +429,6 @@ void mock_dispatcher_init(mock_dispatcher_t *mock) {
 
     /* Set global pointer so callbacks can find us */
     g_active_mock = mock;
-
-    /* Reset the cx_hash_mock pool so each test starts from a clean slate. */
-    g_sha256_pool_next = 0;
 }
 
 int mock_dispatcher_setup(void **state) {

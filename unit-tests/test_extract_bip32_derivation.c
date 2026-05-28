@@ -19,7 +19,6 @@
 #include <cmocka.h>
 
 #include "mock_dispatcher.h"
-#include "cx_hash_mock.h"
 #include "psbt_parse.h"
 
 #include "client_commands.h"
