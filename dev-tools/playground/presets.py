@@ -230,14 +230,6 @@ def _huge_fee_mutator(psbt: PSBT) -> PSBT:
     return psbt
 
 
-def _zero_outputs_mutator(psbt: PSBT) -> PSBT:
-    """Set every output value to zero — exercises the device's zero-amount
-    handling and (via the resulting massive fee) the high-fee warning."""
-    for vout in psbt.tx.vout:
-        vout.nValue = 0
-    return psbt
-
-
 # Sign-psbt-only scenario presets. These reuse simple wallet policies but
 # mutate the generated fake PSBT to put the device in an interesting state.
 SIGN_PSBT_SCENARIO_PRESETS: List[PolicyPreset] = [
