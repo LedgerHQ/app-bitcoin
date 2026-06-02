@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #define MUSIG_PUBNONCE_SIZE 66
 
