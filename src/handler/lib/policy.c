@@ -888,6 +888,9 @@ __attribute__((warn_unused_result)) static int process_multi_sortedmulti_node(
                     }
                 }
             }
+            if (smallest_pubkey_index < 0) {
+                return WITH_ERROR(-1, "No unused key found");  // can never happen
+            }
             bitvector_set(used, smallest_pubkey_index, true);  // mark the key as used
         }
 
@@ -954,6 +957,9 @@ __attribute__((warn_unused_result)) static int process_multi_a_sortedmulti_a_nod
                         smallest_pubkey_index = j;
                     }
                 }
+            }
+            if (smallest_pubkey_index < 0) {
+                return WITH_ERROR(-1, "No unused key found");  // can never happen
             }
             bitvector_set(used, smallest_pubkey_index, true);  // mark the key as used
         }
