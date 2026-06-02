@@ -1,0 +1,211 @@
+# Test vectors for get_extended_pubkey.
+#
+# Source: tests/test_get_extended_pubkey.py
+#
+# Schema (per [[case]]):
+#   name      human-readable identifier.
+#   path      BIP32 derivation path ("m", "m/44'/1'/0'", ...).
+#   standard  whether the path is exported without user confirmation:
+#               * standard = true  -> exported regardless of the display flag.
+#               * standard = false -> only exported with display = true; with
+#                                     display = false it is rejected with
+#                                     NOT_SUPPORTED.
+#   error     (optional) expected status word name. Orthogonal to `standard`:
+#             when set, that error is expected instead of a successful export
+#             (e.g. paths over the max depth give INCORRECT_DATA regardless of
+#             the display flag).
+#   expected_pubkey
+#             (optional) expected base58check pubkey. Only pinned where an
+#             independent source exists (the functional tests). When omitted,
+#             the test only checks that the export succeeds; the encoding
+#             itself is covered by the pinned cases.
+#
+# Pure UI approve/reject flows and raw-APDU parse errors are not captured here.
+
+
+# ---- Standard paths (exported with or without display) ----
+
+[[case]]
+name = "std_pkh_account0"
+path = "m/44'/1'/0'"
+standard = true
+expected_pubkey = "tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
+
+[[case]]
+name = "std_pkh_account10"
+path = "m/44'/1'/10'"
+standard = true
+expected_pubkey = "tpubDCwYjpDhUdPGp21gSpVay2QPJVh6WNySWMXPhbcu1DsxH31dF7mY18oibbu5RxCLBc1Szerjscuc3D5HyvfYqfRvc9mesewnFqGmPjney4d"
+
+[[case]]
+name = "std_pkh_account2_recv_42"
+path = "m/44'/1'/2'/1/42"
+standard = true
+expected_pubkey = "tpubDGF9YgHKv6qh777rcqVhpmDrbNzgophJM9ec7nHiSfrbss7fVBXoqhmZfohmJSvhNakDHAspPHjVVNL657tLbmTXvSeGev2vj5kzjMaeupT"
+
+[[case]]
+name = "std_bip48_account4"
+path = "m/48'/1'/4'/1'/0/7"
+standard = true
+expected_pubkey = "tpubDK8WPFx4WJo1R9mEL7Wq325wBiXvkAe8ipgb9Q1QBDTDUD2YeCfutWtzY88NPokZqJyRPKHLGwTNLT7jBG59aC6VH8q47LDGQitPB6tX2d7"
+
+[[case]]
+name = "std_sh_wpkh_account1"
+path = "m/49'/1'/1'/1/3"
+standard = true
+expected_pubkey = "tpubDGnetmJDCL18TyaaoyRAYbkSE9wbHktSdTS4mfsR6inC8c2r6TjdBt3wkqEQhHYPtXpa46xpxDaCXU2PRNUGVvDzAHPG6hHRavYbwAGfnFr"
+
+[[case]]
+name = "std_wpkh_account2"
+path = "m/84'/1'/2'/0/10"
+standard = true
+expected_pubkey = "tpubDG9YpSUwScWJBBSrhnAT47NcT4NZGLcY18cpkaiWHnkUCi19EtCh8Heeox268NaFF6o56nVeSXuTyK6jpzTvV1h68Kr3edA8AZp27MiLUNt"
+
+[[case]]
+name = "std_tr_account4"
+path = "m/86'/1'/4'/1/12"
+standard = true
+expected_pubkey = "tpubDHTZ815MvTaRmo6Qg1rnU6TEU4ZkWyA56jA1UgpmMcBGomnSsyo34EZLoctzZY9MTJ6j7bhccceUeXZZLxZj5vgkVMYfcZ7DNPsyRdFpS3f"
+
+[[case]]
+name = "std_tr_8_steps"
+path = "m/86'/1'/4'/1/2/3/4/5"
+standard = true
+expected_pubkey = "tpubDNcjumrTe1BBYEc1FmMaJZQw47mbvb4LfX4YwqC6GQ18PfMfuH3BEYREfdHm2gWXkSJ3JiXHF11iKnbJxzxp5qkgo8BBy2L48FRvrLhpTuh"
+
+[[case]]
+name = "std_bip45_unchained_account0"
+path = "m/45'/1'/0'"
+standard = true
+expected_pubkey = "tpubDCy2BKyxJFzACNgThkunvdnkHNotREK9LQDw8L9J1gx26SyzfoeJynJgWekzkramggmahVAgeHPxfpnvFtJ7hcYADrsVUnsPSei2tY9fBLL"
+
+[[case]]
+name = "std_bip45_unchained_account0_chain1"
+path = "m/45'/1'/0'/1"
+standard = true
+expected_pubkey = "tpubDFGDxRGdGFKekUtPuta4p9Kw2a2PSeyyhSTa7KNENJfBuJ78EEsL1LxwAA8ddSxZFWBT9gYRuLDoa2rwdix56WRsq77vAJ2iqeyPw6UBeyt"
+
+# Electrum historically used "m/4541509h/1112098098h" to derive encryption
+# keys, so the app whitelists it: non-standard in the BIP sense, but exported
+# without confirmation.
+[[case]]
+name = "electrum_path"
+path = "m/4541509'/1112098098'"
+standard = true
+expected_pubkey = "tpubDAs3mrkQXkGyzp7Yo9SXiZNW7Tmia5EmdUpXjuBQvBDDGGr9CnVHehSB6P5RZFY3bwkYBweXir8MhmvPXqYHHVxKrFkm3mfZ5UkjG5ZH8Ui"
+
+# Boundary: account == MAX_BIP44_ACCOUNT_RECOMMENDED (100) is still standard.
+[[case]]
+name = "std_account_max"
+path = "m/44'/1'/100'"
+standard = true
+
+# Boundary: BIP48 script type 2' is a standardized value, so this is standard.
+[[case]]
+name = "std_bip48_script_type_2"
+path = "m/48'/1'/0'/2'"
+standard = true
+
+
+# ---- Non-standard paths (exported only with display = true) ----
+
+# Unchained Capital multisig setup. Non-standard for export-without-display:
+# is_path_safe accepts BIP-45 only in the canonical m/45'/coin_type'/account'
+# shape (3 hardened steps, extras unhardened, coin_type == BIP44_COIN_TYPE).
+# This path has a 4th hardened step (1') and coin_type 2', so it is only
+# exported with display = true. (Derivation itself is still permitted; the
+# Makefile whitelists the whole 45' tree via PATH_APP_LOAD_PARAMS.)
+[[case]]
+name = "nonstd_bip45_unchained"
+path = "m/45'/2'/0'/1'"
+standard = false
+expected_pubkey = "tpubDFL11pFAgsKed5bv9Tkxe51xyB4qo1cPDwK6c8WZ4wiVEjtGDg5YuMXNk9yZcB6b47k2oaSWADJF3CRmk97qAwnaiRieT2ocWzh4rq2b3F3"
+
+[[case]]
+name = "nonstandard_bip45_root_display"
+path = "m/45'"
+standard = false
+expected_pubkey = "tpubDA4runSouWhEn4C36dL1PwpMhWi1LCgc7EkYJXLExjVr3eWNE5p5ZRUe7LN7cY8YwCroQsLECcv9ufij8EUpDHM2WQM9Cba8Ztf6Zo8jpFf"
+
+# Maximum supported depth (10 steps). Non-standard: it has hardened steps
+# beyond the BIP48 prefix, so it is only exported when display = true.
+[[case]]
+name = "bip48_max_depth_display"
+path = "m/48'/1'/0'/2'/0'/1'/2'/3'/0/1"
+standard = false
+expected_pubkey = "tpubDSegeM6ezY6VYgNjYiUxk94ZwLYeuUzHpUYff4LLdEEUVUd8VpgGUxyxZ9oRiEepZzmFZogVWFEWznRj3oJgEuWjcg6BERCxTCYdaxwtShk"
+
+[[case]]
+name = "nonstd_root"
+path = "m"
+standard = false
+
+[[case]]
+name = "nonstd_purse_only"
+path = "m/44'"
+standard = false
+
+[[case]]
+name = "nonstd_purpose_coin"
+path = "m/44'/1'"
+standard = false
+
+[[case]]
+name = "nonstd_wrong_coin_type"
+path = "m/44'/10'/0'"
+standard = false
+
+[[case]]
+name = "nonstd_account_not_hardened"
+path = "m/44'/1'/0"
+standard = false
+
+[[case]]
+name = "nonstd_cointype_not_hardened"
+path = "m/44'/1/0'"
+standard = false
+
+[[case]]
+name = "nonstd_purpose_not_hardened"
+path = "m/44/1'/0'"
+standard = false
+
+[[case]]
+name = "nonstd_bip48_script_type_0"
+path = "m/48'/1'/0'/0'"
+standard = false
+
+[[case]]
+name = "nonstd_bip48_script_type_3"
+path = "m/48'/1'/0'/3'"
+standard = false
+
+[[case]]
+name = "nonstd_unknown_purpose"
+path = "m/999'/1'/0'"
+standard = false
+
+[[case]]
+name = "nonstd_bip45_wrong_coin_type"
+path = "m/45'/2'/0'"
+standard = false
+
+[[case]]
+name = "nonstd_bip45_too_short"
+path = "m/45'/1'"
+standard = false
+
+# Boundary: account == MAX_BIP44_ACCOUNT_RECOMMENDED + 1 (101) is non-standard.
+[[case]]
+name = "nonstd_account_over_max"
+path = "m/44'/1'/101'"
+standard = false
+
+
+# ---- Path exceeding the maximum depth: INCORRECT_DATA (regardless of display) ----
+
+[[case]]
+name = "too_long_path"
+path = "m/48'/1'/0'/2'/0'/1'/2'/3'/0/1/2"
+standard = true
+error = "INCORRECT_DATA"

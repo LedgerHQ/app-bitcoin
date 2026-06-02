@@ -332,12 +332,12 @@ if(SPECULOS AND SPECULOS_SRC)
   add_test(test_wallet test_wallet)
 
   # test_get_wallet_address exercises get_wallet_script + get_script_address
-  # end-to-end against a mock dispatcher; vectors come from a separate
-  # TOML file (see test_get_wallet_address_vectors.toml).
+  # end-to-end against a mock dispatcher; vectors come from the test assets
+  # in the repository root (see ../test_vectors/get_wallet_address.toml).
   add_executable(test_get_wallet_address test_get_wallet_address.c)
   app_apply_real_sdk_config(test_get_wallet_address)
   target_compile_definitions(test_get_wallet_address PRIVATE
-    TEST_VECTORS_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}/test_get_wallet_address_vectors.toml\"
+    TEST_VECTORS_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}/../test_vectors/get_wallet_address.toml\"
   )
   target_link_libraries(test_get_wallet_address PRIVATE
     cmocka mock_dispatcher app_crypto buffer buffer_ext tomlc17

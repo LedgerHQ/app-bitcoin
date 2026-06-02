@@ -1,13 +1,9 @@
-# Test vectors for get_wallet_script + get_script_address.
+# Test vectors for get_wallet_address (get_wallet_script + get_script_address).
 #
-# Each test case is a `[[case]]` entry with the following keys:
-#   name              - human-readable label
-#   descriptor_template - the V2 descriptor template
-#   keys_info         - list of key info strings, in the order referenced
-#                       by @0, @1, ...
-#   change            - 0 (receive) or 1 (change)
-#   address_index     - non-negative integer
-#   expected_address  - the address the device must produce
+# Schema and conventions are documented in test_vectors/README.md. In short, each
+# `[[case]]` carries a wallet policy block (descriptor_template, keys_info,
+# optional wallet_name), a `change` flag (0 receive / 1 change), an
+# `address_index`, and the `expected_address` (or an `error` name).
 #
 # Vectors below are taken from tests/test_get_wallet_address.py.
 # All segwit addresses use the "tb" HRP (testnet); base58 versions are

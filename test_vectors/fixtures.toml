@@ -1,0 +1,14 @@
+# Global constants the vectors in this directory were generated against.
+#
+# Frameworks that re-derive keys/signatures from the seed read these once.
+# These match tests/conftest.py (the Speculos test setup).
+
+# The Speculos test seed (BIP-39 mnemonic).
+mnemonic = "glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin"
+
+# Master key fingerprint derived from the seed above (BIP-32, 4 bytes, hex).
+master_key_fingerprint = "f5acc2fd"
+
+# Network all expected addresses/keys are encoded for.
+# testnet: base58 P2PKH version 111, P2SH version 196; bech32/bech32m HRP "tb".
+network = "test"

@@ -1,0 +1,293 @@
+# Test vectors for sign_psbt.
+#
+# Schema and conventions are documented in test_vectors/README.md.
+# Sources: tests/test_sign_psbt.py and tests/test_sign_psbt_with_sighash_types.py.
+#
+# Each case references a PSBT fixture (psbt_file, relative to tests/) plus a wallet
+# policy block, and lists the expected signatures per input. For each signature:
+#   - `sighash_type` is the SIGHASH flag the input is signed with (always present);
+#   - deterministic ECDSA signatures carry exact `signature` bytes;
+#   - taproot Schnorr signatures (non-deterministic) instead carry the `sighash`
+#     digest the signature must verify against (BIP-340), since the produced bytes
+#     are not byte-stable.
+#
+# Randomized PSBTs (txmaker), PSBT-mutation tests, and pure UI flows stay as
+# bespoke code in each framework.
+
+[[case]]
+name = "singlesig_pkh_1to1"
+description = "legacy P2PKH, 1 input 1 output"
+psbt_file = "psbt/singlesig/pkh-1to1.psbt"
+descriptor_template = "pkh(@0/**)"
+keys_info = [
+    "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+]
+
+[[case.expected_signatures]]
+input_index = 0
+pubkey = "02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718"
+sighash_type = 1
+signature = "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
+
+[[case]]
+name = "singlesig_sh_wpkh_1to2"
+description = "wrapped segwit P2SH-P2WPKH, 1 input 2 outputs"
+psbt_file = "psbt/singlesig/sh-wpkh-1to2.psbt"
+descriptor_template = "sh(wpkh(@0/**))"
+keys_info = [
+    "[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3",
+]
+
+[[case.expected_signatures]]
+input_index = 0
+pubkey = "024ba3b77d933de9fa3f9583348c40f3caaf2effad5b6e244ece8abbfcc7244f67"
+sighash_type = 1
+signature = "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
+
+[[case]]
+name = "singlesig_wpkh_1to2"
+description = "native segwit P2WPKH, 1 input 2 outputs"
+psbt_file = "psbt/singlesig/wpkh-1to2.psbt"
+descriptor_template = "wpkh(@0/**)"
+keys_info = [
+    "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P",
+]
+
+[[case.expected_signatures]]
+input_index = 0
+pubkey = "03ee2c3d98eb1f93c0a1aa8e5a4009b70eb7b44ead15f1666f136b012ad58d3068"
+sighash_type = 1
+signature = "3045022100ab44f34dd7e87c9054591297a101e8500a0641d1d591878d0d23cf8096fa79e802205d12d1062d925e27b57bdcf994ecf332ad0a8e67b8fe407bab2101255da632aa01"
+
+[[case]]
+name = "singlesig_wpkh_2to2"
+description = "native segwit P2WPKH, 2 inputs 2 outputs"
+psbt_file = "psbt/singlesig/wpkh-2to2.psbt"
+descriptor_template = "wpkh(@0/**)"
+keys_info = [
+    "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P",
+]
+
+[[case.expected_signatures]]
+input_index = 0
+pubkey = "03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3"
+sighash_type = 1
+signature = "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
+
+[[case.expected_signatures]]
+input_index = 1
+pubkey = "0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0"
+sighash_type = 1
+signature = "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
+
+[[case]]
+name = "multisig_wsh_2of2"
+description = "native segwit 2-of-2 sortedmulti"
+psbt_file = "psbt/multisig/wsh-2of2.psbt"
+descriptor_template = "wsh(sortedmulti(2,@0/**,@1/**))"
+keys_info = [
+    "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+wallet_name = "Cold storage"
+wallet_hmac = "d7c7a60b4ab4a14c1bf8901ba627d72140b2fb907f2b4e35d2e693bce9fbb371"
+
+[[case.expected_signatures]]
+input_index = 0
+pubkey = "036b16e8c1f979fa4cc0f05b6a300affff941459b6f20de77de55b0160ef8e4cac"
+sighash_type = 1
+signature = "304402206ab297c83ab66e573723892061d827c5ac0150e2044fed7ed34742fedbcfb26e0220319cdf4eaddff63fc308cdf53e225ea034024ef96de03fd0939b6deeea1e8bd301"
+
+[[case]]
+name = "singlesig_tr_1to2_sighash_all"
+description = "taproot keypath, SIGHASH_ALL (verify against digest)"
+psbt_file = "psbt/singlesig/tr-1to2-sighash-all.psbt"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+]
+
+[[case.expected_signatures]]
+input_index = 0
+pubkey = "d8f4f1d18996db61bb1caf5423de25d8a1eee9c950d37e6ffa023012d5e62e0d"
+sighash_type = 1
+sighash = "7A999E5AD6F53EA6448E7026061D3B4523F957999C430A5A492DFACE74AE31B6"
+
+[[case]]
+name = "singlesig_tr_1to2_sighash_default"
+description = "taproot keypath, SIGHASH_DEFAULT (64-byte sig, verify against digest)"
+psbt_file = "psbt/singlesig/tr-1to2-sighash-default.psbt"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+]
+
+[[case.expected_signatures]]
+input_index = 0
+pubkey = "89904a6348d7ff9a44d49db8b6a807c622e868364c547da426f30b5a6213186a"
+sighash_type = 0
+sighash = "75C96FB06A12DB4CD011D8C95A5995DB758A4F2837A22F30F0F579619A4466F3"
+
+[[case]]
+name = "singlesig_tr_1to2_sighash_omitted"
+description = "taproot keypath, SIGHASH_DEFAULT (64-byte sig, verify against digest)"
+psbt_file = "psbt/singlesig/tr-1to2-sighash-omitted.psbt"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+]
+
+[[case.expected_signatures]]
+input_index = 0
+pubkey = "89904a6348d7ff9a44d49db8b6a807c622e868364c547da426f30b5a6213186a"
+sighash_type = 0
+sighash = "75C96FB06A12DB4CD011D8C95A5995DB758A4F2837A22F30F0F579619A4466F3"
+
+[[case]]
+name = "sighash_all"
+description = "taproot keypath, sighash flag 0x01, 2 inputs (verify against digests)"
+psbt_file = "psbt/sighash/sighash-all-sign.psbt"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+]
+
+[[case.expected_signatures]]
+input_index = 0
+pubkey = "0b8e7486bc306a0aefb7a7c00af0405542db1acd73eecca82771ccf5fe5eb60f"
+sighash_type = 1
+sighash = "2221AA462110C77A8E2DD34C3681BAA9BFFF6553B4C609EC7E3D8FF9B1D18D69"
+
+[[case.expected_signatures]]
+input_index = 1
+pubkey = "41461489a43cb67e2c64f39427278edd30c03d6d72a4b89986147c428f0cc5f1"
+sighash_type = 1
+sighash = "D47D3FA22B4F6C50521C49E1A42E8CB10689540A227491A8FC5AD0A6E413063E"
+
+[[case]]
+name = "sighash_none"
+description = "taproot keypath, sighash flag 0x02, 2 inputs (verify against digests)"
+psbt_file = "psbt/sighash/sighash-none-sign.psbt"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+]
+
+[[case.expected_signatures]]
+input_index = 0
+pubkey = "0b8e7486bc306a0aefb7a7c00af0405542db1acd73eecca82771ccf5fe5eb60f"
+sighash_type = 2
+sighash = "965976D58A387369D970F0B6560B144E1B721D41E04675592C41AC35D30D2A56"
+
+[[case.expected_signatures]]
+input_index = 1
+pubkey = "41461489a43cb67e2c64f39427278edd30c03d6d72a4b89986147c428f0cc5f1"
+sighash_type = 2
+sighash = "67E85534A12E4054F4AFAA434D7A7C38123DA6909DF7E45DDB9945F7B8D832D0"
+
+[[case]]
+name = "sighash_single"
+description = "taproot keypath, sighash flag 0x03, 2 inputs (verify against digests)"
+psbt_file = "psbt/sighash/sighash-single-sign.psbt"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+]
+
+[[case.expected_signatures]]
+input_index = 0
+pubkey = "0b8e7486bc306a0aefb7a7c00af0405542db1acd73eecca82771ccf5fe5eb60f"
+sighash_type = 3
+sighash = "F9B834D7FE272F9EACE2FC5F7A97468B024438EF5D55338FC243D5273534A6B5"
+
+[[case.expected_signatures]]
+input_index = 1
+pubkey = "41461489a43cb67e2c64f39427278edd30c03d6d72a4b89986147c428f0cc5f1"
+sighash_type = 3
+sighash = "9A4DDC13C6D0EE10A41D33C6595C63F51AF4C9314387685304F515F790260F78"
+
+[[case]]
+name = "sighash_all_anyonecanpay"
+description = "taproot keypath, sighash flag 0x81, 2 inputs (verify against digests)"
+psbt_file = "psbt/sighash/sighash-all-anyone-can-pay-sign.psbt"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+]
+
+[[case.expected_signatures]]
+input_index = 0
+pubkey = "0b8e7486bc306a0aefb7a7c00af0405542db1acd73eecca82771ccf5fe5eb60f"
+sighash_type = 129
+sighash = "09A6559AF84C48C8D5A7984C5A72E53ED88D160AABAE99C18F00E78A55E7EDC7"
+
+[[case.expected_signatures]]
+input_index = 1
+pubkey = "41461489a43cb67e2c64f39427278edd30c03d6d72a4b89986147c428f0cc5f1"
+sighash_type = 129
+sighash = "9B25C319E12F4755D8A43F3295B8C61B861FB23D7EBF7F9A25E6E8CE3242F939"
+
+[[case]]
+name = "sighash_none_anyonecanpay"
+description = "taproot keypath, sighash flag 0x82, 2 inputs (verify against digests)"
+psbt_file = "psbt/sighash/sighash-none-anyone-can-pay-sign.psbt"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+]
+
+[[case.expected_signatures]]
+input_index = 0
+pubkey = "0b8e7486bc306a0aefb7a7c00af0405542db1acd73eecca82771ccf5fe5eb60f"
+sighash_type = 130
+sighash = "8FCEFFAE04D320E05DE04034069FE6AF8C7CBCC93CDE3F187AB0DEC202692735"
+
+[[case.expected_signatures]]
+input_index = 1
+pubkey = "41461489a43cb67e2c64f39427278edd30c03d6d72a4b89986147c428f0cc5f1"
+sighash_type = 130
+sighash = "A06D37C1C8EEE7EA145F9D8A98CBE79F6BB1691B37F8F26F49F8318F9443B766"
+
+[[case]]
+name = "sighash_single_anyonecanpay"
+description = "taproot keypath, sighash flag 0x83, 2 inputs (verify against digests)"
+psbt_file = "psbt/sighash/sighash-single-anyone-can-pay-sign.psbt"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+]
+
+[[case.expected_signatures]]
+input_index = 0
+pubkey = "0b8e7486bc306a0aefb7a7c00af0405542db1acd73eecca82771ccf5fe5eb60f"
+sighash_type = 131
+sighash = "971886B247797E0A616489B449B5E78AE8EC63E54B55727AF626B964DD8F329D"
+
+[[case.expected_signatures]]
+input_index = 1
+pubkey = "41461489a43cb67e2c64f39427278edd30c03d6d72a4b89986147c428f0cc5f1"
+sighash_type = 131
+sighash = "6B130F2BE5467A8BC36227B8C2A082B46CA24F91A6A6A54AA5EFA4901BE5ADBB"
+
+# ---- Deterministic rejections ----
+
+[[case]]
+name = "sighash_single_unallowed_3ins_2outs"
+description = "SIGHASH_SINGLE with input index >= number of outputs is rejected"
+psbt_file = "psbt/sighash/sighash-single-3-ins-2-outs.psbt"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+]
+error = "NOT_SUPPORTED"
+
+[[case]]
+name = "sighash_unsupported_type"
+description = "unsupported sighash type is rejected"
+psbt_file = "psbt/sighash/sighash-unsupported.psbt"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+]
+error = "NOT_SUPPORTED"
+
