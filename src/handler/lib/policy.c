@@ -592,12 +592,7 @@ __attribute__((warn_unused_result)) static int process_generic_node(policy_parse
 
     const generic_processor_command_t *commands = (const generic_processor_command_t *) arg;
 
-    size_t n_commands = 0;
-    while (commands[n_commands].code != CMD_CODE_END) ++n_commands;
-
-    if (node->step > n_commands) {
-        return WITH_ERROR(-1, "Inconsistent state");
-    } else if (node->step == n_commands) {
+    if (commands[node->step].code == CMD_CODE_END) {
         return 1;
     } else {
         uint8_t cmd_code = commands[node->step].code;
@@ -894,6 +889,7 @@ __attribute__((warn_unused_result)) static int process_multi_sortedmulti_node(
                     }
                 }
             }
+            LEDGER_ASSERT(smallest_pubkey_index >= 0, "No unused key found");
             bitvector_set(used, smallest_pubkey_index, true);  // mark the key as used
         }
 
@@ -961,6 +957,7 @@ __attribute__((warn_unused_result)) static int process_multi_a_sortedmulti_a_nod
                     }
                 }
             }
+            LEDGER_ASSERT(smallest_pubkey_index >= 0, "No unused key found");
             bitvector_set(used, smallest_pubkey_index, true);  // mark the key as used
         }
 

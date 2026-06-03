@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.4.6] - 03-06-2026
+
+### Changed
+
+- Fix llvm 21 scan-build defects
+
 ## [2.4.6] - 30-03-2026
 
 ### Changed

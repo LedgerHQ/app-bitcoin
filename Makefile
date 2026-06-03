@@ -28,7 +28,7 @@ include $(BOLOS_SDK)/Makefile.target
 # Application version
 APPVERSION_M = 2
 APPVERSION_N = 4
-APPVERSION_P = 6
+APPVERSION_P = 7
 APPVERSION_SUFFIX = # if not empty, appended at the end. Do not add a dash.
 
 ifeq ($(APPVERSION_SUFFIX),)
