@@ -190,7 +190,7 @@ CFLAGS    += -include debug-helpers/debug.h
 
 ifeq ($(DEBUG),10)
     $(warning Using semihosted PRINTF. Only run with speculos!)
-    DEFINES   += HAVE_PRINTF HAVE_SEMIHOSTED_PRINTF PRINTF=semihosted_printf
+    DEFINES   += HAVE_SEMIHOSTED_PRINTF
 endif
 
 # Needed to be able to include the definition of G_cx
