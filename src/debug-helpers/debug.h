@@ -7,6 +7,13 @@ void debug_write(const char *buf);
 
 int semihosted_printf(const char *format, ...);
 
+#ifdef HAVE_SEMIHOSTED_PRINTF
+// Route PRINTF to the semihosted implementation, instead of the default one
+// that is routed through seproxyhal.
+#undef PRINTF
+#define PRINTF semihosted_printf
+#endif
+
 void print_stack_pointer(const char *file, int line, const char *func_name);
 
 // Helper macro
