@@ -49,8 +49,12 @@ static inline bool copy_optional_string(toml_datum_t table,
                                         char *dst,
                                         size_t dst_size) {
     toml_datum_t d = toml_get(table, key);
-    if (d.type != TOML_STRING) {
+    if (d.type == TOML_UNKNOWN) {
         return false;
+    }
+    if (d.type != TOML_STRING) {
+        fprintf(stderr, "non-string field: %s\n", key);
+        abort();
     }
     if ((size_t) d.u.str.len >= dst_size) {
         fprintf(stderr, "field %s too long (%d >= %zu)\n", key, d.u.str.len, dst_size);
