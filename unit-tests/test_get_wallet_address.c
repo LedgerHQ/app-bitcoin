@@ -24,6 +24,7 @@
 
 #include "mock_dispatcher.h"
 #include "tomlc17.h"
+#include "toml_helpers.h"
 
 #include "common/wallet.h"
 #include "handler/lib/policy.h"
@@ -57,49 +58,6 @@ static size_t g_n_cases = 0;
  *  TOML loader. Copies the relevant fields out of the parsed document into
  *  g_cases, so the document lifetime doesn't need to outlive parsing.
  * =========================================================================== */
-
-/* The TOML loader runs from main() before cmocka_run_group_tests_name(),
- * so there is no active test (and no setjmp buffer) for cmocka's fail()
- * / assert_* macros to unwind to. On malformed input we abort() the
- * process instead, which gives a deterministic, non-zero exit. */
-
-/* Copy a required string field from a TOML table into a fixed-size buffer.
- * Aborts the process if the field is missing or doesn't fit. */
-static void copy_required_string(toml_datum_t table,
-                                 const char *key,
-                                 char *dst,
-                                 size_t dst_size) {
-    toml_datum_t d = toml_get(table, key);
-    if (d.type != TOML_STRING) {
-        fprintf(stderr, "missing or non-string field: %s\n", key);
-        abort();
-    }
-    if ((size_t) d.u.str.len >= dst_size) {
-        fprintf(stderr, "field %s too long (%d >= %zu)\n", key, d.u.str.len, dst_size);
-        abort();
-    }
-    memcpy(dst, d.u.str.ptr, (size_t) d.u.str.len);
-    dst[d.u.str.len] = '\0';
-}
-
-/* Copy a required non-negative integer field. */
-static unsigned int copy_required_uint(toml_datum_t table, const char *key) {
-    toml_datum_t d = toml_get(table, key);
-    if (d.type != TOML_INT64) {
-        fprintf(stderr, "missing or non-integer field: %s\n", key);
-        abort();
-    }
-    if (d.u.int64 < 0) {
-        fprintf(stderr, "negative integer in field: %s\n", key);
-        abort();
-    }
-    if (d.u.int64 > UINT_MAX) {
-        fprintf(stderr, "integer in field %s too large\n", key);
-        abort();
-    }
-    return (unsigned int) d.u.int64;
-}
-
 static void parse_vectors(const char *path) {
     toml_result_t r = toml_parse_file_ex(path);
     if (!r.ok) {
@@ -246,8 +204,8 @@ static void test_one_case(void **state) {
     memcpy(keys_merkle_root, mock->trees[mock->n_trees - 1].root, 32);
 
     uint8_t policy_buf[MAX_WALLET_POLICY_BYTES];
-    buffer_t tpl_buf = buffer_create((void *) tc->descriptor_template,
-                                     strlen(tc->descriptor_template));
+    buffer_t tpl_buf =
+        buffer_create((void *) tc->descriptor_template, strlen(tc->descriptor_template));
     int parse_res = parse_descriptor_template(&tpl_buf,
                                               policy_buf,
                                               sizeof(policy_buf),
