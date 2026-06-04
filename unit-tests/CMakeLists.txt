@@ -343,4 +343,23 @@ if(SPECULOS AND SPECULOS_SRC)
     cmocka mock_dispatcher app_crypto buffer buffer_ext tomlc17
   )
   add_test(test_get_wallet_address test_get_wallet_address)
+
+  # test_get_extended_pubkey exercises handler_get_extended_pubkey (compiled
+  # directly into the test) against the vectors in
+  # ../test_vectors/get_extended_pubkey.toml. It drives the handler through the
+  # mock dispatcher (which backs the response buffer) and provides a capturing
+  # stub for the UI symbol the handler references (ui_display_pubkey).
+  add_executable(test_get_extended_pubkey
+    test_get_extended_pubkey.c
+    ../src/handler/get_extended_pubkey.c
+  )
+  app_apply_real_sdk_config(test_get_extended_pubkey)
+  target_include_directories(test_get_extended_pubkey BEFORE PRIVATE ../src/ui)
+  target_compile_definitions(test_get_extended_pubkey PRIVATE
+    TEST_VECTORS_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}/../test_vectors/get_extended_pubkey.toml\"
+  )
+  target_link_libraries(test_get_extended_pubkey PRIVATE
+    cmocka mock_dispatcher app_crypto buffer buffer_ext tomlc17
+  )
+  add_test(test_get_extended_pubkey test_get_extended_pubkey)
 endif()
