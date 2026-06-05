@@ -74,26 +74,63 @@ typedef struct {
     uint8_t expected_wallet_id[32];
     bool has_wallet_hmac;
     uint8_t expected_wallet_hmac[32];
+    bool has_key_types;
+    key_type_e key_types[MAX_KEYS_PER_CASE];
+    size_t n_key_types;
 } testcase_t;
 
 static testcase_t *g_cases = NULL;
 static size_t g_n_cases = 0;
 
-/* The handler references the UI confirmation; we exercise the UI-free flow, so
- * this stub only needs to satisfy the linker (it always approves). Pure UI
- * DENY flows are out of scope for these vectors (see register_wallet.toml). */
+/* Records the arguments the handler passes to the UI confirmation, so the test
+ * can verify the per-key classification (internal/external/unspendable) the
+ * handler computed — not just the aggregate status word. Reset before each case
+ * in case_setup. A file-scope global is the channel: the stub's signature is
+ * fixed by the UI prototype, and the shared mock dispatcher shouldn't carry
+ * test-specific fields. */
+static struct {
+    bool called;
+    size_t n_keys;
+    key_type_e keys_type[MAX_N_KEYS_IN_WALLET_POLICY];
+    char descriptor_template[MAX_TPL_LEN];
+    char name[MAX_NAME_LEN];
+    uint8_t version;
+} g_ui_capture;
+
+/* The handler calls this once the policy is accepted, just before computing the
+ * HMAC. We capture its arguments and approve (return true); pure UI DENY flows
+ * are out of scope for these vectors (see register_wallet.toml). */
 bool ui_display_register_wallet_policy(
     dispatcher_context_t *context,
     const policy_map_wallet_header_t *wallet_header,
     const char *descriptor_template,
     const char (*keys_info)[MAX_N_KEYS_IN_WALLET_POLICY][MAX_POLICY_KEY_INFO_LEN + 1],
     const key_type_e (*keys_type)[MAX_N_KEYS_IN_WALLET_POLICY]) {
-    (void) context;
-    (void) wallet_header;
-    (void) descriptor_template;
     (void) keys_info;
-    (void) keys_type;
+
+    g_ui_capture.called = true;
+    g_ui_capture.n_keys = wallet_header->n_keys;
+    g_ui_capture.version = wallet_header->version;
+    for (size_t i = 0; i < wallet_header->n_keys && i < MAX_N_KEYS_IN_WALLET_POLICY; i++) {
+        g_ui_capture.keys_type[i] = (*keys_type)[i];
+    }
+    snprintf(g_ui_capture.name, sizeof(g_ui_capture.name), "%s", wallet_header->name);
+    snprintf(g_ui_capture.descriptor_template,
+             sizeof(g_ui_capture.descriptor_template),
+             "%s",
+             descriptor_template);
+
+    (void) context;
     return true;
+}
+
+/* Map a key-type name from the vectors file to its key_type_e. */
+static key_type_e key_type_from_name(const char *name) {
+    if (strcmp(name, "internal") == 0) return PUBKEY_TYPE_INTERNAL;
+    if (strcmp(name, "external") == 0) return PUBKEY_TYPE_EXTERNAL;
+    if (strcmp(name, "unspendable") == 0) return PUBKEY_TYPE_UNSPENDABLE;
+    fprintf(stderr, "unknown key type: %s\n", name);
+    abort();
 }
 
 /* ===========================================================================
@@ -237,6 +274,28 @@ static void parse_vectors(const char *path) {
             memcpy(cur->keys_info[k], key_node.u.str.ptr, (size_t) key_node.u.str.len);
             cur->keys_info[k][key_node.u.str.len] = '\0';
         }
+
+        /* Optional per-key classification (one entry per key, @0,@1,... order). */
+        toml_datum_t kt = toml_get(tc_node, "expected_key_types");
+        cur->has_key_types = (kt.type != TOML_UNKNOWN);
+        if (cur->has_key_types) {
+            if (kt.type != TOML_ARRAY || (size_t) kt.u.arr.size != cur->n_keys) {
+                fprintf(stderr,
+                        "%s: expected_key_types must be an array of length n_keys (%zu)\n",
+                        cur->name,
+                        cur->n_keys);
+                abort();
+            }
+            cur->n_key_types = cur->n_keys;
+            for (size_t k = 0; k < cur->n_keys; k++) {
+                toml_datum_t e = kt.u.arr.elem[k];
+                if (e.type != TOML_STRING) {
+                    fprintf(stderr, "%s: expected_key_types[%zu] is not a string\n", cur->name, k);
+                    abort();
+                }
+                cur->key_types[k] = key_type_from_name(e.u.str.ptr);
+            }
+        }
     }
 
     toml_free(r);
@@ -265,6 +324,7 @@ static int case_setup(void **state) {
     }
     cs->tc = tc;
     *state = cs;
+    memset(&g_ui_capture, 0, sizeof(g_ui_capture));
     return 0;
 }
 
@@ -349,6 +409,8 @@ static void test_one_case(void **state) {
 
     if (tc->has_error) {
         assert_int_equal(mock->last_sw, error_name_to_sw(tc->error));
+        /* A deterministic rejection must return before the UI confirmation. */
+        assert_false(g_ui_capture.called);
         return;
     }
 
@@ -358,6 +420,21 @@ static void test_one_case(void **state) {
     assert_memory_equal(mock->request_buf, tc->expected_wallet_id, 32);
     if (tc->has_wallet_hmac) {
         assert_memory_equal(mock->request_buf + 32, tc->expected_wallet_hmac, 32);
+    }
+
+    /* The UI confirmation must have been shown, with the parsed header intact. */
+    assert_true(g_ui_capture.called);
+    assert_int_equal(g_ui_capture.version, WALLET_POLICY_VERSION_V2);
+    assert_int_equal(g_ui_capture.n_keys, tc->n_keys);
+    assert_string_equal(g_ui_capture.descriptor_template, tc->descriptor_template);
+    assert_string_equal(g_ui_capture.name, tc->wallet_name);
+
+    /* When pinned, verify the per-key classification (NUMS / internal-key
+     * re-derivation / fingerprint-collision guard) the handler computed. */
+    if (tc->has_key_types) {
+        for (size_t i = 0; i < tc->n_key_types; i++) {
+            assert_int_equal(g_ui_capture.keys_type[i], tc->key_types[i]);
+        }
     }
 }
 

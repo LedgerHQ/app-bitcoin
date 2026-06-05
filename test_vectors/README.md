@@ -94,6 +94,11 @@ on navigation, not on the request, and stay as framework-specific code.
   secret-free, checkable by any framework.
 - `expected_wallet_hmac` (hex, 32 bytes, optional): reproducible only with the
   Speculos registration key.
+- `expected_key_types` (array of strings, optional): the per-key classification the
+  device assigns, one entry per key in `@0,@1,…` order. Each is `"internal"` (our key,
+  re-derived and matched), `"external"` (a foreign key, including a fingerprint collision
+  whose re-derived pubkey doesn't match), or `"unspendable"` (the BIP-341 NUMS point).
+  Present only on success cases.
 - *or* `error` (e.g. `INCORRECT_DATA` for a bad name, `NOT_SUPPORTED` for a
   non-sane policy).
 
