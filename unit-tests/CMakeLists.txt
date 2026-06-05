@@ -362,4 +362,24 @@ if(SPECULOS AND SPECULOS_SRC)
     cmocka mock_dispatcher app_crypto buffer buffer_ext tomlc17
   )
   add_test(test_get_extended_pubkey test_get_extended_pubkey)
+
+  # test_register_wallet exercises the UI-free core of handler_register_wallet
+  # (the handler source is compiled directly into the test) against the vectors
+  # in ../test_vectors/register_wallet.toml. It drives the handler through the
+  # mock dispatcher (which serves the keys Merkle tree and the descriptor
+  # preimage) and provides a stub for the UI symbol the handler references
+  # (ui_display_register_wallet_policy).
+  add_executable(test_register_wallet
+    test_register_wallet.c
+    ../src/handler/register_wallet.c
+  )
+  app_apply_real_sdk_config(test_register_wallet)
+  target_include_directories(test_register_wallet BEFORE PRIVATE ../src/ui)
+  target_compile_definitions(test_register_wallet PRIVATE
+    TEST_VECTORS_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}/../test_vectors/register_wallet.toml\"
+  )
+  target_link_libraries(test_register_wallet PRIVATE
+    cmocka mock_dispatcher app_crypto buffer buffer_ext tomlc17
+  )
+  add_test(test_register_wallet test_register_wallet)
 endif()
