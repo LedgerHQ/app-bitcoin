@@ -10,36 +10,42 @@ name = "times_headline"
 message = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks."
 path = "m/44'/1'/0'/0/0"
 expected_signature = "IOR4YRVlmJGMx+H7PgQvHzWAF0HAgrUggQeRdnoWKpypfaAberpvF+XbOCM5Cd/ljogNyU3w2OIL8eYCyZ6Ru2k="
+displayed_as = "message"
 
 [[case]]
 name = "times_headline_with_eol"
 message = "\nThe Times 03/Jan/2009 Chancellor\non brink of second bailout for banks."
 path = "m/44'/1'/0'/0/0"
 expected_signature = "ILMgIpFxqZwrB5bgR/seis2N48jS7pmHViKcRYisIPBdDjhAzGDGP3HiLPcrYMlEOXJvdJ9/Mud/+fslM2KtKaM="
+displayed_as = "message"
 
 [[case]]
 name = "hello_world"
 message = "Hello world!"
 path = "m/84'/1'/0'/0/0"
 expected_signature = "IEOK4+JMK7FToR7XMzFCoAYh1nud1IKm9Wq3vXLSVk/lBay8rHCRp9bP6riyR5NDqXYyYf7cXgMQTHNz3SemwZI="
+displayed_as = "message"
 
 [[case]]
 name = "long_multileaf"
 message = "The root problem with conventional currency is all the trust that's required to make it work. The central bank must be trusted not to debase the currency, but the history of fiat currencies is full of breaches of that trust. Banks must be trusted to hold our money and transfer it electronically, but they lend it out in waves of credit bubbles with barely a fraction in reserve. We have to trust them with our privacy, trust them not to let identity thieves drain our accounts. Their massive overhead costs make micropayments impossible."
 path = "m/84'/1'/0'/0/8"
 expected_signature = "H4frM6TYm5ty1MAf9o/Zz9Qiy3VEldAYFY91SJ/5nYMAZY1UUB97fiRjKW8mJit2+V4OCa1YCqjDqyFnD9Fw75k="
+displayed_as = "message"
 
 [[case]]
 name = "non_ascii_carriage_return"
 message = "Hello\rworld!"
 path = "m/84'/1'/0'/0/8"
 expected_signature = "ILXQPJapQ/OEy9f/ggRouI6HuAleQveIOBphNUCLlWNVQAml2Yx+885tsU0DKIxggsVq53o/fQRlosTPTQE/keE="
+displayed_as = "hash"
 
 [[case]]
 name = "too_long_to_display"
 message = "The root problem with conventional currency is all the trust that's required to make it work. The central bank must be trusted not to debase the currency, but the history of fiat currencies is full of breaches of that trust. Banks must be trusted to hold our money and transfer it electronically, but they lend it out in waves of credit bubbles with barely a fraction in reserve. We have to trust them with our privacy, trust them not to let identity thieves drain our accounts. Their massive overhead costs make micropayments impossible. The root problem with conventional currency is all the trust that's required to make it work. The central bank must be trusted not to debase the currency, but the history of fiat currencies is full of breaches of that trust. Banks must be trusted to hold our money and transfer it electronically, but they lend it out in waves of credit bubbles with barely a fraction in reserve. We have to trust them with our privacy, trust them not to let identity thieves drain our accounts. Their massive overhead costs make micropayments impossible. The root problem with conventional currency is all the trust that's required to make it work. The central bank must be trusted not to debase the currency, but the history of fiat currencies is full of breaches of that trust. Banks must be trusted to hold our money and transfer it electronically, but they lend it out in waves of credit bubbles with barely a fraction in reserve. We have to trust them with our privacy, trust them not to let identity thieves drain our accounts. Their massive overhead costs make micropayments impossible."
 path = "m/84'/1'/0'/0/8"
 expected_signature = "IDAl9RThAyunmYuol9DaDs/CScUpiol3FDSjIjyK9y0tc/x1HWrbT/ufdkPFY1Bmi+L9hc3ip1me2RmufprVuNk="
+displayed_as = "hash"
 
 # Path with 11 derivation steps exceeds the maximum (10): WRONG_DATA_LENGTH.
 [[case]]
