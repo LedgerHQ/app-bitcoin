@@ -84,9 +84,13 @@ on navigation, not on the request, and stay as framework-specific code.
   `INCORRECT_DATA`).
 
 ### `sign_message.toml`
-- `message` (string) *or* `message_hex` (hex string) for raw/binary input.
+- `message` (string): UTF-8 text to sign.
 - `path` (string).
 - `expected_signature` (base64 string) on success — *or* `error`.
+- `displayed_as` (string, optional): how the device shows the message on the
+  confirmation screen — `"message"` (the text itself, for printable messages up to
+  10 lines) or `"hash"` (the uppercase hex of `sha256(message)`, for non-printable or
+  over-long messages). Present only on success cases.
 
 ### `register_wallet.toml`
 - wallet policy block (`descriptor_template`, `keys_info`, `wallet_name`).
