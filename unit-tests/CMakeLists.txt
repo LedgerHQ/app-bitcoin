@@ -382,4 +382,22 @@ if(SPECULOS AND SPECULOS_SRC)
     cmocka mock_dispatcher app_crypto buffer buffer_ext tomlc17
   )
   add_test(test_register_wallet test_register_wallet)
+
+  # test_sign_message exercises handler_sign_message (compiled directly into the
+  # test) against the vectors in ../test_vectors/sign_message.toml. It drives the
+  # handler through the mock dispatcher (which streams back the message chunks)
+  # and provides capturing stubs for the UI symbols the handler references.
+  add_executable(test_sign_message
+    test_sign_message.c
+    ../src/handler/sign_message.c
+  )
+  app_apply_real_sdk_config(test_sign_message)
+  target_include_directories(test_sign_message BEFORE PRIVATE ../src/ui)
+  target_compile_definitions(test_sign_message PRIVATE
+    TEST_VECTORS_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}/../test_vectors/sign_message.toml\"
+  )
+  target_link_libraries(test_sign_message PRIVATE
+    cmocka mock_dispatcher app_crypto buffer buffer_ext tomlc17
+  )
+  add_test(test_sign_message test_sign_message)
 endif()
