@@ -121,8 +121,8 @@ static bool __attribute__((noinline)) parse_sign_psbt_apdu(dispatcher_context_t 
  * Returns true on success; on failure, an error status word has already been
  * sent.
  */
-static bool __attribute__((noinline))
-process_global_map(dispatcher_context_t *dc, sign_psbt_state_t *st) {
+static bool __attribute__((noinline)) process_global_map(dispatcher_context_t *dc,
+                                                         sign_psbt_state_t *st) {
     // Check integrity of the global map
     if (call_check_merkle_tree_sorted(dc, st->global_map.keys_root, (size_t) st->global_map.size) <
         0) {
@@ -136,7 +136,7 @@ process_global_map(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     // Read tx version
     result_len = call_get_merkleized_map_value(dc,
                                                &st->global_map,
-                                               (uint8_t[]){PSBT_GLOBAL_TX_VERSION},
+                                               (uint8_t[]) {PSBT_GLOBAL_TX_VERSION},
                                                1,
                                                raw_result,
                                                sizeof(raw_result));
@@ -152,7 +152,7 @@ process_global_map(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     // locktime to the appropriate value before calling sign_psbt.
     result_len = call_get_merkleized_map_value(dc,
                                                &st->global_map,
-                                               (uint8_t[]){PSBT_GLOBAL_FALLBACK_LOCKTIME},
+                                               (uint8_t[]) {PSBT_GLOBAL_FALLBACK_LOCKTIME},
                                                1,
                                                raw_result,
                                                sizeof(raw_result));

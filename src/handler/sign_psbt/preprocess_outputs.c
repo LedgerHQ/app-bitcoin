@@ -87,11 +87,11 @@ static void output_keys_callback(dispatcher_context_t *dc,
     }
 }
 
-bool __attribute__((noinline))
-preprocess_outputs(dispatcher_context_t *dc,
-                   sign_psbt_state_t *st,
-                   sign_psbt_cache_t *sign_psbt_cache,
-                   uint8_t internal_outputs[static BITVECTOR_REAL_SIZE(MAX_N_OUTPUTS_CAN_SIGN)]) {
+bool __attribute__((noinline)) preprocess_outputs(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *st,
+    sign_psbt_cache_t *sign_psbt_cache,
+    uint8_t internal_outputs[static BITVECTOR_REAL_SIZE(MAX_N_OUTPUTS_CAN_SIGN)]) {
     /** OUTPUTS VERIFICATION FLOW
      *
      *  For each output, check if it's internal (that is, a change address).
@@ -137,7 +137,7 @@ preprocess_outputs(dispatcher_context_t *dc,
         // Read the output's amount
         int result_len = call_get_merkleized_map_value(dc,
                                                        &output.in_out.map,
-                                                       (uint8_t[]){PSBT_OUT_AMOUNT},
+                                                       (uint8_t[]) {PSBT_OUT_AMOUNT},
                                                        1,
                                                        raw_result,
                                                        sizeof(raw_result));
@@ -160,7 +160,7 @@ preprocess_outputs(dispatcher_context_t *dc,
         // Read the output's scriptPubKey
         result_len = call_get_merkleized_map_value(dc,
                                                    &output.in_out.map,
-                                                   (uint8_t[]){PSBT_OUT_SCRIPT},
+                                                   (uint8_t[]) {PSBT_OUT_SCRIPT},
                                                    1,
                                                    output.in_out.scriptPubKey,
                                                    sizeof(output.in_out.scriptPubKey));

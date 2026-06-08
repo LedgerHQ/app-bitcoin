@@ -44,7 +44,7 @@ int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness(
     uint32_t prevout_n;
     if (4 != call_get_merkleized_map_value_u32_le(dc,
                                                   input_map,
-                                                  (uint8_t[]){PSBT_IN_OUTPUT_INDEX},
+                                                  (uint8_t[]) {PSBT_IN_OUTPUT_INDEX},
                                                   1,
                                                   &prevout_n)) {
         return -1;
@@ -54,7 +54,7 @@ int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness(
     // request non-witness utxo, and get the prevout's value and scriptpubkey
     int res = call_psbt_parse_rawtx(dc,
                                     input_map,
-                                    (uint8_t[]){PSBT_IN_NON_WITNESS_UTXO},
+                                    (uint8_t[]) {PSBT_IN_NON_WITNESS_UTXO},
                                     1,
                                     prevout_n,
                                     &parser_outputs);
@@ -83,17 +83,17 @@ int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness(
  a PSBTv2.
  Returns -1 on failure, 0 on success.
 */
-int __attribute__((noinline))
-get_amount_scriptpubkey_from_psbt_witness(dispatcher_context_t *dc,
-                                          const merkleized_map_commitment_t *input_map,
-                                          uint64_t *amount,
-                                          uint8_t scriptPubKey[static MAX_PREVOUT_SCRIPTPUBKEY_LEN],
-                                          size_t *scriptPubKey_len) {
+int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_witness(
+    dispatcher_context_t *dc,
+    const merkleized_map_commitment_t *input_map,
+    uint64_t *amount,
+    uint8_t scriptPubKey[static MAX_PREVOUT_SCRIPTPUBKEY_LEN],
+    size_t *scriptPubKey_len) {
     uint8_t raw_witnessUtxo[8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN];
 
     int wit_utxo_len = call_get_merkleized_map_value(dc,
                                                      input_map,
-                                                     (uint8_t[]){PSBT_IN_WITNESS_UTXO},
+                                                     (uint8_t[]) {PSBT_IN_WITNESS_UTXO},
                                                      1,
                                                      raw_witnessUtxo,
                                                      sizeof(raw_witnessUtxo));

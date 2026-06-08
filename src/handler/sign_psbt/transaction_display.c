@@ -35,14 +35,14 @@
 #include "script.h"
 #include "sw.h"
 
-static bool __attribute__((noinline))
-display_output(dispatcher_context_t *dc,
-               sign_psbt_state_t *st,
-               int cur_output_index,
-               int external_outputs_count,
-               const uint8_t out_scriptPubKey[static MAX_OUTPUT_SCRIPTPUBKEY_LEN],
-               size_t out_scriptPubKey_len,
-               uint64_t out_amount) {
+static bool __attribute__((noinline)) display_output(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *st,
+    int cur_output_index,
+    int external_outputs_count,
+    const uint8_t out_scriptPubKey[static MAX_OUTPUT_SCRIPTPUBKEY_LEN],
+    size_t out_scriptPubKey_len,
+    uint64_t out_amount) {
     UNUSED(cur_output_index);
 
     // show this output's address
@@ -95,7 +95,7 @@ static bool get_output_script_and_amount(
     // Read the output's amount
     int result_len = call_get_merkleized_map_value(dc,
                                                    &map,
-                                                   (uint8_t[]){PSBT_OUT_AMOUNT},
+                                                   (uint8_t[]) {PSBT_OUT_AMOUNT},
                                                    1,
                                                    raw_result,
                                                    sizeof(raw_result));
@@ -109,7 +109,7 @@ static bool get_output_script_and_amount(
     // Read the output's scriptPubKey
     result_len = call_get_merkleized_map_value(dc,
                                                &map,
-                                               (uint8_t[]){PSBT_OUT_SCRIPT},
+                                               (uint8_t[]) {PSBT_OUT_SCRIPT},
                                                1,
                                                out_scriptPubKey,
                                                MAX_OUTPUT_SCRIPTPUBKEY_LEN);
@@ -180,8 +180,8 @@ static bool __attribute__((noinline)) display_external_outputs(
     return true;
 }
 
-static bool __attribute__((noinline))
-display_warnings(dispatcher_context_t *dc, sign_psbt_state_t *st) {
+static bool __attribute__((noinline)) display_warnings(dispatcher_context_t *dc,
+                                                       sign_psbt_state_t *st) {
     // If any input has non-default sighash, we warn the user
     if (st->warnings.non_default_sighash && !ui_warn_nondefault_sighash(dc)) {
         SEND_SW(dc, SW_DENY);

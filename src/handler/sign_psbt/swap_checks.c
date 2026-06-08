@@ -35,8 +35,8 @@
 #include "swap/swap_globals.h"
 #include "sw.h"
 
-bool __attribute__((noinline))
-execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
+bool __attribute__((noinline)) execute_swap_checks(dispatcher_context_t *dc,
+                                                   sign_psbt_state_t *st) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     // Swap feature: check that wallet policy is a default one

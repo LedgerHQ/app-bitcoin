@@ -153,7 +153,7 @@ bool compute_musig_per_input_info(dispatcher_context_t *dc,
     // Malicious collisions are not a concern, as they would only result in a signing failure (since
     // the nonces would be incorrectly regenerated during round 2 of MuSig2).
     crypto_tr_tagged_hash(
-        (uint8_t[]){'P', 's', 'b', 't', 'S', 'e', 's', 's', 'i', 'o', 'n', 'I', 'd'},
+        (uint8_t[]) {'P', 's', 'b', 't', 'S', 'e', 's', 's', 'i', 'o', 'n', 'I', 'd'},
         13,
         st->account.wallet_header
             .keys_info_merkle_root,  // TODO: wallet policy id would be more precise
