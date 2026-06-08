@@ -1,191 +1,106 @@
-# Wallet policy
+# Wallet policies
 
-A _wallet policy_ is a structured representation of an account secured by a policy expressed with output script descriptors. It is composed by two parts:
-a wallet descriptor template and the vector of key placeholder expressions.
+The Ledger Bitcoin app describes every account using a **wallet policy**, the
+representation standardized in
+[BIP-388](https://github.com/bitcoin/bips/blob/master/bip-0388.mediawiki). A wallet policy
+is a pair of:
 
-A _wallet descriptor template_ follows language very similar to output descriptor, with a few differences; the biggest one is that each `KEY` expression with a key placeholder `KP` expression, that refers to one of the keys in the _keys information vector_, plus the additional derivation steps to use for that key. Contextually, the keys information vector contains all the relevant _xpubs_, and possibly their key origin information.
+- a **wallet descriptor template** — an output script descriptor in which each key is
+  replaced by a key placeholder (`@0`, `@1`, …); and
+- a **key information vector** — the actual keys (`xpub`s), each optionally preceded by its
+  key origin information.
 
-Each entry in the key information vector contains an _xpub_ (other types of keys supported in output script descriptors are not allowed), possible preceded by the key origin information. The key origin information is compulsory for internal keys.
+The key origin information is compulsory for xpubs controlled by the device. Without it, the xpub
+will be considered external, and the device will not sign for any key derived by it.
 
-This section formally defines wallet policies, and how they relate to
-output script descriptors.
+Wallet policies are registered with a short readable *account name* provided by the host wallet, which is shown on-screen.
 
-## Formal definition
+For a higher-level explanation of wallet policies, registration, and the security model,
+see [integration.md](integration.md).
 
-A _wallet policy_ is composed by a _wallet descriptor template_, together with a vector of _key information items_.
+## Supported scripts
 
-### Wallet descriptor template ====
+The following templates are supported as the **top-level** script:
 
-A wallet descriptor template is a `SCRIPT` expression.
+- `pkh(KP)`, `wpkh(KP)`, `sh(wpkh(KP))` — single-key legacy, native SegWit, and nested
+  SegWit;
+- `sh(multi(...))`, `sh(sortedmulti(...))` — legacy multisig;
+- `sh(wsh(multi(...)))`, `sh(wsh(sortedmulti(...)))` — wrapped-SegWit multisig;
+- `wsh(SCRIPT)` — native SegWit;
+- `tr(KP)` and `tr(KP, TREE)` — taproot, with an optional tree of script paths.
 
-`SCRIPT` expressions:
-- `sh(SCRIPT)` (top level only): P2SH embed the argument.
-- `wsh(SCRIPT)` (top level or inside `sh` only): P2WSH embed the argument.
-- `pkh(KP)` (not inside `tr`): P2PKH output for the given public key (use
-`addr` if you only know the pubkey hash).
-- `wpkh(KP)` (top level or inside `sh` only): P2WPKH output for the given
-compressed pubkey.
-- `multi(k,KP_1,KP_2,...,KP_n)` (not inside `tr`): k-of-n multisig script using OP_CHECKMULTISIG.
-- `sortedmulti(k,KP_1,KP_2,...,KP_n)` (not inside `tr`): k-of-n multisig script with keys
-sorted lexicographically in the resulting script.
-- `multi_a(k,KP_1,KP_2,...,KP_n)` (only inside `tr`): k-of-n multisig script.
-- `sortedmulti_a(k,KP_1,KP_2,...,KP_n)` (only inside `tr`): k-of-n multisig script with keys
-sorted lexicographically in the resulting script.
-- `tr(KP)` or `tr(KP,TREE)`: P2TR output with the specified key placeholder internal key, and optionally a tree of script paths.
-- any valid [miniscript](https://bitcoin.sipa.be/miniscript) template (only inside top-level `wsh`, or in `TREE`).
+Within `wsh(...)`, `SCRIPT` can be `multi(...)`, `sortedmulti(...)`, or a valid SegWit
+[miniscript](https://github.com/bitcoin/bips/blob/master/bip-0379.md) template.
 
-`TREE` expressions:
-- any `SCRIPT`expression.
-- An open brace `{`, a `TREE` expression, a comma `,`, a `TREE` expression, and a closing brace `}`.
+Within a taproot `TREE`, each leaf script can be `multi_a(...)`, `sortedmulti_a(...)`, or a
+valid taproot miniscript template.
 
-`KP` expressions (key placeholders) consist of
-- a single character `@`
-- followed by a non-negative decimal number, with no leading zeros (except
-for `@0`).
-- possibly followed by either:
-  - the string  `/**`, or
-  - a string of the form `/<NUM;NUM>/*`, for two distinct decimal numbers
-`NUM` representing unhardened derivations.
+Taproot key placeholders (both the taproot internal key, and key expressions used in tapleaves) may
+also be `musig(...)` aggregate-key expressions, as described in [musig.md](musig.md).
 
-The `/**` in the placeholder template represents commonly used paths for
-receive/change addresses, and is equivalent to `<0;1>`.
+## Default wallets
 
-The placeholder `@i` for some number *i* represents the *i*-th key in the
-vector of key origin information (which must be of size at least *i* + 1,
-or the wallet policy is invalid).
+A few policies that correspond to standardized single-key accounts can be used for address
+derivation and signing **without prior registration**. For these *default wallet accounts*, the
+wallet name must be empty. They are:
 
-### Keys information vector
+| Policy template   | Address type   | Standard                                                                       |
+|-------------------|----------------|--------------------------------------------------------------------------------|
+| `pkh(@0/**)`      | Legacy         | [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)       |
+| `sh(wpkh(@0/**))` | Nested SegWit  | [BIP-49](https://github.com/bitcoin/bips/blob/master/bip-0049.mediawiki)       |
+| `wpkh(@0/**)`     | Native SegWit  | [BIP-84](https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki)       |
+| `tr(@0/**)`       | Taproot        | [BIP-86](https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki)       |
 
-Each element of the keys origin information vector is a `KEY` expression.
+A policy is treated as a default wallet only if its single key's origin path follows the
+corresponding BIP. In addition, the BIP-44 `account` level must be at most `100`, and the
+address index at most `50000`. Accounts that exceed those bounds, or use a non-standard
+path, are still usable, but must be registered first.
 
-`KEY` expressions consist of
-- Optionally, key origin information, consisting of:
-  - An open bracket `[`
-  - Exactly 8 hex characters for the fingerprint of the master key from
-which this key is derived from (see [BIP32](
-https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki) for details)
-  - Followed by zero or more `/NUM'` path elements to indicate hardened
-derivation steps between the fingerprint and the xpub that follows
-  - A closing bracket `]`
-- Followed by the actual key, which is either
-  - a hex-encoded pubkey, which is either
-    - inside `wpkh` and `wsh`, only compressed public keys are permitted
-(exactly 66 hex characters starting with `02` or `03`.
-    - inside `tr`, x-only pubkeys are also permitted (exactly 64 hex
-characters).
-  - a serialized extended public key (`xpub`) (as defined in [BIP 32](
-https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki))
+## Serialization
 
-The placeholder `@i` for some number *i* represents the *i*-th key in the
-vector of key origin information (which must be of size at least *i* + 1,
-or the wallet policy is invalid).
+A registered wallet policy comprises:
 
-A key with no origin information will be treated as external by the hardware wallet.
+- the **wallet name**, shown to the user on-screen to identify the wallet (empty for a
+  default wallet);
+- the **wallet descriptor template**, as a string;
+- the **key information vector**.
 
-### Additional rules
+It is serialized as the concatenation of:
 
-The wallet policy is invalid if any placeholder expression with additional
-derivation steps is used when the corresponding key information is not an
-xpub.
+- `1 byte`: `0x02`, the version of the wallet policy language;
+- `1 byte`: the length of the wallet name (`0` for a default wallet);
+- `<variable length>`: the wallet name (empty for default wallets);
+- `<variable length>`: the length of the wallet descriptor template, as a Bitcoin-style
+  variable-length integer;
+- `32 bytes`: the SHA-256 hash of the wallet descriptor template;
+- `<variable length>`: the number of keys in the key information vector, as a Bitcoin-style
+  variable-length integer;
+- `32 bytes`: the root of the canonical Merkle tree of the key information vector.
 
-The key information vector *should* be ordered so that placeholder `@i`
-never appear for the first time before an occurrence of `@j` for some `j < i`; for example, the first placeholder is always `@0`, the next one is
-`@1`, etc.
+See [merkle.md](merkle.md) for the Merkle tree construction.
 
-### Implementation-specific restrictions
+The SHA-256 hash of a serialized wallet policy is the **wallet policy id**.
 
-- Placeholder _must_ be followed by `/**` or `/<0;1>`.
-- Key expressions only support xpubs at this time (no hex-encoded pubkeys).
-- Very large policies might not be supported because of the device's memory limitations.
+### Wallet name
 
-## Descriptor derivation
+The wallet name must be recognizable by the user when shown on-screen. During
+registration the app enforces:
 
-From a wallet descriptor template (and the associated vector of keys
-information), one can therefore obtain the 1-dimensional descriptor for
-receive and change addresses by:
+- the name is at least 1 and at most 64 characters long;
+- every character is an ASCII character with code between `0x20` (space) and `0x7e` (`~`),
+  inclusive;
+- the first and last characters are not spaces.
 
-- replacing each key placeholder with the corresponding key origin
-information;
-- replacing every `/**` with `/0/*` for the receive descriptor, and `/1/*`
-for the change descriptor;
-- replacing every `/<M;N>` with `/M` for the receive descriptor, and `/N`
-for the change descriptor.
+Registration is rejected for names that do not satisfy these constraints.
 
-For example, the wallet descriptor `pkh(@0/**)` with key information
-`["[d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL"]`
-produces the following two descriptors:
+## Registration and usage
 
-- Receive descriptor:
-`pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/0/*)`
+Because the app is stateless, a registered policy is not persisted on the device. A
+successful registration instead returns a 32-byte HMAC-SHA256 that authorizes that exact
+policy; the host must store the wallet policy together with this HMAC and supply both on
+every later call that uses the account. The HMAC key is derived deterministically from the
+device seed ([SLIP-0021](https://github.com/satoshilabs/slips/blob/master/slip-0021.md)),
+so registration is non-revocable.
 
-- Change descriptor:
-`pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)`
-
-
-# Policy registration and usage
-The app supports a number of features related to wallet policies. In order to securely sign transactions with a policy wallet (for example in a multisignature), it is necessary to be able to:
-
-- register a wallet, validating all the information (policy and keys involved) with the user on the trusted screen;
-- show the addresses for a registered wallet on the trusted screen;
-- sign spends from the wallet.
-
-Since the application is stateless, wallet registration is not persisted on device. In order to make it possible to use a registered wallet in future requests, the device returns a hmac-sha256 (32 bytes long) for the wallet upon a successful registration. The client side is responsible for persisting the wallet policy *and* the returned hmac-sha256, and to provide this information in future requests.
-
-As the symmetric key used for hmac-sha256 is deterministically derived from the hardware wallet seed (using [SLIP-0021](https://github.com/satoshilabs/slips/blob/master/slip-0021.md)), the completed wallet registration is non-revokable.
-
-## Wallet policy serialization
-
-A registered wallet policy comprises the following:
-- The wallet name, up to 16 bytes long; the name is shown to the user on-screen in order to identify the wallet.
-- The wallet descriptor template as a string.
-- The list of keys.
-
-The wallet policy is serialized as the concatenation of:
-
-- `1 byte`: a byte equal to `0x02`, the version of the wallet policy language
-- `1 byte`: the length of the wallet name (0 for standard wallet)
-- `<variable length>`: the wallet name (empty for standard wallets)
-- `<variable length>`: the length of the wallet descriptor template, encoded as a Bitcoin-style variable-length integer
-- `32 bytes`: the sha256 hash of the wallet descriptor template
-- `<variable length>`: the number of keys in the list of keys, encoded as a Bitcoin-style variable-length integer
-- `<32 bytes>`: the root of the canonical Merkle tree of the list of keys
-
-See [merkle](merkle.md) for information on Merkle trees.
-
-The sha256 hash of a serialized wallet policy is used as a *wallet policy id*.
-
-## Wallet name
-
-The wallet name must be recognizable from the user when shown on-screen. Currently, the following limitations apply during wallet registration:
-- The wallet name must be at least 1 and at most 64 characters long.
-- Each character must be an ASCII character with code at least 32 = 0x20 (the 'space' character) and at most 125 = 0x7e (the '~' character).
-- The first and the last character must _not_ be spaces.
-
-The hardware wallet will reject registration for wallet names not respecting the above constraints.
-
-## Supported policies
-
-The following policy types are currently supported as top-level scripts:
-
-- `sh(multi(...))` and `sh(sortedmulti(...))` (legacy multisignature wallets);
-- `sh(wsh(multi(...)))` and `sh(wsh(sortedmulti(...)))` (wrapped-segwit multisignature wallets);
-- `wsh(SCRIPT)`;
-- `tr(KP)` and `tr(KP,TREE)`.
-
-`SCRIPT` expression within `wsh` can be:
-- `multi` or `sortedmulti`;
-- a valid SegWit miniscript template.
-
-`SCRIPT` expression within `TREE` can be:
-- `multi_a` or `sortedmulti_a`;
-- a valid taproot miniscript template.
-
-# Default wallets
-A few policies that correspond to standardized single-key wallets can be used without requiring any registration; in the serialization, the wallet name must be a zero-length string. Those are the following policies:
-
-- ``pkh(@0/**)`` - legacy addresses as per [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)
-- ``wpkh(@0/**)`` - native segwit addresses per [BIP-84](https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki)
-- ``sh(wpkh(@0/**))`` - nested segwit addresses as per [BIP-49](https://github.com/bitcoin/bips/blob/master/bip-0049.mediawiki)
-- ``tr(@0/**)`` - single Key P2TR as per [BIP-86](https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki)
-
-Note that the wallet policy is considered standard (and therefore usable for signing without prior registration) only if the signing paths (defined in the key origin information) adhere to the corresponding BIP. Moreover, the BIP-44 `account` level must be at most `100`, and the `address index` at most `50000`. Larger values can still be used by registering the policy.
+The registration, address-derivation, and signing flows are described in
+[integration.md](integration.md) (concepts) and [bitcoin.md](bitcoin.md) (wire protocol).
