@@ -44,12 +44,12 @@ int compare_wallet_script_at_path(dispatcher_context_t *dispatcher_context,
     int wallet_script_len =
         get_wallet_script(dispatcher_context,
                           policy,
-                          &(wallet_derivation_info_t){.wallet_version = wallet_version,
-                                                      .keys_merkle_root = keys_merkle_root,
-                                                      .n_keys = n_keys,
-                                                      .change = change,
-                                                      .address_index = address_index,
-                                                      .sign_psbt_cache = sign_psbt_cache},
+                          &(wallet_derivation_info_t) {.wallet_version = wallet_version,
+                                                       .keys_merkle_root = keys_merkle_root,
+                                                       .n_keys = n_keys,
+                                                       .change = change,
+                                                       .address_index = address_index,
+                                                       .sign_psbt_cache = sign_psbt_cache},
                           wallet_script);
     if (wallet_script_len < 0) {
         PRINTF("Failed to get wallet script\n");

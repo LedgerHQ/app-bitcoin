@@ -102,11 +102,11 @@ void input_keys_callback(dispatcher_context_t *dc,
     }
 }
 
-bool __attribute__((noinline))
-preprocess_inputs(dispatcher_context_t *dc,
-                  sign_psbt_state_t *st,
-                  sign_psbt_cache_t *sign_psbt_cache,
-                  uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
+bool __attribute__((noinline)) preprocess_inputs(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *st,
+    sign_psbt_cache_t *sign_psbt_cache,
+    uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     memset(internal_inputs, 0, BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN));
@@ -155,7 +155,7 @@ preprocess_inputs(dispatcher_context_t *dc,
             // non-witness utxo
             if (0 > call_get_merkleized_map_value(dc,
                                                   &input.in_out.map,
-                                                  (uint8_t[]){PSBT_IN_PREVIOUS_TXID},
+                                                  (uint8_t[]) {PSBT_IN_PREVIOUS_TXID},
                                                   1,
                                                   prevout_hash,
                                                   sizeof(prevout_hash))) {
@@ -280,7 +280,7 @@ preprocess_inputs(dispatcher_context_t *dc,
         // get the sighash_type
         if (4 != call_get_merkleized_map_value_u32_le(dc,
                                                       &input.in_out.map,
-                                                      (uint8_t[]){PSBT_IN_SIGHASH_TYPE},
+                                                      (uint8_t[]) {PSBT_IN_SIGHASH_TYPE},
                                                       1,
                                                       &input.sighash_type)) {
             PRINTF("Malformed PSBT_IN_SIGHASH_TYPE for input %d\n", cur_input_index);

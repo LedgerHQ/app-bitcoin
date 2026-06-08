@@ -233,7 +233,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
         // Get sighash type
         if (4 != call_get_merkleized_map_value_u32_le(dc,
                                                       &input->in_out.map,
-                                                      (uint8_t[]){PSBT_IN_SIGHASH_TYPE},
+                                                      (uint8_t[]) {PSBT_IN_SIGHASH_TYPE},
                                                       1,
                                                       &input->sighash_type)) {
             PRINTF("Malformed PSBT_IN_SIGHASH_TYPE for input %d\n", cur_input_index);
@@ -321,7 +321,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 int redeemScript_length =
                     call_get_merkleized_map_value(dc,
                                                   &input->in_out.map,
-                                                  (uint8_t[]){PSBT_IN_REDEEM_SCRIPT},
+                                                  (uint8_t[]) {PSBT_IN_REDEEM_SCRIPT},
                                                   1,
                                                   redeemScript,
                                                   sizeof(redeemScript));
@@ -403,7 +403,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 // keypath spend, we compute the taptree hash
                 if (0 > compute_taptree_hash(
                             dc,
-                            &(wallet_derivation_info_t){
+                            &(wallet_derivation_info_t) {
                                 .address_index = input->in_out.address_index,
                                 .change = input->in_out.is_change ? 1 : 0,
                                 .keys_merkle_root = st->account.wallet_header.keys_info_merkle_root,
@@ -425,7 +425,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 // keypath spend
                 if (isnull_policy_node_tree(&policy->tree)) {
                     // tweak as specified in BIP-86 and BIP-386
-                    tweak_data = (uint8_t[]){};
+                    tweak_data = (uint8_t[]) {};
                     tweak_data_len = 0;
                 } else {
                     // tweak with the taptree hash, per BIP-341
@@ -472,13 +472,13 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
     return true;
 }
 
-static bool __attribute__((noinline))
-fill_taproot_keyexpr_info(dispatcher_context_t *dc,
-                          sign_psbt_state_t *st,
-                          const input_info_t *input,
-                          const policy_node_t *tapleaf_ptr,
-                          keyexpr_info_t *keyexpr_info,
-                          sign_psbt_cache_t *sign_psbt_cache) {
+static bool __attribute__((noinline)) fill_taproot_keyexpr_info(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *st,
+    const input_info_t *input,
+    const policy_node_t *tapleaf_ptr,
+    keyexpr_info_t *keyexpr_info,
+    sign_psbt_cache_t *sign_psbt_cache) {
     cx_sha256_t hash_context;
     crypto_tr_tapleaf_hash_init(&hash_context);
 
@@ -604,7 +604,7 @@ bool __attribute__((noinline)) produce_musig2_pubnonces(
                     if (0 >
                         compute_taptree_hash(
                             dc,
-                            &(wallet_derivation_info_t){
+                            &(wallet_derivation_info_t) {
                                 .address_index = input.in_out.address_index,
                                 .change = input.in_out.is_change ? 1 : 0,
                                 .keys_merkle_root = st->account.wallet_header.keys_info_merkle_root,
@@ -641,12 +641,12 @@ bool __attribute__((noinline)) produce_musig2_pubnonces(
     return true;
 }
 
-bool __attribute__((noinline))
-sign_transaction(dispatcher_context_t *dc,
-                 sign_psbt_state_t *st,
-                 sign_psbt_cache_t *sign_psbt_cache,
-                 signing_state_t *signing_state,
-                 const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
+bool __attribute__((noinline)) sign_transaction(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *st,
+    sign_psbt_cache_t *sign_psbt_cache,
+    signing_state_t *signing_state,
+    const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     bool keyexpr_to_process[MAX_INTERNAL_KEY_EXPRESSIONS] = {0};

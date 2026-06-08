@@ -44,12 +44,12 @@ int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness(
  a PSBTv2.
  Returns -1 on failure, 0 on success.
 */
-int __attribute__((noinline))
-get_amount_scriptpubkey_from_psbt_witness(dispatcher_context_t *dc,
-                                          const merkleized_map_commitment_t *input_map,
-                                          uint64_t *amount,
-                                          uint8_t scriptPubKey[static MAX_PREVOUT_SCRIPTPUBKEY_LEN],
-                                          size_t *scriptPubKey_len);
+int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_witness(
+    dispatcher_context_t *dc,
+    const merkleized_map_commitment_t *input_map,
+    uint64_t *amount,
+    uint8_t scriptPubKey[static MAX_PREVOUT_SCRIPTPUBKEY_LEN],
+    size_t *scriptPubKey_len);
 
 /*
  Convenience function to get the amount and scriptpubkey of a certain input in a PSBTv2.

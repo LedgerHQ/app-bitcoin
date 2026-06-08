@@ -155,7 +155,7 @@ void ui_display_transaction_simplified_flow_init(void) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     if (state->has_wallet_policy) {
-        pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+        pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
             .item = "From",
             .value = state->wallet_policy_name,
         };
@@ -169,21 +169,21 @@ void ui_display_transaction_simplified_flow_add(void) {
     if (!state->is_self_transfer) {
         if (state->n_outputs > 1) {
             pairs[n_pairs++] =
-                (nbgl_layoutTagValue_t){.item = "Transaction output",
-                                        .value = state->output_index_str[output_index],
-                                        .forcePageStart = true};
+                (nbgl_layoutTagValue_t) {.item = "Transaction output",
+                                         .value = state->output_index_str[output_index],
+                                         .forcePageStart = true};
         }
-        pairs[n_pairs++] = (nbgl_layoutTagValue_t){.item = "Amount",
-                                                   .value = state->amount[output_index],
-                                                   .forcePageStart = false};
+        pairs[n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Amount",
+                                                    .value = state->amount[output_index],
+                                                    .forcePageStart = false};
 
-        pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+        pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
             .item = "To",
             .value = state->address_or_description[output_index],
         };
     } else {
         pairs[n_pairs++] =
-            (nbgl_layoutTagValue_t){.item = "Amount", .value = SELF_TRANSFER_DESCRIPTION};
+            (nbgl_layoutTagValue_t) {.item = "Amount", .value = SELF_TRANSFER_DESCRIPTION};
     }
 }
 
@@ -191,15 +191,15 @@ void ui_display_transaction_simplified_flow_show(void) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     if (state->warnings.high_fee) {
-        pairs[n_pairs++] = (nbgl_contentTagValue_t){.item = GA_WARN_HIGH_FEES_TITLE,
-                                                    .value = GA_WARN_HIGH_FEES,
-                                                    .centeredInfo = true,
-                                                    .valueIcon = &ICON_APP_IMPORTANT};
+        pairs[n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_WARN_HIGH_FEES_TITLE,
+                                                     .value = GA_WARN_HIGH_FEES,
+                                                     .centeredInfo = true,
+                                                     .valueIcon = &ICON_APP_IMPORTANT};
     }
 
-    pairs[n_pairs++] = (nbgl_layoutTagValue_t){.item = "Fees",
-                                               .value = state->fee,
-                                               .forcePageStart = state->n_outputs > 1 ? 1 : 0};
+    pairs[n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Fees",
+                                                .value = state->fee,
+                                                .forcePageStart = state->n_outputs > 1 ? 1 : 0};
 
     pairList.nbPairs = n_pairs;
 
@@ -221,7 +221,7 @@ void ui_display_transaction_streaming_prompt(void) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     if (state->has_wallet_policy) {
-        pairs[0] = (nbgl_layoutTagValue_t){
+        pairs[0] = (nbgl_layoutTagValue_t) {
             .item = "From",
             .value = state->wallet_policy_name,
         };
@@ -263,10 +263,10 @@ void ui_display_transaction_streaming_flow(bool is_self_transfer) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     if (state->warnings.high_fee) {
-        pairs[l_n_pairs++] = (nbgl_contentTagValue_t){.item = GA_WARN_HIGH_FEES_TITLE,
-                                                      .value = GA_WARN_HIGH_FEES,
-                                                      .centeredInfo = true,
-                                                      .valueIcon = &ICON_APP_IMPORTANT};
+        pairs[l_n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_WARN_HIGH_FEES_TITLE,
+                                                       .value = GA_WARN_HIGH_FEES,
+                                                       .centeredInfo = true,
+                                                       .valueIcon = &ICON_APP_IMPORTANT};
     }
 
     if (!is_self_transfer) {
@@ -351,12 +351,12 @@ void ui_display_register_wallet_policy_flow(void) {
     pairList.nbMaxLinesForValue = 0;
     pairList.pairs = pairs;
 
-    pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+    pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
         .item = "Account name",
         .value = g_ui_state.register_wallet_policy.wallet_name,
     };
 
-    pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+    pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
 #ifdef SCREEN_SIZE_WALLET
         .item = "Descriptor template",
 #else
@@ -365,14 +365,14 @@ void ui_display_register_wallet_policy_flow(void) {
         .value = g_ui_state.register_wallet_policy.descriptor_template,
     };
 
-    pairs[n_pairs++] = (nbgl_contentTagValue_t){.centeredInfo = true,
-                                                .item = "Review co-signer\npublic keys",
-                                                .value = ""};
+    pairs[n_pairs++] = (nbgl_contentTagValue_t) {.centeredInfo = true,
+                                                 .item = "Review co-signer\npublic keys",
+                                                 .value = ""};
 
     for (size_t i = 0; i < g_ui_state.register_wallet_policy.n_keys; i++) {
         pairs[n_pairs++] =
-            (nbgl_layoutTagValue_t){.item = g_ui_state.register_wallet_policy.keys_label[i],
-                                    .value = g_ui_state.register_wallet_policy.keys_info[i]};
+            (nbgl_layoutTagValue_t) {.item = g_ui_state.register_wallet_policy.keys_label[i],
+                                     .value = g_ui_state.register_wallet_policy.keys_info[i]};
     }
 
     pairList.nbPairs = n_pairs;

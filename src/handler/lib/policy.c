@@ -1226,7 +1226,7 @@ __attribute__((noinline)) int get_wallet_internal_script_hash(
                                    .hash_context = hash_context};
 
     state.nodes[0] =
-        (policy_parser_node_state_t){.length = 0, .flags = 0, .step = 0, .policy_node = policy};
+        (policy_parser_node_state_t) {.length = 0, .flags = 0, .step = 0, .policy_node = policy};
 
     int ret;
     do {
