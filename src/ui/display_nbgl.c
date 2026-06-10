@@ -374,7 +374,7 @@ void ui_display_register_wallet_policy_flow(void) {
     }
 
     nbgl_useCaseReviewLight(TYPE_OPERATION,
-                            make_pair_list(n_pairs, false),
+                            make_pair_list(n_pairs, true),
                             &ICON_APP_ACTION,
                             "Review account\nto register",
                             NULL,
