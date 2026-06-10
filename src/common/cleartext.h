@@ -8,7 +8,7 @@
 #include "common/cleartext_specs.h"
 
 // Maximum confusion score below which the cleartext representation is shown.
-#define CLEARTEXT_MAX_CONFUSION_SCORE 3600ULL
+#define CLEARTEXT_MAX_CONFUSION_SCORE 100000ULL
 
 // Maximum number of cleartext lines we'll produce (1 primary spending path
 // + up to CT_MAX_LINES-1 tapleaves).

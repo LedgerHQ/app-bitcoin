@@ -248,8 +248,10 @@ static const char *const vec_057_ct[] = {
     "Both @1 and @1 must sign",
 };
 static const char *const vec_058_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1), and 2 of @2 and @3",
+    "Primary path: 3 of @0, @1 and @2",
+    "2 of @0 and @1 after 1d 1h 36m",
+    "2 of @0 and @2 after 1d 1h 36m",
+    "2 of @1 and @2 after 1d 1h 36m",
 };
 static const char *const vec_059_ct[] = {
     "Primary path: @0",
@@ -261,27 +263,31 @@ static const char *const vec_060_ct[] = {
 };
 static const char *const vec_061_ct[] = {
     "Primary path: @0",
-    "2 of @1 and @2, and 2 of @3 and @4",
+    "Single-signature (@1), and 2 of @2 and @3",
 };
 static const char *const vec_062_ct[] = {
     "Primary path: @0",
-    "Both @1 and @2 must sign, and 2 of @3 and @4",
+    "2 of @1 and @2, and 2 of @3 and @4",
 };
 static const char *const vec_063_ct[] = {
+    "Primary path: @0",
+    "Both @1 and @2 must sign, and 2 of @3 and @4",
+};
+static const char *const vec_064_ct[] = {
     "Primary path: @0",
     "Single-signature (@1)",
     "Single-signature (@2), and 2 of @3 and @4",
 };
-static const char *const vec_064_ct[] = {
+static const char *const vec_065_ct[] = {
     "pkh(@0/<2;3>/*)",
 };
-static const char *const vec_065_ct[] = {
+static const char *const vec_066_ct[] = {
     "wpkh(@0/<0;2>/*)",
 };
-static const char *const vec_066_ct[] = {
+static const char *const vec_067_ct[] = {
     "tr(@0/<4;5>/*)",
 };
-static const char *const vec_067_ct[] = {
+static const char *const vec_068_ct[] = {
     "tr(@0/**,pk(@1/<2;3>/*))",
 };
 
@@ -302,33 +308,33 @@ static const ct_vector_t CT_VECTORS[] = {
     { .template_str = "tr(@0/**,{pk(@1/**),pk(@2/**)})", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_013_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(@0/**,{sortedmulti_a(2,@1/**,@2/**),pk(@3/**)})", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_014_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(@0/**,{{pk(@1/**),pk(@2/**)},pk(@3/**)})", .has_confusion_score = true, .confusion_score = 3ULL, .has_cleartext_array = true, .cleartext_n = 4, .cleartext = vec_015_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{pk(@2/**),pk(@1/**)})", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_016_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{and_v(v:pk(@2/<0;1>/*),older(2000)),and_v(v:pk(@1/<0;1>/*),older(1000))})", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_017_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{multi_a(2,@1/**,@2/**,@3/**),multi_a(2,@4/**,@5/**)})", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_018_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{and_v(v:pk(@1/**),older(960)),t:or_c(pk(@2/**),and_v(v:pk(@3/**),or_c(pk(@4/**),v:ripemd160(907cd521fff981ce4063a4dc43c6f3fd28e08995))))})", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_019_ct, .has_has_cleartext = true, .cleartext_flag = false },
-    { .template_str = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),older(52560)))", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_020_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{pk(@2/**),pk(@1/**)})", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_016_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{and_v(v:pk(@2/<0;1>/*),older(2000)),and_v(v:pk(@1/<0;1>/*),older(1000))})", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_017_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{multi_a(2,@1/**,@2/**,@3/**),multi_a(2,@4/**,@5/**)})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_018_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{and_v(v:pk(@1/**),older(960)),t:or_c(pk(@2/**),and_v(v:pk(@3/**),or_c(pk(@4/**),v:ripemd160(907cd521fff981ce4063a4dc43c6f3fd28e08995))))})", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_019_ct, .has_has_cleartext = true, .cleartext_flag = false },
+    { .template_str = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),older(52560)))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_020_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/<0;1>/*),older(52560))})", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_021_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/<0;1>/*),older(1008))})", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_022_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),older(4194305)))", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_023_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/<0;1>/*),older(1008))})", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_022_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),older(4194305)))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_023_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/<0;1>/*),older(4194305))})", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_024_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/<0;1>/*),older(4194484))})", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_025_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/<0;1>/*),older(4194484))})", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_025_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:multi_a(2,@2/<0;1>/*,@3/<0;1>/*),older(4194484))})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_026_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),after(840000)))", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_027_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:multi_a(2,@2/<0;1>/*,@3/<0;1>/*),after(840000))})", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_028_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),after(500000000)))", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_029_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:multi_a(2,@2/<0;1>/*,@3/<0;1>/*),after(1700000000))})", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_030_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),older(1008)))", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_031_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:and_v(v:pk(@2/<0;1>/*),pk(@3/<0;1>/*)),older(1008))})", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_032_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),older(4194484)))", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_033_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),after(840000)))", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_034_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),after(1700000000)))", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_035_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),after(840000)))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_027_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:multi_a(2,@2/<0;1>/*,@3/<0;1>/*),after(840000))})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_028_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),after(500000000)))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_029_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:multi_a(2,@2/<0;1>/*,@3/<0;1>/*),after(1700000000))})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_030_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),older(1008)))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_031_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:and_v(v:pk(@2/<0;1>/*),pk(@3/<0;1>/*)),older(1008))})", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_032_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),older(4194484)))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_033_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),after(840000)))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_034_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),after(1700000000)))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_035_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(musig(@0,@1)/**)", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_036_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(musig(@0,@1,@2)/**)", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_037_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(musig(@0,@1)/**,pk(@2/**))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_038_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(musig(@0,@1)/**,{pk(@2/**),pk(@3/**)})", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_039_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(musig(@0,@1)/**,{{pk(@2/**),pk(@3/**)},pk(@4/**)})", .has_confusion_score = true, .confusion_score = 3ULL, .has_cleartext_array = true, .cleartext_n = 4, .cleartext = vec_040_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(musig(@0,@1)/**,and_v(v:pk(@2/<0;1>/*),older(1008)))", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_041_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(musig(@0,@1)/**,{pk(@2/**),and_v(v:pk(@3/<0;1>/*),after(840000))})", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_042_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(musig(@0,@1)/**,and_v(v:pk(@2/<0;1>/*),older(1008)))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_041_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(musig(@0,@1)/**,{pk(@2/**),and_v(v:pk(@3/<0;1>/*),after(840000))})", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_042_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(@0/**,pk(musig(@1,@2)/**))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_043_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(@0/**,pk(musig(@1,@2,@3)/**))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_044_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(@0/**,and_v(v:pk(musig(@1,@2)/**),older(1008)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_045_ct, .has_has_cleartext = true, .cleartext_flag = true },
@@ -337,23 +343,24 @@ static const ct_vector_t CT_VECTORS[] = {
     { .template_str = "tr(@0/**,and_v(v:pk(musig(@1,@2)/**),after(1700000000)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_048_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(@0/**,{pk(@1/**),pk(musig(@2,@3)/**)})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_049_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(@0/**,{multi_a(2,@1/**,@2/**,@3/**),pk(musig(@4,@5)/**)})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_050_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/<0;1>/*,{and_v(v:pk(@1/<0;1>/*),older(4383)),and_v(v:pk(@2/<0;1>/*),pk(@1/<2;3>/*))})", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_051_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/<0;1>/*,{and_v(v:pk(@1/<0;1>/*),older(4383)),and_v(v:pk(@2/<0;1>/*),pk(@1/<2;3>/*))})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_051_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(@0/<0;1>/*,{and_v(v:multi_a(2,@1/<0;1>/*,@2/<0;1>/*,@3/<0;1>/*),older(144)),and_v(v:pk(@1/<2;3>/*),pk(@2/<2;3>/*))})", .has_confusion_score = true, .confusion_score = 4ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_052_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/<0;1>/*,pk(@0/<2;3>/*))", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_053_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/<0;1>/*,{pk(@0/<2;3>/*),pk(@0/<4;5>/*)})", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_054_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{pk(@1/<0;1>/*),pk(@1/<2;3>/*)})", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_055_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{and_v(v:pk(@1/<0;1>/*),older(4383)),pk(@1/<2;3>/*)})", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_056_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/<0;1>/*,{pk(@0/<2;3>/*),and_v(v:pk(@1/<0;1>/*),pk(@1/<2;3>/*))})", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_057_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:pk(@1/**),multi_a(2,@2/**,@3/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_058_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:pk(@1/**),pk(musig(@2,@3)/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_059_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:pk(@1/**),multi_a(2,@2/**,@3/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_060_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:multi_a(2,@1/**,@2/**),multi_a(2,@3/**,@4/**)))", .has_confusion_score = true, .confusion_score = 4ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_061_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:and_v(v:pk(@1/**),pk(@2/**)),multi_a(2,@3/**,@4/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_062_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/**),multi_a(2,@3/**,@4/**))})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_063_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "pkh(@0/<2;3>/*)", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_064_ct, .has_has_cleartext = true, .cleartext_flag = false },
-    { .template_str = "wpkh(@0/<0;2>/*)", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_065_ct, .has_has_cleartext = true, .cleartext_flag = false },
-    { .template_str = "tr(@0/<4;5>/*)", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_066_ct, .has_has_cleartext = true, .cleartext_flag = false },
-    { .template_str = "tr(@0/**,pk(@1/<2;3>/*))", .has_confusion_score = false, .confusion_score = 0ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_067_ct, .has_has_cleartext = true, .cleartext_flag = false },
+    { .template_str = "tr(@0/<0;1>/*,pk(@0/<2;3>/*))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_053_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/<0;1>/*,{pk(@0/<2;3>/*),pk(@0/<4;5>/*)})", .has_confusion_score = true, .confusion_score = 6ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_054_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{pk(@1/<0;1>/*),pk(@1/<2;3>/*)})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_055_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{and_v(v:pk(@1/<0;1>/*),older(4383)),pk(@1/<2;3>/*)})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_056_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/<0;1>/*,{pk(@0/<2;3>/*),and_v(v:pk(@1/<0;1>/*),pk(@1/<2;3>/*))})", .has_confusion_score = true, .confusion_score = 4ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_057_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(musig(@0,@1,@2)/**,{and_v(v:pk(musig(@0,@1)/**),older(4194484)),{and_v(v:pk(musig(@0,@2)/**),older(4194484)),and_v(v:pk(musig(@1,@2)/**),older(4194484))}})", .has_confusion_score = true, .confusion_score = 5184ULL, .has_cleartext_array = true, .cleartext_n = 4, .cleartext = vec_058_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:pk(@1/**),multi_a(2,@2/**,@3/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_059_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:pk(@1/**),pk(musig(@2,@3)/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_060_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:pk(@1/**),multi_a(2,@2/**,@3/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_061_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:multi_a(2,@1/**,@2/**),multi_a(2,@3/**,@4/**)))", .has_confusion_score = true, .confusion_score = 4ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_062_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:and_v(v:pk(@1/**),pk(@2/**)),multi_a(2,@3/**,@4/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_063_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/**),multi_a(2,@3/**,@4/**))})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_064_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "pkh(@0/<2;3>/*)", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_065_ct, .has_has_cleartext = true, .cleartext_flag = false },
+    { .template_str = "wpkh(@0/<0;2>/*)", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_066_ct, .has_has_cleartext = true, .cleartext_flag = false },
+    { .template_str = "tr(@0/<4;5>/*)", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_067_ct, .has_has_cleartext = true, .cleartext_flag = false },
+    { .template_str = "tr(@0/**,pk(@1/<2;3>/*))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_068_ct, .has_has_cleartext = true, .cleartext_flag = false },
 };
 static const size_t CT_VECTORS_N = sizeof(CT_VECTORS) / sizeof(CT_VECTORS[0]);
 

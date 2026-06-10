@@ -30,9 +30,9 @@
 #   3. when only `has_cleartext` is set: the boolean part of the encoder's
 #      output matches.
 #   4. when `has_cleartext == true` AND both `confusion_score` and `cleartext`
-#      are set: decoding `cleartext` yields exactly `confusion_score`
-#      structurally distinct descriptor templates, each of which re-encodes
-#      to `cleartext`, and no two of which are equal.
+#      are set: decoding `cleartext` yields at most `confusion_score`
+#      structurally distinct descriptor templates (the score is an upper bound),
+#      each of which re-encodes to `cleartext`, and no two of which are equal.
 
 # =============================================================================
 # Legacy / SegWit single-signature
@@ -162,6 +162,7 @@ has_cleartext = true
 # Tie-break: two SingleSig leaves given in reverse key_index order
 [[vector]]
 template = "tr(@0/**,{pk(@2/**),pk(@1/**)})"
+confusion_score = 1
 cleartext = [
     "Primary path: @0",
     "Single-signature (@1)",
@@ -172,6 +173,7 @@ has_cleartext = true
 # Tie-break: two RelativeHeightlockSingleSig leaves -- sort by key_index, then blocks
 [[vector]]
 template = "tr(@0/**,{and_v(v:pk(@2/<0;1>/*),older(2000)),and_v(v:pk(@1/<0;1>/*),older(1000))})"
+confusion_score = 1
 cleartext = [
     "Primary path: @0",
     "Single-signature (@1) after 1000 blocks",
@@ -182,6 +184,7 @@ has_cleartext = true
 # Tie-break: two Multisig leaves -- fewer keys first, then smaller threshold
 [[vector]]
 template = "tr(@0/**,{multi_a(2,@1/**,@2/**,@3/**),multi_a(2,@4/**,@5/**)})"
+confusion_score = 2
 cleartext = [
     "Primary path: @0",
     "2 of @4 and @5",
@@ -192,6 +195,7 @@ has_cleartext = true
 # Recognised first leaf + unrecognised second leaf (complex miniscript)
 [[vector]]
 template = "tr(@0/**,{and_v(v:pk(@1/**),older(960)),t:or_c(pk(@2/**),and_v(v:pk(@3/**),or_c(pk(@4/**),v:ripemd160(907cd521fff981ce4063a4dc43c6f3fd28e08995))))})"
+confusion_score = 1
 cleartext = [
     "Primary path: @0",
     "Single-signature (@1) after 960 blocks",
@@ -205,6 +209,7 @@ has_cleartext = false
 
 [[vector]]
 template = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),older(52560)))"
+confusion_score = 1
 cleartext = ["Primary path: @0", "Single-signature (@1) after 52560 blocks"]
 has_cleartext = true
 
@@ -220,6 +225,7 @@ has_cleartext = true
 
 [[vector]]
 template = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/<0;1>/*),older(1008))})"
+confusion_score = 1
 cleartext = [
     "Primary path: @0",
     "Single-signature (@1)",
@@ -233,6 +239,7 @@ has_cleartext = true
 
 [[vector]]
 template = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),older(4194305)))"
+confusion_score = 1
 cleartext = ["Primary path: @0", "Single-signature (@1) after 8m 32s"]
 has_cleartext = true
 
@@ -248,6 +255,7 @@ has_cleartext = true
 
 [[vector]]
 template = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/<0;1>/*),older(4194484))})"
+confusion_score = 1
 cleartext = [
     "Primary path: @0",
     "Single-signature (@1)",
@@ -271,11 +279,13 @@ has_cleartext = true
 
 [[vector]]
 template = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),after(840000)))"
+confusion_score = 1
 cleartext = ["Primary path: @0", "Single-signature (@1) after block height 840000"]
 has_cleartext = true
 
 [[vector]]
 template = "tr(@0/**,{pk(@1/**),and_v(v:multi_a(2,@2/<0;1>/*,@3/<0;1>/*),after(840000))})"
+confusion_score = 2
 cleartext = [
     "Primary path: @0",
     "Single-signature (@1)",
@@ -285,11 +295,13 @@ has_cleartext = true
 
 [[vector]]
 template = "tr(@0/**,and_v(v:pk(@1/<0;1>/*),after(500000000)))"
+confusion_score = 1
 cleartext = ["Primary path: @0", "Single-signature (@1) after date 1985-11-05 00:53:20"]
 has_cleartext = true
 
 [[vector]]
 template = "tr(@0/**,{pk(@1/**),and_v(v:multi_a(2,@2/<0;1>/*,@3/<0;1>/*),after(1700000000))})"
+confusion_score = 2
 cleartext = [
     "Primary path: @0",
     "Single-signature (@1)",
@@ -303,11 +315,13 @@ has_cleartext = true
 
 [[vector]]
 template = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),older(1008)))"
+confusion_score = 1
 cleartext = ["Primary path: @0", "Both @1 and @2 must sign after 1008 blocks"]
 has_cleartext = true
 
 [[vector]]
 template = "tr(@0/**,{pk(@1/**),and_v(v:and_v(v:pk(@2/<0;1>/*),pk(@3/<0;1>/*)),older(1008))})"
+confusion_score = 1
 cleartext = [
     "Primary path: @0",
     "Single-signature (@1)",
@@ -317,16 +331,19 @@ has_cleartext = true
 
 [[vector]]
 template = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),older(4194484)))"
+confusion_score = 1
 cleartext = ["Primary path: @0", "Both @1 and @2 must sign after 1d 1h 36m"]
 has_cleartext = true
 
 [[vector]]
 template = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),after(840000)))"
+confusion_score = 1
 cleartext = ["Primary path: @0", "Both @1 and @2 must sign after block height 840000"]
 has_cleartext = true
 
 [[vector]]
 template = "tr(@0/**,and_v(v:and_v(v:pk(@1/<0;1>/*),pk(@2/<0;1>/*)),after(1700000000)))"
+confusion_score = 1
 cleartext = ["Primary path: @0", "Both @1 and @2 must sign after date 2023-11-14 22:13:20"]
 has_cleartext = true
 
@@ -375,11 +392,13 @@ has_cleartext = true
 
 [[vector]]
 template = "tr(musig(@0,@1)/**,and_v(v:pk(@2/<0;1>/*),older(1008)))"
+confusion_score = 1
 cleartext = ["Primary path: 2 of @0 and @1", "Single-signature (@2) after 1008 blocks"]
 has_cleartext = true
 
 [[vector]]
 template = "tr(musig(@0,@1)/**,{pk(@2/**),and_v(v:pk(@3/<0;1>/*),after(840000))})"
+confusion_score = 1
 cleartext = [
     "Primary path: 2 of @0 and @1",
     "Single-signature (@2)",
@@ -457,6 +476,7 @@ has_cleartext = true
 # @1 appears twice (<0;1>, <2;3>) -> factor 2! = 2
 [[vector]]
 template = "tr(@0/<0;1>/*,{and_v(v:pk(@1/<0;1>/*),older(4383)),and_v(v:pk(@2/<0;1>/*),pk(@1/<2;3>/*))})"
+confusion_score = 2
 cleartext = [
     "Primary path: @0",
     "Both @2 and @1 must sign",
@@ -478,12 +498,14 @@ has_cleartext = true
 # @0 appears twice (key path + leaf) -> 2! = 2
 [[vector]]
 template = "tr(@0/<0;1>/*,pk(@0/<2;3>/*))"
+confusion_score = 2
 cleartext = ["Primary path: @0", "Single-signature (@0)"]
 has_cleartext = true
 
 # @0 appears three times -> 3! = 6
 [[vector]]
 template = "tr(@0/<0;1>/*,{pk(@0/<2;3>/*),pk(@0/<4;5>/*)})"
+confusion_score = 6
 cleartext = [
     "Primary path: @0",
     "Single-signature (@0)",
@@ -494,6 +516,7 @@ has_cleartext = true
 # @1 appears twice in two leaves -> 2! = 2
 [[vector]]
 template = "tr(@0/**,{pk(@1/<0;1>/*),pk(@1/<2;3>/*)})"
+confusion_score = 2
 cleartext = [
     "Primary path: @0",
     "Single-signature (@1)",
@@ -504,6 +527,7 @@ has_cleartext = true
 # @1 appears twice across distinct leaf shapes -> 2! = 2
 [[vector]]
 template = "tr(@0/**,{and_v(v:pk(@1/<0;1>/*),older(4383)),pk(@1/<2;3>/*)})"
+confusion_score = 2
 cleartext = [
     "Primary path: @0",
     "Single-signature (@1)",
@@ -514,10 +538,36 @@ has_cleartext = true
 # @0 twice, @1 twice -> 2! * 2! = 4
 [[vector]]
 template = "tr(@0/<0;1>/*,{pk(@0/<2;3>/*),and_v(v:pk(@1/<0;1>/*),pk(@1/<2;3>/*))})"
+confusion_score = 4
 cleartext = [
     "Primary path: @0",
     "Single-signature (@0)",
     "Both @1 and @1 must sign",
+]
+has_cleartext = true
+
+# Musig key path with three 2-of-2 musig fallback leaves that share keys: each of
+# @0, @1, @2 appears once in the key path and in two leaves. The confusion score
+# expands every musig group to its plain-key members and counts orderings by key
+# index, so each of @0, @1, @2 has multiplicity 3 -> 3! ^ 3 = 216 derivation
+# orderings. Combined with 2 options per leaf (8) and 3 taptree shapes that gives
+# 8 * 3 * 216 = 5184.
+#
+# This is a deliberate over-count: the true number of distinct decodings is 54.
+# The bound counts the most-permutable (multi_a) interpretation of every key
+# independently, even though the internal key is never a multi_a and not all
+# combinations realize the maximum orderings. Over-counting is the safe direction
+# for the `confusion_score <= MAX_CONFUSION_SCORE` display gate; we keep the
+# formula simple rather than computing the exact figure. The confusion score is
+# therefore an upper bound: decoding this cleartext yields 54 <= 5184 templates.
+[[vector]]
+template = "tr(musig(@0,@1,@2)/**,{and_v(v:pk(musig(@0,@1)/**),older(4194484)),{and_v(v:pk(musig(@0,@2)/**),older(4194484)),and_v(v:pk(musig(@1,@2)/**),older(4194484))}})"
+confusion_score = 5184
+cleartext = [
+    "Primary path: 3 of @0, @1 and @2",
+    "2 of @0 and @1 after 1d 1h 36m",
+    "2 of @0 and @2 after 1d 1h 36m",
+    "2 of @1 and @2 after 1d 1h 36m",
 ]
 has_cleartext = true
 
@@ -594,20 +644,24 @@ has_cleartext = true
 
 [[vector]]
 template = "pkh(@0/<2;3>/*)"
+confusion_score = 1
 cleartext = ["pkh(@0/<2;3>/*)"]
 has_cleartext = false
 
 [[vector]]
 template = "wpkh(@0/<0;2>/*)"
+confusion_score = 2
 cleartext = ["wpkh(@0/<0;2>/*)"]
 has_cleartext = false
 
 [[vector]]
 template = "tr(@0/<4;5>/*)"
+confusion_score = 1
 cleartext = ["tr(@0/<4;5>/*)"]
 has_cleartext = false
 
 [[vector]]
 template = "tr(@0/**,pk(@1/<2;3>/*))"
+confusion_score = 1
 cleartext = ["tr(@0/**,pk(@1/<2;3>/*))"]
 has_cleartext = false

@@ -409,11 +409,10 @@ static uint64_t key_orderings_count(const policy_node_t *root, bool *out_canonic
         classes[idx].n_pairs++;
     }
 
+    // Canonical check: group by full key identity (musig groups stay whole) and
+    // require each group's sorted derivation pairs to be (0,1),(2,3),(4,5),...
     *out_canonical = true;
-    uint64_t product = 1;
     for (int i = 0; i < n_classes; i++) {
-        product = sat_mul_u64(product, sat_factorial(classes[i].n_pairs));
-        // Check canonical derivations: sort and compare to (0,1),(2,3),...
         sort_pairs(classes[i].pairs, classes[i].n_pairs);
         for (uint8_t j = 0; j < classes[i].n_pairs; j++) {
             if (classes[i].pairs[j][0] != (uint32_t) (2 * j) ||
@@ -421,6 +420,46 @@ static uint64_t key_orderings_count(const policy_node_t *root, bool *out_canonic
                 *out_canonical = false;
             }
         }
+    }
+
+    // Compute an upper bound on the possible number of orderings for the
+    // derivation pairs.
+    uint32_t idx_vals[CT_MAX_KEYEXPRS * MAX_PUBKEYS_PER_MUSIG];
+    uint32_t idx_cnts[CT_MAX_KEYEXPRS * MAX_PUBKEYS_PER_MUSIG];
+    int n_idx = 0;
+    for (int i = 0; i < n; i++) {
+        const policy_node_keyexpr_t *k = kx[i];
+        // Build the list of plain key indices contributed by this keyexpr.
+        uint32_t members[MAX_PUBKEYS_PER_MUSIG];
+        uint16_t n_members;
+        if (k->type == KEY_EXPRESSION_NORMAL) {
+            members[0] = k->k.key_index;
+            n_members = 1;
+        } else {
+            const musig_aggr_key_info_t *ai = r_musig_aggr_key_info(&k->m.musig_info);
+            const uint16_t *ak = r_uint16(&ai->key_indexes);
+            n_members = ai->n;
+            for (uint16_t j = 0; j < n_members; j++) members[j] = ak[j];
+        }
+        for (uint16_t j = 0; j < n_members; j++) {
+            int slot = -1;
+            for (int s = 0; s < n_idx; s++) {
+                if (idx_vals[s] == members[j]) {
+                    slot = s;
+                    break;
+                }
+            }
+            if (slot < 0) {
+                idx_vals[n_idx] = members[j];
+                idx_cnts[n_idx] = 0;
+                slot = n_idx++;
+            }
+            idx_cnts[slot]++;
+        }
+    }
+    uint64_t product = 1;
+    for (int i = 0; i < n_idx; i++) {
+        product = sat_mul_u64(product, sat_factorial(idx_cnts[i]));
     }
     return product;
 }
@@ -749,6 +788,45 @@ static bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
 // Tap-leaf display ordering (port of mod.rs::display_cmp)
 // ---------------------------------------------------------------------------
 
+// Number of effective member keys in a multisig `$keys` binding. For a
+// multi_a/sortedmulti_a list this is the list length; for the pk(musig(...))
+// sentinel (n == 1, a single musig keyexpr) it is the musig member count.
+static uint16_t keys_member_count(const ct_value_t *v) {
+    if (v->u.keys.n == 1 && v->u.keys.array != NULL &&
+        v->u.keys.array[0].type == KEY_EXPRESSION_MUSIG) {
+        return r_musig_aggr_key_info(&v->u.keys.array[0].m.musig_info)->n;
+    }
+    return v->u.keys.n;
+}
+
+// The j-th effective member key index of a multisig `$keys` binding.
+static uint32_t keys_member_index(const ct_value_t *v, uint16_t j) {
+    if (v->u.keys.n == 1 && v->u.keys.array != NULL &&
+        v->u.keys.array[0].type == KEY_EXPRESSION_MUSIG) {
+        const musig_aggr_key_info_t *mi = r_musig_aggr_key_info(&v->u.keys.array[0].m.musig_info);
+        return r_uint16(&mi->key_indexes)[j];
+    }
+    return v->u.keys.array[j].k.key_index;
+}
+
+// Compare two multisig `$keys` bindings element by element by key index
+// (derivation-independent). Used as a tie-breaker once the lists are known to
+// be the same length, so that two same-size, same-threshold multisig leaves
+// order deterministically by their keys rather than by tap-tree position
+// (which is unstable across descriptors that share a cleartext rendering).
+// Mirrors `cmp_keys`/`cmp_key` in the reference implementation.
+static int cmp_binding_keys(const ct_value_t *a, const ct_value_t *b) {
+    uint16_t na = keys_member_count(a);
+    uint16_t nb = keys_member_count(b);
+    uint16_t m = (na < nb) ? na : nb;
+    for (uint16_t i = 0; i < m; i++) {
+        uint32_t ia = keys_member_index(a, i);
+        uint32_t ib = keys_member_index(b, i);
+        if (ia != ib) return (ia < ib) ? -1 : 1;
+    }
+    return 0;
+}
+
 // Compare two matched tapleaves. Order primarily by class enum value, then
 // by binding values. SUB bindings recurse; TIMELOCK bindings compare by
 // is_relative ascending (relative < absolute) then by raw value.
@@ -772,9 +850,14 @@ static int leaf_cmp(const ct_leaf_match_t *a, const ct_leaf_match_t *b) {
                     return (ka->num_second < kb->num_second) ? -1 : 1;
                 break;
             }
-            case CT_BV_KEYS:
+            case CT_BV_KEYS: {
                 if (va->u.keys.n != vb->u.keys.n) return (va->u.keys.n < vb->u.keys.n) ? -1 : 1;
+                // Tie-break by the keys themselves, so multisig leaves that
+                // share a size and threshold still order deterministically.
+                int r = cmp_binding_keys(va, vb);
+                if (r != 0) return r;
                 break;
+            }
             case CT_BV_NUMBER:
                 if (va->u.number != vb->u.number) return (va->u.number < vb->u.number) ? -1 : 1;
                 break;
