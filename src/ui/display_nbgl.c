@@ -62,6 +62,17 @@ extern bool G_was_processing_screen_shown;
 
 static void finish_transaction_flow(bool choice);
 
+static nbgl_layoutTagValueList_t *make_pair_list(unsigned int nbPairs, bool wrapping) {
+    pairList = (nbgl_layoutTagValueList_t) {
+        .pairs = pairs,
+        .nbPairs = nbPairs,
+        .nbMaxLinesForValue = 0,
+        .wrapping = wrapping,
+    };
+
+    return &pairList;
+}
+
 // ux_flow_response
 static void ux_flow_response_false(void) {
     set_ux_flow_response(false);
@@ -147,9 +158,6 @@ void ui_display_transaction_simplified_flow_init(void) {
     /* 1 From + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER*3 + 1 Fees + 1 High fees */
     _Static_assert(N_UX_PAIRS >= (1 + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER * 3 + 1 + 1),
                    "Insufficient pairs for this flow");
-    // Setup list
-    pairList.nbMaxLinesForValue = 0;
-    pairList.pairs = pairs;
     n_pairs = 0;
 
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
@@ -201,10 +209,8 @@ void ui_display_transaction_simplified_flow_show(void) {
                                                 .value = state->fee,
                                                 .forcePageStart = state->n_outputs > 1 ? 1 : 0};
 
-    pairList.nbPairs = n_pairs;
-
     nbgl_useCaseReview(TYPE_TRANSACTION,
-                       &pairList,
+                       make_pair_list(n_pairs, false),
                        &ICON_APP_ACTION,
                        GA_REVIEW_TRANSACTION,
                        NULL,
@@ -225,12 +231,8 @@ void ui_display_transaction_streaming_prompt(void) {
             .item = "From",
             .value = state->wallet_policy_name,
         };
-        // Setup list
-        pairList.nbMaxLinesForValue = 0;
-        pairList.nbPairs = 1;
-        pairList.pairs = pairs;
 
-        nbgl_useCaseReviewStreamingContinue(&pairList, start_transaction_callback);
+        nbgl_useCaseReviewStreamingContinue(make_pair_list(1, false), start_transaction_callback);
     }
 }
 
@@ -246,19 +248,10 @@ void ui_display_transaction_streaming_output_address_amount(void) {
     pairs[2].item = "Address";
     pairs[2].value = state->address_or_description[0];
 
-    // Setup list
-    pairList.nbMaxLinesForValue = 0;
-    pairList.nbPairs = 3;
-    pairList.pairs = pairs;
-
-    nbgl_useCaseReviewStreamingContinue(&pairList, start_transaction_callback);
+    nbgl_useCaseReviewStreamingContinue(make_pair_list(3, false), start_transaction_callback);
 }
 
 void ui_display_transaction_streaming_flow(bool is_self_transfer) {
-    // Setup list
-    pairList.nbMaxLinesForValue = 0;
-    pairList.pairs = pairs;
-
     unsigned int l_n_pairs = 0;
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
@@ -272,19 +265,15 @@ void ui_display_transaction_streaming_flow(bool is_self_transfer) {
     if (!is_self_transfer) {
         pairs[l_n_pairs].item = "Fees";
         pairs[l_n_pairs++].value = state->fee;
-
-        pairList.nbPairs = l_n_pairs;
     } else {
         pairs[l_n_pairs].item = "Amount";
         pairs[l_n_pairs++].value = "Self-transfer";
 
         pairs[l_n_pairs].item = "Fees";
         pairs[l_n_pairs++].value = state->fee;
-
-        pairList.nbPairs = l_n_pairs;
     }
 
-    nbgl_useCaseReviewStreamingContinue(&pairList, finish_transaction_flow);
+    nbgl_useCaseReviewStreamingContinue(make_pair_list(l_n_pairs, false), finish_transaction_flow);
 }
 
 static void finish_transaction_flow(bool choice) {
@@ -307,13 +296,8 @@ void ui_display_pubkey_flow(void) {
     pairs[1].item = "Public key";
     pairs[1].value = g_ui_state.path_and_pubkey.pubkey;
 
-    // Setup list
-    pairList.nbMaxLinesForValue = 0;
-    pairList.nbPairs = 2;
-    pairList.pairs = pairs;
-
     nbgl_useCaseReviewLight(TYPE_OPERATION,
-                            &pairList,
+                            make_pair_list(2, false),
                             &ICON_APP_ACTION,
                             "Confirm public key",
                             NULL,
@@ -326,13 +310,8 @@ void ui_display_receive_in_wallet_flow(void) {
     pairs[0].item = "Account name";
     pairs[0].value = g_ui_state.wallet.wallet_name;
 
-    // Setup list
-    pairList.nbMaxLinesForValue = 0;
-    pairList.nbPairs = 1;
-    pairList.pairs = pairs;
-
     nbgl_useCaseAddressReview(g_ui_state.wallet.address,
-                              &pairList,
+                              make_pair_list(1, false),
                               &ICON_APP_ACTION,
                               "Verify bitcoin\naddress",
                               NULL,
@@ -347,9 +326,6 @@ void ui_display_register_wallet_policy_flow(void) {
     rejected_status = "Account rejected";
 
     n_pairs = 0;
-
-    pairList.nbMaxLinesForValue = 0;
-    pairList.pairs = pairs;
 
     pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
         .item = "Account name",
@@ -375,10 +351,8 @@ void ui_display_register_wallet_policy_flow(void) {
                                      .value = g_ui_state.register_wallet_policy.keys_info[i]};
     }
 
-    pairList.nbPairs = n_pairs;
-
     nbgl_useCaseReviewLight(TYPE_OPERATION,
-                            &pairList,
+                            make_pair_list(n_pairs, false),
                             &ICON_APP_ACTION,
                             "Review account\nto register",
                             NULL,
@@ -402,12 +376,8 @@ void ui_sign_message_and_confirm_flow(bool is_hash) {
 
     pairs[1].value = g_ui_state.path_and_message.message;
 
-    pairList.wrapping = true;
-    pairList.nbPairs = 2;
-    pairList.pairs = pairs;
-
     nbgl_useCaseReview(TYPE_MESSAGE,
-                       &pairList,
+                       make_pair_list(2, true),
                        &ICON_APP_ACTION,
                        GA_REVIEW_MESSAGE,
                        NULL,
