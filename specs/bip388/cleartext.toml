@@ -102,6 +102,17 @@ cleartext = ["Main path: any ", "$threshold", " of ", "$keys", " must sign"]
 # correct when wrapped by a combinator leaf (`Timelocked`, `AndV`): e.g.
 # "@1 must sign" composes as "@1 must sign - and also - ..." whereas
 # "spendable by @1 alone" would not.
+#
+# Tapleaf cleartext is written LOWERCASE (e.g. "any 2 of ...") so it reads
+# correctly when composed mid-sentence inside another leaf. The encoder
+# capitalizes the first letter of each finished top-level element (see
+# `capitalize_first` in `mod.rs`), so a standalone leaf still displays as
+# "Any 2 of ..." while a composed one stays lowercase
+# ("@1 must sign - and also - any 2 of ..."). Decoding is case-insensitive: the
+# reverse parser lower-cases the whole input and the pattern literals before
+# matching (see `decode.rs`), so the patterns must stay unambiguous when
+# lower-cased (enforced by `check_cleartext_uniqueness` and the
+# `test_spec_shape_uniqueness` test).
 # =============================================================================
 
 [[tapleaf]]
@@ -117,7 +128,7 @@ cleartext = ["$key1", " and ", "$key2", " must both sign"]
 [[tapleaf]]
 name = "SortedMultisig"
 patterns = ["sortedmulti_a($threshold, $keys)"]
-cleartext = ["Any ", "$threshold", " of ", "$keys", " must sign (sorted)"]
+cleartext = ["any ", "$threshold", " of ", "$keys", " must sign (sorted)"]
 
 [[tapleaf]]
 name = "Multisig"
@@ -125,7 +136,7 @@ patterns = [
     "multi_a($threshold, $keys)",
     "pk(musig($keys))",
 ]
-cleartext = ["Any ", "$threshold", " of ", "$keys", " must sign"]
+cleartext = ["any ", "$threshold", " of ", "$keys", " must sign"]
 
 # Timelocked leaves are `and_v(v:SIGNER, LOCK)`. The signer is a `$sub`
 # sub-policy (classified recursively as a non-combinator leaf: SingleSig,

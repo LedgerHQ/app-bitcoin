@@ -1215,6 +1215,18 @@ uint64_t cleartext_confusion_score(const policy_node_t *root) {
     return score;
 }
 
+// Capitalize the first character of a finished top-level cleartext line if it is
+// a lowercase ASCII letter. Tapleaf specs are written lowercase so they read
+// correctly when composed mid-sentence inside another leaf (e.g. as the second
+// operand of an `and_v`); this fixes up only the leading character of each fully
+// assembled line, leaving composed sub-policies lowercase. Mirrors
+// `capitalize_first` in the reference mod.rs.
+static void capitalize_first(char *s) {
+    if (s[0] >= 'a' && s[0] <= 'z') {
+        s[0] = (char) (s[0] - 'a' + 'A');
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Top-level encoder
 // ---------------------------------------------------------------------------
@@ -1255,6 +1267,7 @@ int cleartext_encode(const policy_node_t *root,
     // Render the primary line.
     const cleartext_spec_t *top_spec = &CT_TOP_LEVEL_SPECS[top.cls];
     if (render_spec(top_spec, &top.bindings, out_lines[0], CT_MAX_LINE_LEN + 1) < 0) return -1;
+    capitalize_first(out_lines[0]);
     *out_n_lines = 1;
 
     if (top.cls != DC_TAPROOT && top.cls != DC_TAPROOT_MUSIG) {
@@ -1319,6 +1332,7 @@ int cleartext_encode(const policy_node_t *root,
                             CT_MAX_LINE_LEN + 1) < 0) {
                 return -1;
             }
+            capitalize_first(out_lines[line_idx]);
         }
     }
     *out_n_lines = (size_t) n_leaves + 1;

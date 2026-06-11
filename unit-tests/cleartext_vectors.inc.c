@@ -255,28 +255,28 @@ static const char *const vec_058_ct[] = {
 };
 static const char *const vec_059_ct[] = {
     "Main path: spendable by @0",
-    "@1 must sign - and also - Any 2 of @2 and @3 must sign",
+    "@1 must sign - and also - any 2 of @2 and @3 must sign",
 };
 static const char *const vec_060_ct[] = {
     "Main path: spendable by @0",
-    "@1 must sign - and also - Any 2 of @2 and @3 must sign",
+    "@1 must sign - and also - any 2 of @2 and @3 must sign",
 };
 static const char *const vec_061_ct[] = {
     "Main path: spendable by @0",
-    "@1 must sign - and also - Any 2 of @2 and @3 must sign",
+    "@1 must sign - and also - any 2 of @2 and @3 must sign",
 };
 static const char *const vec_062_ct[] = {
     "Main path: spendable by @0",
-    "Any 2 of @1 and @2 must sign - and also - Any 2 of @3 and @4 must sign",
+    "Any 2 of @1 and @2 must sign - and also - any 2 of @3 and @4 must sign",
 };
 static const char *const vec_063_ct[] = {
     "Main path: spendable by @0",
-    "@1 and @2 must both sign - and also - Any 2 of @3 and @4 must sign",
+    "@1 and @2 must both sign - and also - any 2 of @3 and @4 must sign",
 };
 static const char *const vec_064_ct[] = {
     "Main path: spendable by @0",
     "@1 must sign",
-    "@2 must sign - and also - Any 2 of @3 and @4 must sign",
+    "@2 must sign - and also - any 2 of @3 and @4 must sign",
 };
 static const char *const vec_065_ct[] = {
     "pkh(@0/<2;3>/*)",

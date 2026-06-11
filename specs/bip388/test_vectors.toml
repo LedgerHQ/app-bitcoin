@@ -581,7 +581,7 @@ template = "tr(@0/**,and_v(v:pk(@1/**),multi_a(2,@2/**,@3/**)))"
 confusion_score = 2
 cleartext = [
     "Main path: spendable by @0",
-    "@1 must sign - and also - Any 2 of @2 and @3 must sign",
+    "@1 must sign - and also - any 2 of @2 and @3 must sign",
 ]
 has_cleartext = true
 
@@ -591,7 +591,7 @@ template = "tr(@0/**,and_v(v:pk(@1/**),pk(musig(@2,@3)/**)))"
 confusion_score = 2
 cleartext = [
     "Main path: spendable by @0",
-    "@1 must sign - and also - Any 2 of @2 and @3 must sign",
+    "@1 must sign - and also - any 2 of @2 and @3 must sign",
 ]
 has_cleartext = true
 
@@ -602,7 +602,7 @@ template = "tr(@0/**,and_v(v:pk(@1/**),multi_a(2,@2/**,@3/**)))"
 confusion_score = 2
 cleartext = [
     "Main path: spendable by @0",
-    "@1 must sign - and also - Any 2 of @2 and @3 must sign",
+    "@1 must sign - and also - any 2 of @2 and @3 must sign",
 ]
 has_cleartext = true
 
@@ -612,7 +612,7 @@ template = "tr(@0/**,and_v(v:multi_a(2,@1/**,@2/**),multi_a(2,@3/**,@4/**)))"
 confusion_score = 4
 cleartext = [
     "Main path: spendable by @0",
-    "Any 2 of @1 and @2 must sign - and also - Any 2 of @3 and @4 must sign",
+    "Any 2 of @1 and @2 must sign - and also - any 2 of @3 and @4 must sign",
 ]
 has_cleartext = true
 
@@ -622,7 +622,7 @@ template = "tr(@0/**,and_v(v:and_v(v:pk(@1/**),pk(@2/**)),multi_a(2,@3/**,@4/**)
 confusion_score = 2
 cleartext = [
     "Main path: spendable by @0",
-    "@1 and @2 must both sign - and also - Any 2 of @3 and @4 must sign",
+    "@1 and @2 must both sign - and also - any 2 of @3 and @4 must sign",
 ]
 has_cleartext = true
 
@@ -633,7 +633,7 @@ confusion_score = 2
 cleartext = [
     "Main path: spendable by @0",
     "@1 must sign",
-    "@2 must sign - and also - Any 2 of @3 and @4 must sign",
+    "@2 must sign - and also - any 2 of @3 and @4 must sign",
 ]
 has_cleartext = true
 
