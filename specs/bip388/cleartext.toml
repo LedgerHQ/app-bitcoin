@@ -27,6 +27,22 @@
 #
 # Tapleaf entries also carry their position in this file as their display
 # `order` (used to group leaves when rendering a taptree).
+#
+# Wording conventions (see also `format_timelock` / `format_seconds` in
+# `mod.rs`, which produce the dynamic `$timelock` text):
+#   - A taproot's `to_cleartext` returns the key-path description first, then one
+#     line per leaf. The leaves are ALTERNATIVE spending paths (any one suffices);
+#     conditions *within* a leaf are combined with AND. Hence the consistent
+#     "... must sign" phrasing per signer, and " - and also - " for an explicit
+#     AND between two sub-policies.
+#   - Thresholds read "Any K of <keys> ... must sign" so the K-of-N meaning is
+#     unambiguous (when K == N this naturally reads as "all of them").
+#   - Timelocks distinguish *relative* locks ("<duration> after receiving",
+#     counted from when these coins were received) from *absolute* locks
+#     ("not before block N" / "not before <date> UTC", a fixed point).
+#   - Address-encoding / script-form qualifiers that don't change who can spend
+#     (Legacy / SegWit / sorted) are kept as a trailing parenthetical so the
+#     plain-language policy comes first.
 
 # =============================================================================
 # Top-level patterns
@@ -35,12 +51,12 @@
 [[top_level]]
 name = "LegacySingleSig"
 patterns = ["pkh($key)"]
-cleartext = ["Legacy single-signature (", "$key", ")"]
+cleartext = ["Spendable by ", "$key", " alone (Legacy)"]
 
 [[top_level]]
 name = "SegwitSingleSig"
 patterns = ["wpkh($key)", "sh(wpkh($key))"]
-cleartext = ["Segwit single-signature (", "$key", ")"]
+cleartext = ["Spendable by ", "$key", " alone (SegWit)"]
 
 [[top_level]]
 name = "SegwitMultisig"
@@ -50,57 +66,90 @@ patterns = [
     "sh(wsh(multi($threshold, $keys)))",
     "sh(wsh(sortedmulti($threshold, $keys)))",
 ]
-cleartext = ["$threshold", " of ", "$keys", " (SegWit)"]
+cleartext = ["Any ", "$threshold", " of ", "$keys", " must sign (SegWit)"]
+
+# Leaf-less taproot (key-path spend only, no script alternatives). These must
+# appear before the `Taproot` / `TaprootMusig` entries below: their patterns have
+# no tree argument, so they match only `tr(key)` (tree == None), and the
+# classifier tries entries in order. Because there is a single spending path, the
+# wording is standalone (no "Main path:" prefix), mirroring the other
+# single-/multi-signature choices, with a "(Taproot)" qualifier to keep the
+# rendering distinguishable from the Legacy/SegWit forms when decoding.
+[[top_level]]
+name = "TaprootKeyOnly"
+patterns = ["tr($internal_key)"]
+cleartext = ["Spendable by ", "$internal_key", " alone (Taproot)"]
+
+[[top_level]]
+name = "TaprootMusigKeyOnly"
+patterns = ["tr(musig($keys))"]
+cleartext = ["Any ", "$threshold", " of ", "$keys", " must sign (Taproot)"]
 
 [[top_level]]
 name = "Taproot"
 patterns = ["tr($internal_key, $leaves)"]
-cleartext = ["Primary path: ", "$internal_key"]
+cleartext = ["Main path: spendable by ", "$internal_key"]
 
 [[top_level]]
 name = "TaprootMusig"
-patterns = ["tr(musig($threshold, $keys), $leaves)"]
-cleartext = ["Primary path: ", "$threshold", " of ", "$keys"]
+patterns = ["tr(musig($keys), $leaves)"]
+cleartext = ["Main path: any ", "$threshold", " of ", "$keys", " must sign"]
 
 # =============================================================================
 # Tapleaf patterns
+#
+# Each tapleaf is an alternative spending path. The wording is chosen so it stays
+# correct when wrapped by a combinator leaf (`Timelocked`, `AndV`): e.g.
+# "@1 must sign" composes as "@1 must sign - and also - ..." whereas
+# "spendable by @1 alone" would not.
 # =============================================================================
 
 [[tapleaf]]
 name = "SingleSig"
 patterns = ["pk($key)"]
-cleartext = ["Single-signature (", "$key", ")"]
+cleartext = ["$key", " must sign"]
 
 [[tapleaf]]
 name = "BothMustSign"
 patterns = ["and_v(v:pk($key1), pk($key2))"]
-cleartext = ["Both ", "$key1", " and ", "$key2", " must sign"]
+cleartext = ["$key1", " and ", "$key2", " must both sign"]
 
 [[tapleaf]]
 name = "SortedMultisig"
 patterns = ["sortedmulti_a($threshold, $keys)"]
-cleartext = ["$threshold", " of ", "$keys", " (sorted)"]
+cleartext = ["Any ", "$threshold", " of ", "$keys", " must sign (sorted)"]
 
 [[tapleaf]]
 name = "Multisig"
 patterns = [
     "multi_a($threshold, $keys)",
-    "pk(musig($threshold, $keys))",
+    "pk(musig($keys))",
 ]
-cleartext = ["$threshold", " of ", "$keys"]
+cleartext = ["Any ", "$threshold", " of ", "$keys", " must sign"]
 
 # Timelocked leaves are `and_v(v:SIGNER, LOCK)`. The signer is a `$sub`
 # sub-policy (classified recursively as a non-combinator leaf: SingleSig,
 # BothMustSign, SortedMultisig or Multisig). The lock is a single `$timelock`
-# binding that matches both `older(...)` (relative) and `after(...)` (absolute);
-# the four display forms (blocks / duration / block height / date) are produced
-# by the `$timelock` value itself.
+# binding that matches both `older(...)` (relative) and `after(...)` (absolute).
+#
+# The `$timelock` value carries its own connective so relative and absolute
+# locks read differently (produced by `format_timelock`):
+#   - relative block count : "<n> blocks after receiving"
+#   - relative duration    : "<duration> after receiving"  (e.g. "8 minutes 32 seconds")
+#   - absolute block height: "not before block <n>"
+#   - absolute date        : "not before <YYYY-MM-DD[ HH:MM:SS]> UTC"
+# so the literal between `$sub` and `$timelock` is just ", ".
+#
+# Using ", " as the delimiter is unambiguous for the reverse parser: the only
+# sub-policy with an internal ", " is a 3+-key multisig, and its commas are
+# always followed by more keys (never by a valid `$timelock` tail), so the split
+# only ever succeeds at the real boundary.
 [[tapleaf]]
 name = "Timelocked"
 patterns = ["and_v(v:$sub, $timelock)"]
-cleartext = ["$sub", " after ", "$timelock"]
+cleartext = ["$sub", ", ", "$timelock"]
 
 [[tapleaf]]
 name = "AndV"
 patterns = ["and_v(v:$sub1, $sub2)"]
-cleartext = ["$sub1", ", and ", "$sub2"]
+cleartext = ["$sub1", " - and also - ", "$sub2"]

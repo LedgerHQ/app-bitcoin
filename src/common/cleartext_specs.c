@@ -4,101 +4,125 @@
 #include "common/cleartext_specs.h"
 
 const char ct_string_pool[] = {
-    0x4c, 0x65, 0x67, 0x61, 0x63, 0x79, 0x20, 0x73, 0x69, 0x6e, 0x67, 0x6c, 0x65, 0x2d, 0x73, 0x69,
-    0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x20, 0x28, 0x00, 0x29, 0x00, 0x53, 0x65, 0x67, 0x77,
-    0x69, 0x74, 0x20, 0x73, 0x69, 0x6e, 0x67, 0x6c, 0x65, 0x2d, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74,
-    0x75, 0x72, 0x65, 0x20, 0x28, 0x00, 0x20, 0x6f, 0x66, 0x20, 0x00, 0x20, 0x28, 0x53, 0x65, 0x67,
-    0x57, 0x69, 0x74, 0x29, 0x00, 0x50, 0x72, 0x69, 0x6d, 0x61, 0x72, 0x79, 0x20, 0x70, 0x61, 0x74,
-    0x68, 0x3a, 0x20, 0x00, 0x53, 0x69, 0x6e, 0x67, 0x6c, 0x65, 0x2d, 0x73, 0x69, 0x67, 0x6e, 0x61,
-    0x74, 0x75, 0x72, 0x65, 0x20, 0x28, 0x00, 0x42, 0x6f, 0x74, 0x68, 0x20, 0x00, 0x20, 0x61, 0x6e,
-    0x64, 0x20, 0x00, 0x20, 0x6d, 0x75, 0x73, 0x74, 0x20, 0x73, 0x69, 0x67, 0x6e, 0x00, 0x20, 0x28,
-    0x73, 0x6f, 0x72, 0x74, 0x65, 0x64, 0x29, 0x00, 0x20, 0x61, 0x66, 0x74, 0x65, 0x72, 0x20, 0x00,
-    0x2c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x00,
+    0x53, 0x70, 0x65, 0x6e, 0x64, 0x61, 0x62, 0x6c, 0x65, 0x20, 0x62, 0x79, 0x20, 0x00, 0x20, 0x61,
+    0x6c, 0x6f, 0x6e, 0x65, 0x20, 0x28, 0x4c, 0x65, 0x67, 0x61, 0x63, 0x79, 0x29, 0x00, 0x20, 0x61,
+    0x6c, 0x6f, 0x6e, 0x65, 0x20, 0x28, 0x53, 0x65, 0x67, 0x57, 0x69, 0x74, 0x29, 0x00, 0x41, 0x6e,
+    0x79, 0x20, 0x00, 0x20, 0x6f, 0x66, 0x20, 0x00, 0x20, 0x6d, 0x75, 0x73, 0x74, 0x20, 0x73, 0x69,
+    0x67, 0x6e, 0x20, 0x28, 0x53, 0x65, 0x67, 0x57, 0x69, 0x74, 0x29, 0x00, 0x20, 0x61, 0x6c, 0x6f,
+    0x6e, 0x65, 0x20, 0x28, 0x54, 0x61, 0x70, 0x72, 0x6f, 0x6f, 0x74, 0x29, 0x00, 0x20, 0x6d, 0x75,
+    0x73, 0x74, 0x20, 0x73, 0x69, 0x67, 0x6e, 0x20, 0x28, 0x54, 0x61, 0x70, 0x72, 0x6f, 0x6f, 0x74,
+    0x29, 0x00, 0x4d, 0x61, 0x69, 0x6e, 0x20, 0x70, 0x61, 0x74, 0x68, 0x3a, 0x20, 0x73, 0x70, 0x65,
+    0x6e, 0x64, 0x61, 0x62, 0x6c, 0x65, 0x20, 0x62, 0x79, 0x20, 0x00, 0x4d, 0x61, 0x69, 0x6e, 0x20,
+    0x70, 0x61, 0x74, 0x68, 0x3a, 0x20, 0x61, 0x6e, 0x79, 0x20, 0x00, 0x20, 0x6d, 0x75, 0x73, 0x74,
+    0x20, 0x73, 0x69, 0x67, 0x6e, 0x00, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x00, 0x20, 0x6d, 0x75, 0x73,
+    0x74, 0x20, 0x62, 0x6f, 0x74, 0x68, 0x20, 0x73, 0x69, 0x67, 0x6e, 0x00, 0x20, 0x6d, 0x75, 0x73,
+    0x74, 0x20, 0x73, 0x69, 0x67, 0x6e, 0x20, 0x28, 0x73, 0x6f, 0x72, 0x74, 0x65, 0x64, 0x29, 0x00,
+    0x2c, 0x20, 0x00, 0x20, 0x2d, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x61, 0x6c, 0x73, 0x6f, 0x20, 0x2d,
+    0x20, 0x00,
 };
 
 static const cleartext_part_t TOP_LEGACY_SINGLE_SIG_PARTS[] = {
-    { CT_PART_LITERAL    , 0,    0 },  // 'Legacy single-signature ('
+    { CT_PART_LITERAL    , 0,    0 },  // 'Spendable by '
     { CT_PART_KEY        , 0,    0 },  // $key
-    { CT_PART_LITERAL    , 0,   26 },  // ')'
+    { CT_PART_LITERAL    , 0,   14 },  // ' alone (Legacy)'
 };
 
 static const cleartext_part_t TOP_SEGWIT_SINGLE_SIG_PARTS[] = {
-    { CT_PART_LITERAL    , 0,   28 },  // 'Segwit single-signature ('
+    { CT_PART_LITERAL    , 0,    0 },  // 'Spendable by '
     { CT_PART_KEY        , 0,    0 },  // $key
-    { CT_PART_LITERAL    , 0,   26 },  // ')'
+    { CT_PART_LITERAL    , 0,   30 },  // ' alone (SegWit)'
 };
 
 static const cleartext_part_t TOP_SEGWIT_MULTISIG_PARTS[] = {
+    { CT_PART_LITERAL    , 0,   46 },  // 'Any '
     { CT_PART_THRESHOLD  , 0,    0 },  // $threshold
-    { CT_PART_LITERAL    , 0,   54 },  // ' of '
+    { CT_PART_LITERAL    , 0,   51 },  // ' of '
     { CT_PART_KEYS       , 1,    0 },  // $keys
-    { CT_PART_LITERAL    , 0,   59 },  // ' (SegWit)'
+    { CT_PART_LITERAL    , 0,   56 },  // ' must sign (SegWit)'
+};
+
+static const cleartext_part_t TOP_TAPROOT_KEY_ONLY_PARTS[] = {
+    { CT_PART_LITERAL    , 0,    0 },  // 'Spendable by '
+    { CT_PART_KEY        , 0,    0 },  // $internal_key
+    { CT_PART_LITERAL    , 0,   76 },  // ' alone (Taproot)'
+};
+
+static const cleartext_part_t TOP_TAPROOT_MUSIG_KEY_ONLY_PARTS[] = {
+    { CT_PART_LITERAL    , 0,   46 },  // 'Any '
+    { CT_PART_THRESHOLD  , 0,    0 },  // $threshold
+    { CT_PART_LITERAL    , 0,   51 },  // ' of '
+    { CT_PART_KEYS       , 1,    0 },  // $keys
+    { CT_PART_LITERAL    , 0,   93 },  // ' must sign (Taproot)'
 };
 
 static const cleartext_part_t TOP_TAPROOT_PARTS[] = {
-    { CT_PART_LITERAL    , 0,   69 },  // 'Primary path: '
+    { CT_PART_LITERAL    , 0,  114 },  // 'Main path: spendable by '
     { CT_PART_KEY        , 0,    0 },  // $internal_key
 };
 
 static const cleartext_part_t TOP_TAPROOT_MUSIG_PARTS[] = {
-    { CT_PART_LITERAL    , 0,   69 },  // 'Primary path: '
+    { CT_PART_LITERAL    , 0,  139 },  // 'Main path: any '
     { CT_PART_THRESHOLD  , 0,    0 },  // $threshold
-    { CT_PART_LITERAL    , 0,   54 },  // ' of '
+    { CT_PART_LITERAL    , 0,   51 },  // ' of '
     { CT_PART_KEYS       , 1,    0 },  // $keys
+    { CT_PART_LITERAL    , 0,  155 },  // ' must sign'
 };
 
 static const cleartext_part_t LEAF_SINGLE_SIG_PARTS[] = {
-    { CT_PART_LITERAL    , 0,   84 },  // 'Single-signature ('
     { CT_PART_KEY        , 0,    0 },  // $key
-    { CT_PART_LITERAL    , 0,   26 },  // ')'
+    { CT_PART_LITERAL    , 0,  155 },  // ' must sign'
 };
 
 static const cleartext_part_t LEAF_BOTH_MUST_SIGN_PARTS[] = {
-    { CT_PART_LITERAL    , 0,  103 },  // 'Both '
     { CT_PART_KEY        , 0,    0 },  // $key1
-    { CT_PART_LITERAL    , 0,  109 },  // ' and '
+    { CT_PART_LITERAL    , 0,  166 },  // ' and '
     { CT_PART_KEY        , 1,    0 },  // $key2
-    { CT_PART_LITERAL    , 0,  115 },  // ' must sign'
+    { CT_PART_LITERAL    , 0,  172 },  // ' must both sign'
 };
 
 static const cleartext_part_t LEAF_SORTED_MULTISIG_PARTS[] = {
+    { CT_PART_LITERAL    , 0,   46 },  // 'Any '
     { CT_PART_THRESHOLD  , 0,    0 },  // $threshold
-    { CT_PART_LITERAL    , 0,   54 },  // ' of '
+    { CT_PART_LITERAL    , 0,   51 },  // ' of '
     { CT_PART_KEYS       , 1,    0 },  // $keys
-    { CT_PART_LITERAL    , 0,  126 },  // ' (sorted)'
+    { CT_PART_LITERAL    , 0,  188 },  // ' must sign (sorted)'
 };
 
 static const cleartext_part_t LEAF_MULTISIG_PARTS[] = {
+    { CT_PART_LITERAL    , 0,   46 },  // 'Any '
     { CT_PART_THRESHOLD  , 0,    0 },  // $threshold
-    { CT_PART_LITERAL    , 0,   54 },  // ' of '
+    { CT_PART_LITERAL    , 0,   51 },  // ' of '
     { CT_PART_KEYS       , 1,    0 },  // $keys
+    { CT_PART_LITERAL    , 0,  155 },  // ' must sign'
 };
 
 static const cleartext_part_t LEAF_TIMELOCKED_PARTS[] = {
     { CT_PART_SUB        , 0,    0 },  // $sub
-    { CT_PART_LITERAL    , 0,  136 },  // ' after '
+    { CT_PART_LITERAL    , 0,  208 },  // ', '
     { CT_PART_TIMELOCK   , 1,    0 },  // $timelock
 };
 
 static const cleartext_part_t LEAF_AND_V_PARTS[] = {
     { CT_PART_SUB        , 0,    0 },  // $sub1
-    { CT_PART_LITERAL    , 0,  144 },  // ', and '
+    { CT_PART_LITERAL    , 0,  211 },  // ' - and also - '
     { CT_PART_SUB        , 1,    0 },  // $sub2
 };
 
 const cleartext_spec_t CT_TOP_LEVEL_SPECS[DC__COUNT] = {
     [DC_LEGACY_SINGLE_SIG] = { 1, 0, 3, TOP_LEGACY_SINGLE_SIG_PARTS },
     [DC_SEGWIT_SINGLE_SIG] = { 2, 0, 3, TOP_SEGWIT_SINGLE_SIG_PARTS },
-    [DC_SEGWIT_MULTISIG] = { 4, 0, 4, TOP_SEGWIT_MULTISIG_PARTS },
+    [DC_SEGWIT_MULTISIG] = { 4, 0, 5, TOP_SEGWIT_MULTISIG_PARTS },
+    [DC_TAPROOT_KEY_ONLY] = { 1, 0, 3, TOP_TAPROOT_KEY_ONLY_PARTS },
+    [DC_TAPROOT_MUSIG_KEY_ONLY] = { 1, 1, 5, TOP_TAPROOT_MUSIG_KEY_ONLY_PARTS },
     [DC_TAPROOT] = { 1, 0, 2, TOP_TAPROOT_PARTS },
-    [DC_TAPROOT_MUSIG] = { 1, 1, 4, TOP_TAPROOT_MUSIG_PARTS },
+    [DC_TAPROOT_MUSIG] = { 1, 1, 5, TOP_TAPROOT_MUSIG_PARTS },
 };
 
 const cleartext_spec_t CT_TAPLEAF_SPECS[TC__COUNT] = {
-    [TC_SINGLE_SIG] = { 1, 0, 3, LEAF_SINGLE_SIG_PARTS },
-    [TC_BOTH_MUST_SIGN] = { 1, 0, 5, LEAF_BOTH_MUST_SIGN_PARTS },
-    [TC_SORTED_MULTISIG] = { 1, 0, 4, LEAF_SORTED_MULTISIG_PARTS },
-    [TC_MULTISIG] = { 2, 1, 3, LEAF_MULTISIG_PARTS },
+    [TC_SINGLE_SIG] = { 1, 0, 2, LEAF_SINGLE_SIG_PARTS },
+    [TC_BOTH_MUST_SIGN] = { 1, 0, 4, LEAF_BOTH_MUST_SIGN_PARTS },
+    [TC_SORTED_MULTISIG] = { 1, 0, 5, LEAF_SORTED_MULTISIG_PARTS },
+    [TC_MULTISIG] = { 2, 1, 5, LEAF_MULTISIG_PARTS },
     [TC_TIMELOCKED] = { 1, 0, 3, LEAF_TIMELOCKED_PARTS },
     [TC_AND_V] = { 1, 0, 3, LEAF_AND_V_PARTS },
 };

@@ -2,281 +2,281 @@
 // clang-format off
 
 static const char *const vec_000_ct[] = {
-    "Legacy single-signature (@0)",
+    "Spendable by @0 alone (Legacy)",
 };
 static const char *const vec_001_ct[] = {
-    "Segwit single-signature (@0)",
+    "Spendable by @0 alone (SegWit)",
 };
 static const char *const vec_002_ct[] = {
-    "Segwit single-signature (@0)",
+    "Spendable by @0 alone (SegWit)",
 };
 static const char *const vec_003_ct[] = {
-    "2 of @0 and @1 (SegWit)",
+    "Any 2 of @0 and @1 must sign (SegWit)",
 };
 static const char *const vec_004_ct[] = {
-    "2 of @0, @1 and @2 (SegWit)",
+    "Any 2 of @0, @1 and @2 must sign (SegWit)",
 };
 static const char *const vec_005_ct[] = {
-    "3 of @0, @1 and @2 (SegWit)",
+    "Any 3 of @0, @1 and @2 must sign (SegWit)",
 };
 static const char *const vec_006_ct[] = {
-    "2 of @0 and @1 (SegWit)",
+    "Any 2 of @0 and @1 must sign (SegWit)",
 };
 static const char *const vec_007_ct[] = {
-    "2 of @0 and @1 (SegWit)",
+    "Any 2 of @0 and @1 must sign (SegWit)",
 };
 static const char *const vec_008_ct[] = {
-    "2 of @0 and @1 (SegWit)",
+    "Any 2 of @0 and @1 must sign (SegWit)",
 };
 static const char *const vec_009_ct[] = {
-    "2 of @0, @1 and @2 (SegWit)",
+    "Any 2 of @0, @1 and @2 must sign (SegWit)",
 };
 static const char *const vec_010_ct[] = {
-    "3 of @0, @1 and @2 (SegWit)",
+    "Any 3 of @0, @1 and @2 must sign (SegWit)",
 };
 static const char *const vec_011_ct[] = {
-    "Primary path: @0",
+    "Spendable by @0 alone (Taproot)",
 };
 static const char *const vec_012_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
+    "Main path: spendable by @0",
+    "@1 must sign",
 };
 static const char *const vec_013_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
-    "Single-signature (@2)",
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "@2 must sign",
 };
 static const char *const vec_014_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@3)",
-    "2 of @1 and @2 (sorted)",
+    "Main path: spendable by @0",
+    "@3 must sign",
+    "Any 2 of @1 and @2 must sign (sorted)",
 };
 static const char *const vec_015_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
-    "Single-signature (@2)",
-    "Single-signature (@3)",
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "@2 must sign",
+    "@3 must sign",
 };
 static const char *const vec_016_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
-    "Single-signature (@2)",
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "@2 must sign",
 };
 static const char *const vec_017_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1) after 1000 blocks",
-    "Single-signature (@2) after 2000 blocks",
+    "Main path: spendable by @0",
+    "@1 must sign, 1000 blocks after receiving",
+    "@2 must sign, 2000 blocks after receiving",
 };
 static const char *const vec_018_ct[] = {
-    "Primary path: @0",
-    "2 of @4 and @5",
-    "2 of @1, @2 and @3",
+    "Main path: spendable by @0",
+    "Any 2 of @4 and @5 must sign",
+    "Any 2 of @1, @2 and @3 must sign",
 };
 static const char *const vec_019_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1) after 960 blocks",
+    "Main path: spendable by @0",
+    "@1 must sign, 960 blocks after receiving",
     "t:or_c(pk(@2/**),and_v(v:pk(@3/**),or_c(pk(@4/**),v:ripemd160(907cd521fff981ce4063a4dc43c6f3fd28e08995))))",
 };
 static const char *const vec_020_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1) after 52560 blocks",
+    "Main path: spendable by @0",
+    "@1 must sign, 52560 blocks after receiving",
 };
 static const char *const vec_021_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
-    "Single-signature (@2) after 52560 blocks",
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "@2 must sign, 52560 blocks after receiving",
 };
 static const char *const vec_022_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
-    "Single-signature (@2) after 1008 blocks",
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "@2 must sign, 1008 blocks after receiving",
 };
 static const char *const vec_023_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1) after 8m 32s",
+    "Main path: spendable by @0",
+    "@1 must sign, 8 minutes 32 seconds after receiving",
 };
 static const char *const vec_024_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
-    "Single-signature (@2) after 8m 32s",
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "@2 must sign, 8 minutes 32 seconds after receiving",
 };
 static const char *const vec_025_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
-    "Single-signature (@2) after 1d 1h 36m",
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "@2 must sign, 1 day 1 hour 36 minutes after receiving",
 };
 static const char *const vec_026_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
-    "2 of @2 and @3 after 1d 1h 36m",
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "Any 2 of @2 and @3 must sign, 1 day 1 hour 36 minutes after receiving",
 };
 static const char *const vec_027_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1) after block height 840000",
+    "Main path: spendable by @0",
+    "@1 must sign, not before block 840000",
 };
 static const char *const vec_028_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
-    "2 of @2 and @3 after block height 840000",
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "Any 2 of @2 and @3 must sign, not before block 840000",
 };
 static const char *const vec_029_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1) after date 1985-11-05 00:53:20",
+    "Main path: spendable by @0",
+    "@1 must sign, not before 1985-11-05 00:53:20 UTC",
 };
 static const char *const vec_030_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
-    "2 of @2 and @3 after date 2023-11-14 22:13:20",
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "Any 2 of @2 and @3 must sign, not before 2023-11-14 22:13:20 UTC",
 };
 static const char *const vec_031_ct[] = {
-    "Primary path: @0",
-    "Both @1 and @2 must sign after 1008 blocks",
+    "Main path: spendable by @0",
+    "@1 and @2 must both sign, 1008 blocks after receiving",
 };
 static const char *const vec_032_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
-    "Both @2 and @3 must sign after 1008 blocks",
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "@2 and @3 must both sign, 1008 blocks after receiving",
 };
 static const char *const vec_033_ct[] = {
-    "Primary path: @0",
-    "Both @1 and @2 must sign after 1d 1h 36m",
+    "Main path: spendable by @0",
+    "@1 and @2 must both sign, 1 day 1 hour 36 minutes after receiving",
 };
 static const char *const vec_034_ct[] = {
-    "Primary path: @0",
-    "Both @1 and @2 must sign after block height 840000",
+    "Main path: spendable by @0",
+    "@1 and @2 must both sign, not before block 840000",
 };
 static const char *const vec_035_ct[] = {
-    "Primary path: @0",
-    "Both @1 and @2 must sign after date 2023-11-14 22:13:20",
+    "Main path: spendable by @0",
+    "@1 and @2 must both sign, not before 2023-11-14 22:13:20 UTC",
 };
 static const char *const vec_036_ct[] = {
-    "Primary path: 2 of @0 and @1",
+    "Any 2 of @0 and @1 must sign (Taproot)",
 };
 static const char *const vec_037_ct[] = {
-    "Primary path: 3 of @0, @1 and @2",
+    "Any 3 of @0, @1 and @2 must sign (Taproot)",
 };
 static const char *const vec_038_ct[] = {
-    "Primary path: 2 of @0 and @1",
-    "Single-signature (@2)",
+    "Main path: any 2 of @0 and @1 must sign",
+    "@2 must sign",
 };
 static const char *const vec_039_ct[] = {
-    "Primary path: 2 of @0 and @1",
-    "Single-signature (@2)",
-    "Single-signature (@3)",
+    "Main path: any 2 of @0 and @1 must sign",
+    "@2 must sign",
+    "@3 must sign",
 };
 static const char *const vec_040_ct[] = {
-    "Primary path: 2 of @0 and @1",
-    "Single-signature (@2)",
-    "Single-signature (@3)",
-    "Single-signature (@4)",
+    "Main path: any 2 of @0 and @1 must sign",
+    "@2 must sign",
+    "@3 must sign",
+    "@4 must sign",
 };
 static const char *const vec_041_ct[] = {
-    "Primary path: 2 of @0 and @1",
-    "Single-signature (@2) after 1008 blocks",
+    "Main path: any 2 of @0 and @1 must sign",
+    "@2 must sign, 1008 blocks after receiving",
 };
 static const char *const vec_042_ct[] = {
-    "Primary path: 2 of @0 and @1",
-    "Single-signature (@2)",
-    "Single-signature (@3) after block height 840000",
+    "Main path: any 2 of @0 and @1 must sign",
+    "@2 must sign",
+    "@3 must sign, not before block 840000",
 };
 static const char *const vec_043_ct[] = {
-    "Primary path: @0",
-    "2 of @1 and @2",
+    "Main path: spendable by @0",
+    "Any 2 of @1 and @2 must sign",
 };
 static const char *const vec_044_ct[] = {
-    "Primary path: @0",
-    "3 of @1, @2 and @3",
+    "Main path: spendable by @0",
+    "Any 3 of @1, @2 and @3 must sign",
 };
 static const char *const vec_045_ct[] = {
-    "Primary path: @0",
-    "2 of @1 and @2 after 1008 blocks",
+    "Main path: spendable by @0",
+    "Any 2 of @1 and @2 must sign, 1008 blocks after receiving",
 };
 static const char *const vec_046_ct[] = {
-    "Primary path: @0",
-    "2 of @1 and @2 after 1d 1h 36m",
+    "Main path: spendable by @0",
+    "Any 2 of @1 and @2 must sign, 1 day 1 hour 36 minutes after receiving",
 };
 static const char *const vec_047_ct[] = {
-    "Primary path: @0",
-    "2 of @1 and @2 after block height 840000",
+    "Main path: spendable by @0",
+    "Any 2 of @1 and @2 must sign, not before block 840000",
 };
 static const char *const vec_048_ct[] = {
-    "Primary path: @0",
-    "2 of @1 and @2 after date 2023-11-14 22:13:20",
+    "Main path: spendable by @0",
+    "Any 2 of @1 and @2 must sign, not before 2023-11-14 22:13:20 UTC",
 };
 static const char *const vec_049_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
-    "2 of @2 and @3",
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "Any 2 of @2 and @3 must sign",
 };
 static const char *const vec_050_ct[] = {
-    "Primary path: @0",
-    "2 of @4 and @5",
-    "2 of @1, @2 and @3",
+    "Main path: spendable by @0",
+    "Any 2 of @4 and @5 must sign",
+    "Any 2 of @1, @2 and @3 must sign",
 };
 static const char *const vec_051_ct[] = {
-    "Primary path: @0",
-    "Both @2 and @1 must sign",
-    "Single-signature (@1) after 4383 blocks",
+    "Main path: spendable by @0",
+    "@2 and @1 must both sign",
+    "@1 must sign, 4383 blocks after receiving",
 };
 static const char *const vec_052_ct[] = {
-    "Primary path: @0",
-    "Both @1 and @2 must sign",
-    "2 of @1, @2 and @3 after 144 blocks",
+    "Main path: spendable by @0",
+    "@1 and @2 must both sign",
+    "Any 2 of @1, @2 and @3 must sign, 144 blocks after receiving",
 };
 static const char *const vec_053_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@0)",
+    "Main path: spendable by @0",
+    "@0 must sign",
 };
 static const char *const vec_054_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@0)",
-    "Single-signature (@0)",
+    "Main path: spendable by @0",
+    "@0 must sign",
+    "@0 must sign",
 };
 static const char *const vec_055_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
-    "Single-signature (@1)",
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "@1 must sign",
 };
 static const char *const vec_056_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
-    "Single-signature (@1) after 4383 blocks",
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "@1 must sign, 4383 blocks after receiving",
 };
 static const char *const vec_057_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@0)",
-    "Both @1 and @1 must sign",
+    "Main path: spendable by @0",
+    "@0 must sign",
+    "@1 and @1 must both sign",
 };
 static const char *const vec_058_ct[] = {
-    "Primary path: 3 of @0, @1 and @2",
-    "2 of @0 and @1 after 1d 1h 36m",
-    "2 of @0 and @2 after 1d 1h 36m",
-    "2 of @1 and @2 after 1d 1h 36m",
+    "Main path: any 3 of @0, @1 and @2 must sign",
+    "Any 2 of @0 and @1 must sign, 1 day 1 hour 36 minutes after receiving",
+    "Any 2 of @0 and @2 must sign, 1 day 1 hour 36 minutes after receiving",
+    "Any 2 of @1 and @2 must sign, 1 day 1 hour 36 minutes after receiving",
 };
 static const char *const vec_059_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1), and 2 of @2 and @3",
+    "Main path: spendable by @0",
+    "@1 must sign - and also - Any 2 of @2 and @3 must sign",
 };
 static const char *const vec_060_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1), and 2 of @2 and @3",
+    "Main path: spendable by @0",
+    "@1 must sign - and also - Any 2 of @2 and @3 must sign",
 };
 static const char *const vec_061_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1), and 2 of @2 and @3",
+    "Main path: spendable by @0",
+    "@1 must sign - and also - Any 2 of @2 and @3 must sign",
 };
 static const char *const vec_062_ct[] = {
-    "Primary path: @0",
-    "2 of @1 and @2, and 2 of @3 and @4",
+    "Main path: spendable by @0",
+    "Any 2 of @1 and @2 must sign - and also - Any 2 of @3 and @4 must sign",
 };
 static const char *const vec_063_ct[] = {
-    "Primary path: @0",
-    "Both @1 and @2 must sign, and 2 of @3 and @4",
+    "Main path: spendable by @0",
+    "@1 and @2 must both sign - and also - Any 2 of @3 and @4 must sign",
 };
 static const char *const vec_064_ct[] = {
-    "Primary path: @0",
-    "Single-signature (@1)",
-    "Single-signature (@2), and 2 of @3 and @4",
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "@2 must sign - and also - Any 2 of @3 and @4 must sign",
 };
 static const char *const vec_065_ct[] = {
     "pkh(@0/<2;3>/*)",

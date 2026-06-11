@@ -66,11 +66,29 @@ def part_kind_c(kind: str) -> str:
 
 _BINDING_RE = re.compile(r"\$([A-Za-z_][A-Za-z0-9_]*)")
 _TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_:]*|\$[A-Za-z_][A-Za-z0-9_]*|[(),]")
+# A musig key argument: `musig($keys)`. musig is n-of-n, so the threshold is
+# implied by the key count and is not written explicitly.
+_MUSIG_KEYS_RE = re.compile(r"musig\(\$([A-Za-z_][A-Za-z0-9_]*)\)")
+
+
+def synthesize_threshold_name(keys: str) -> str:
+    """Mirror `synthesize_threshold_name` in the Rust build.rs: swap the "keys"
+    base for "threshold", preserving any trailing digit suffix so it stays
+    consistent with a sibling pattern's explicit `$threshold` (e.g.
+    `keys` -> `threshold`, `keys1` -> `threshold1`)."""
+    base = keys.rstrip("0123456789")
+    return "threshold" + keys[len(base):]
 
 
 def pattern_bindings(pattern: str) -> list[tuple[str, str]]:
     """Return the list of (binding_name, kind) in the order they appear in
-    the pattern string. Excludes structural bindings (LEAVES)."""
+    the pattern string.
+
+    `musig($keys)` is n-of-n: it carries no explicit threshold, so (as in the
+    Rust build.rs) we synthesize a `$threshold` binding right before its `$keys`.
+    Its value is the key count at match time, and the shared cleartext can still
+    reference `$threshold`."""
+    musig_keys = {m.group(1) for m in _MUSIG_KEYS_RE.finditer(pattern)}
     bindings: list[tuple[str, str]] = []
     seen = set()
     for m in _BINDING_RE.finditer(pattern):
@@ -81,6 +99,11 @@ def pattern_bindings(pattern: str) -> list[tuple[str, str]]:
         kind = binding_kind(name)
         if kind is None:
             raise ValueError(f"unknown binding name {name!r} in pattern {pattern!r}")
+        if name in musig_keys:
+            tname = synthesize_threshold_name(name)
+            if tname not in seen:
+                seen.add(tname)
+                bindings.append((tname, "THRESHOLD"))
         bindings.append((name, kind))
     return bindings
 

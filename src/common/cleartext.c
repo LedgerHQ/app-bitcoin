@@ -760,20 +760,24 @@ static bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
         }
     }
 
-    // tr($internal_key, $leaves?) or tr(musig(...), $leaves?)
+    // tr($internal_key, $leaves?) or tr(musig(...), $leaves?). A leaf-less
+    // taproot (key-path spend only) classifies as the *_KEY_ONLY variant, which
+    // carries standalone wording; a taproot with a tree keeps the "Main path:"
+    // variant followed by per-leaf lines.
     if (root->type == TOKEN_TR) {
         const policy_node_tr_t *tr = (const policy_node_tr_t *) root;
         const policy_node_keyexpr_t *kx = r_policy_node_keyexpr(&tr->key);
-        out->taptree = isnull_policy_node_tree(&tr->tree) ? NULL : r_policy_node_tree(&tr->tree);
+        bool has_tree = !isnull_policy_node_tree(&tr->tree);
+        out->taptree = has_tree ? r_policy_node_tree(&tr->tree) : NULL;
         if (kx->type == KEY_EXPRESSION_NORMAL) {
-            out->cls = DC_TAPROOT;
+            out->cls = has_tree ? DC_TAPROOT : DC_TAPROOT_KEY_ONLY;
             set_binding_key(&out->bindings, 0, kx);
             out->bindings.n = 1;
             return true;
         }
         // KEY_EXPRESSION_MUSIG
         const musig_aggr_key_info_t *mi = r_musig_aggr_key_info(&kx->m.musig_info);
-        out->cls = DC_TAPROOT_MUSIG;
+        out->cls = has_tree ? DC_TAPROOT_MUSIG : DC_TAPROOT_MUSIG_KEY_ONLY;
         set_binding_number(&out->bindings, 0, mi->n);
         // Pass the keyexpr itself as the keys binding, signaling a musig list.
         set_binding_keys(&out->bindings, 1, kx, 1);
@@ -991,68 +995,81 @@ static void civil_from_unix(uint32_t secs,
     *y = (int) (yyy + (*m <= 2 ? 1 : 0));
 }
 
-// Unified timelock formatter. Produces one of:
-//   - "<N> blocks"             — relative height (raw without flag)
-//   - "<Nd Nh Nm Ns>"          — relative time (raw with flag, scaled ×512s)
-//   - "block height <N>"       — absolute height (raw < LOCKTIME_THRESHOLD)
-//   - "date YYYY-MM-DD HH:MM:SS" — absolute timestamp (raw >= LOCKTIME_THRESHOLD)
+// Appends a number of seconds as a human-readable duration with spelled-out,
+// pluralized units (so a non-technical reader can't mistake "m" for months).
+// Renders "0 seconds" for zero. Mirrors `format_seconds` in the reference
+// time.rs. Example: "1 day 2 hours 30 minutes".
+static int append_duration(char *out, size_t cap, size_t *off, uint32_t secs) {
+    uint32_t days = secs / 86400u;
+    uint32_t hours = (secs % 86400u) / 3600u;
+    uint32_t minutes = (secs % 3600u) / 60u;
+    uint32_t seconds = secs % 60u;
+    char buf[16];
+    bool any = false;
+    if (days > 0) {
+        snprintf(buf, sizeof(buf), "%u ", days);
+        if (append_str(out, cap, off, buf) < 0) return -1;
+        if (append_str(out, cap, off, days == 1 ? "day" : "days") < 0) return -1;
+        any = true;
+    }
+    if (hours > 0) {
+        if (any && append_str(out, cap, off, " ") < 0) return -1;
+        snprintf(buf, sizeof(buf), "%u ", hours);
+        if (append_str(out, cap, off, buf) < 0) return -1;
+        if (append_str(out, cap, off, hours == 1 ? "hour" : "hours") < 0) return -1;
+        any = true;
+    }
+    if (minutes > 0) {
+        if (any && append_str(out, cap, off, " ") < 0) return -1;
+        snprintf(buf, sizeof(buf), "%u ", minutes);
+        if (append_str(out, cap, off, buf) < 0) return -1;
+        if (append_str(out, cap, off, minutes == 1 ? "minute" : "minutes") < 0) return -1;
+        any = true;
+    }
+    if (seconds > 0 || !any) {
+        if (any && append_str(out, cap, off, " ") < 0) return -1;
+        snprintf(buf, sizeof(buf), "%u ", seconds);
+        if (append_str(out, cap, off, buf) < 0) return -1;
+        if (append_str(out, cap, off, seconds == 1 ? "second" : "seconds") < 0) return -1;
+    }
+    return 0;
+}
+
+// Unified timelock formatter. Relative locks (counted from when the coins were
+// received) end in "after receiving"; absolute locks (a fixed point) read
+// "not before ...". Produces one of:
+//   - "<N> blocks after receiving"      — relative height (raw without flag)
+//   - "<duration> after receiving"      — relative time (raw with flag, ×512s)
+//   - "not before block <N>"            — absolute height (raw < LOCKTIME_THRESHOLD)
+//   - "not before YYYY-MM-DD[ HH:MM:SS] UTC" — absolute timestamp (raw >= threshold)
 static int append_timelock(char *out, size_t cap, size_t *off, ct_timelock_t tl) {
     char buf[40];
     if (tl.is_relative) {
         if (tl.raw & SEQUENCE_LOCKTIME_TYPE_FLAG) {
             uint32_t units = tl.raw & ~SEQUENCE_LOCKTIME_TYPE_FLAG;
-            uint64_t secs = (uint64_t) units * 512u;
-            uint64_t days = secs / 86400u;
-            uint64_t rem = secs % 86400u;
-            uint64_t hours = rem / 3600u;
-            rem %= 3600u;
-            uint64_t mins = rem / 60u;
-            uint64_t s = rem % 60u;
-
-            bool any = false;
-            if (days > 0) {
-                snprintf(buf, sizeof(buf), "%llud", (unsigned long long) days);
-                if (append_str(out, cap, off, buf) < 0) return -1;
-                any = true;
-            }
-            if (hours > 0) {
-                if (any && append_str(out, cap, off, " ") < 0) return -1;
-                snprintf(buf, sizeof(buf), "%lluh", (unsigned long long) hours);
-                if (append_str(out, cap, off, buf) < 0) return -1;
-                any = true;
-            }
-            if (mins > 0) {
-                if (any && append_str(out, cap, off, " ") < 0) return -1;
-                snprintf(buf, sizeof(buf), "%llum", (unsigned long long) mins);
-                if (append_str(out, cap, off, buf) < 0) return -1;
-                any = true;
-            }
-            if (s > 0 || !any) {
-                if (any && append_str(out, cap, off, " ") < 0) return -1;
-                snprintf(buf, sizeof(buf), "%llus", (unsigned long long) s);
-                if (append_str(out, cap, off, buf) < 0) return -1;
-            }
-            return 0;
+            if (append_duration(out, cap, off, units * 512u) < 0) return -1;
+            return append_str(out, cap, off, " after receiving");
         }
-        snprintf(buf, sizeof(buf), "%u blocks", tl.raw);
+        snprintf(buf, sizeof(buf), "%u blocks after receiving", tl.raw);
         return append_str(out, cap, off, buf);
     }
     // Absolute.
     if (tl.raw < LOCKTIME_THRESHOLD) {
-        snprintf(buf, sizeof(buf), "block height %u", tl.raw);
+        snprintf(buf, sizeof(buf), "not before block %u", tl.raw);
         return append_str(out, cap, off, buf);
     }
     {
         int y;
         unsigned mo, d, hh, mm, ss;
         civil_from_unix(tl.raw, &y, &mo, &d, &hh, &mm, &ss);
-        if (append_str(out, cap, off, "date ") < 0) return -1;
+        if (append_str(out, cap, off, "not before ") < 0) return -1;
         if (hh == 0 && mm == 0 && ss == 0) {
             snprintf(buf, sizeof(buf), "%04d-%02u-%02u", y, mo, d);
         } else {
             snprintf(buf, sizeof(buf), "%04d-%02u-%02u %02u:%02u:%02u", y, mo, d, hh, mm, ss);
         }
-        return append_str(out, cap, off, buf);
+        if (append_str(out, cap, off, buf) < 0) return -1;
+        return append_str(out, cap, off, " UTC");
     }
 }
 

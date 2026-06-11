@@ -32,11 +32,12 @@ uint64_t cleartext_confusion_score(const policy_node_t *root);
 /**
  * Encodes a descriptor template into cleartext spending-path lines.
  *
- * For top-level shapes other than taproot, exactly one line is produced
- * ("Spending policy"). For taproot, the first line is the primary spending
- * path ("Primary path: ..."), followed by one line per leaf (in canonical
- * display order). If a leaf is not recognised, the raw descriptor template is
- * returned as a single line with *out_has_cleartext == false.
+ * For top-level shapes other than a taproot with a script tree (including a
+ * leaf-less / key-path-only taproot), exactly one line is produced. For a
+ * taproot with a tree, the first line is the key-path spending description
+ * ("Main path: ..."), followed by one line per leaf (in canonical display
+ * order). If a leaf is not recognised, the raw descriptor template is returned
+ * as a single line with *out_has_cleartext == false.
  *
  * @param root pointer to the root of the parsed descriptor template
  * @param raw_template the original descriptor template string (used as
