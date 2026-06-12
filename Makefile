@@ -144,6 +144,11 @@ ENABLE_NBGL_QRCODE = 1
 ENABLE_SWAP = 1
 
 ########################################
+#        Stack protection features     #
+########################################
+ENABLE_STACK_PROTECTOR = 1
+
+########################################
 #          Features disablers          #
 ########################################
 # Don't use standard app file to avoid conflicts for now
