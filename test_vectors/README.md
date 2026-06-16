@@ -19,12 +19,12 @@ All vectors were generated against the Speculos test seed (see
 
 | File | Operation |
 |------|-----------|
-| [`fixtures.toml`](fixtures.toml) | Global constants (seed, master fingerprint, network). |
-| [`get_extended_pubkey.toml`](get_extended_pubkey.toml) | `get_extended_pubkey`. |
-| [`sign_message.toml`](sign_message.toml) | `sign_message`. |
-| [`register_wallet.toml`](register_wallet.toml) | `register_wallet`. |
-| [`get_wallet_address.toml`](get_wallet_address.toml) | `get_wallet_address`. |
-| [`sign_psbt.toml`](sign_psbt.toml) | `sign_psbt`. |
+| [`fixtures.toml`](fixtures.toml) | Global constants (seed, master fingerprint, network) |
+| [`get_extended_pubkey.toml`](get_extended_pubkey.toml) | `get_extended_pubkey` |
+| [`sign_message.toml`](sign_message.toml) | `sign_message` |
+| [`register_wallet.toml`](register_wallet.toml) | `register_wallet` |
+| [`get_wallet_address.toml`](get_wallet_address.toml) | `get_wallet_address` |
+| [`sign_psbt.toml`](sign_psbt.toml) | `sign_psbt` |
 
 ## Common conventions
 
