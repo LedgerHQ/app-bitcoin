@@ -4,6 +4,7 @@
 
 /* SDK headers */
 #include "bip32.h"
+#include "bolos_target.h"
 #include "format.h"
 
 /* Local headers */
@@ -20,6 +21,9 @@
 // Displayed message length - if the message is too long we will not display it
 #define MAX_DISPLAYBLE_MESSAGE_LENGTH (10 * MESSAGE_CHUNK_SIZE)
 
+#ifndef TARGET_ID
+#error "bolos_target.h must be included (TARGET_* constants unavailable)"
+#endif
 #if defined(TARGET_STAX) || defined(TARGET_FLEX)
 #define ICON_APP_IMPORTANT IMPORTANT_CIRCLE_ICON
 #define ICON_APP_WARNING   LARGE_WARNING_ICON

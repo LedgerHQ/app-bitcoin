@@ -80,6 +80,7 @@ include_directories(libs)
 include_directories($ENV{BOLOS_SDK})
 include_directories($ENV{BOLOS_SDK}/include)
 include_directories($ENV{BOLOS_SDK}/lib_standard_app)
+include_directories($ENV{BOLOS_SDK}/target/nanos2/include)
 
 # Include paths shared by every target under ../src/handler.
 set(HANDLER_INCLUDES ../src/handler ../src/handler/lib ../src/common)
