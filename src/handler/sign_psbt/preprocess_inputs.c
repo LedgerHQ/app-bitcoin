@@ -29,6 +29,7 @@
 #include "bitvector.h"
 #include "buffer.h"
 #include "constants.h"
+#include "display.h"
 #include "dispatcher.h"
 #include "error_codes.h"
 #include "get_merkleized_map.h"
@@ -300,6 +301,9 @@ bool __attribute__((noinline)) preprocess_inputs(
             // "Allow non-standard sighash" in the application settings.
             if (!app_settings_get_allow_nondefault_sighash()) {
                 PRINTF("Non-standard sighash rejected: setting not enabled\n");
+                // Show a clear on-device status so the user understands why the
+                // transaction was rejected
+                ui_warn_nondefault_sighash_disabled(dc);
                 SEND_SW_EC(dc,
                            SW_SECURITY_STATUS_NOT_SATISFIED,
                            EC_SIGN_PSBT_NONDEFAULT_SIGHASH_NOT_ALLOWED);

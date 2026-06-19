@@ -170,6 +170,9 @@ bool ui_warn_unverified_segwit_inputs(dispatcher_context_t *context);
 
 bool ui_warn_nondefault_sighash(dispatcher_context_t *context);
 
+// Shows a terminal status explaining that a non-standard sighash was rejected
+void ui_warn_nondefault_sighash_disabled(dispatcher_context_t *context);
+
 bool ui_warn_high_fee(dispatcher_context_t *context);
 
 /* These 3 functions have to be called in following order:
@@ -215,6 +218,8 @@ void ui_display_warning_external_inputs_flow(void);
 void ui_display_unverified_segwit_inputs_flows(void);
 
 void ui_display_nondefault_sighash_flow(void);
+
+void ui_display_nondefault_sighash_disabled_flow(void);
 
 void ui_warn_high_fee_flow(void);
 
