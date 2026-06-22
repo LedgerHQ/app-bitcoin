@@ -67,13 +67,28 @@ def open_psbt_from_file(filename: str) -> PSBT:
     return psbt
 
 
+def assert_disabled_sighash_screen(navigator: Navigator, default_screenshot_path: Path,
+                                   test_name: str):
+    """Capture and compare the rejection screen ("Non-standard signing rules are
+    disabled in settings").
+
+    The error SW is returned fire-and-forget, so sign_psbt's navigation flow does
+    not capture this screen. It stays up (~3s) after the SW, so we snapshot it here:
+    navigate_and_compare with no instructions waits for the screen to be shown,
+    pauses the auto-dismiss ticker so it cannot race, and compares snapshot 0 with
+    the golden image (honoring --golden_run).
+    """
+    navigator.navigate_and_compare(default_screenshot_path, test_name, [],
+                                   screen_change_before_first_instruction=True)
+
+
 # =========================================================================
 # Tests: Default behavior (setting disabled) - non-standard sighash REJECTED
 # =========================================================================
 
 
 def test_sighash_none_rejected_by_default(navigator: Navigator, firmware: Firmware,
-                                          client: RaggerClient, test_name: str):
+                                          client: RaggerClient, test_name: str, default_screenshot_path: Path):
     """SIGHASH_NONE should be rejected when the non-standard sighash setting is disabled (default)."""
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-sign.psbt")
 
@@ -85,6 +100,9 @@ def test_sighash_none_rejected_by_default(navigator: Navigator, firmware: Firmwa
     assert len(e.value.data) == 2
     error_code = int.from_bytes(e.value.data, 'big')
     assert error_code == EC_SIGN_PSBT_NONDEFAULT_SIGHASH_NOT_ALLOWED
+
+    # Verify the on-device rejection screen is shown to the user
+    assert_disabled_sighash_screen(navigator, default_screenshot_path, test_name)
 
 
 def test_sighash_single_rejected_by_default(navigator: Navigator, firmware: Firmware,
