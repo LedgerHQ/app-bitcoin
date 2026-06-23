@@ -51,7 +51,9 @@ tr(@0/**)
 keys: ["[f5acc2fd/86'/0'/0']xpub6C..."]
 ```
 
-A 2-of-3 native SegWit multisig (must be registered before use):
+Other more complex wallet types must be registered before use.
+
+This is a 2-of-3 native SegWit multisig:
 
 ```
 wsh(sortedmulti(2,@0/**,@1/**,@2/**))
@@ -62,7 +64,7 @@ keys: [
 ]
 ```
 
-A miniscript "recovery vault" — spendable by the primary key at any time, or by a backup
+The following is a miniscript "recovery vault" — spendable by the primary key at any time, or by a backup
 key after a relative timelock of `65535` blocks:
 
 ```
@@ -75,9 +77,9 @@ keys: [
 
 ## Default vs registered wallets
 
-- **Default (standard) wallet accounts** are the four single-key account types listed in
-  [features.md](features.md) (`pkh`, `sh(wpkh)`, `wpkh`, `tr`), with the corresponding
-  standard derivation paths. They can be used for address derivation and signing **without registration**. In the serialization, a default wallet has an empty name.
+- **Default (standard) wallet accounts** are the four single-key account types
+  (`pkh`, `sh(wpkh)`, `wpkh`, `tr`), with the corresponding standard derivation paths
+  (see [wallet.md](wallet.md#default-wallets) for the templates and bounds). They can be used for address derivation and signing **without registration**. In the serialization, a default wallet has an empty name.
 - **Any other policy** (multisig, miniscript, taproot trees, MuSig2, or even a standard
   single-key account using a non-standard path) must be **registered** before it can be
   used.

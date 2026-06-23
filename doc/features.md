@@ -44,25 +44,16 @@ supported.
 
 ### Single-key standard accounts
 
-These four single-key account types follow widely adopted BIPs and can be used **without
-registration** (see *default wallets* in [integration.md](integration.md)):
-
-| Policy template | Address type | Standard |
-|-----------------|--------------|----------|
-| `pkh(@0/**)` | Legacy | [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki) |
-| `sh(wpkh(@0/**))` | Nested SegWit | [BIP-49](https://github.com/bitcoin/bips/blob/master/bip-0049.mediawiki) |
-| `wpkh(@0/**)` | Native SegWit | [BIP-84](https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki) |
-| `tr(@0/**)` | Taproot | [BIP-86](https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki) |
+Four single-key account types — legacy, nested SegWit, native SegWit, and taproot, following
+BIP-44/49/84/86 — can be used **without registration**. These are the *default wallets*; see
+[wallet.md](wallet.md#default-wallets) for the exact templates, derivation paths, and bounds, and
+[integration.md](integration.md) for the default-vs-registered distinction.
 
 ### Multisig
 
-- Native SegWit: `wsh(multi(...))` and `wsh(sortedmulti(...))`.
-- Legacy and wrapped SegWit: `sh(multi(...))`, `sh(sortedmulti(...))`,
-  `sh(wsh(multi(...)))`, `sh(wsh(sortedmulti(...)))`.
-- Taproot: `tr(KP, multi_a(...))` / `tr(KP, sortedmulti_a(...))` as a script path.
-
-`sortedmulti` variants sort the keys lexicographically in the resulting script, so the
-order of the keys in the policy does not affect the addresses.
+Multisig is supported across legacy, nested SegWit, native SegWit, and taproot (as a
+script path), in both `multi` and `sortedmulti` forms. See [wallet.md](wallet.md#supported-scripts)
+for the exact set of templates.
 
 ### Taproot
 
