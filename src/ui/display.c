@@ -226,6 +226,16 @@ bool ui_warn_nondefault_sighash(dispatcher_context_t *context) {
     return io_ui_process(context);
 }
 
+void ui_warn_nondefault_sighash_disabled(dispatcher_context_t *context) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return;
+#endif
+
+    UNUSED(context);
+    // Fire-and-forget terminal status
+    ui_display_nondefault_sighash_disabled_flow();
+}
+
 bool ui_transaction_streaming_prompt(dispatcher_context_t *context) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
     return true;

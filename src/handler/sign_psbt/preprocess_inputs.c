@@ -24,10 +24,12 @@
 #include "read.h"
 
 /* Local headers */
+#include "app_settings.h"
 #include "amount_from_psbt.h"
 #include "bitvector.h"
 #include "buffer.h"
 #include "constants.h"
+#include "display.h"
 #include "dispatcher.h"
 #include "error_codes.h"
 #include "get_merkleized_map.h"
@@ -36,6 +38,7 @@
 #include "policy.h"
 #include "process_in_outs.h"
 #include "psbt.h"
+#include "sighash.h"
 #include "sign_psbt_cache.h"
 #include "sw.h"
 
@@ -289,16 +292,23 @@ bool __attribute__((noinline)) preprocess_inputs(
             return false;
         }
 
-        if (((segwit_version > 0) && (input.sighash_type == SIGHASH_DEFAULT)) ||
-            (input.sighash_type == SIGHASH_ALL)) {
+        sighash_class_t sighash_class = classify_sighash(input.sighash_type, segwit_version);
+        if (sighash_class == SIGHASH_CLASS_SAFE) {
             PRINTF("Sighash type is SIGHASH_DEFAULT or SIGHASH_ALL\n");
 
-        } else if ((segwit_version >= 0) &&
-                   ((input.sighash_type == SIGHASH_NONE) ||
-                    (input.sighash_type == SIGHASH_SINGLE) ||
-                    (input.sighash_type == (SIGHASH_ANYONECANPAY | SIGHASH_ALL)) ||
-                    (input.sighash_type == (SIGHASH_ANYONECANPAY | SIGHASH_NONE)) ||
-                    (input.sighash_type == (SIGHASH_ANYONECANPAY | SIGHASH_SINGLE)))) {
+        } else if (sighash_class == SIGHASH_CLASS_NON_SAFE) {
+            // Non-standard sighash: only allowed if the user explicitly enabled
+            // "Allow non-standard sighash" in the application settings.
+            if (!app_settings_get_allow_nondefault_sighash()) {
+                PRINTF("Non-standard sighash rejected: setting not enabled\n");
+                // Show a clear on-device status so the user understands why the
+                // transaction was rejected
+                ui_warn_nondefault_sighash_disabled(dc);
+                SEND_SW_EC(dc,
+                           SW_SECURITY_STATUS_NOT_SATISFIED,
+                           EC_SIGN_PSBT_NONDEFAULT_SIGHASH_NOT_ALLOWED);
+                return false;
+            }
             PRINTF("Sighash type is non-default, will show a warning.\n");
             st->warnings.non_default_sighash = true;
         } else {

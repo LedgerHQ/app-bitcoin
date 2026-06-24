@@ -33,6 +33,7 @@ const char GA_RISK_EXTERNAL_INPUTS[] =
 const char GA_RISK_NON_STD_SIGHASH[] =
     "This transaction uses non-standard signing rules (modified sighash). You could spend more "
     "than expected.";
+const char GA_NON_STD_SIGHASH_DISABLED[] = "Non-standard signing rules are disabled in settings";
 const char GA_WARN_HIGH_FEES[] =
     "This transaction has fees higher than 10% of the amount you're sending.";
 #else
@@ -40,6 +41,7 @@ const char GA_SECURITY_RISK_TITLE[] = "Security risk";
 const char GA_WARN_HIGH_FEES_TITLE[] = "High fees warning";
 const char GA_RISK_EXTERNAL_INPUTS[] = "There are external inputs\nReject if not sure";
 const char GA_RISK_NON_STD_SIGHASH[] = "Non-default sighash";
+const char GA_NON_STD_SIGHASH_DISABLED[] = "Non-standard\nsighash disabled\nin settings";
 const char GA_WARN_HIGH_FEES[] = "Fees are above 10%\n of total amount";
 #endif
 
@@ -461,6 +463,13 @@ void ui_display_unverified_segwit_inputs_flows(void) {
 
 void ui_display_nondefault_sighash_flow(void) {
     ui_display_warning_generic(GA_RISK_NON_STD_SIGHASH);
+}
+
+// Terminal status shown when a non-standard sighash is rejected because the
+// "Non-standard sighash" setting is disabled.
+void ui_display_nondefault_sighash_disabled_flow(void) {
+    ux_flow_response_false();
+    nbgl_useCaseStatus(GA_NON_STD_SIGHASH_DISABLED, false, ui_menu_main);
 }
 
 // Statuses
