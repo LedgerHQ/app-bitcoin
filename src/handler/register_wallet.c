@@ -227,6 +227,8 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
     if (!ui_display_register_wallet_policy(dc,
                                            &wallet_header,
                                            (char *) policy_map_descriptor,
+                                           NULL,
+                                           0,
                                            &keys_info,
                                            &keys_type)) {
         SEND_SW(dc, SW_DENY);
