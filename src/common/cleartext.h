@@ -33,7 +33,7 @@
  * for a taproot with a script tree the first line describes the key-path policy
  * and each following line describes one leaf (in canonical display order).
  *
- * @param descriptor the raw descriptor template string (e.g. "wsh(sortedmulti(2,@0/**,@1/**))").
+ * @param descriptor the raw descriptor template string, e.g. a wsh(sortedmulti(...)) template.
  * @param descriptor_len its length in bytes (not counting any NUL).
  * @param out_lines caller-owned buffer; rendered lines are written as
  *        NUL-terminated UTF-8 strings.

@@ -135,6 +135,49 @@ add_unit_test(test_parser        LIBS test_common parser buffer buffer_ext varin
 add_unit_test(test_psbt_parse    LIBS test_common psbt_parse)
 
 # ---------------------------------------------------------------------------
+# Cleartext binding (host build of the vendored Rust staticlib)
+# ---------------------------------------------------------------------------
+# The register-wallet handler renders descriptor templates into a human-readable
+# description via the no_std Rust crate in ../rust/bip388-c. For the host unit
+# tests we build that crate's default (no_std) staticlib with cargo and link it.
+# Requires a Rust toolchain: when cargo is absent the cleartext targets are
+# skipped and test_register_wallet is built without HAVE_CLEARTEXT (the handler
+# then just shows the raw descriptor template, which the tests still verify).
+find_program(CARGO_EXECUTABLE cargo)
+if(CARGO_EXECUTABLE)
+  set(BIP388C_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../rust/bip388-c)
+  set(BIP388C_LIB ${BIP388C_DIR}/target/release/libbip388_c.a)
+  file(GLOB_RECURSE BIP388C_SRCS CONFIGURE_DEPENDS
+       ${BIP388C_DIR}/src/*.rs
+       ${CMAKE_CURRENT_SOURCE_DIR}/../rust/bip388/src/*.rs
+       ${CMAKE_CURRENT_SOURCE_DIR}/../rust/bip388/src/cleartext/specs/*.toml)
+  add_custom_command(
+    OUTPUT ${BIP388C_LIB}
+    COMMAND ${CARGO_EXECUTABLE} build --release
+    WORKING_DIRECTORY ${BIP388C_DIR}
+    DEPENDS ${BIP388C_SRCS}
+    COMMENT "Building host libbip388_c.a"
+    VERBATIM)
+  add_custom_target(bip388c_lib DEPENDS ${BIP388C_LIB})
+
+  # Thin C wrapper around the binding. HAVE_CLEARTEXT enables the body;
+  # CLEARTEXT_HOST_BUILD emits the rust_eh_personality stub needed when linking
+  # the no_std staticlib on a hosted target (see src/common/cleartext.c).
+  add_library(cleartext STATIC ../src/common/cleartext.c)
+  add_dependencies(cleartext bip388c_lib)
+  target_compile_definitions(cleartext PRIVATE HAVE_CLEARTEXT CLEARTEXT_HOST_BUILD)
+  target_include_directories(cleartext PRIVATE ../src/common ${BIP388C_DIR}/include)
+  # PUBLIC so the staticlib (which defines bip388_to_cleartext, and references
+  # rust_eh_personality back into cleartext) is on each consumer's link line.
+  target_link_libraries(cleartext PUBLIC ${BIP388C_LIB})
+
+  add_unit_test(test_cleartext LIBS test_common cleartext INCLUDES ../src/common)
+else()
+  message(WARNING "cargo not found: cleartext tests disabled; "
+                  "test_register_wallet will be built without HAVE_CLEARTEXT")
+endif()
+
+# ---------------------------------------------------------------------------
 # Speculos-backed crypto tests
 # ---------------------------------------------------------------------------
 # test_crypto exercises the real app crypto code (src/crypto.c) by
@@ -390,6 +433,12 @@ if(SPECULOS AND SPECULOS_SRC)
   target_link_libraries(test_register_wallet PRIVATE
     cmocka mock_dispatcher app_crypto buffer buffer_ext tomlc17
   )
+  # Exercise the cleartext path when the binding is available; otherwise the
+  # handler (and the test's assertions) fall back to showing the raw template.
+  if(TARGET cleartext)
+    target_compile_definitions(test_register_wallet PRIVATE HAVE_CLEARTEXT)
+    target_link_libraries(test_register_wallet PRIVATE cleartext)
+  endif()
   add_test(test_register_wallet test_register_wallet)
 
   # test_sign_message exercises handler_sign_message (compiled directly into the
