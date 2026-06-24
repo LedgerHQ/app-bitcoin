@@ -1,5 +1,6 @@
 #ifdef HAVE_CLEARTEXT
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "cleartext.h"
@@ -14,9 +15,19 @@ _Static_assert(CT_MAX_LINES == BIP388_MAX_TAPLEAVES + 1,
 #ifdef CLEARTEXT_HOST_BUILD
 // On a hosted target (unit tests) the precompiled Rust `alloc` is built with
 // unwinding and references rust_eh_personality even though this crate is
-// panic=abort. Provide a stub so the test executables link. The freestanding
-// device build (no_std, abort-by-default) never references it.
+// panic=abort. Provide a stub so the test executables link.
 void rust_eh_personality(void) {}
+#else
+// Freestanding device build: the crate's #[panic_handler] calls abort(). The
+// device's newlib abort() pulls in _exit/_kill/_getpid syscall stubs that BOLOS
+// does not provide, so the app would fail to link (undefined _kill/_getpid/
+// _exit). Provide our own abort() that traps instead, which also keeps newlib's
+// signal machinery out of the binary. A panic is unreachable for in-range
+// policies (the binding's a-priori arena-fit check prevents the only abort
+// path), so this is a safety backstop, not an expected code path.
+void abort(void) {
+    __builtin_trap();
+}
 #endif
 
 // Scratch arena the binding bump-allocates from for the duration of one call.
