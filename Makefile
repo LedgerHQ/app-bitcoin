@@ -230,13 +230,21 @@ ifeq ($(ENABLE_CLEARTEXT),1)
     # Ensure the lib is (re)built before the app is linked.
     APP_CUSTOM_LINK_DEPENDENCIES += $(CLEARTEXT_LIB)
 
-    CARGO ?= cargo
+    CARGO  ?= cargo
+    RUSTUP ?= rustup
     # Re-run cargo whenever a crate source or spec file changes; cargo itself is
     # incremental, so an unchanged tree is a fast no-op.
     CLEARTEXT_SRC := $(shell find $(CLEARTEXT_CRATE_DIR) $(CURDIR)/rust/bip388 \
                         -type f \( -name '*.rs' -o -name '*.toml' \) -not -path '*/target/*')
+    # The recipe first ensures the cross target's precompiled std is installed:
+    # the ledger-app-builder image ships the Rust toolchain but not every target
+    # (e.g. thumbv8m.main-none-eabi), which otherwise fails with "can't find
+    # crate for `core`". Best-effort: if rustup is unavailable we fall through
+    # and let cargo report a clear error.
     $(CLEARTEXT_LIB): $(CLEARTEXT_SRC)
 	@echo "[CARGO]   libbip388_c.a ($(RUST_TARGET))"
+	@command -v $(RUSTUP) >/dev/null 2>&1 && $(RUSTUP) target add $(RUST_TARGET) || \
+		echo "[CARGO]   rustup unavailable; assuming $(RUST_TARGET) std is installed"
 	cd $(CLEARTEXT_CRATE_DIR) && $(CARGO) build --release --target $(RUST_TARGET)
 endif
 
