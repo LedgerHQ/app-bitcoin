@@ -1,0 +1,189 @@
+# Cleartext-display specification for BIP388 descriptor templates.
+#
+# This file is the single source of truth for:
+#   - Which descriptor template shapes have a cleartext display
+#   - The cleartext template (literals + dynamic fields) for each shape
+#   - The score (number of structurally distinct templates that share a shape's
+#     cleartext rendering)
+#   - The reverse-direction reconstruction (cleartext -> all DescriptorTemplate
+#     candidates)
+#
+# A build script (`build.rs`) parses this file and generates Rust code that
+# implements all of the above. See `cleartext.rs` for how the generated code is
+# integrated.
+#
+# Two tables here:
+#   - `[[top_level]]` -- shapes for the root DescriptorTemplate
+#   - `[[tapleaf]]`   -- shapes for the leaves of a taproot tree
+#
+# Each entry has:
+#   - `name`     : variant name in the generated DescriptorClass / TapleafClass
+#   - `patterns` : list of pattern strings; the generated classifier tries each
+#                  in order. The score equals the number of patterns that admit
+#                  a class instance (including round-trip checks performed by
+#                  primitives such as `musig`).
+#   - `cleartext`: list of literal strings and `$field` references. The
+#                  field's display kind is derived from its binding-name kind.
+#
+# Tapleaf entries also carry their position in this file as their display
+# `order` (used to group leaves when rendering a taptree).
+#
+# Wording conventions (see also `format_timelock` / `format_seconds` in
+# `mod.rs`, which produce the dynamic `$timelock` text):
+#   - A taproot's `to_cleartext` returns the key-path description first, then one
+#     line per leaf. The leaves are ALTERNATIVE spending paths (any one suffices);
+#     conditions *within* a leaf are combined with AND. Hence the consistent
+#     "... must sign" phrasing per signer, and " - and also - " for an explicit
+#     AND between two sub-policies.
+#   - Thresholds read "Any K of <keys> ... must sign" when K < N. When K == N the
+#     wording is unnatural, so the n-of-n case renders "Each of <keys> ... must sign"
+#     instead. This is selected at encode time from each multisig entry's optional
+#     `cleartext_all` template (used when threshold == number of keys); a leaf-less
+#     `tr(musig(...))` key-path is inherently n-of-n and is folded into the
+#     `Multisig` class, so it renders through that class's `cleartext_all` ("Each
+#     of ..."). `TaprootMusig` (a musig key-path *with* a script tree) is not n-of-n
+#     selectable and keeps only its "Main path: each of ..." `cleartext`. A
+#     `cleartext_all` template omits `$threshold` (it is implied by the key count);
+#     the reverse parser re-synthesizes threshold = number of keys.
+#   - Timelocks distinguish *relative* locks ("<duration> after receiving",
+#     counted from when these coins were received) from *absolute* locks
+#     ("not before block N" / "not before <date> UTC", a fixed point).
+#   - Address-encoding / script-form qualifiers that don't change who can spend
+#     (Legacy / SegWit / sorted) are kept as a trailing parenthetical so the
+#     plain-language policy comes first. The `Multisig` top-level class is a
+#     deliberate exception: it coalesces the script multisig forms and the
+#     leaf-less taproot `musig` key-path into one qualifier-free rendering, so a
+#     k-of-n policy reads the same regardless of how it is realized on-chain. The
+#     extra on-chain encodings it now stands for are reflected in its score.
+
+# =============================================================================
+# Top-level patterns
+# =============================================================================
+
+[[top_level]]
+name = "LegacySingleSig"
+patterns = ["pkh($key)"]
+cleartext = ["Spendable by ", "$key", " alone (Legacy)"]
+
+[[top_level]]
+name = "SegwitSingleSig"
+patterns = ["wpkh($key)", "sh(wpkh($key))"]
+cleartext = ["Spendable by ", "$key", " alone (SegWit)"]
+
+# A k-of-n multisignature, rendered without an address-encoding qualifier. This
+# class deliberately coalesces every shape that displays the same way to a signer:
+# the script multisig forms (`sh`/`wsh`/`sh(wsh)` over `multi`/`sortedmulti`) and
+# the leaf-less taproot `musig` key-path (`tr(musig(...))`, inherently n-of-n). The
+# `tr(musig($keys))` pattern has no tree argument, so it matches only `tr(key)`
+# (tree == None) and -- like `TaprootKeyOnly` below -- must be tried before the
+# `TaprootMusig` entry (which would otherwise swallow it with empty leaves); its
+# position here, ahead of the taproot tree entries, satisfies that.
+[[top_level]]
+name = "Multisig"
+patterns = [
+    "sh(multi($threshold, $keys))",
+    "sh(sortedmulti($threshold, $keys))",
+    "wsh(multi($threshold, $keys))",
+    "wsh(sortedmulti($threshold, $keys))",
+    "sh(wsh(multi($threshold, $keys)))",
+    "sh(wsh(sortedmulti($threshold, $keys)))",
+    "tr(musig($keys))",
+]
+cleartext = ["Any ", "$threshold", " of ", "$keys", " must sign"]
+cleartext_all = ["Each of ", "$keys", " must sign"]
+
+# Leaf-less taproot, single-key path spend (no script alternatives). This must
+# appear before the `Taproot` entry below: its pattern has no tree argument, so it
+# matches only `tr(key)` (tree == None), and the classifier tries entries in order.
+# Because there is a single spending path, the wording is standalone (no "Main
+# path:" prefix), mirroring the other single-signature choices, with a "(Taproot)"
+# qualifier to keep the rendering distinguishable from the Legacy/SegWit forms when
+# decoding. (The leaf-less *musig* key-path `tr(musig(...))` is handled by the
+# `Multisig` entry above, not here.)
+[[top_level]]
+name = "TaprootKeyOnly"
+patterns = ["tr($internal_key)"]
+cleartext = ["Spendable by ", "$internal_key", " alone (Taproot)"]
+
+[[top_level]]
+name = "Taproot"
+patterns = ["tr($internal_key, $leaves)"]
+cleartext = ["Main path: spendable by ", "$internal_key"]
+
+[[top_level]]
+name = "TaprootMusig"
+patterns = ["tr(musig($keys), $leaves)"]
+# musig is inherently n-of-n: always "each of ...", with `$threshold` omitted.
+cleartext = ["Main path: each of ", "$keys", " must sign"]
+
+# =============================================================================
+# Tapleaf patterns
+#
+# Each tapleaf is an alternative spending path. The wording is chosen so it stays
+# correct when wrapped by a combinator leaf (`Timelocked`, `AndV`): e.g.
+# "@1 must sign" composes as "@1 must sign - and also - ..." whereas
+# "spendable by @1 alone" would not.
+#
+# Tapleaf cleartext is written LOWERCASE (e.g. "any 2 of ...") so it reads
+# correctly when composed mid-sentence inside another leaf. The encoder
+# capitalizes the first letter of each finished top-level element (see
+# `capitalize_first` in `mod.rs`), so a standalone leaf still displays as
+# "Any 2 of ..." while a composed one stays lowercase
+# ("@1 must sign - and also - any 2 of ..."). Decoding is case-insensitive: the
+# reverse parser lower-cases the whole input and the pattern literals before
+# matching (see `decode.rs`), so the patterns must stay unambiguous when
+# lower-cased (enforced by `check_cleartext_uniqueness` and the
+# `test_spec_shape_uniqueness` test).
+# =============================================================================
+
+[[tapleaf]]
+name = "SingleSig"
+patterns = ["pk($key)"]
+cleartext = ["$key", " must sign"]
+
+[[tapleaf]]
+name = "BothMustSign"
+patterns = ["and_v(v:pk($key1), pk($key2))"]
+cleartext = ["$key1", " and ", "$key2", " must both sign"]
+
+[[tapleaf]]
+name = "SortedMultisig"
+patterns = ["sortedmulti_a($threshold, $keys)"]
+cleartext = ["any ", "$threshold", " of ", "$keys", " must sign (sorted)"]
+cleartext_all = ["each of ", "$keys", " must sign (sorted)"]
+
+[[tapleaf]]
+name = "Multisig"
+patterns = [
+    "multi_a($threshold, $keys)",
+    "pk(musig($keys))",
+]
+cleartext = ["any ", "$threshold", " of ", "$keys", " must sign"]
+cleartext_all = ["each of ", "$keys", " must sign"]
+
+# Timelocked leaves are `and_v(v:SIGNER, LOCK)`. The signer is a `$sub`
+# sub-policy (classified recursively as a non-combinator leaf: SingleSig,
+# BothMustSign, SortedMultisig or Multisig). The lock is a single `$timelock`
+# binding that matches both `older(...)` (relative) and `after(...)` (absolute).
+#
+# The `$timelock` value carries its own connective so relative and absolute
+# locks read differently (produced by `format_timelock`):
+#   - relative block count : "<n> blocks after receiving"
+#   - relative duration    : "<duration> after receiving"  (e.g. "8 minutes 32 seconds")
+#   - absolute block height: "not before block <n>"
+#   - absolute date        : "not before <YYYY-MM-DD[ HH:MM:SS]> UTC"
+# so the literal between `$sub` and `$timelock` is just ", ".
+#
+# Using ", " as the delimiter is unambiguous for the reverse parser: the only
+# sub-policy with an internal ", " is a 3+-key multisig, and its commas are
+# always followed by more keys (never by a valid `$timelock` tail), so the split
+# only ever succeeds at the real boundary.
+[[tapleaf]]
+name = "Timelocked"
+patterns = ["and_v(v:$sub, $timelock)"]
+cleartext = ["$sub", ", ", "$timelock"]
+
+[[tapleaf]]
+name = "AndV"
+patterns = ["and_v(v:$sub1, $sub2)"]
+cleartext = ["$sub1", " - and also - ", "$sub2"]

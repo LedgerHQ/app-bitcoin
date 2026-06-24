@@ -1,0 +1,37 @@
+[package]
+name = "bip388-c"
+version = "0.1.0"
+edition = "2021"
+description = "C ABI bindings for the bip388 cleartext API (parse + confusion_score + to_cleartext)."
+
+[lib]
+# `staticlib` is the artifact linked into C programs (e.g. the Ledger app);
+# `rlib` lets the host test harness link the crate directly.
+crate-type = ["staticlib", "rlib"]
+
+[features]
+# Off by default so the produced artifact is a freestanding `no_std` staticlib
+# backed by the caller-provided bump arena. Enable only for host `cargo test`,
+# which needs libstd (test harness + system allocator + panic handler).
+default = []
+std = []
+
+[dependencies]
+# Default features only -> no `cleartext-decode`; the reverse parser is excluded.
+bip388 = { path = "../bip388" }
+# Reclaiming free-list allocator backing the caller arena (no_std build only;
+# the same allocator embedded-alloc wraps). Used directly so the heap can be
+# reset per call. Not referenced under `std`.
+linked_list_allocator = { version = "0.10", default-features = false }
+
+[build-dependencies]
+cbindgen = "0.27"
+
+[profile.release]
+opt-level = "z"
+lto = true
+# No unwinding in the freestanding artifact: a `#[panic_handler]` + abort means
+# no `eh_personality` is required and panics cannot cross the C ABI boundary.
+panic = "abort"
+
+[workspace]
