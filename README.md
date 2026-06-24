@@ -138,15 +138,20 @@ python3 -m ledgerblue.runScript --scp --fileName bin/app.apdu --elfFile bin/app.
 
 ## Documentation
 
-For many use cases, the code examples provided in the following client libraries might be sufficient to get started:
+If you want to understand what the app does or build an integration on top of an existing client library, start here:
+- [features.md](doc/features.md): Overview of the app's features and the account/script types it supports.
+- [integration.md](doc/integration.md): Concepts and security model for integrators — wallet policies, registration, and on-device verification.
+
+For many use cases, the code examples provided in the following client libraries are enough to get started:
 - [Python client library](bitcoin_client)
 - [JavaScript client library](bitcoin_client_js)
 - [Rust client library](bitcoin_client_rs)
 
-If you need to go deeper into the rabbit hole 🐇🕳️, refer to the following documents:
+If you need to go deeper into the rabbit hole 🐇🕳️ (for example to implement a client library or work at the protocol level), refer to the following documents:
 - [bitcoin.md](doc/bitcoin.md): Low-level documentation of the Bitcoin app's communication protocol and commands.
+- [wallet.md](doc/wallet.md): Formal definition of the wallet policy language, its serialization, and the supported scripts.
 - [merkle.md](doc/merkle.md): Advanced details on techniques used in the Bitcoin app's secured and scalable communication protocol.
-- [wallet.md](doc/wallet.md): Information on the types of scripts supported by the Ledger Bitcoin app and the security requirements for multi-user or multi-key spending policies.
+- [musig.md](doc/musig.md): Details of the MuSig2 implementation and its on-device state management.
 - [debugging.md](doc/debugging.md): Guidance on how to diagnose and resolve issues.
 
 ## Tests
