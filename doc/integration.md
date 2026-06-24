@@ -24,23 +24,16 @@ did not approve.
 
 ## Wallet policies
 
-An account is described by a **wallet policy**, which is the standard defined in
-[BIP-388](https://github.com/bitcoin/bips/blob/master/bip-0388.mediawiki). A wallet
-policy has two parts:
-
-1. A **descriptor template** — an output descriptor in which each key is replaced by a
-   key placeholder `@0`, `@1`, … The placeholder is followed by `/**` (a shorthand for
-   the receive/change derivation `/<0;1>/*`).
-2. A **key information vector** — the actual keys (`xpub`s), each optionally preceded by
-   its **key origin information**: the master key fingerprint and the derivation steps
-   used to reach that `xpub`, e.g. `[f5acc2fd/48'/1'/0'/2']xpub6E...`.
+An account is described by a **wallet policy** — the representation standardized in
+[BIP-388](https://github.com/bitcoin/bips/blob/master/bip-0388.mediawiki). It pairs a
+*descriptor template*, which captures the script's shape with keys replaced by
+placeholders (`@0`, `@1`, …), with a *key information vector* that holds the actual keys
+(`xpub`s) and their key origin information. [wallet.md](wallet.md) defines the format,
+grammar, serialization, and implementation-specific restrictions.
 
 Separating the template from the keys lets the device recognize the *shape* of a policy
 independently of the specific keys, and lets `sortedmulti`-style policies be order
 independent.
-
-For the exact grammar, the app's serialization, and implementation-specific
-restrictions, see [wallet.md](wallet.md).
 
 ### Examples
 
@@ -97,17 +90,12 @@ Registration is the step where the user reviews a non-standard policy — its na
 script template, and every key — on the trusted screen and approves it once. This protects
 the user from a compromised host silently substituting a malicious policy.
 
-Because the device is stateless, it does not store the approved policy. Instead, a
-successful registration returns a **32-byte HMAC-SHA256** that authorizes that exact
-policy. The host wallet **must persist exactly** the wallet policy (descriptor template
-and keys information), its name and the returned HMAC, and supply them together on every
-later call related to the same account (address derivation, signing).
-
-The HMAC key is deterministically derived from the device seed
-([SLIP-0021](https://github.com/satoshilabs/slips/blob/master/slip-0021.md)), so the same
-wallet policy (and name) always yields the same HMAC on the same seed.
-A consequence is that registration is **non-revocable**: there is no on-device list to delete
-an entry from. See [wallet.md](wallet.md) for the serialization and the *wallet policy id*.
+Because the device is stateless, it does not store the approved policy: registration
+instead returns an HMAC that authorizes that exact policy. The host wallet **must persist
+exactly** the wallet policy and its name together with the returned HMAC, and supply them
+on every later call related to the same account (address derivation, signing). See
+[wallet.md](wallet.md#registration-and-usage) for the HMAC mechanics, its seed-derived key,
+the resulting non-revocability, and the *wallet policy id*.
 
 ## On-device verification and the trusted screen
 
