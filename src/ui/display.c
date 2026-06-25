@@ -268,8 +268,25 @@ bool ui_transaction_streaming_validate_output(dispatcher_context_t *context,
     return io_ui_process(context);
 }
 
+// Format the amount to show (fee, or |total_spent|) into state->fee. Shared by the
+// simplified and streaming flows.
+static void prepare_tx_summary(ui_validate_transaction_state_t *state,
+                               const tx_summary_t *summary) {
+    state->display_mode = summary->mode;
+    state->spent_is_receive = false;
+    if (summary->mode == TX_DISPLAY_FULL) {
+        format_sats_amount(COIN_COINID_SHORT, summary->fee, state->fee);
+    } else if (summary->mode == TX_DISPLAY_SPENT_ONLY) {
+        state->spent_is_receive = summary->total_spent < 0;
+        uint64_t magnitude = summary->total_spent < 0 ? (uint64_t) -summary->total_spent
+                                                      : (uint64_t) summary->total_spent;
+        format_sats_amount(COIN_COINID_SHORT, magnitude, state->fee);
+    }
+    // TX_DISPLAY_UNAVAILABLE: nothing to format
+}
+
 bool ui_transaction_streaming_validate(dispatcher_context_t *context,
-                                       uint64_t fee,
+                                       const tx_summary_t *summary,
                                        tx_ux_warning_t warnings,
                                        bool is_self_transfer) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
@@ -278,7 +295,7 @@ bool ui_transaction_streaming_validate(dispatcher_context_t *context,
 
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    format_sats_amount(COIN_COINID_SHORT, fee, state->fee);
+    prepare_tx_summary(state, summary);
     state->warnings = warnings;
 
     ui_display_transaction_streaming_flow(is_self_transfer);
@@ -324,13 +341,13 @@ void ui_transaction_simplified_add(uint64_t amount, const char *address_or_descr
     state->output_index++;
 }
 
-bool ui_transaction_simplified_show(dispatcher_context_t *context, uint64_t fee) {
+bool ui_transaction_simplified_show(dispatcher_context_t *context, const tx_summary_t *summary) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
     return true;
 #endif
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    format_sats_amount(COIN_COINID_SHORT, fee, state->fee);
+    prepare_tx_summary(state, summary);
 
     ui_display_transaction_simplified_flow_show();
 

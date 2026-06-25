@@ -54,6 +54,13 @@ const char GA_LOADING_TRANSACTION[] = "Loading transaction";
 const char GA_SIGNING_TRANSACTION[] = "Signing transaction";
 const char GA_LOADING_MESSAGE[] = "Loading message";
 
+// Non-default-sighash transaction summary labels (trustworthy-or-bust display)
+const char GA_FEE_NOT_AVAILABLE[] = "Not available";
+const char GA_YOU_SPEND[] = "You spend";
+const char GA_YOU_RECEIVE[] = "You receive";
+const char GA_AMOUNTS_UNAVAILABLE_TITLE[] = "Amounts & fees";
+const char GA_AMOUNTS_UNAVAILABLE[] = "Cannot be verified for these signing rules";
+
 #define N_UX_PAIRS 51
 
 static nbgl_layoutTagValue_t pairs[N_UX_PAIRS];
@@ -192,16 +199,30 @@ void ui_display_transaction_simplified_flow_add(void) {
 void ui_display_transaction_simplified_flow_show(void) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    if (state->warnings.high_fee) {
-        pairs[n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_WARN_HIGH_FEES_TITLE,
-                                                     .value = GA_WARN_HIGH_FEES,
+    if (state->display_mode == TX_DISPLAY_UNAVAILABLE) {
+        // No amount is reliable: just show a notice.
+        pairs[n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_AMOUNTS_UNAVAILABLE_TITLE,
+                                                     .value = GA_AMOUNTS_UNAVAILABLE,
                                                      .centeredInfo = true,
-                                                     .valueIcon = &ICON_APP_IMPORTANT};
+                                                     .valueIcon = &ICON_APP_WARNING};
+    } else if (state->display_mode == TX_DISPLAY_SPENT_ONLY) {
+        // total_spent is reliable, fee is not.
+        pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
+            .item = state->spent_is_receive ? GA_YOU_RECEIVE : GA_YOU_SPEND,
+            .value = state->fee,
+            .forcePageStart = state->n_outputs > 1 ? 1 : 0};
+        pairs[n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Fees", .value = GA_FEE_NOT_AVAILABLE};
+    } else {  // TX_DISPLAY_FULL
+        if (state->warnings.high_fee) {
+            pairs[n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_WARN_HIGH_FEES_TITLE,
+                                                         .value = GA_WARN_HIGH_FEES,
+                                                         .centeredInfo = true,
+                                                         .valueIcon = &ICON_APP_IMPORTANT};
+        }
+        pairs[n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Fees",
+                                                    .value = state->fee,
+                                                    .forcePageStart = state->n_outputs > 1 ? 1 : 0};
     }
-
-    pairs[n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Fees",
-                                                .value = state->fee,
-                                                .forcePageStart = state->n_outputs > 1 ? 1 : 0};
 
     pairList.nbPairs = n_pairs;
 
@@ -264,27 +285,31 @@ void ui_display_transaction_streaming_flow(bool is_self_transfer) {
     unsigned int l_n_pairs = 0;
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    if (state->warnings.high_fee) {
+    // high-fee warning only applies when we actually have a fee
+    if (state->display_mode == TX_DISPLAY_FULL && state->warnings.high_fee) {
         pairs[l_n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_WARN_HIGH_FEES_TITLE,
                                                        .value = GA_WARN_HIGH_FEES,
                                                        .centeredInfo = true,
                                                        .valueIcon = &ICON_APP_IMPORTANT};
     }
 
-    if (!is_self_transfer) {
-        pairs[l_n_pairs].item = "Fees";
-        pairs[l_n_pairs++].value = state->fee;
-
-        pairList.nbPairs = l_n_pairs;
-    } else {
+    if (is_self_transfer) {
         pairs[l_n_pairs].item = "Amount";
         pairs[l_n_pairs++].value = "Self-transfer";
+    }
 
+    if (state->display_mode == TX_DISPLAY_SPENT_ONLY) {
+        // total_spent is reliable, fee is not
+        pairs[l_n_pairs].item = state->spent_is_receive ? GA_YOU_RECEIVE : GA_YOU_SPEND;
+        pairs[l_n_pairs++].value = state->fee;
+        pairs[l_n_pairs].item = "Fees";
+        pairs[l_n_pairs++].value = GA_FEE_NOT_AVAILABLE;
+    } else {  // TX_DISPLAY_FULL
         pairs[l_n_pairs].item = "Fees";
         pairs[l_n_pairs++].value = state->fee;
-
-        pairList.nbPairs = l_n_pairs;
     }
+
+    pairList.nbPairs = l_n_pairs;
 
     nbgl_useCaseReviewStreamingContinue(&pairList, finish_transaction_flow);
 }

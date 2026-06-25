@@ -8,6 +8,7 @@
 #include "format.h"
 
 /* Local headers */
+#include "sighash.h"  // tx_display_mode_t
 #include "constants.h"
 #include "dispatcher.h"
 #include "display.h"
@@ -102,6 +103,13 @@ typedef struct {
     char signer_index[sizeof("Key @999 <theirs>")];
 } ui_cosigner_pubkey_and_index_state_t;
 
+// Amount summary for the transaction review (mode from decide_tx_display_mode).
+typedef struct {
+    tx_display_mode_t mode;
+    uint64_t fee;         // for TX_DISPLAY_FULL
+    int64_t total_spent;  // for TX_DISPLAY_SPENT_ONLY (negative = net receive)
+} tx_summary_t;
+
 typedef struct {
     tx_ux_warning_t warnings;
     bool has_wallet_policy;
@@ -113,7 +121,10 @@ typedef struct {
     char address_or_description[MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER]
                                [MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
     char amount[MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER][MAX_AMOUNT_LENGTH + 1];
-    char fee[MAX_AMOUNT_LENGTH + 1];
+    char fee[MAX_AMOUNT_LENGTH + 1];  // formatted: network fee, or |total_spent| for SPENT_ONLY
+
+    tx_display_mode_t display_mode;
+    bool spent_is_receive;  // for TX_DISPLAY_SPENT_ONLY: total_spent < 0
 } ui_validate_transaction_state_t;
 
 /**
@@ -185,7 +196,7 @@ void ui_transaction_simplified_init(const char *wallet_policy_name,
                                     unsigned int outputs_num,
                                     tx_ux_warning_t warnings);
 void ui_transaction_simplified_add(uint64_t amount, const char *address_or_description);
-bool ui_transaction_simplified_show(dispatcher_context_t *context, uint64_t fee);
+bool ui_transaction_simplified_show(dispatcher_context_t *context, const tx_summary_t *summary);
 
 bool ui_transaction_streaming_prompt(dispatcher_context_t *context);
 bool ui_transaction_streaming_validate_output(dispatcher_context_t *context,
@@ -194,7 +205,7 @@ bool ui_transaction_streaming_validate_output(dispatcher_context_t *context,
                                               const char *address_or_description,
                                               uint64_t amount);
 bool ui_transaction_streaming_validate(dispatcher_context_t *context,
-                                       uint64_t fee,
+                                       const tx_summary_t *summary,
                                        tx_ux_warning_t warnings,
                                        bool is_self_transfer);
 

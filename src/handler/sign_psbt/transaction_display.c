@@ -33,6 +33,7 @@
 #include "menu.h"
 #include "psbt.h"
 #include "script.h"
+#include "sighash.h"
 #include "sw.h"
 
 static bool __attribute__((noinline)) display_output(
@@ -211,6 +212,21 @@ bool __attribute__((noinline)) display_transaction(
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     uint64_t fee = st->inputs_total_amount - st->outputs.total_amount;
+    int64_t total_spent =
+        (int64_t) st->internal_inputs_total_amount - (int64_t) st->outputs.change_total_amount;
+
+    // Default sighash => always FULL, same as before. With non-default sighash the
+    // fee and/or total_spent may not be trustworthy. Internal inputs are guaranteed
+    // present (see preprocess_inputs), so the only trust condition left is that their
+    // amounts are verified.
+    tx_display_mode_t mode = TX_DISPLAY_FULL;
+    if (st->warnings.non_default_sighash) {
+        mode = decide_tx_display_mode(!st->sighash_inputs_open,
+                                      !st->sighash_outputs_open,
+                                      !st->warnings.missing_nonwitnessutxo);
+    }
+
+    tx_summary_t summary = {.mode = mode, .fee = fee, .total_spent = total_spent};
 
     /** INPUT VERIFICATION ALERTS
      *
@@ -220,13 +236,26 @@ bool __attribute__((noinline)) display_transaction(
      * - non-default sighash types
      */
 
-    // if the value of fees is 10% or more of the amount, and it's more than 100000
-    st->warnings.high_fee = 10 * fee >= st->inputs_total_amount && st->inputs_total_amount > 100000;
+    // high-fee warning only applies when we trust the fee
+    st->warnings.high_fee = (mode == TX_DISPLAY_FULL) &&
+                            (10 * fee >= st->inputs_total_amount && st->inputs_total_amount > 100000);
 
     // Display warnings/risks information before the transaction title
     // for the both classical and streaming cases.
     if (!display_warnings(dc, st)) {
         return false;
+    }
+
+    if (mode == TX_DISPLAY_UNAVAILABLE) {
+        // Nothing reliable to show: no outputs/amounts, only a notice to confirm.
+        ui_transaction_simplified_init(
+            st->account.is_default ? NULL : st->account.wallet_header.name, 0, st->warnings);
+        ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
+        if (!ui_transaction_simplified_show(dc, &summary)) {
+            SEND_SW(dc, SW_DENY);
+            return false;
+        }
+        return true;
     }
 
     if (st->n_external_outputs <= MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER) {
@@ -267,7 +296,7 @@ bool __attribute__((noinline)) display_transaction(
 
         /* Start the review */
         ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
-        if (!ui_transaction_simplified_show(dc, fee)) {
+        if (!ui_transaction_simplified_show(dc, &summary)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
@@ -298,7 +327,7 @@ bool __attribute__((noinline)) display_transaction(
          */
         // Show final user validation UI
         ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
-        if (!ui_transaction_streaming_validate(dc, fee, st->warnings, false)) {
+        if (!ui_transaction_streaming_validate(dc, &summary, st->warnings, false)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
