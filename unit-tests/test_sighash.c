@@ -95,9 +95,80 @@ static void test_classify_sighash(void **state) {
     }
 }
 
+// ========================================================================
+// Tests for the commit predicates and the display-mode decision
+// ========================================================================
+
+typedef struct {
+    uint32_t sighash_type;
+    bool commits_inputs;
+    bool commits_outputs;
+} commit_case_t;
+
+static const commit_case_t commit_cases[] = {
+    {SIGHASH_DEFAULT, true, true},
+    {SIGHASH_ALL, true, true},
+    {SIGHASH_NONE, true, false},
+    {SIGHASH_SINGLE, true, false},
+    {SIGHASH_ANYONECANPAY | SIGHASH_ALL, false, true},
+    {SIGHASH_ANYONECANPAY | SIGHASH_NONE, false, false},
+    {SIGHASH_ANYONECANPAY | SIGHASH_SINGLE, false, false},
+};
+
+static void test_sighash_commit_predicates(void **state) {
+    (void) state;
+    for (size_t i = 0; i < sizeof(commit_cases) / sizeof(commit_cases[0]); i++) {
+        const commit_case_t *c = &commit_cases[i];
+        bool gi = sighash_commits_all_inputs(c->sighash_type);
+        bool go = sighash_commits_all_outputs(c->sighash_type);
+        if (gi != c->commits_inputs || go != c->commits_outputs) {
+            fail_msg("case[%zu]: sighash 0x%02x -> inputs=%d outputs=%d, expected inputs=%d outputs=%d",
+                     i, c->sighash_type, gi, go, c->commits_inputs, c->commits_outputs);
+        }
+    }
+}
+
+typedef struct {
+    bool commits_inputs;
+    bool commits_outputs;
+    bool amounts_trustworthy;
+    tx_display_mode_t expected;
+} mode_case_t;
+
+static const mode_case_t mode_cases[] = {
+    // trustworthy + both committed -> FULL
+    {true, true, true, TX_DISPLAY_FULL},
+    // trustworthy + outputs committed, inputs open -> SPENT_ONLY
+    {false, true, true, TX_DISPLAY_SPENT_ONLY},
+    // outputs open -> UNAVAILABLE (regardless of inputs)
+    {true, false, true, TX_DISPLAY_UNAVAILABLE},
+    {false, false, true, TX_DISPLAY_UNAVAILABLE},
+    // amounts not trustworthy -> UNAVAILABLE (regardless of commitment)
+    {true, true, false, TX_DISPLAY_UNAVAILABLE},
+    {false, true, false, TX_DISPLAY_UNAVAILABLE},
+    {true, false, false, TX_DISPLAY_UNAVAILABLE},
+    {false, false, false, TX_DISPLAY_UNAVAILABLE},
+};
+
+static void test_tx_display_mode(void **state) {
+    (void) state;
+    for (size_t i = 0; i < sizeof(mode_cases) / sizeof(mode_cases[0]); i++) {
+        const mode_case_t *c = &mode_cases[i];
+        tx_display_mode_t got =
+            decide_tx_display_mode(c->commits_inputs, c->commits_outputs, c->amounts_trustworthy);
+        if (got != c->expected) {
+            fail_msg("case[%zu]: decide(in=%d,out=%d,trust=%d) = %d, expected %d",
+                     i, c->commits_inputs, c->commits_outputs, c->amounts_trustworthy,
+                     (int) got, (int) c->expected);
+        }
+    }
+}
+
 int main() {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_classify_sighash),
+        cmocka_unit_test(test_sighash_commit_predicates),
+        cmocka_unit_test(test_tx_display_mode),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
