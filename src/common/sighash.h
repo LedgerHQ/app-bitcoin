@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /* Local headers */
 #include "constants.h"
@@ -50,4 +51,49 @@ static inline sighash_class_t classify_sighash(uint32_t sighash_type, int segwit
     }
 
     return SIGHASH_CLASS_UNSUPPORTED;
+}
+
+// Whether the input set is closed (no one can add inputs): true iff not ANYONECANPAY.
+static inline bool sighash_input_set_closed(uint32_t sighash_type) {
+    return (sighash_type & SIGHASH_ANYONECANPAY) == 0;
+}
+
+// Output set closed (no one can add/replace outputs): only base ALL/DEFAULT.
+static inline bool sighash_output_set_closed(uint32_t sighash_type) {
+    uint32_t base = sighash_type & ~(uint32_t) SIGHASH_ANYONECANPAY;
+    return base == SIGHASH_ALL || base == SIGHASH_DEFAULT;
+}
+
+// Whether the signature commits every output in this PSBT: base ALL/DEFAULT, or SINGLE with
+// exactly one output. (Unlike output_set_closed: SINGLE+1out commits it but the set stays open.)
+static inline bool sighash_commits_provided_outputs(uint32_t sighash_type, unsigned int n_outputs) {
+    uint32_t base = sighash_type & ~(uint32_t) SIGHASH_ANYONECANPAY;
+    if (base == SIGHASH_ALL || base == SIGHASH_DEFAULT) {
+        return true;
+    }
+    return base == SIGHASH_SINGLE && n_outputs == 1;
+}
+
+// What the review can trust, given what the signed inputs commit to.
+typedef enum {
+    TX_DISPLAY_FULL,         // all outputs and the fee
+    TX_DISPLAY_NET_ONLY,     // only the net amount leaving our account; fee unknown
+    TX_DISPLAY_UNAVAILABLE,  // outputs not even fixed; show a warning only
+} tx_display_mode_t;
+
+/**
+ * Decides what the review can trustworthily show.
+ *
+ * @param fee_trustworthy true iff all inputs and outputs are committed, so the fee can't
+ *        change after signing; false for any non-default sighash
+ * @param commits_all_outputs true iff every output in this PSBT is committed (ALL/DEFAULT,
+ *        or SINGLE with one output), so the net amount is exact
+ * @return the display mode: FULL, NET_ONLY, or UNAVAILABLE
+ */
+static inline tx_display_mode_t decide_tx_display_mode(bool fee_trustworthy,
+                                                       bool commits_all_outputs) {
+    if (!commits_all_outputs) {
+        return TX_DISPLAY_UNAVAILABLE;
+    }
+    return fee_trustworthy ? TX_DISPLAY_FULL : TX_DISPLAY_NET_ONLY;
 }
