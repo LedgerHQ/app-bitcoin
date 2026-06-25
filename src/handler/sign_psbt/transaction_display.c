@@ -33,6 +33,7 @@
 #include "menu.h"
 #include "psbt.h"
 #include "script.h"
+#include "sighash.h"
 #include "sw.h"
 
 static bool __attribute__((noinline)) display_output(
@@ -204,13 +205,89 @@ static bool __attribute__((noinline)) display_warnings(dispatcher_context_t *dc,
     return true;
 }
 
+// Human-readable label for a default (unregistered) account, e.g. "Native SegWit #2"
+static bool format_default_account_label(int bip44_purpose,
+                                         uint32_t account,
+                                         char *out,
+                                         size_t out_len) {
+    const char *type;
+    switch (bip44_purpose) {
+        case 44:
+            type = "Legacy";
+            break;
+        case 49:
+            type = "Nested SegWit";
+            break;
+        case 84:
+            type = "Native SegWit";
+            break;
+        case 86:
+            type = "Taproot";
+            break;
+        default:
+            return false;
+    }
+    return snprintf(out, out_len, "%s #%u", type, (unsigned int) account) > 0;
+}
+
+// Account label for the review, or NULL for no row. Registered: its name (always);
+// default: a derived label, but only in the trust-reduced modes (FULL stays lean).
+static const char *account_review_label(const sign_psbt_state_t *st,
+                                        tx_display_mode_t mode,
+                                        char *buf,
+                                        size_t buf_len) {
+    if (!st->account.is_default) {
+        return st->account.wallet_header.name;
+    }
+    if (mode != TX_DISPLAY_FULL && format_default_account_label(st->account.bip44_purpose,
+                                                                st->account.bip44_account,
+                                                                buf,
+                                                                buf_len)) {
+        return buf;
+    }
+    return NULL;
+}
+
 bool __attribute__((noinline)) display_transaction(
     dispatcher_context_t *dc,
     sign_psbt_state_t *st,
     const uint8_t internal_outputs[static BITVECTOR_REAL_SIZE(MAX_N_OUTPUTS_CAN_SIGN)]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
+    char account_label_buf[MAX_WALLET_NAME_LENGTH + 1];
+
+    // only shown for a default sighash (FULL); may underflow otherwise, but then unused
     uint64_t fee = st->inputs_total_amount - st->outputs.total_amount;
+    int64_t total_spent =
+        (int64_t) st->internal_inputs_total_amount - (int64_t) st->outputs.change_total_amount;
+
+    // Default sighash => FULL. Non-default => show only what the signed inputs commit to.
+    tx_display_mode_t mode = TX_DISPLAY_FULL;
+    if (st->warnings.non_default_sighash) {
+        if (st->sighash_mixed) {
+            mode = TX_DISPLAY_UNAVAILABLE;  // signed inputs disagree: nothing coherent
+        } else {
+            // uniform non-default sighash never fixes the whole set => fee never trustworthy
+            bool fee_trustworthy = false;
+            bool outputs_committed =
+                sighash_commits_provided_outputs(st->seen_sighash, st->n_outputs);
+            mode = decide_tx_display_mode(fee_trustworthy, outputs_committed);
+        }
+    }
+
+    tx_summary_t summary = {.mode = mode,
+                            .fee = fee,
+                            .total_spent = total_spent,
+                            .seen_sighash = st->seen_sighash,
+                            .sighash_mixed = st->sighash_mixed};
+
+    // From when net-spending, To when net-receiving, unknown direction for UNAVAILABLE.
+    account_role_t account_role = ACCOUNT_ROLE_FROM;
+    if (mode == TX_DISPLAY_UNAVAILABLE) {
+        account_role = ACCOUNT_ROLE_UNKNOWN;
+    } else if (mode == TX_DISPLAY_NET_ONLY && total_spent < 0) {
+        account_role = ACCOUNT_ROLE_TO;
+    }
 
     /** INPUT VERIFICATION ALERTS
      *
@@ -220,13 +297,31 @@ bool __attribute__((noinline)) display_transaction(
      * - non-default sighash types
      */
 
-    // if the value of fees is 10% or more of the amount, and it's more than 100000
-    st->warnings.high_fee = 10 * fee >= st->inputs_total_amount && st->inputs_total_amount > 100000;
+    // high-fee warning only applies when we trust the fee
+    st->warnings.high_fee = (mode == TX_DISPLAY_FULL) && (10 * fee >= st->inputs_total_amount &&
+                                                          st->inputs_total_amount > 100000);
 
     // Display warnings/risks information before the transaction title
     // for the both classical and streaming cases.
     if (!display_warnings(dc, st)) {
         return false;
+    }
+
+    if (mode == TX_DISPLAY_UNAVAILABLE) {
+        // Nothing reliable to show: no outputs/amounts, only a notice to confirm.
+        ui_transaction_simplified_init(
+            account_review_label(st, mode, account_label_buf, sizeof(account_label_buf)),
+            0,
+            st->warnings,
+            account_role,
+            st->account.is_default,
+            &summary);
+        ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
+        if (!ui_transaction_simplified_show(dc)) {
+            SEND_SW(dc, SW_DENY);
+            return false;
+        }
+        return true;
     }
 
     if (st->n_external_outputs <= MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER) {
@@ -236,12 +331,25 @@ bool __attribute__((noinline)) display_transaction(
 
         bool is_self_transfer = st->n_external_outputs == 0;
 
+        // With DISPLAY_FULL and no external outputs, we add a line to make it clear that
+        // the amount sent is 0 (except the fee that is shown separately).
+        bool show_self_transfer_row = is_self_transfer && mode == TX_DISPLAY_FULL;
+
+        // Number of amount rows shown: external outputs, or one "self-transfer" row (if any).
+        unsigned int n_output_rows = st->n_external_outputs;
+        if (is_self_transfer) {
+            n_output_rows = show_self_transfer_row ? 1 : 0;
+        }
+
         /** TRANSACTION CONFIRMATION */
         /* Init*/
         ui_transaction_simplified_init(
-            st->account.is_default ? NULL : st->account.wallet_header.name,
-            is_self_transfer ? 1 : st->n_external_outputs,
-            st->warnings);
+            account_review_label(st, mode, account_label_buf, sizeof(account_label_buf)),
+            n_output_rows,
+            st->warnings,
+            account_role,
+            st->account.is_default,
+            &summary);
 
         /* Adding outputs */
         if (!is_self_transfer) {
@@ -258,27 +366,29 @@ bool __attribute__((noinline)) display_transaction(
                     return false;
                 }
 
-                ui_transaction_simplified_add(is_self_transfer ? 0 : st->outputs.output_amounts[i],
-                                              is_self_transfer ? NULL : output_description);
+                ui_transaction_simplified_add(st->outputs.output_amounts[i], output_description);
             }
-        } else {
+        } else if (show_self_transfer_row) {
             ui_transaction_simplified_add(0, NULL);
         }
 
         /* Start the review */
         ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
-        if (!ui_transaction_simplified_show(dc, fee)) {
+        if (!ui_transaction_simplified_show(dc)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
     } else {
-        // Transactions with more than one external output; show one output per page,
-        // using the streaming NBGL API.
+        // Transactions with more than MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER external outputs;
+        // show one output per page, using the streaming NBGL API.
 
         // If it's not a default wallet policy, let's save this info to ask the user for
         // confirmation
-        ui_prepare_authorize_wallet_spend(!st->account.is_default ? st->account.wallet_header.name
-                                                                  : NULL);
+        ui_prepare_authorize_wallet_spend(
+            account_review_label(st, mode, account_label_buf, sizeof(account_label_buf)),
+            account_role,
+            st->account.is_default,
+            &summary);
 
         // "Review transaction to send Bitcoin"
         if (!ui_transaction_streaming_prompt(dc)) {
@@ -298,7 +408,7 @@ bool __attribute__((noinline)) display_transaction(
          */
         // Show final user validation UI
         ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
-        if (!ui_transaction_streaming_validate(dc, fee, st->warnings, false)) {
+        if (!ui_transaction_streaming_validate(dc, st->warnings, false)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }

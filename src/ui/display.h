@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
 /* SDK headers */
 #include "bip32.h"
@@ -8,6 +9,7 @@
 #include "format.h"
 
 /* Local headers */
+#include "sighash.h"  // tx_display_mode_t
 #include "constants.h"
 #include "dispatcher.h"
 #include "display.h"
@@ -102,6 +104,22 @@ typedef struct {
     char signer_index[sizeof("Key @999 <theirs>")];
 } ui_cosigner_pubkey_and_index_state_t;
 
+// Which side of the transaction the wallet account is on, for the account review row.
+typedef enum {
+    ACCOUNT_ROLE_FROM,     // net spend (and the default/FULL case)
+    ACCOUNT_ROLE_TO,       // net receive
+    ACCOUNT_ROLE_UNKNOWN,  // direction not knowable (UNAVAILABLE)
+} account_role_t;
+
+// Amount summary for the transaction review (mode from decide_tx_display_mode).
+typedef struct {
+    tx_display_mode_t mode;
+    uint64_t fee;           // for TX_DISPLAY_FULL
+    int64_t total_spent;    // for TX_DISPLAY_NET_ONLY (negative = net receive)
+    uint32_t seen_sighash;  // effective sighash, for the "Signing rule" row
+    bool sighash_mixed;     // signed inputs disagree -> shown as "Mixed"
+} tx_summary_t;
+
 typedef struct {
     tx_ux_warning_t warnings;
     bool has_wallet_policy;
@@ -113,7 +131,16 @@ typedef struct {
     char address_or_description[MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER]
                                [MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
     char amount[MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER][MAX_AMOUNT_LENGTH + 1];
-    char fee[MAX_AMOUNT_LENGTH + 1];
+    char fee[MAX_AMOUNT_LENGTH + 1];         // formatted network fee (FULL only)
+    char net_amount[MAX_AMOUNT_LENGTH + 1];  // formatted |total_spent|, the "You spend/receive"
+                                             // value (NET_ONLY only)
+
+    tx_display_mode_t display_mode;
+    bool spent_is_receive;        // for TX_DISPLAY_NET_ONLY: total_spent < 0
+    account_role_t account_role;  // From / To / unknown for the account row
+    bool account_is_default;      // default derivation vs registered policy, for the row label
+    uint32_t seen_sighash;        // for the "Signing rule" row
+    bool sighash_mixed;
 } ui_validate_transaction_state_t;
 
 /**
@@ -162,7 +189,10 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
 
 bool ui_display_unusual_path(dispatcher_context_t *context, const char *bip32_path_str);
 
-void ui_prepare_authorize_wallet_spend(const char *wallet_name);
+void ui_prepare_authorize_wallet_spend(const char *wallet_name,
+                                       account_role_t account_role,
+                                       bool account_is_default,
+                                       const tx_summary_t *summary);
 
 bool ui_warn_external_inputs(dispatcher_context_t *context);
 
@@ -176,16 +206,20 @@ void ui_warn_nondefault_sighash_disabled(dispatcher_context_t *context);
 bool ui_warn_high_fee(dispatcher_context_t *context);
 
 /* These 3 functions have to be called in following order:
- * 1. init - to initialize the transaction signature flow with basic parameters.
+ * 1. init - initialize the flow; the summary is applied here so the account row, the
+ *           "Signing rule" line and the per-output page breaks are all available up front.
  * 2. add  - to add information for an output.
  * 3. show - to actually start showing the transaction screens.
  * These functions call respectively init, add and show functions from display_nbgl module.
  */
 void ui_transaction_simplified_init(const char *wallet_policy_name,
                                     unsigned int outputs_num,
-                                    tx_ux_warning_t warnings);
+                                    tx_ux_warning_t warnings,
+                                    account_role_t account_role,
+                                    bool account_is_default,
+                                    const tx_summary_t *summary);
 void ui_transaction_simplified_add(uint64_t amount, const char *address_or_description);
-bool ui_transaction_simplified_show(dispatcher_context_t *context, uint64_t fee);
+bool ui_transaction_simplified_show(dispatcher_context_t *context);
 
 bool ui_transaction_streaming_prompt(dispatcher_context_t *context);
 bool ui_transaction_streaming_validate_output(dispatcher_context_t *context,
@@ -194,7 +228,6 @@ bool ui_transaction_streaming_validate_output(dispatcher_context_t *context,
                                               const char *address_or_description,
                                               uint64_t amount);
 bool ui_transaction_streaming_validate(dispatcher_context_t *context,
-                                       uint64_t fee,
                                        tx_ux_warning_t warnings,
                                        bool is_self_transfer);
 
