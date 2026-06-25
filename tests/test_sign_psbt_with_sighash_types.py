@@ -1,9 +1,10 @@
+import copy
 import pytest
 from pathlib import Path
-from ledger_bitcoin import WalletPolicy
-from ledger_bitcoin.exception.errors import NotSupportedError
+from ledger_bitcoin import WalletPolicy, MultisigWallet, AddressType
+from ledger_bitcoin.exception.errors import NotSupportedError, IncorrectDataError
 from ledger_bitcoin.exception.device_exception import DeviceException
-from ledger_bitcoin.psbt import PSBT
+from ledger_bitcoin.psbt import PSBT, PartiallySignedOutput
 from test_utils import bip0340
 from ragger.navigator import Navigator
 from ragger.error import ExceptionRAPDU
@@ -124,7 +125,7 @@ def test_sighash_none_sign_psbt(navigator: Navigator, firmware: Firmware, client
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-sign.psbt")
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     # get the (tweaked) pubkey from the scriptPubKey
@@ -151,7 +152,7 @@ def test_sighash_none_input_modified(navigator: Navigator, firmware: Firmware, c
     psbt.tx.vin[0].nSequence = psbt.tx.vin[0].nSequence - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
     assert len(result) == 2
 
@@ -172,7 +173,7 @@ def test_sighash_none_output_modified(navigator: Navigator, firmware: Firmware, 
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
     assert len(result) == 2
 
@@ -192,7 +193,7 @@ def test_sighash_single_sign_psbt(navigator: Navigator, firmware: Firmware, clie
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-sign.psbt")
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -220,7 +221,7 @@ def test_sighash_single_input_modified(navigator: Navigator, firmware: Firmware,
     psbt.tx.vin[1].nSequence = psbt.tx.vin[1].nSequence - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     # get the (tweaked) pubkey from the scriptPubKey
@@ -243,7 +244,7 @@ def test_sighash_single_output_same_index_modified(navigator: Navigator, firmwar
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     # get the (tweaked) pubkey from the scriptPubKey
@@ -266,7 +267,7 @@ def test_sighash_single_output_different_index_modified(navigator: Navigator, fi
     psbt.tx.vout[1].nValue = psbt.tx.vout[1].nValue - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     # get the (tweaked) pubkey from the scriptPubKey
@@ -377,7 +378,7 @@ def test_sighash_none_anyone_sign(navigator: Navigator, firmware: Firmware, clie
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-anyone-can-pay-sign.psbt")
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -405,7 +406,7 @@ def test_sighash_none_anyone_input_changed(navigator: Navigator, firmware: Firmw
     psbt.tx.vin[0].nSequence = psbt.tx.vin[0].nSequence - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -428,7 +429,7 @@ def test_sighash_none_anyone_output_changed(navigator: Navigator, firmware: Firm
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -449,7 +450,7 @@ def test_sighash_single_anyone_sign(navigator: Navigator, firmware: Firmware, cl
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-anyone-can-pay-sign.psbt")
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -477,7 +478,7 @@ def test_sighash_single_anyone_input_changed(navigator: Navigator, firmware: Fir
     psbt.tx.vin[0].nSequence = psbt.tx.vin[0].nSequence - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -500,7 +501,7 @@ def test_sighash_single_anyone_output_changed(navigator: Navigator, firmware: Fi
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -514,6 +515,34 @@ def test_sighash_single_anyone_output_changed(navigator: Navigator, firmware: Fi
 
     assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_0, pubkey0, partial_sig0.signature[:-1]) == 0
     assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_1, pubkey1, partial_sig1.signature[:-1])
+
+
+def test_sighash_anyonecanpay_negative_fee_shows_receive(navigator: Navigator, firmware: Firmware,
+                                                         client: RaggerClient, test_name: str):
+    # ANYONECANPAY (open inputs): bump the change above our inputs so we net-receive and
+    # inputs < outputs. Must NOT be rejected as a negative fee; "You receive" checked by snapshots.
+    toggle_nonstandard_sighash_setting(navigator, firmware)
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-all-anyone-can-pay-sign.psbt")
+    psbt.tx.vout[0].nValue = 9929389  # > inputs total (9919389)
+
+    result = client.sign_psbt(psbt, tr_wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              testname=test_name)
+    assert len(result) == 2
+
+
+def test_negative_fee_rejected_default_sighash(navigator: Navigator, firmware: Firmware,
+                                               client: RaggerClient, test_name: str):
+    # With the default sighash the whole transaction is committed, so inputs < outputs
+    # is a genuine (invalid) negative fee and must still be rejected.
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-all-sign.psbt")
+    psbt.tx.vout[0].nValue = 9929389  # > inputs total (9919389)
+
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.sign_psbt(psbt, tr_wallet, None, navigator,
+                         instructions=sign_psbt_instruction_approve(firmware),
+                         testname=test_name)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
 
 
 def test_sighash_unsupported(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
@@ -589,7 +618,7 @@ def test_sighash_segwitv0_sighash2(navigator: Navigator, firmware: Firmware, cli
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
     psbt.inputs[0].sighash = 2
     result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
     assert result[0][1].signature == expected_sig
 
@@ -601,7 +630,7 @@ def test_sighash_segwitv0_sighash3(navigator: Navigator, firmware: Firmware, cli
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
     psbt.inputs[0].sighash = 3
     result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
     assert result[0][1].signature == expected_sig
 
@@ -618,6 +647,18 @@ def test_sighash_segwitv0_sighash81(navigator: Navigator, firmware: Firmware, cl
     assert result[0][1].signature == expected_sig
 
 
+def _wpkh_1in1out(sighash: int) -> PSBT:
+    # 1-in/1-out P2WPKH from wpkh-1to2: drop the change, keep the external payment
+    # (resized to keep the small fee). Exercises the SINGLE output-count carve-out.
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
+    input_amount = psbt.inputs[0].witness_utxo.nValue
+    del psbt.tx.vout[1]
+    del psbt.outputs[1]
+    psbt.tx.vout[0].nValue = input_amount - 145
+    psbt.inputs[0].sighash = sighash
+    return psbt
+
+
 def test_sighash_segwitv0_sighash82(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     toggle_nonstandard_sighash_setting(navigator, firmware)
     expected_sig = b'0E\x02!\x00\xe5\r7m\xa2\x1a\xb4\x89\xd48k\x14\xeb\xd0\xa9\xcc\x00\x17\x9ch\x8b\x16\xb5\x9d&\xab\x94md9\x929\x02 "\x159\xdc\xa3\x06\x06\x9cR\n\xf1\x9a\xfb^\xde)\x1a\xe9\x1e\x07S\x96\xedARN\xfeY\xa4\xc1A\xd4\x82'
@@ -625,7 +666,7 @@ def test_sighash_segwitv0_sighash82(navigator: Navigator, firmware: Firmware, cl
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
     psbt.inputs[0].sighash = 0x82
     result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
     assert result[0][1].signature == expected_sig
 
@@ -638,6 +679,105 @@ def test_sighash_segwitv0_sighash83(navigator: Navigator, firmware: Firmware, cl
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
     psbt.inputs[0].sighash = 0x83
     result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
     assert result[0][1].signature == expected_sig
+
+
+def test_sighash_single_1in1out_spent_only(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    # SINGLE (0x03) carve-out: one provided output is committed -> SPENT_ONLY (not the
+    # UNAVAILABLE shown for SINGLE with >1 output). Non-default sighash is never FULL.
+    toggle_nonstandard_sighash_setting(navigator, firmware)
+    psbt = _wpkh_1in1out(0x03)
+    result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              testname=test_name)
+    assert len(result) == 1
+    assert result[0][1].signature[-1] == 0x03
+
+
+def test_sighash_single_anyonecanpay_1in1out_spent_only(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    # ANYONECANPAY|SINGLE (0x83), one output: output committed, inputs open -> SPENT_ONLY.
+    # The coinjoin maker/taker shape (each party signs their own 1-in/1-out slice).
+    toggle_nonstandard_sighash_setting(navigator, firmware)
+    psbt = _wpkh_1in1out(0x83)
+    result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              testname=test_name)
+    assert len(result) == 1
+    assert result[0][1].signature[-1] == 0x83
+
+
+def test_sighash_registered_wallet_spent_only(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    # Registered (non-default) policy: the account row shows the registered name (not a
+    # "<script> #n" default label). ANYONECANPAY|ALL (0x81) -> SPENT_ONLY.
+    toggle_nonstandard_sighash_setting(navigator, firmware)
+    wallet = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.WIT,
+        threshold=2,
+        keys_info=[
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        ],
+    )
+    wallet_hmac = bytes.fromhex(
+        "d7c7a60b4ab4a14c1bf8901ba627d72140b2fb907f2b4e35d2e693bce9fbb371"
+    )
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/multisig/wsh-2of2.psbt")
+    psbt.inputs[0].sighash = 0x81
+    result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware, has_spend_from_wallet=True, has_sighashwarning=True),
+                              testname=test_name)
+    assert len(result) == 1
+    assert result[0][1].signature[-1] == 0x81
+
+
+def _wpkh_two_external_outputs(sighash) -> PSBT:
+    # Split wpkh-1to2's single payment into two external recipients, to exercise a review
+    # with two output rows (Amount/Address x2). sighash=None keeps the default.
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
+    second = copy.deepcopy(psbt.tx.vout[0])
+    psbt.tx.vout[0].nValue = 500000
+    second.nValue = 400000
+    psbt.tx.vout.insert(1, second)
+    psbt.outputs.insert(1, PartiallySignedOutput(0))
+    if sighash is not None:
+        psbt.inputs[0].sighash = sighash
+    return psbt
+
+
+def test_sighash_two_outputs_full(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    # Default sighash, two external outputs -> FULL review with two Amount/Address rows + Fees.
+    psbt = _wpkh_two_external_outputs(None)
+    result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware),
+                              testname=test_name)
+    assert len(result) == 1
+
+
+def test_sighash_two_outputs_anyonecanpay_net_only(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    # ANYONECANPAY|ALL with two external outputs -> NET_ONLY: both outputs are committed and
+    # shown, but the fee is untrusted (open inputs), so the net "You spend" is shown instead.
+    toggle_nonstandard_sighash_setting(navigator, firmware)
+    psbt = _wpkh_two_external_outputs(0x81)
+    result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              testname=test_name)
+    assert len(result) == 1
+    assert result[0][1].signature[-1] == 0x81
+
+
+def test_sighash_mixed_across_inputs_unavailable(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    # Two internal inputs signed with different (non-default) sighashes: the signed inputs
+    # disagree on what is committed, so no coherent amount/fee can be shown -> UNAVAILABLE.
+    toggle_nonstandard_sighash_setting(navigator, firmware)
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-2to2.psbt")
+    psbt.inputs[0].sighash = 0x81  # ANYONECANPAY | ALL
+    psbt.inputs[1].sighash = 0x82  # ANYONECANPAY | NONE
+    result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
+                              testname=test_name)
+    assert len(result) == 2
+    assert result[0][1].signature[-1] == 0x81
+    assert result[1][1].signature[-1] == 0x82
