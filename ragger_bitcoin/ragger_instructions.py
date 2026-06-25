@@ -75,8 +75,8 @@ class Instructions:
                          save_screenshot=save_screenshot)
 
     def confirm_transaction(self, save_screenshot=True):
-        self.same_request("Sign", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_CONFIRM,
-                          save_screenshot=save_screenshot)
+        self.same_request("Sign transaction", NavInsID.USE_CASE_REVIEW_TAP,
+                          NavInsID.USE_CASE_REVIEW_CONFIRM, save_screenshot=save_screenshot)
         self.new_request("Transaction", NavInsID.USE_CASE_REVIEW_TAP,
                          NavInsID.USE_CASE_STATUS_DISMISS,
                          save_screenshot=save_screenshot)
