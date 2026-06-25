@@ -199,6 +199,56 @@ endif
 INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
 
 ########################################
+#      BIP-388 cleartext bindings      #
+########################################
+# Render a wallet-policy descriptor template into a human-readable description
+# at registration time. The rendering comes from the vendored no_std Rust
+# binding in rust/bip388-c (see rust/README.md), cross-compiled to the device's
+# Rust target and linked as a static library. Set ENABLE_CLEARTEXT=0 to build
+# the app without the feature (no Rust toolchain required).
+ENABLE_CLEARTEXT ?= 1
+ifeq ($(ENABLE_CLEARTEXT),1)
+    DEFINES += HAVE_CLEARTEXT
+
+    # Map the BOLOS CPU (see $(BOLOS_SDK)/Makefile.defines) to its Rust target:
+    #   cortex-m3         (Nano X)                    -> thumbv7m-none-eabi
+    #   cortex-m35p+nodsp (Nano S+, Stax, Flex, Apex) -> thumbv8m.main-none-eabi
+    ifeq ($(TARGET_NAME),TARGET_NANOX)
+        RUST_TARGET := thumbv7m-none-eabi
+    else
+        RUST_TARGET := thumbv8m.main-none-eabi
+    endif
+
+    CLEARTEXT_CRATE_DIR := $(CURDIR)/rust/bip388-c
+    CLEARTEXT_LIB_DIR   := $(CLEARTEXT_CRATE_DIR)/target/$(RUST_TARGET)/release
+    CLEARTEXT_LIB       := $(CLEARTEXT_LIB_DIR)/libbip388_c.a
+
+    INCLUDES_PATH += $(CLEARTEXT_CRATE_DIR)/include
+    # Link the static lib. Placed before the SDK's libc/builtins (appended by
+    # Makefile.standard_app) so the archive's references resolve in one pass.
+    LDLIBS += -L$(CLEARTEXT_LIB_DIR) -lbip388_c
+    # Ensure the lib is (re)built before the app is linked.
+    APP_CUSTOM_LINK_DEPENDENCIES += $(CLEARTEXT_LIB)
+
+    CARGO  ?= cargo
+    RUSTUP ?= rustup
+    # Re-run cargo whenever a crate source or spec file changes; cargo itself is
+    # incremental, so an unchanged tree is a fast no-op.
+    CLEARTEXT_SRC := $(shell find $(CLEARTEXT_CRATE_DIR) $(CURDIR)/rust/bip388 \
+                        -type f \( -name '*.rs' -o -name '*.toml' \) -not -path '*/target/*')
+    # The recipe first ensures the cross target's precompiled std is installed:
+    # the ledger-app-builder image ships the Rust toolchain but not every target
+    # (e.g. thumbv8m.main-none-eabi), which otherwise fails with "can't find
+    # crate for `core`". Best-effort: if rustup is unavailable we fall through
+    # and let cargo report a clear error.
+    $(CLEARTEXT_LIB): $(CLEARTEXT_SRC)
+	@echo "[CARGO]   libbip388_c.a ($(RUST_TARGET))"
+	@command -v $(RUSTUP) >/dev/null 2>&1 && $(RUSTUP) target add $(RUST_TARGET) || \
+		echo "[CARGO]   rustup unavailable; assuming $(RUST_TARGET) std is installed"
+	cd $(CLEARTEXT_CRATE_DIR) && $(CARGO) build --release --target $(RUST_TARGET)
+endif
+
+########################################
 #          Features enablers           #
 ########################################
 # Converting build warnings to errors

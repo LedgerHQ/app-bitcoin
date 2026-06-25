@@ -32,6 +32,9 @@ jobs:
     name: Build application using the reusable workflow
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_build.yml@v1
     with:
+      # Full builder image: ships the Rust toolchain needed to cross-compile the
+      # vendored libbip388_c.a cleartext binding (see rust/README.md, Makefile).
+      builder: 'ledger-app-builder'
       upload_app_binaries_artifact: "compiled_app_binaries"
       flags: "DEBUG=0 COIN=bitcoin_testnet"
       build_comparison: true
