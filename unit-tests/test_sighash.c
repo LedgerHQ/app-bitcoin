@@ -95,9 +95,111 @@ static void test_classify_sighash(void **state) {
     }
 }
 
+// ========================================================================
+// Tests for the commit predicates and the display-mode decision
+// ========================================================================
+
+typedef struct {
+    uint32_t sighash_type;
+    bool commits_inputs;
+    bool commits_outputs;
+} commit_case_t;
+
+static const commit_case_t commit_cases[] = {
+    {SIGHASH_DEFAULT, true, true},
+    {SIGHASH_ALL, true, true},
+    {SIGHASH_NONE, true, false},
+    {SIGHASH_SINGLE, true, false},
+    {SIGHASH_ANYONECANPAY | SIGHASH_ALL, false, true},
+    {SIGHASH_ANYONECANPAY | SIGHASH_NONE, false, false},
+    {SIGHASH_ANYONECANPAY | SIGHASH_SINGLE, false, false},
+};
+
+static void test_sighash_commit_predicates(void **state) {
+    (void) state;
+    for (size_t i = 0; i < sizeof(commit_cases) / sizeof(commit_cases[0]); i++) {
+        const commit_case_t *c = &commit_cases[i];
+        bool gi = sighash_input_set_closed(c->sighash_type);
+        bool go = sighash_output_set_closed(c->sighash_type);
+        if (gi != c->commits_inputs || go != c->commits_outputs) {
+            fail_msg("case[%zu]: sighash 0x%02x -> inputs=%d outputs=%d, expected inputs=%d outputs=%d",
+                     i, c->sighash_type, gi, go, c->commits_inputs, c->commits_outputs);
+        }
+    }
+}
+
+// commits_provided_outputs: base ALL/DEFAULT always; base SINGLE only with 1 output.
+typedef struct {
+    uint32_t sighash_type;
+    unsigned int n_outputs;
+    bool expected;
+} provided_outputs_case_t;
+
+static const provided_outputs_case_t provided_outputs_cases[] = {
+    // base ALL/DEFAULT: all provided outputs committed, regardless of count (or ANYONECANPAY)
+    {SIGHASH_ALL, 1, true},
+    {SIGHASH_ALL, 3, true},
+    {SIGHASH_DEFAULT, 5, true},
+    {SIGHASH_ANYONECANPAY | SIGHASH_ALL, 4, true},
+    // SINGLE / ACP|SINGLE: committed only when there is exactly one output
+    {SIGHASH_SINGLE, 1, true},
+    {SIGHASH_SINGLE, 2, false},
+    {SIGHASH_SINGLE, 0, false},
+    {SIGHASH_ANYONECANPAY | SIGHASH_SINGLE, 1, true},
+    {SIGHASH_ANYONECANPAY | SIGHASH_SINGLE, 3, false},
+    // NONE: never commits outputs
+    {SIGHASH_NONE, 1, false},
+    {SIGHASH_ANYONECANPAY | SIGHASH_NONE, 1, false},
+};
+
+static void test_sighash_commits_provided_outputs(void **state) {
+    (void) state;
+    for (size_t i = 0; i < sizeof(provided_outputs_cases) / sizeof(provided_outputs_cases[0]);
+         i++) {
+        const provided_outputs_case_t *c = &provided_outputs_cases[i];
+        bool got = sighash_commits_provided_outputs(c->sighash_type, c->n_outputs);
+        if (got != c->expected) {
+            fail_msg("case[%zu]: commits_provided_outputs(0x%02x, %u) = %d, expected %d",
+                     i, c->sighash_type, c->n_outputs, got, c->expected);
+        }
+    }
+}
+
+typedef struct {
+    bool fee_trustworthy;
+    bool commits_outputs;
+    tx_display_mode_t expected;
+} mode_case_t;
+
+static const mode_case_t mode_cases[] = {
+    // fee trustworthy + outputs committed -> FULL
+    {true, true, TX_DISPLAY_FULL},
+    // outputs committed, fee not trustworthy -> NET_ONLY
+    {false, true, TX_DISPLAY_NET_ONLY},
+    // outputs not committed -> UNAVAILABLE (regardless of the fee)
+    {true, false, TX_DISPLAY_UNAVAILABLE},
+    {false, false, TX_DISPLAY_UNAVAILABLE},
+};
+
+static void test_tx_display_mode(void **state) {
+    (void) state;
+    for (size_t i = 0; i < sizeof(mode_cases) / sizeof(mode_cases[0]); i++) {
+        const mode_case_t *c = &mode_cases[i];
+        tx_display_mode_t got = decide_tx_display_mode(c->fee_trustworthy, c->commits_outputs);
+        if (got != c->expected) {
+            fail_msg("case[%zu]: decide(fee=%d,out=%d) = %d, expected %d",
+                     i, c->fee_trustworthy, c->commits_outputs,
+                     (int) got, (int) c->expected);
+        }
+    }
+}
+
 int main() {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_classify_sighash),
+        cmocka_unit_test(test_sighash_commit_predicates),
+        cmocka_unit_test(test_sighash_commits_provided_outputs),
+        cmocka_unit_test(test_tx_display_mode),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
