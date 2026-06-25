@@ -7,6 +7,9 @@ dep/
 obj/
 build/
 
+# Rust cleartext binding build artifacts
+rust/*/target/
+
 # Unit tests and code coverage
 unit-tests/build/
 unit-tests/coverage/

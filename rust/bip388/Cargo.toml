@@ -1,0 +1,36 @@
+[package]
+name = "bip388"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["alloc", "wallet-policy"]
+# Owned `DescriptorTemplate` AST, parser->owned bridge, owned cleartext/Display,
+# and the `Vec<String>` cleartext API. The cursor (arena) path is always built.
+alloc = ["dep:hex"]
+# `KeyOrigin`/`KeyInformation`/`WalletPolicy` + (de)serialization (pulls in `bitcoin`).
+wallet-policy = ["alloc", "dep:bitcoin"]
+# Reverse parsing of cleartext back into descriptor templates.
+cleartext-decode = ["alloc"]
+
+[dependencies]
+bitcoin = { version = "0.32.0", features = ["serde"], default-features = false, optional = true }
+hex = { version = "0.4.3", default-features = false, features = ["alloc"], optional = true }
+
+[dev-dependencies]
+toml = { version = "0.8", default-features = false, features = ["parse"] }
+serde = { version = "1.0", features = ["derive"] }
+
+[build-dependencies]
+toml = { version = "0.8", default-features = false, features = ["parse"] }
+serde = { version = "1.0", features = ["derive"] }
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full"] }
+prettyplease = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = true
+
+[workspace]

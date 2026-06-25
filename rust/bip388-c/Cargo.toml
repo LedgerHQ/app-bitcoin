@@ -1,0 +1,22 @@
+[package]
+name = "bip388-c"
+version = "0.1.0"
+edition = "2021"
+description = "C ABI bindings for the bip388 cleartext / confusion-score API (no_std, no allocator)"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+# The minimal, allocation-free, bitcoin-free core.
+bip388 = { path = "../bip388", default-features = false }
+
+[profile.release]
+opt-level = "z"
+lto = true
+panic = "abort"
+
+[profile.dev]
+panic = "abort"
+
+[workspace]
