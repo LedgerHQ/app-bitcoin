@@ -205,9 +205,11 @@ bool __attribute__((noinline)) preprocess_outputs(
 
     st->n_external_outputs = external_outputs_count;
 
-    if (st->inputs_total_amount < st->outputs.total_amount) {
+    // Reject inputs < outputs only when the whole tx is committed; an open sighash
+    // (ANYONECANPAY/NONE/SINGLE) may still add inputs later.
+    if (!st->sighash_inputs_open && !st->sighash_outputs_open &&
+        st->inputs_total_amount < st->outputs.total_amount) {
         PRINTF("Negative fee is invalid\n");
-        // negative fee transaction is invalid
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }

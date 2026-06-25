@@ -105,6 +105,18 @@ void input_keys_callback(dispatcher_context_t *dc,
     }
 }
 
+// Track the sighash seen across the inputs we sign (DEFAULT canonicalized to ALL);
+// disagreement -> sighash_mixed.
+static void track_seen_sighash(sign_psbt_state_t *st, uint32_t sighash_type) {
+    uint32_t canon = (sighash_type == SIGHASH_DEFAULT) ? SIGHASH_ALL : sighash_type;
+    if (!st->seen_sighash_set) {
+        st->seen_sighash = canon;
+        st->seen_sighash_set = true;
+    } else if (st->seen_sighash != canon) {
+        st->sighash_mixed = true;
+    }
+}
+
 bool __attribute__((noinline)) preprocess_inputs(
     dispatcher_context_t *dc,
     sign_psbt_state_t *st,
@@ -242,6 +254,7 @@ bool __attribute__((noinline)) preprocess_inputs(
         }
 
         bitvector_set(internal_inputs, cur_input_index, 1);
+        st->internal_inputs_total_amount += input.prevout_amount;
 
         int segwit_version = get_policy_segwit_version(st->account.policy_map);
 
@@ -277,6 +290,7 @@ bool __attribute__((noinline)) preprocess_inputs(
         // SIGHASH_ALL, we show a warning
 
         if (!input.has_sighash_type) {
+            track_seen_sighash(st, SIGHASH_ALL);  // no explicit sighash => commits all
             continue;
         }
 
@@ -316,6 +330,16 @@ bool __attribute__((noinline)) preprocess_inputs(
             SEND_SW(dc, SW_NOT_SUPPORTED);
             return false;
         }
+
+        // track whether any signed input leaves the inputs or outputs open
+        if (!sighash_input_set_closed(input.sighash_type)) {
+            st->sighash_inputs_open = true;
+        }
+        if (!sighash_output_set_closed(input.sighash_type)) {
+            st->sighash_outputs_open = true;
+        }
+
+        track_seen_sighash(st, input.sighash_type);
 
         if (((input.sighash_type & SIGHASH_SINGLE) == SIGHASH_SINGLE) &&
             (cur_input_index >= st->n_outputs)) {

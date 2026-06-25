@@ -54,11 +54,103 @@ const char GA_LOADING_TRANSACTION[] = "Loading transaction";
 const char GA_SIGNING_TRANSACTION[] = "Signing transaction";
 const char GA_LOADING_MESSAGE[] = "Loading message";
 
-#define N_UX_PAIRS 51
+// Non-default-sighash transaction summary labels (trustworthy-or-bust display)
+const char GA_FEE_NOT_AVAILABLE[] = "Not available";
+const char GA_YOU_SPEND[] = "You spend";
+const char GA_YOU_RECEIVE[] = "You receive";
+const char GA_AMOUNTS_UNAVAILABLE_TITLE[] = "Amounts & fees";
+#ifdef SCREEN_SIZE_WALLET
+const char GA_AMOUNTS_UNAVAILABLE[] =
+    "Cannot be verified for these signing rules. Only sign if you expected it and fully trust the "
+    "software wallet.";
+#else
+const char GA_AMOUNTS_UNAVAILABLE[] = "Cannot be verified\nReject if not sure";
+#endif
+const char GA_SIGNING_RULE_TITLE[] = "Signing rule";
+
+// +1 slot for the "Signing rule" row shown in the non-default-sighash flows
+#define N_UX_PAIRS 52
 
 static nbgl_layoutTagValue_t pairs[N_UX_PAIRS];
 static unsigned int n_pairs;
 static nbgl_layoutTagValueList_t pairList;
+
+// Account row label: direction (From/To/neutral) + type. "default" = a standard derivation,
+// "registered" = a registered policy. On Nano there's no room for the type, so we keep only
+// the direction.
+static const char *account_role_label(account_role_t role, bool is_default) {
+#ifdef SCREEN_SIZE_WALLET
+    switch (role) {
+        case ACCOUNT_ROLE_TO:
+            return is_default ? "To default account" : "To registered account";
+        case ACCOUNT_ROLE_NEUTRAL:
+            return is_default ? "Default account" : "Registered account";
+        default:
+            return is_default ? "From default account" : "From registered account";
+    }
+#else
+    (void) is_default;
+    switch (role) {
+        case ACCOUNT_ROLE_TO:
+            return "To account";
+        case ACCOUNT_ROLE_NEUTRAL:
+            return "Account";
+        default:
+            return "From account";
+    }
+#endif
+}
+
+// Name of the (uniform) sighash flag; NULL for default, "Mixed" if signed inputs disagree.
+static const char *signing_rule_str(uint32_t sighash, bool mixed) {
+    if (mixed) {
+        return "Mixed";
+    }
+    switch (sighash) {
+        case SIGHASH_NONE:
+            return "NONE";
+        case SIGHASH_SINGLE:
+            return "SINGLE";
+        case SIGHASH_ANYONECANPAY | SIGHASH_ALL:
+            return "ACP | ALL";
+        case SIGHASH_ANYONECANPAY | SIGHASH_NONE:
+            return "ACP | NONE";
+        case SIGHASH_ANYONECANPAY | SIGHASH_SINGLE:
+            return "ACP | SINGLE";
+        default:
+            return NULL;
+    }
+}
+
+// Appends the context pairs (account row + non-default "Signing rule") at idx, returns the
+// new count. Shared by the simplified and streaming flows.
+static unsigned int append_context_pairs(const ui_validate_transaction_state_t *state,
+                                         unsigned int idx) {
+    if (state->has_wallet_policy) {
+        pairs[idx++] = (nbgl_layoutTagValue_t) {
+            .item = account_role_label(state->account_role, state->account_is_default),
+            .value = state->wallet_policy_name,
+        };
+    }
+    const char *signing_rule = signing_rule_str(state->seen_sighash, state->sighash_mixed);
+    if (signing_rule != NULL) {
+        pairs[idx++] =
+            (nbgl_layoutTagValue_t) {.item = GA_SIGNING_RULE_TITLE, .value = signing_rule};
+    }
+    return idx;
+}
+
+// Appends the NET_ONLY money rows ("You spend/receive" + "Fees: Not available") at idx.
+static unsigned int append_net_only_pairs(const ui_validate_transaction_state_t *state,
+                                          unsigned int idx,
+                                          bool force_page) {
+    pairs[idx++] =
+        (nbgl_layoutTagValue_t) {.item = state->spent_is_receive ? GA_YOU_RECEIVE : GA_YOU_SPEND,
+                                 .value = state->fee,
+                                 .forcePageStart = force_page};
+    pairs[idx++] = (nbgl_layoutTagValue_t) {.item = "Fees", .value = GA_FEE_NOT_AVAILABLE};
+    return idx;
+}
 
 extern bool G_was_processing_screen_shown;
 
@@ -146,8 +238,8 @@ static void start_transaction_callback(bool confirm) {
 #define SELF_TRANSFER_DESCRIPTION COMBINE("0 ", COMBINE(COIN_COINID_SHORT, " (self-transfer)"))
 
 void ui_display_transaction_simplified_flow_init(void) {
-    /* 1 From + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER*3 + 1 Fees + 1 High fees */
-    _Static_assert(N_UX_PAIRS >= (1 + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER * 3 + 1 + 1),
+    /* 1 From/To + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER*3 + 1 Fees + 1 High fees + 1 Signing rule */
+    _Static_assert(N_UX_PAIRS >= (1 + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER * 3 + 1 + 1 + 1),
                    "Insufficient pairs for this flow");
     // Setup list
     pairList.nbMaxLinesForValue = 0;
@@ -156,12 +248,8 @@ void ui_display_transaction_simplified_flow_init(void) {
 
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    if (state->has_wallet_policy) {
-        pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
-            .item = "From",
-            .value = state->wallet_policy_name,
-        };
-    }
+    // Context page: account row + "Signing rule", so the caveat precedes any amount.
+    n_pairs = append_context_pairs(state, n_pairs);
 }
 
 void ui_display_transaction_simplified_flow_add(void) {
@@ -175,12 +263,15 @@ void ui_display_transaction_simplified_flow_add(void) {
                                          .value = state->output_index_str[output_index],
                                          .forcePageStart = true};
         }
+        // Keep the single output off the context page (multi-output already breaks above).
+        bool force_output_page =
+            state->display_mode != TX_DISPLAY_FULL && state->n_outputs == 1 && output_index == 0;
         pairs[n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Amount",
                                                     .value = state->amount[output_index],
-                                                    .forcePageStart = false};
+                                                    .forcePageStart = force_output_page};
 
         pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
-            .item = "To",
+            .item = "Address",
             .value = state->address_or_description[output_index],
         };
     } else {
@@ -192,16 +283,26 @@ void ui_display_transaction_simplified_flow_add(void) {
 void ui_display_transaction_simplified_flow_show(void) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    if (state->warnings.high_fee) {
-        pairs[n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_WARN_HIGH_FEES_TITLE,
-                                                     .value = GA_WARN_HIGH_FEES,
+    if (state->display_mode == TX_DISPLAY_UNAVAILABLE) {
+        // Only the notice (Signing rule was on the context page); it must stay the last pair.
+        pairs[n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_AMOUNTS_UNAVAILABLE_TITLE,
+                                                     .value = GA_AMOUNTS_UNAVAILABLE,
                                                      .centeredInfo = true,
-                                                     .valueIcon = &ICON_APP_IMPORTANT};
+                                                     .valueIcon = &ICON_APP_WARNING};
+    } else if (state->display_mode == TX_DISPLAY_NET_ONLY) {
+        // Money-summary page: the net "You spend/receive" + untrusted fee on their own page.
+        n_pairs = append_net_only_pairs(state, n_pairs, /* force_page */ true);
+    } else {  // TX_DISPLAY_FULL
+        if (state->warnings.high_fee) {
+            pairs[n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_WARN_HIGH_FEES_TITLE,
+                                                         .value = GA_WARN_HIGH_FEES,
+                                                         .centeredInfo = true,
+                                                         .valueIcon = &ICON_APP_IMPORTANT};
+        }
+        pairs[n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Fees",
+                                                    .value = state->fee,
+                                                    .forcePageStart = state->n_outputs > 1 ? 1 : 0};
     }
-
-    pairs[n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Fees",
-                                                .value = state->fee,
-                                                .forcePageStart = state->n_outputs > 1 ? 1 : 0};
 
     pairList.nbPairs = n_pairs;
 
@@ -222,14 +323,11 @@ void ui_display_transaction_streaming_prompt(void) {
                                      start_transaction_callback);
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    if (state->has_wallet_policy) {
-        pairs[0] = (nbgl_layoutTagValue_t) {
-            .item = "From",
-            .value = state->wallet_policy_name,
-        };
-        // Setup list
+    // Context page: account row + (non-default) "Signing rule", same as the simplified flow.
+    unsigned int l_n_pairs = append_context_pairs(state, 0);
+    if (l_n_pairs > 0) {
         pairList.nbMaxLinesForValue = 0;
-        pairList.nbPairs = 1;
+        pairList.nbPairs = l_n_pairs;
         pairList.pairs = pairs;
 
         nbgl_useCaseReviewStreamingContinue(&pairList, start_transaction_callback);
@@ -264,27 +362,28 @@ void ui_display_transaction_streaming_flow(bool is_self_transfer) {
     unsigned int l_n_pairs = 0;
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    if (state->warnings.high_fee) {
+    // high-fee warning only applies when we actually have a fee
+    if (state->display_mode == TX_DISPLAY_FULL && state->warnings.high_fee) {
         pairs[l_n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_WARN_HIGH_FEES_TITLE,
                                                        .value = GA_WARN_HIGH_FEES,
                                                        .centeredInfo = true,
                                                        .valueIcon = &ICON_APP_IMPORTANT};
     }
 
-    if (!is_self_transfer) {
-        pairs[l_n_pairs].item = "Fees";
-        pairs[l_n_pairs++].value = state->fee;
-
-        pairList.nbPairs = l_n_pairs;
-    } else {
+    if (is_self_transfer) {
         pairs[l_n_pairs].item = "Amount";
         pairs[l_n_pairs++].value = "Self-transfer";
+    }
 
+    if (state->display_mode == TX_DISPLAY_NET_ONLY) {
+        // net "You spend/receive" + untrusted fee (the "Signing rule" was on the context page)
+        l_n_pairs = append_net_only_pairs(state, l_n_pairs, /* force_page */ false);
+    } else {  // TX_DISPLAY_FULL
         pairs[l_n_pairs].item = "Fees";
         pairs[l_n_pairs++].value = state->fee;
-
-        pairList.nbPairs = l_n_pairs;
     }
+
+    pairList.nbPairs = l_n_pairs;
 
     nbgl_useCaseReviewStreamingContinue(&pairList, finish_transaction_flow);
 }
