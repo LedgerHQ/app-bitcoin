@@ -243,7 +243,7 @@ def test_sighash_none_allowed_after_enabling_setting(
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
                               instructions=sign_psbt_instruction_approve(
-                                  firmware, has_sighashwarning=True),
+                                  firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
@@ -273,7 +273,7 @@ def test_sighash_single_allowed_after_enabling_setting(
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
                               instructions=sign_psbt_instruction_approve(
-                                  firmware, has_sighashwarning=True),
+                                  firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -314,6 +314,6 @@ def test_sighash_segwitv0_sighash2_allowed_after_enabling_setting(
 
     result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
                               instructions=sign_psbt_instruction_approve(
-                                  firmware, has_sighashwarning=True),
+                                  firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
     assert len(result) == 1
