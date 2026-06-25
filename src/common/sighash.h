@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /* Local headers */
 #include "constants.h"
@@ -50,4 +51,42 @@ static inline sighash_class_t classify_sighash(uint32_t sighash_type, int segwit
     }
 
     return SIGHASH_CLASS_UNSUPPORTED;
+}
+
+// Whether the input set is closed (no one can add inputs): true iff not ANYONECANPAY.
+static inline bool sighash_input_set_closed(uint32_t sighash_type) {
+    return (sighash_type & SIGHASH_ANYONECANPAY) == 0;
+}
+
+// Output set closed (no one can add/replace outputs): only base ALL/DEFAULT.
+static inline bool sighash_output_set_closed(uint32_t sighash_type) {
+    uint32_t base = sighash_type & ~(uint32_t) SIGHASH_ANYONECANPAY;
+    return base == SIGHASH_ALL || base == SIGHASH_DEFAULT;
+}
+
+// Whether the signature commits every output in this PSBT: base ALL/DEFAULT, or SINGLE with
+// exactly one output. (Unlike output_set_closed: SINGLE+1out commits it but the set stays open.)
+static inline bool sighash_commits_provided_outputs(uint32_t sighash_type, unsigned int n_outputs) {
+    uint32_t base = sighash_type & ~(uint32_t) SIGHASH_ANYONECANPAY;
+    if (base == SIGHASH_ALL || base == SIGHASH_DEFAULT) {
+        return true;
+    }
+    return base == SIGHASH_SINGLE && n_outputs == 1;
+}
+
+// What the review can show, given the signed inputs' commitment and amount trust.
+typedef enum {
+    TX_DISPLAY_FULL,         // outputs + fee (and total_spent)
+    TX_DISPLAY_NET_ONLY,     // total_spent only; fee unknown
+    TX_DISPLAY_UNAVAILABLE,  // nothing about amounts/fee is reliable
+} tx_display_mode_t;
+
+// FULL if the fee is trusted; NET_ONLY if only the net is exact; else UNAVAILABLE.
+static inline tx_display_mode_t decide_tx_display_mode(bool fee_trustworthy,
+                                                       bool commits_all_outputs,
+                                                       bool amounts_trustworthy) {
+    if (!amounts_trustworthy || !commits_all_outputs) {
+        return TX_DISPLAY_UNAVAILABLE;
+    }
+    return fee_trustworthy ? TX_DISPLAY_FULL : TX_DISPLAY_NET_ONLY;
 }

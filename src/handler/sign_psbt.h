@@ -134,6 +134,10 @@ typedef struct {
     // true iff the wallet policy is a default (BIP-44/49/84/86) policy used without HMAC.
     bool is_default;
 
+    // BIP-44 purpose/account from m/purpose'/coin'/account'; only when is_default.
+    int bip44_purpose;
+    uint32_t bip44_account;
+
     __attribute__((aligned(4))) uint8_t policy_map_bytes[MAX_WALLET_POLICY_BYTES];
     policy_node_t *policy_map;
 
@@ -155,8 +159,20 @@ typedef struct {
 
     uint64_t inputs_total_amount;
 
+    // Sum of the internal (signed) inputs only; used for total_spent.
+    uint64_t internal_inputs_total_amount;
+
     unsigned int n_external_inputs;
     unsigned int n_external_outputs;
+
+    // Set if any signed input opens the inputs (ANYONECANPAY) / outputs (NONE/SINGLE).
+    bool sighash_inputs_open;
+    bool sighash_outputs_open;
+
+    // Common sighash of signed inputs (DEFAULT canonicalized to ALL); valid if !sighash_mixed.
+    uint32_t signed_sighash;
+    bool signed_sighash_set;
+    bool sighash_mixed;  // signed inputs disagree on sighash -> can't display coherently
 
     // set to true if at least a PSBT_IN_MUSIG2_PUB_NONCE field is present in the PSBT
     bool has_musig2_pub_nonces;

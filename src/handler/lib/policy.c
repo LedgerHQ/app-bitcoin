@@ -1437,7 +1437,9 @@ static int get_bip44_purpose(const policy_node_t *descriptor_template) {
 
 bool is_wallet_policy_standard(dispatcher_context_t *dispatcher_context,
                                const policy_map_wallet_header_t *wallet_policy_header,
-                               const policy_node_t *descriptor_template) {
+                               const policy_node_t *descriptor_template,
+                               int *out_bip44_purpose,
+                               uint32_t *out_bip44_account) {
     // Based on the address type, we set the expected bip44 purpose
     int bip44_purpose = get_bip44_purpose(descriptor_template);
     if (bip44_purpose < 0) {
@@ -1506,6 +1508,13 @@ bool is_wallet_policy_standard(dispatcher_context_t *dispatcher_context,
         key_info.master_key_derivation[2] < H ||
         key_info.master_key_derivation[2] > H + MAX_BIP44_ACCOUNT_RECOMMENDED) {
         return false;
+    }
+
+    if (out_bip44_purpose != NULL) {
+        *out_bip44_purpose = bip44_purpose;
+    }
+    if (out_bip44_account != NULL) {
+        *out_bip44_account = key_info.master_key_derivation[2] - H;
     }
 
     return true;
