@@ -271,8 +271,10 @@ def toggle_nonstandard_sighash_setting(navigator: Navigator, firmware: Firmware,
     """
     if firmware.device.startswith("nano"):
         # The warning in the choice dialog can span a variable number of Nano pages,
-        # so scroll to the confirm button by text ("enable", from "I understand,
-        # enable") instead of hard-coding the RIGHT_CLICK count.
+        # so scroll to the confirm button by text instead of hard-coding the
+        # RIGHT_CLICK count. ragger matches with re.match (anchored at the start of
+        # the screen text), so use the start of the button label "I understand, enable".
+        confirm_text = "I understand"
         open_dialog = [NavInsID.RIGHT_CLICK, NavInsID.BOTH_CLICK, NavInsID.BOTH_CLICK]
         exit_settings = [NavInsID.RIGHT_CLICK, NavInsID.BOTH_CLICK]
 
@@ -282,13 +284,13 @@ def toggle_nonstandard_sighash_setting(navigator: Navigator, firmware: Firmware,
                 screen_change_before_first_instruction=False, snap_start_idx=0)
             # exit is not snapshotted: the scroll length above is variable
             navigator.navigate_until_text_and_compare(
-                NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], "enable",
+                NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], confirm_text,
                 TESTS_ROOT_DIR, test_case_name,
                 screen_change_before_first_instruction=False, snap_start_idx=len(open_dialog))
         else:
             navigator.navigate(open_dialog, screen_change_before_first_instruction=False)
             navigator.navigate_until_text(
-                NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], "enable",
+                NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], confirm_text,
                 screen_change_before_first_instruction=False)
         navigator.navigate(exit_settings, screen_change_before_first_instruction=False)
         return

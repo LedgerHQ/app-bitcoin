@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 from ledger_bitcoin import WalletPolicy
-from ledger_bitcoin.exception.errors import NotSupportedError
+from ledger_bitcoin.exception.errors import NotSupportedError, IncorrectDataError
 from ledger_bitcoin.exception.device_exception import DeviceException
 from ledger_bitcoin.psbt import PSBT
 from test_utils import bip0340
@@ -514,6 +514,36 @@ def test_sighash_single_anyone_output_changed(navigator: Navigator, firmware: Fi
 
     assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_0, pubkey0, partial_sig0.signature[:-1]) == 0
     assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_1, pubkey1, partial_sig1.signature[:-1])
+
+
+def test_sighash_anyonecanpay_negative_fee_shows_receive(navigator: Navigator, firmware: Firmware,
+                                                         client: RaggerClient, test_name: str):
+    # ANYONECANPAY leaves the input set open, so other parties may fund the rest of
+    # the transaction. Here we bump the change output above our own inputs: we end up
+    # net-receiving and inputs < outputs. The device must NOT reject this as a negative
+    # fee, and must show "You receive" with the fee marked unavailable.
+    toggle_nonstandard_sighash_setting(navigator, firmware)
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-all-anyone-can-pay-sign.psbt")
+    psbt.tx.vout[0].nValue = 9929389  # > inputs total (9919389)
+
+    result = client.sign_psbt(psbt, tr_wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              testname=test_name)
+    assert len(result) == 2
+
+
+def test_negative_fee_rejected_default_sighash(navigator: Navigator, firmware: Firmware,
+                                               client: RaggerClient, test_name: str):
+    # With the default sighash the whole transaction is committed, so inputs < outputs
+    # is a genuine (invalid) negative fee and must still be rejected.
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-all-sign.psbt")
+    psbt.tx.vout[0].nValue = 9929389  # > inputs total (9919389)
+
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.sign_psbt(psbt, tr_wallet, None, navigator,
+                         instructions=sign_psbt_instruction_approve(firmware),
+                         testname=test_name)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
 
 
 def test_sighash_unsupported(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
