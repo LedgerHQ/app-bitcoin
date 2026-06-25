@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 from ledger_bitcoin import WalletPolicy
-from ledger_bitcoin.exception.errors import NotSupportedError
+from ledger_bitcoin.exception.errors import NotSupportedError, IncorrectDataError
 from ledger_bitcoin.exception.device_exception import DeviceException
 from ledger_bitcoin.psbt import PSBT
 from test_utils import bip0340
@@ -124,7 +124,7 @@ def test_sighash_none_sign_psbt(navigator: Navigator, firmware: Firmware, client
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-sign.psbt")
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     # get the (tweaked) pubkey from the scriptPubKey
@@ -151,7 +151,7 @@ def test_sighash_none_input_modified(navigator: Navigator, firmware: Firmware, c
     psbt.tx.vin[0].nSequence = psbt.tx.vin[0].nSequence - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
     assert len(result) == 2
 
@@ -172,7 +172,7 @@ def test_sighash_none_output_modified(navigator: Navigator, firmware: Firmware, 
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
     assert len(result) == 2
 
@@ -192,7 +192,7 @@ def test_sighash_single_sign_psbt(navigator: Navigator, firmware: Firmware, clie
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-sign.psbt")
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -220,7 +220,7 @@ def test_sighash_single_input_modified(navigator: Navigator, firmware: Firmware,
     psbt.tx.vin[1].nSequence = psbt.tx.vin[1].nSequence - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     # get the (tweaked) pubkey from the scriptPubKey
@@ -243,7 +243,7 @@ def test_sighash_single_output_same_index_modified(navigator: Navigator, firmwar
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     # get the (tweaked) pubkey from the scriptPubKey
@@ -266,7 +266,7 @@ def test_sighash_single_output_different_index_modified(navigator: Navigator, fi
     psbt.tx.vout[1].nValue = psbt.tx.vout[1].nValue - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     # get the (tweaked) pubkey from the scriptPubKey
@@ -377,7 +377,7 @@ def test_sighash_none_anyone_sign(navigator: Navigator, firmware: Firmware, clie
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-anyone-can-pay-sign.psbt")
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -405,7 +405,7 @@ def test_sighash_none_anyone_input_changed(navigator: Navigator, firmware: Firmw
     psbt.tx.vin[0].nSequence = psbt.tx.vin[0].nSequence - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -428,7 +428,7 @@ def test_sighash_none_anyone_output_changed(navigator: Navigator, firmware: Firm
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -449,7 +449,7 @@ def test_sighash_single_anyone_sign(navigator: Navigator, firmware: Firmware, cl
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-anyone-can-pay-sign.psbt")
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -477,7 +477,7 @@ def test_sighash_single_anyone_input_changed(navigator: Navigator, firmware: Fir
     psbt.tx.vin[0].nSequence = psbt.tx.vin[0].nSequence - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -500,7 +500,7 @@ def test_sighash_single_anyone_output_changed(navigator: Navigator, firmware: Fi
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
 
     result = client.sign_psbt(psbt, tr_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -514,6 +514,38 @@ def test_sighash_single_anyone_output_changed(navigator: Navigator, firmware: Fi
 
     assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_0, pubkey0, partial_sig0.signature[:-1]) == 0
     assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_1, pubkey1, partial_sig1.signature[:-1])
+
+
+def test_sighash_anyonecanpay_negative_fee_shows_receive(navigator: Navigator, firmware: Firmware,
+                                                         client: RaggerClient, test_name: str):
+    # ANYONECANPAY leaves the input set open, so other parties may fund the rest of
+    # the transaction. Here we bump the change output above our own inputs: we end up
+    # net-receiving and inputs < outputs. The device must NOT reject this as a negative
+    # fee. The "You receive" + "Fees: Not available" review is checked by the golden
+    # snapshots (the per-page layout differs across devices, so we don't navigate by
+    # those texts here).
+    toggle_nonstandard_sighash_setting(navigator, firmware)
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-all-anyone-can-pay-sign.psbt")
+    psbt.tx.vout[0].nValue = 9929389  # > inputs total (9919389)
+
+    result = client.sign_psbt(psbt, tr_wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              testname=test_name)
+    assert len(result) == 2
+
+
+def test_negative_fee_rejected_default_sighash(navigator: Navigator, firmware: Firmware,
+                                               client: RaggerClient, test_name: str):
+    # With the default sighash the whole transaction is committed, so inputs < outputs
+    # is a genuine (invalid) negative fee and must still be rejected.
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-all-sign.psbt")
+    psbt.tx.vout[0].nValue = 9929389  # > inputs total (9919389)
+
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.sign_psbt(psbt, tr_wallet, None, navigator,
+                         instructions=sign_psbt_instruction_approve(firmware),
+                         testname=test_name)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
 
 
 def test_sighash_unsupported(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
@@ -589,7 +621,7 @@ def test_sighash_segwitv0_sighash2(navigator: Navigator, firmware: Firmware, cli
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
     psbt.inputs[0].sighash = 2
     result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
     assert result[0][1].signature == expected_sig
 
@@ -601,7 +633,7 @@ def test_sighash_segwitv0_sighash3(navigator: Navigator, firmware: Firmware, cli
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
     psbt.inputs[0].sighash = 3
     result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
     assert result[0][1].signature == expected_sig
 
@@ -625,7 +657,7 @@ def test_sighash_segwitv0_sighash82(navigator: Navigator, firmware: Firmware, cl
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
     psbt.inputs[0].sighash = 0x82
     result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
     assert result[0][1].signature == expected_sig
 
@@ -638,6 +670,6 @@ def test_sighash_segwitv0_sighash83(navigator: Navigator, firmware: Firmware, cl
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
     psbt.inputs[0].sighash = 0x83
     result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, amounts_unavailable=True),
                               testname=test_name)
     assert result[0][1].signature == expected_sig
