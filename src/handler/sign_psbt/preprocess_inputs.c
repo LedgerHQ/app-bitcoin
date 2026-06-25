@@ -242,6 +242,7 @@ bool __attribute__((noinline)) preprocess_inputs(
         }
 
         bitvector_set(internal_inputs, cur_input_index, 1);
+        st->internal_inputs_total_amount += input.prevout_amount;
 
         int segwit_version = get_policy_segwit_version(st->account.policy_map);
 
@@ -315,6 +316,14 @@ bool __attribute__((noinline)) preprocess_inputs(
             PRINTF("Unsupported sighash\n");
             SEND_SW(dc, SW_NOT_SUPPORTED);
             return false;
+        }
+
+        // track whether any signed input leaves the inputs or outputs open
+        if (!sighash_commits_all_inputs(input.sighash_type)) {
+            st->sighash_inputs_open = true;
+        }
+        if (!sighash_commits_all_outputs(input.sighash_type)) {
+            st->sighash_outputs_open = true;
         }
 
         if (((input.sighash_type & SIGHASH_SINGLE) == SIGHASH_SINGLE) &&

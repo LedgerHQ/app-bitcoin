@@ -155,8 +155,16 @@ typedef struct {
 
     uint64_t inputs_total_amount;
 
+    // Sum of the internal (signed) inputs only; used for total_spent.
+    uint64_t internal_inputs_total_amount;
+
     unsigned int n_external_inputs;
     unsigned int n_external_outputs;
+
+    // Aggregated over the signed inputs: set if any uses ANYONECANPAY (open inputs)
+    // resp. NONE/SINGLE (open outputs).
+    bool sighash_inputs_open;
+    bool sighash_outputs_open;
 
     // set to true if at least a PSBT_IN_MUSIG2_PUB_NONCE field is present in the PSBT
     bool has_musig2_pub_nonces;
