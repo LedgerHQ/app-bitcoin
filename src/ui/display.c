@@ -125,6 +125,8 @@ bool ui_display_register_wallet_policy(
     dispatcher_context_t *context,
     const policy_map_wallet_header_t *wallet_header,
     const char *descriptor_template,
+    const char (*cleartext_lines)[CT_MAX_LINES][CT_MAX_LINE_LEN + 1],
+    size_t n_cleartext_lines,
     const char (*keys_info)[MAX_N_KEYS_IN_WALLET_POLICY][MAX_POLICY_KEY_INFO_LEN + 1],
     const key_type_e (*keys_type)[MAX_N_KEYS_IN_WALLET_POLICY]) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
@@ -139,6 +141,15 @@ bool ui_display_register_wallet_policy(
     state->n_keys = wallet_header->n_keys;
     state->wallet_name = wallet_header->name;
     state->descriptor_template = descriptor_template;
+
+    LEDGER_ASSERT(n_cleartext_lines <= CT_MAX_LINES, "Too many cleartext lines");
+    if (cleartext_lines == NULL || n_cleartext_lines == 0) {
+        state->cleartext_lines = NULL;
+        state->n_cleartext_lines = 0;
+    } else {
+        state->cleartext_lines = *cleartext_lines;
+        state->n_cleartext_lines = n_cleartext_lines;
+    }
     for (size_t i = 0; i < wallet_header->n_keys; i++) {
         state->keys_info[i] = (*keys_info)[i];
 #ifdef SCREEN_SIZE_WALLET

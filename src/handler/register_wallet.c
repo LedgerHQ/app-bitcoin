@@ -41,9 +41,13 @@
 #include "policy.h"
 #include "sw.h"
 #include "wallet.h"
+#include "common/cleartext.h"
 
 static bool is_policy_acceptable(const policy_node_t *policy);
 static bool is_policy_name_acceptable(const char *name, size_t name_len);
+#ifdef HAVE_CLEARTEXT
+static bool is_plain_multisig(const policy_node_t *policy);
+#endif
 
 static const uint8_t BIP0341_NUMS_PUBKEY[] = {0x02, 0x50, 0x92, 0x9b, 0x74, 0xc1, 0xa0, 0x49, 0x54,
                                               0xb7, 0x8b, 0x4b, 0x60, 0x35, 0xe9, 0x7a, 0x5e, 0x07,
@@ -223,10 +227,47 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         return;
     }
 
+    // By default, show the raw descriptor template and no cleartext.
+    const char *descriptor_to_show = (char *) policy_map_descriptor;
+    const char (*cleartext_lines_ptr)[CT_MAX_LINES][CT_MAX_LINE_LEN + 1] = NULL;
+    size_t n_cleartext_lines = 0;
+
+#ifdef HAVE_CLEARTEXT
+    // Render the descriptor template into human-readable spending-path lines.
+    // The cleartext block is shown only if every part of the descriptor has a
+    // cleartext form and its confusion score is below the threshold; otherwise
+    // the UX falls back to the raw descriptor template alone.
+    char cleartext_lines[CT_MAX_LINES][CT_MAX_LINE_LEN + 1];
+    {
+        bool has_cleartext = false;
+        uint64_t confusion_score = 0;
+        int rc = cleartext_encode((const char *) policy_map_descriptor,
+                                  wallet_header.descriptor_template_len,
+                                  cleartext_lines,
+                                  &n_cleartext_lines,
+                                  &has_cleartext,
+                                  &confusion_score);
+        if (rc == 1 && has_cleartext && confusion_score <= CLEARTEXT_MAX_CONFUSION_SCORE) {
+            cleartext_lines_ptr = &cleartext_lines;
+
+            // For plain multisig policies the cleartext "Each of <keys> must
+            // sign" captures the spending policy with little risk of ambiguity,
+            // so we hide the raw descriptor template to simplify the UX.
+            if (is_plain_multisig(&policy_map.parsed)) {
+                descriptor_to_show = NULL;
+            }
+        } else {
+            n_cleartext_lines = 0;
+        }
+    }
+#endif
+
     // show wallet policy
     if (!ui_display_register_wallet_policy(dc,
                                            &wallet_header,
-                                           (char *) policy_map_descriptor,
+                                           descriptor_to_show,
+                                           cleartext_lines_ptr,
+                                           n_cleartext_lines,
                                            &keys_info,
                                            &keys_type)) {
         SEND_SW(dc, SW_DENY);
@@ -252,6 +293,19 @@ static bool is_policy_acceptable(const policy_node_t *policy) {
     return policy->type == TOKEN_PKH || policy->type == TOKEN_WPKH || policy->type == TOKEN_SH ||
            policy->type == TOKEN_WSH || policy->type == TOKEN_TR;
 }
+
+#ifdef HAVE_CLEARTEXT
+// True iff `policy` is a plain (non-taproot) multisig: multi()/sortedmulti(),
+// possibly wrapped in sh() and/or wsh(). For such policies the cleartext lines
+// fully capture the spending condition, so the raw descriptor template can be
+// hidden. (multi_a()/sortedmulti_a() are taproot leaves and are not matched.)
+static bool is_plain_multisig(const policy_node_t *policy) {
+    while (policy->type == TOKEN_SH || policy->type == TOKEN_WSH) {
+        policy = r_policy_node(&((const policy_node_with_script_t *) policy)->script);
+    }
+    return policy->type == TOKEN_MULTI || policy->type == TOKEN_SORTEDMULTI;
+}
+#endif
 
 static bool is_policy_name_acceptable(const char *name, size_t name_len) {
     // between 1 and MAX_WALLET_NAME_LENGTH characters
