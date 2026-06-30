@@ -3,7 +3,7 @@ import { createVarint } from './varint';
 
 /**
  * This implements "Merkelized Maps", documented at
- * https://github.com/LedgerHQ/app-bitcoin-new/blob/master/doc/merkle.md#merkleized-maps
+ * https://github.com/LedgerHQ/app-bitcoin/blob/master/doc/merkle.md#merkleized-maps
  *
  * A merkelized map consist of two merkle trees, one for the keys of
  * a map and one for the values of the same map, thus the two merkle

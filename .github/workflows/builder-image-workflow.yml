@@ -22,7 +22,7 @@ jobs:
       uses: docker/build-push-action@v1
       with:
         dockerfile: .github/workflows/Dockerfile
-        repository: ledgerhq/app-bitcoin-new/speculos-bitcoin
+        repository: ledgerhq/app-bitcoin/speculos-bitcoin
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

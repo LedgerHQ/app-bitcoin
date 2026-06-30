@@ -7,7 +7,7 @@
   "typings": "build/main/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/LedgerHQ/app-bitcoin-new.git"
+    "url": "git+https://github.com/LedgerHQ/app-bitcoin.git"
   },
   "license": "Apache-2.0",
   "keywords": [

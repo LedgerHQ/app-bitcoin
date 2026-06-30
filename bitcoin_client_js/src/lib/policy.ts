@@ -11,7 +11,7 @@ const WALLET_POLICY_V2 = 2;
  * of a "Descriptor Template" and a list of "keys". A key is basically
  * a serialized BIP32 extended public key with some added derivation path
  * information. This is documented at
- * https://github.com/LedgerHQ/app-bitcoin-new/blob/master/doc/wallet.md
+ * https://github.com/LedgerHQ/app-bitcoin/blob/master/doc/wallet.md
  */
 export class WalletPolicy {
   readonly name: string;
