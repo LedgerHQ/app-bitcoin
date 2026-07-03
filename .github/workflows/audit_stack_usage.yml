@@ -14,7 +14,7 @@ on:
 
 jobs:
   audit:
-    name: "Stack audit – ${{ matrix.target }}"
+    name: "Stack audit - ${{ matrix.target }}"
 
     strategy:
       fail-fast: false
@@ -28,7 +28,7 @@ jobs:
 
     env:
       # Hard-coded SDK branch for test purposes
-      SDK_REF: stack_analysis_API_LEVEL_25
+      SDK_REF: stack_analysis_API_LEVEL_26
       SDK_DIR: ledger-secure-sdk
 
     steps:
