@@ -85,6 +85,12 @@ path = "m/45'/1'/0'/1"
 standard = true
 expected_pubkey = "tpubDFGDxRGdGFKekUtPuta4p9Kw2a2PSeyyhSTa7KNENJfBuJ78EEsL1LxwAA8ddSxZFWBT9gYRuLDoa2rwdix56WRsq77vAJ2iqeyPw6UBeyt"
 
+[[case]]
+name = "std_bip87"
+path = "m/87'/1'/0'"
+standard = true
+expected_pubkey = "tpubDCfRoKFmEJ2uJdvBmrUngREKnaab4P6vC5NbMaeLhjdr3b5zEoruPKByWBJJag5qTdc5FptiSRpuY7AReZPcQAQqCVCUDj3R6DJuyzjMAmh"
+
 # Electrum historically used "m/4541509h/1112098098h" to derive encryption
 # keys, so the app whitelists it: non-standard in the BIP sense, but exported
 # without confirmation.
@@ -105,7 +111,6 @@ standard = true
 name = "std_bip48_script_type_2"
 path = "m/48'/1'/0'/2'"
 standard = true
-
 
 # ---- Non-standard paths (exported only with display = true) ----
 
