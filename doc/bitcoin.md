@@ -102,7 +102,7 @@ Returns an extended public key at the given derivation path, serialized as per B
 
 This command returns the extended public key for the given BIP 32 path.
 
-The paths defined in [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki), [BIP-48](https://github.com/bitcoin/bips/blob/master/bip-0048.mediawiki), [BIP-49](https://github.com/bitcoin/bips/blob/master/bip-0049.mediawiki), [BIP-84](https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki) and [BIP-86](https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki), either in full or are at the deepest hardened level (excluding `change` and `address_index`), are considered standard.
+The paths defined in [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki), [BIP-48](https://github.com/bitcoin/bips/blob/master/bip-0048.mediawiki), [BIP-49](https://github.com/bitcoin/bips/blob/master/bip-0049.mediawiki), [BIP-84](https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki), [BIP-86](https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki) and [BIP-87](https://github.com/bitcoin/bips/blob/master/bip-0087.mediawiki), either in full or are at the deepest hardened level (excluding `change` and `address_index`), are considered standard.
 
 If the `display` parameter is `0` and the path is not standard, an error is returned.
 
