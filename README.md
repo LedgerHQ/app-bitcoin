@@ -2,6 +2,13 @@
 
 This is the Bitcoin application for Ledger devices.
 
+> [!NOTE]
+> **This repository was renamed.** It was previously `LedgerHQ/app-bitcoin-new` and is
+> the current, actively developed Ledger Bitcoin application.
+>
+> The older Bitcoin app that used to live at `LedgerHQ/app-bitcoin` has been renamed to
+> [`LedgerHQ/app-bitcoin-legacy`](https://github.com/LedgerHQ/app-bitcoin-legacy).
+
 ## Quick start guide
 
 ### With VSCode
@@ -16,8 +23,8 @@ It will allow you, whether you are developing on macOS, Windows or Linux to quic
     * On macOS, install and launch [XQuartz](https://www.xquartz.org/) (make sure to go to XQuartz > Preferences > Security and check "Allow client connections").
     * On Windows, install and launch [VcXsrv](https://sourceforge.net/projects/vcxsrv/) (make sure to configure it to disable access control).
 * Install [VScode](https://code.visualstudio.com/download) and add [Ledger's extension](https://marketplace.visualstudio.com/items?itemName=LedgerHQ.ledger-dev-tools).
-* Open a terminal and clone `app-bitcoin-new` with `git clone git@github.com:LedgerHQ/app-bitcoin-new.git`.
-* Open the `app-bitcoin-new` folder with VSCode.
+* Open a terminal and clone `app-bitcoin` with `git clone git@github.com:LedgerHQ/app-bitcoin.git`.
+* Open the `app-bitcoin` folder with VSCode.
 * Use Ledger extension's sidebar menu or open the tasks menu with `ctrl + shift + b` (`command + shift + b` on a Mac) to conveniently execute actions :
     * Build the app for the device model of your choice with `Build`.
     * Test your binary on [Speculos](https://github.com/LedgerHQ/speculos) with `Run with Speculos`.

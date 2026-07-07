@@ -16,7 +16,7 @@ Two front-ends:
 
 ## Setup
 
-All commands assume you're at the repo root (`app-bitcoin-new/`).
+All commands assume you're at the repo root (`app-bitcoin/`).
 
 ```bash
 # 1. Create and activate a Python virtualenv (Python >= 3.8).
