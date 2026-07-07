@@ -2,6 +2,13 @@
 
 This is the Bitcoin application for Ledger devices.
 
+> [!NOTE]
+> **This repository was renamed.** It was previously `LedgerHQ/app-bitcoin-new` and is
+> the current, actively developed Ledger Bitcoin application.
+>
+> The older Bitcoin app that used to live at `LedgerHQ/app-bitcoin` has been renamed to
+> [`LedgerHQ/app-bitcoin-legacy`](https://github.com/LedgerHQ/app-bitcoin-legacy).
+
 ## Quick start guide
 
 ### With VSCode
