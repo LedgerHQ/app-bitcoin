@@ -13,6 +13,10 @@ Dates are in `dd-mm-yyyy` format.
 
 - Enable stack protector
 
+### Changed
+
+- Standard BIP-87 xpubs can now be exported without explicit user confirmation.
+
 ## [2.4.6] - 30-03-2026
 
 ### Changed
