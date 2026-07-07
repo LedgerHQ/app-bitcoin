@@ -53,6 +53,7 @@ static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[], size_t b
         case 49:
         case 84:
         case 86:
+        case 87:
             hardened_der_len = 3;
             break;
         case 45:
