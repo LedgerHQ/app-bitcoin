@@ -189,8 +189,9 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
     return io_ui_process(context);
 }
 
-void ui_prepare_authorize_wallet_spend(const char *wallet_name) {
+void ui_prepare_authorize_wallet_spend(const char *wallet_name, account_role_t account_role) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
+    state->account_role = account_role;
     if (wallet_name == NULL) {
         state->has_wallet_policy = false;
     } else {
@@ -274,6 +275,8 @@ static void prepare_tx_summary(ui_validate_transaction_state_t *state,
                                const tx_summary_t *summary) {
     state->display_mode = summary->mode;
     state->spent_is_receive = false;
+    state->signed_sighash = summary->signed_sighash;
+    state->sighash_mixed = summary->sighash_mixed;
     if (summary->mode == TX_DISPLAY_FULL) {
         format_sats_amount(COIN_COINID_SHORT, summary->fee, state->fee);
     } else if (summary->mode == TX_DISPLAY_SPENT_ONLY) {
@@ -305,7 +308,8 @@ bool ui_transaction_streaming_validate(dispatcher_context_t *context,
 
 void ui_transaction_simplified_init(const char *wallet_policy_name,
                                     unsigned int outputs_num,
-                                    tx_ux_warning_t warnings) {
+                                    tx_ux_warning_t warnings,
+                                    account_role_t account_role) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     memset(state, 0, sizeof(ui_validate_transaction_state_t));
@@ -318,6 +322,7 @@ void ui_transaction_simplified_init(const char *wallet_policy_name,
     }
     state->n_outputs = outputs_num;
     state->warnings = warnings;
+    state->account_role = account_role;
 
     ui_display_transaction_simplified_flow_init();
 }

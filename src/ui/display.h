@@ -104,11 +104,20 @@ typedef struct {
     char signer_index[sizeof("Key @999 <theirs>")];
 } ui_cosigner_pubkey_and_index_state_t;
 
+// Which side of the transaction the wallet account is on, for the account review row.
+typedef enum {
+    ACCOUNT_ROLE_FROM,     // net spend (and the default/FULL case)
+    ACCOUNT_ROLE_TO,       // net receive
+    ACCOUNT_ROLE_NEUTRAL,  // direction not knowable (UNAVAILABLE)
+} account_role_t;
+
 // Amount summary for the transaction review (mode from decide_tx_display_mode).
 typedef struct {
     tx_display_mode_t mode;
-    uint64_t fee;         // for TX_DISPLAY_FULL
-    int64_t total_spent;  // for TX_DISPLAY_SPENT_ONLY (negative = net receive)
+    uint64_t fee;             // for TX_DISPLAY_FULL
+    int64_t total_spent;      // for TX_DISPLAY_SPENT_ONLY (negative = net receive)
+    uint32_t signed_sighash;  // effective sighash, for the "Signing rule" row
+    bool sighash_mixed;       // signed inputs disagree -> shown as "Mixed"
 } tx_summary_t;
 
 typedef struct {
@@ -125,7 +134,10 @@ typedef struct {
     char fee[MAX_AMOUNT_LENGTH + 1];  // formatted: network fee, or |total_spent| for SPENT_ONLY
 
     tx_display_mode_t display_mode;
-    bool spent_is_receive;  // for TX_DISPLAY_SPENT_ONLY: total_spent < 0
+    bool spent_is_receive;        // for TX_DISPLAY_SPENT_ONLY: total_spent < 0
+    account_role_t account_role;  // From / To / neutral for the account row
+    uint32_t signed_sighash;      // for the "Signing rule" row
+    bool sighash_mixed;
 } ui_validate_transaction_state_t;
 
 /**
@@ -174,7 +186,7 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
 
 bool ui_display_unusual_path(dispatcher_context_t *context, const char *bip32_path_str);
 
-void ui_prepare_authorize_wallet_spend(const char *wallet_name);
+void ui_prepare_authorize_wallet_spend(const char *wallet_name, account_role_t account_role);
 
 bool ui_warn_external_inputs(dispatcher_context_t *context);
 
@@ -195,7 +207,8 @@ bool ui_warn_high_fee(dispatcher_context_t *context);
  */
 void ui_transaction_simplified_init(const char *wallet_policy_name,
                                     unsigned int outputs_num,
-                                    tx_ux_warning_t warnings);
+                                    tx_ux_warning_t warnings,
+                                    account_role_t account_role);
 void ui_transaction_simplified_add(uint64_t amount, const char *address_or_description);
 bool ui_transaction_simplified_show(dispatcher_context_t *context, const tx_summary_t *summary);
 
