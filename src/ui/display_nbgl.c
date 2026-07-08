@@ -59,13 +59,56 @@ const char GA_FEE_NOT_AVAILABLE[] = "Not available";
 const char GA_YOU_SPEND[] = "You spend";
 const char GA_YOU_RECEIVE[] = "You receive";
 const char GA_AMOUNTS_UNAVAILABLE_TITLE[] = "Amounts & fees";
-const char GA_AMOUNTS_UNAVAILABLE[] = "Cannot be verified for these signing rules";
+const char GA_AMOUNTS_UNAVAILABLE[] =
+    "Cannot be verified for these signing rules. Only sign if you trust the source.";
+const char GA_SIGNING_RULE_TITLE[] = "Signing rule";
+const char GA_SIGHASH_NONE[] = "NONE";
+const char GA_SIGHASH_SINGLE[] = "SINGLE";
+const char GA_SIGHASH_ACP_ALL[] = "ANYONECANPAY | ALL";
+const char GA_SIGHASH_ACP_NONE[] = "ANYONECANPAY | NONE";
+const char GA_SIGHASH_ACP_SINGLE[] = "ANYONECANPAY | SINGLE";
+const char GA_SIGHASH_MIXED[] = "Mixed";
 
-#define N_UX_PAIRS 51
+// +1 slot for the "Signing rule" row shown in the non-default-sighash flows
+#define N_UX_PAIRS 52
 
 static nbgl_layoutTagValue_t pairs[N_UX_PAIRS];
 static unsigned int n_pairs;
 static nbgl_layoutTagValueList_t pairList;
+
+// Label for the account review row, per the net direction of the transaction.
+static const char *account_role_label(account_role_t role) {
+    switch (role) {
+        case ACCOUNT_ROLE_TO:
+            return "To";
+        case ACCOUNT_ROLE_NEUTRAL:
+            return "Account";
+        default:
+            return "From";
+    }
+}
+
+// Human-readable name of the (uniform) sighash flag, or NULL when there is nothing to show
+// (default sighash). "Mixed" when the signed inputs disagree.
+static const char *signing_rule_str(uint32_t sighash, bool mixed) {
+    if (mixed) {
+        return GA_SIGHASH_MIXED;
+    }
+    switch (sighash) {
+        case SIGHASH_NONE:
+            return GA_SIGHASH_NONE;
+        case SIGHASH_SINGLE:
+            return GA_SIGHASH_SINGLE;
+        case SIGHASH_ANYONECANPAY | SIGHASH_ALL:
+            return GA_SIGHASH_ACP_ALL;
+        case SIGHASH_ANYONECANPAY | SIGHASH_NONE:
+            return GA_SIGHASH_ACP_NONE;
+        case SIGHASH_ANYONECANPAY | SIGHASH_SINGLE:
+            return GA_SIGHASH_ACP_SINGLE;
+        default:
+            return NULL;
+    }
+}
 
 extern bool G_was_processing_screen_shown;
 
@@ -153,8 +196,8 @@ static void start_transaction_callback(bool confirm) {
 #define SELF_TRANSFER_DESCRIPTION COMBINE("0 ", COMBINE(COIN_COINID_SHORT, " (self-transfer)"))
 
 void ui_display_transaction_simplified_flow_init(void) {
-    /* 1 From + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER*3 + 1 Fees + 1 High fees */
-    _Static_assert(N_UX_PAIRS >= (1 + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER * 3 + 1 + 1),
+    /* 1 From/To + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER*3 + 1 Fees + 1 High fees + 1 Signing rule */
+    _Static_assert(N_UX_PAIRS >= (1 + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER * 3 + 1 + 1 + 1),
                    "Insufficient pairs for this flow");
     // Setup list
     pairList.nbMaxLinesForValue = 0;
@@ -165,7 +208,7 @@ void ui_display_transaction_simplified_flow_init(void) {
 
     if (state->has_wallet_policy) {
         pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
-            .item = "From",
+            .item = account_role_label(state->account_role),
             .value = state->wallet_policy_name,
         };
     }
@@ -199,12 +242,18 @@ void ui_display_transaction_simplified_flow_add(void) {
 void ui_display_transaction_simplified_flow_show(void) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
+    const char *signing_rule = signing_rule_str(state->signed_sighash, state->sighash_mixed);
+
     if (state->display_mode == TX_DISPLAY_UNAVAILABLE) {
-        // No amount is reliable: just show a notice.
+        // No amount is reliable: just show a notice, plus the signing rule in effect.
         pairs[n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_AMOUNTS_UNAVAILABLE_TITLE,
                                                      .value = GA_AMOUNTS_UNAVAILABLE,
                                                      .centeredInfo = true,
                                                      .valueIcon = &ICON_APP_WARNING};
+        if (signing_rule != NULL) {
+            pairs[n_pairs++] =
+                (nbgl_layoutTagValue_t) {.item = GA_SIGNING_RULE_TITLE, .value = signing_rule};
+        }
     } else if (state->display_mode == TX_DISPLAY_SPENT_ONLY) {
         // total_spent is reliable, fee is not.
         pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
@@ -212,6 +261,10 @@ void ui_display_transaction_simplified_flow_show(void) {
             .value = state->fee,
             .forcePageStart = state->n_outputs > 1 ? 1 : 0};
         pairs[n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Fees", .value = GA_FEE_NOT_AVAILABLE};
+        if (signing_rule != NULL) {
+            pairs[n_pairs++] =
+                (nbgl_layoutTagValue_t) {.item = GA_SIGNING_RULE_TITLE, .value = signing_rule};
+        }
     } else {  // TX_DISPLAY_FULL
         if (state->warnings.high_fee) {
             pairs[n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_WARN_HIGH_FEES_TITLE,
@@ -245,7 +298,7 @@ void ui_display_transaction_streaming_prompt(void) {
 
     if (state->has_wallet_policy) {
         pairs[0] = (nbgl_layoutTagValue_t) {
-            .item = "From",
+            .item = account_role_label(state->account_role),
             .value = state->wallet_policy_name,
         };
         // Setup list
@@ -304,6 +357,11 @@ void ui_display_transaction_streaming_flow(bool is_self_transfer) {
         pairs[l_n_pairs++].value = state->fee;
         pairs[l_n_pairs].item = "Fees";
         pairs[l_n_pairs++].value = GA_FEE_NOT_AVAILABLE;
+        const char *signing_rule = signing_rule_str(state->signed_sighash, state->sighash_mixed);
+        if (signing_rule != NULL) {
+            pairs[l_n_pairs].item = GA_SIGNING_RULE_TITLE;
+            pairs[l_n_pairs++].value = signing_rule;
+        }
     } else {  // TX_DISPLAY_FULL
         pairs[l_n_pairs].item = "Fees";
         pairs[l_n_pairs++].value = state->fee;

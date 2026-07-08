@@ -231,7 +231,20 @@ bool __attribute__((noinline)) display_transaction(
         }
     }
 
-    tx_summary_t summary = {.mode = mode, .fee = fee, .total_spent = total_spent};
+    tx_summary_t summary = {.mode = mode,
+                            .fee = fee,
+                            .total_spent = total_spent,
+                            .signed_sighash = st->signed_sighash,
+                            .sighash_mixed = st->sighash_mixed};
+
+    // The account is the source (From) when net-spending, the destination (To) when
+    // net-receiving, and neutral when the direction can't be trusted (UNAVAILABLE).
+    account_role_t account_role = ACCOUNT_ROLE_FROM;
+    if (mode == TX_DISPLAY_UNAVAILABLE) {
+        account_role = ACCOUNT_ROLE_NEUTRAL;
+    } else if (mode == TX_DISPLAY_SPENT_ONLY && total_spent < 0) {
+        account_role = ACCOUNT_ROLE_TO;
+    }
 
     /** INPUT VERIFICATION ALERTS
      *
@@ -256,7 +269,8 @@ bool __attribute__((noinline)) display_transaction(
         ui_transaction_simplified_init(
             st->account.is_default ? NULL : st->account.wallet_header.name,
             0,
-            st->warnings);
+            st->warnings,
+            account_role);
         ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
         if (!ui_transaction_simplified_show(dc, &summary)) {
             SEND_SW(dc, SW_DENY);
@@ -272,12 +286,17 @@ bool __attribute__((noinline)) display_transaction(
 
         bool is_self_transfer = st->n_external_outputs == 0;
 
+        // In SPENT_ONLY the account-level "You spend/receive" line already states the
+        // amount; a "0 (self-transfer)" row would contradict a net-receive, so omit it.
+        bool show_self_transfer_row = is_self_transfer && mode != TX_DISPLAY_SPENT_ONLY;
+
         /** TRANSACTION CONFIRMATION */
         /* Init*/
         ui_transaction_simplified_init(
             st->account.is_default ? NULL : st->account.wallet_header.name,
-            is_self_transfer ? 1 : st->n_external_outputs,
-            st->warnings);
+            is_self_transfer ? (show_self_transfer_row ? 1 : 0) : st->n_external_outputs,
+            st->warnings,
+            account_role);
 
         /* Adding outputs */
         if (!is_self_transfer) {
@@ -294,10 +313,9 @@ bool __attribute__((noinline)) display_transaction(
                     return false;
                 }
 
-                ui_transaction_simplified_add(is_self_transfer ? 0 : st->outputs.output_amounts[i],
-                                              is_self_transfer ? NULL : output_description);
+                ui_transaction_simplified_add(st->outputs.output_amounts[i], output_description);
             }
-        } else {
+        } else if (show_self_transfer_row) {
             ui_transaction_simplified_add(0, NULL);
         }
 
@@ -313,8 +331,9 @@ bool __attribute__((noinline)) display_transaction(
 
         // If it's not a default wallet policy, let's save this info to ask the user for
         // confirmation
-        ui_prepare_authorize_wallet_spend(!st->account.is_default ? st->account.wallet_header.name
-                                                                  : NULL);
+        ui_prepare_authorize_wallet_spend(
+            !st->account.is_default ? st->account.wallet_header.name : NULL,
+            account_role);
 
         // "Review transaction to send Bitcoin"
         if (!ui_transaction_streaming_prompt(dc)) {
