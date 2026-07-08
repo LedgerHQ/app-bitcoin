@@ -119,8 +119,8 @@ static void test_sighash_commit_predicates(void **state) {
     (void) state;
     for (size_t i = 0; i < sizeof(commit_cases) / sizeof(commit_cases[0]); i++) {
         const commit_case_t *c = &commit_cases[i];
-        bool gi = sighash_commits_all_inputs(c->sighash_type);
-        bool go = sighash_commits_all_outputs(c->sighash_type);
+        bool gi = sighash_input_set_closed(c->sighash_type);
+        bool go = sighash_output_set_closed(c->sighash_type);
         if (gi != c->commits_inputs || go != c->commits_outputs) {
             fail_msg("case[%zu]: sighash 0x%02x -> inputs=%d outputs=%d, expected inputs=%d outputs=%d",
                      i, c->sighash_type, gi, go, c->commits_inputs, c->commits_outputs);

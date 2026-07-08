@@ -105,6 +105,18 @@ void input_keys_callback(dispatcher_context_t *dc,
     }
 }
 
+// Track the sighash across signed inputs; canonicalize ALL/DEFAULT together so a
+// segwitv0+taproot default mix isn't flagged as mixed. Disagreement -> sighash_mixed.
+static void record_signed_sighash(sign_psbt_state_t *st, uint32_t sighash_type) {
+    uint32_t canon = (sighash_type == SIGHASH_DEFAULT) ? SIGHASH_ALL : sighash_type;
+    if (!st->signed_sighash_set) {
+        st->signed_sighash = canon;
+        st->signed_sighash_set = true;
+    } else if (st->signed_sighash != canon) {
+        st->sighash_mixed = true;
+    }
+}
+
 bool __attribute__((noinline)) preprocess_inputs(
     dispatcher_context_t *dc,
     sign_psbt_state_t *st,
@@ -278,6 +290,7 @@ bool __attribute__((noinline)) preprocess_inputs(
         // SIGHASH_ALL, we show a warning
 
         if (!input.has_sighash_type) {
+            record_signed_sighash(st, SIGHASH_ALL);  // no explicit sighash => commits all
             continue;
         }
 
@@ -319,12 +332,14 @@ bool __attribute__((noinline)) preprocess_inputs(
         }
 
         // track whether any signed input leaves the inputs or outputs open
-        if (!sighash_commits_all_inputs(input.sighash_type)) {
+        if (!sighash_input_set_closed(input.sighash_type)) {
             st->sighash_inputs_open = true;
         }
-        if (!sighash_commits_all_outputs(input.sighash_type)) {
+        if (!sighash_output_set_closed(input.sighash_type)) {
             st->sighash_outputs_open = true;
         }
+
+        record_signed_sighash(st, input.sighash_type);
 
         if (((input.sighash_type & SIGHASH_SINGLE) == SIGHASH_SINGLE) &&
             (cur_input_index >= st->n_outputs)) {
