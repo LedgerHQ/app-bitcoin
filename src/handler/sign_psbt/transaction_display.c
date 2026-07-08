@@ -215,15 +215,20 @@ bool __attribute__((noinline)) display_transaction(
     int64_t total_spent =
         (int64_t) st->internal_inputs_total_amount - (int64_t) st->outputs.change_total_amount;
 
-    // Default sighash => always FULL, same as before. With non-default sighash the
-    // fee and/or total_spent may not be trustworthy. Internal inputs are guaranteed
-    // present (see preprocess_inputs), so the only trust condition left is that their
-    // amounts are verified.
+    // Default sighash => FULL. Non-default => show only what the signed inputs commit to.
     tx_display_mode_t mode = TX_DISPLAY_FULL;
     if (st->warnings.non_default_sighash) {
-        mode = decide_tx_display_mode(!st->sighash_inputs_open,
-                                      !st->sighash_outputs_open,
-                                      !st->warnings.missing_nonwitnessutxo);
+        if (st->sighash_mixed) {
+            mode = TX_DISPLAY_UNAVAILABLE;  // signed inputs disagree: nothing coherent
+        } else {
+            // uniform non-default sighash never fixes the whole set => fee never trustworthy
+            bool fee_trustworthy = false;
+            bool outputs_committed =
+                sighash_commits_provided_outputs(st->signed_sighash, st->n_outputs);
+            bool amounts_trustworthy = !st->warnings.missing_nonwitnessutxo;
+            mode =
+                decide_tx_display_mode(fee_trustworthy, outputs_committed, amounts_trustworthy);
+        }
     }
 
     tx_summary_t summary = {.mode = mode, .fee = fee, .total_spent = total_spent};

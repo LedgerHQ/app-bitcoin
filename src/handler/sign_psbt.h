@@ -166,6 +166,12 @@ typedef struct {
     bool sighash_inputs_open;
     bool sighash_outputs_open;
 
+    // Effective sighash common to all signed inputs (ALL/DEFAULT canonicalized to ALL);
+    // valid only when !sighash_mixed.
+    uint32_t signed_sighash;
+    bool signed_sighash_set;
+    bool sighash_mixed;  // signed inputs disagree on sighash -> can't display coherently
+
     // set to true if at least a PSBT_IN_MUSIG2_PUB_NONCE field is present in the PSBT
     bool has_musig2_pub_nonces;
 
