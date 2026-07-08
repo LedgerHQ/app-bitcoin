@@ -225,8 +225,13 @@ static bool __attribute__((noinline)) load_wallet_account(dispatcher_context_t *
     st->account.policy_map = (policy_node_t *) st->account.policy_map_bytes;
 
     if (st->account.is_default) {
-        // No hmac, verify that the policy is indeed a default one
-        if (!is_wallet_policy_standard(dc, &st->account.wallet_header, st->account.policy_map)) {
+        // No hmac, verify that the policy is indeed a default one; also capture its
+        // purpose/account so the review can label the account without registration.
+        if (!is_wallet_policy_standard(dc,
+                                       &st->account.wallet_header,
+                                       st->account.policy_map,
+                                       &st->account.bip44_purpose,
+                                       &st->account.bip44_account)) {
             PRINTF("Non-standard policy, and no hmac provided\n");
             SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_MISSING_HMAC_FOR_NONDEFAULT_POLICY);
             return false;

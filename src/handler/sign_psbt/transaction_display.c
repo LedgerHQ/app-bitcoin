@@ -205,11 +205,60 @@ static bool __attribute__((noinline)) display_warnings(dispatcher_context_t *dc,
     return true;
 }
 
+// Human-readable label for a default (unregistered) account, e.g. "Native SegWit account
+// #2". Returns false for an unknown purpose (no label shown).
+static bool format_default_account_label(int bip44_purpose,
+                                         uint32_t account,
+                                         char *out,
+                                         size_t out_len) {
+    const char *type;
+    switch (bip44_purpose) {
+        case 44:
+            type = "Legacy";
+            break;
+        case 49:
+            type = "Nested SegWit";
+            break;
+        case 84:
+            type = "Native SegWit";
+            break;
+        case 86:
+            type = "Taproot";
+            break;
+        default:
+            return false;
+    }
+    return snprintf(out, out_len, "%s account #%u", type, (unsigned int) account) > 0;
+}
+
+// The account label to show on the review, or NULL for no account row. Registered policies
+// always show their name; a default account is labelled (from its derivation) only in the
+// trust-reduced modes, where "which account is at risk" matters — the default FULL flow
+// stays lean.
+static const char *account_review_label(const sign_psbt_state_t *st,
+                                        tx_display_mode_t mode,
+                                        char *buf,
+                                        size_t buf_len) {
+    if (!st->account.is_default) {
+        return st->account.wallet_header.name;
+    }
+    if (mode != TX_DISPLAY_FULL &&
+        format_default_account_label(st->account.bip44_purpose,
+                                     st->account.bip44_account,
+                                     buf,
+                                     buf_len)) {
+        return buf;
+    }
+    return NULL;
+}
+
 bool __attribute__((noinline)) display_transaction(
     dispatcher_context_t *dc,
     sign_psbt_state_t *st,
     const uint8_t internal_outputs[static BITVECTOR_REAL_SIZE(MAX_N_OUTPUTS_CAN_SIGN)]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
+
+    char account_label_buf[MAX_WALLET_NAME_LENGTH + 1];
 
     uint64_t fee = st->inputs_total_amount - st->outputs.total_amount;
     int64_t total_spent =
@@ -267,7 +316,7 @@ bool __attribute__((noinline)) display_transaction(
     if (mode == TX_DISPLAY_UNAVAILABLE) {
         // Nothing reliable to show: no outputs/amounts, only a notice to confirm.
         ui_transaction_simplified_init(
-            st->account.is_default ? NULL : st->account.wallet_header.name,
+            account_review_label(st, mode, account_label_buf, sizeof(account_label_buf)),
             0,
             st->warnings,
             account_role);
@@ -293,7 +342,7 @@ bool __attribute__((noinline)) display_transaction(
         /** TRANSACTION CONFIRMATION */
         /* Init*/
         ui_transaction_simplified_init(
-            st->account.is_default ? NULL : st->account.wallet_header.name,
+            account_review_label(st, mode, account_label_buf, sizeof(account_label_buf)),
             is_self_transfer ? (show_self_transfer_row ? 1 : 0) : st->n_external_outputs,
             st->warnings,
             account_role);
@@ -332,7 +381,7 @@ bool __attribute__((noinline)) display_transaction(
         // If it's not a default wallet policy, let's save this info to ask the user for
         // confirmation
         ui_prepare_authorize_wallet_spend(
-            !st->account.is_default ? st->account.wallet_header.name : NULL,
+            account_review_label(st, mode, account_label_buf, sizeof(account_label_buf)),
             account_role);
 
         // "Review transaction to send Bitcoin"

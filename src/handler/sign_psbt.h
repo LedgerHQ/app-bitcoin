@@ -134,6 +134,11 @@ typedef struct {
     // true iff the wallet policy is a default (BIP-44/49/84/86) policy used without HMAC.
     bool is_default;
 
+    // For a default policy: the BIP-44 purpose (44/49/84/86) and (unhardened) account
+    // index from the validated m/purpose'/coin'/account'. Only meaningful when is_default.
+    int bip44_purpose;
+    uint32_t bip44_account;
+
     __attribute__((aligned(4))) uint8_t policy_map_bytes[MAX_WALLET_POLICY_BYTES];
     policy_node_t *policy_map;
 
