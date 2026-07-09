@@ -250,7 +250,7 @@ def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True,
             funcdict[which_func](review_anchor, NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
                                       save_screenshot=save_screenshot)
             if to_on_next_page:
-                funcdict[which_func]("To", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+                funcdict[which_func]("Address", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
                                           save_screenshot=save_screenshot)
             if fees_on_next_page:
                 funcdict[which_func]("Fees", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,

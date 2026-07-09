@@ -83,15 +83,18 @@ static nbgl_layoutTagValue_t pairs[N_UX_PAIRS];
 static unsigned int n_pairs;
 static nbgl_layoutTagValueList_t pairList;
 
-// Label for the account review row, per the net direction of the transaction.
-static const char *account_role_label(account_role_t role) {
+// Account row label: direction (From/To, or none when the direction can't be trusted)
+// plus the account type. "default" = a standard BIP-44/49/84/86 derivation the device
+// recognises; "registered" = a user-registered wallet policy. Naming the type also keeps
+// this row's "To" distinct from an output's "To" (the destination address).
+static const char *account_role_label(account_role_t role, bool is_default) {
     switch (role) {
         case ACCOUNT_ROLE_TO:
-            return "To";
+            return is_default ? "To default" : "To registered";
         case ACCOUNT_ROLE_NEUTRAL:
-            return "Account";
+            return is_default ? "Default" : "Registered";
         default:
-            return "From";
+            return is_default ? "From default" : "From registered";
     }
 }
 
@@ -213,11 +216,18 @@ void ui_display_transaction_simplified_flow_init(void) {
 
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
+    // Context page: the account row and (for a non-default sighash) the "Signing rule",
+    // so the customer sees the caveat before any amount.
     if (state->has_wallet_policy) {
         pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
-            .item = account_role_label(state->account_role),
+            .item = account_role_label(state->account_role, state->account_is_default),
             .value = state->wallet_policy_name,
         };
+    }
+    const char *signing_rule = signing_rule_str(state->signed_sighash, state->sighash_mixed);
+    if (signing_rule != NULL) {
+        pairs[n_pairs++] =
+            (nbgl_layoutTagValue_t) {.item = GA_SIGNING_RULE_TITLE, .value = signing_rule};
     }
 }
 
@@ -232,12 +242,16 @@ void ui_display_transaction_simplified_flow_add(void) {
                                          .value = state->output_index_str[output_index],
                                          .forcePageStart = true};
         }
+        // In the trust-reduced modes the account/"Signing rule" context sits on its own
+        // page; keep the (single) output off it. Multi-output already breaks above.
+        bool force_output_page =
+            state->display_mode != TX_DISPLAY_FULL && state->n_outputs == 1 && output_index == 0;
         pairs[n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Amount",
                                                     .value = state->amount[output_index],
-                                                    .forcePageStart = false};
+                                                    .forcePageStart = force_output_page};
 
         pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
-            .item = "To",
+            .item = "Address",
             .value = state->address_or_description[output_index],
         };
     } else {
@@ -249,30 +263,21 @@ void ui_display_transaction_simplified_flow_add(void) {
 void ui_display_transaction_simplified_flow_show(void) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    const char *signing_rule = signing_rule_str(state->signed_sighash, state->sighash_mixed);
-
     if (state->display_mode == TX_DISPLAY_UNAVAILABLE) {
-        // Show the signing rule first, then the notice. The centeredInfo notice must remain
-        // the last pair: a normal row after it breaks tap-to-advance in the review.
-        if (signing_rule != NULL) {
-            pairs[n_pairs++] =
-                (nbgl_layoutTagValue_t) {.item = GA_SIGNING_RULE_TITLE, .value = signing_rule};
-        }
+        // Nothing reliable to show: only the notice (the "Signing rule" was on the context
+        // page). The centeredInfo notice must be the last pair, else tap-to-advance breaks.
         pairs[n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_AMOUNTS_UNAVAILABLE_TITLE,
                                                      .value = GA_AMOUNTS_UNAVAILABLE,
                                                      .centeredInfo = true,
                                                      .valueIcon = &ICON_APP_WARNING};
-    } else if (state->display_mode == TX_DISPLAY_SPENT_ONLY) {
-        // total_spent is reliable, fee is not.
+    } else if (state->display_mode == TX_DISPLAY_NET_ONLY) {
+        // Money-summary page: the reliable net "You spend/receive" and the untrusted fee,
+        // kept together on their own page.
         pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
             .item = state->spent_is_receive ? GA_YOU_RECEIVE : GA_YOU_SPEND,
             .value = state->fee,
-            .forcePageStart = state->n_outputs > 1 ? 1 : 0};
+            .forcePageStart = true};
         pairs[n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Fees", .value = GA_FEE_NOT_AVAILABLE};
-        if (signing_rule != NULL) {
-            pairs[n_pairs++] =
-                (nbgl_layoutTagValue_t) {.item = GA_SIGNING_RULE_TITLE, .value = signing_rule};
-        }
     } else {  // TX_DISPLAY_FULL
         if (state->warnings.high_fee) {
             pairs[n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_WARN_HIGH_FEES_TITLE,
@@ -305,13 +310,20 @@ void ui_display_transaction_streaming_prompt(void) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     if (state->has_wallet_policy) {
-        pairs[0] = (nbgl_layoutTagValue_t) {
-            .item = account_role_label(state->account_role),
+        unsigned int l_n_pairs = 0;
+        pairs[l_n_pairs++] = (nbgl_layoutTagValue_t) {
+            .item = account_role_label(state->account_role, state->account_is_default),
             .value = state->wallet_policy_name,
         };
+        // Context page: also carry the "Signing rule" caveat (non-default sighash).
+        const char *signing_rule = signing_rule_str(state->signed_sighash, state->sighash_mixed);
+        if (signing_rule != NULL) {
+            pairs[l_n_pairs++] =
+                (nbgl_layoutTagValue_t) {.item = GA_SIGNING_RULE_TITLE, .value = signing_rule};
+        }
         // Setup list
         pairList.nbMaxLinesForValue = 0;
-        pairList.nbPairs = 1;
+        pairList.nbPairs = l_n_pairs;
         pairList.pairs = pairs;
 
         nbgl_useCaseReviewStreamingContinue(&pairList, start_transaction_callback);
@@ -359,17 +371,12 @@ void ui_display_transaction_streaming_flow(bool is_self_transfer) {
         pairs[l_n_pairs++].value = "Self-transfer";
     }
 
-    if (state->display_mode == TX_DISPLAY_SPENT_ONLY) {
-        // total_spent is reliable, fee is not
+    if (state->display_mode == TX_DISPLAY_NET_ONLY) {
+        // total_spent is reliable, fee is not (the "Signing rule" was on the context page)
         pairs[l_n_pairs].item = state->spent_is_receive ? GA_YOU_RECEIVE : GA_YOU_SPEND;
         pairs[l_n_pairs++].value = state->fee;
         pairs[l_n_pairs].item = "Fees";
         pairs[l_n_pairs++].value = GA_FEE_NOT_AVAILABLE;
-        const char *signing_rule = signing_rule_str(state->signed_sighash, state->sighash_mixed);
-        if (signing_rule != NULL) {
-            pairs[l_n_pairs].item = GA_SIGNING_RULE_TITLE;
-            pairs[l_n_pairs++].value = signing_rule;
-        }
     } else {  // TX_DISPLAY_FULL
         pairs[l_n_pairs].item = "Fees";
         pairs[l_n_pairs++].value = state->fee;

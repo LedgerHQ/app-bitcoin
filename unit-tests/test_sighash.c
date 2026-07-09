@@ -176,8 +176,8 @@ typedef struct {
 static const mode_case_t mode_cases[] = {
     // fee trustworthy + outputs committed + amounts trustworthy -> FULL
     {true, true, true, TX_DISPLAY_FULL},
-    // outputs committed + amounts trustworthy, fee not trustworthy -> SPENT_ONLY
-    {false, true, true, TX_DISPLAY_SPENT_ONLY},
+    // outputs committed + amounts trustworthy, fee not trustworthy -> NET_ONLY
+    {false, true, true, TX_DISPLAY_NET_ONLY},
     // outputs not committed -> UNAVAILABLE (regardless of the fee)
     {true, false, true, TX_DISPLAY_UNAVAILABLE},
     {false, false, true, TX_DISPLAY_UNAVAILABLE},

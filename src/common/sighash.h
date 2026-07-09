@@ -66,7 +66,7 @@ static inline bool sighash_output_set_closed(uint32_t sighash_type) {
 }
 
 // Whether the signature commits to the outputs *present in this PSBT*: base ALL/DEFAULT
-// always, or SINGLE with a single output. Unlocks SINGLE 1-in-1-out for SPENT_ONLY.
+// always, or SINGLE with a single output. Unlocks SINGLE 1-in-1-out for NET_ONLY.
 // Distinct from sighash_output_set_closed: with SINGLE + 1 output the output is committed,
 // yet the set is still open (others can append outputs).
 static inline bool sighash_commits_provided_outputs(uint32_t sighash_type,
@@ -82,17 +82,17 @@ static inline bool sighash_commits_provided_outputs(uint32_t sighash_type,
 // the signed inputs and whether the amounts are trustworthy.
 typedef enum {
     TX_DISPLAY_FULL,         // outputs + fee (and total_spent)
-    TX_DISPLAY_SPENT_ONLY,   // total_spent only; fee unknown
+    TX_DISPLAY_NET_ONLY,   // total_spent only; fee unknown
     TX_DISPLAY_UNAVAILABLE,  // nothing about amounts/fee is reliable
 } tx_display_mode_t;
 
 // UNAVAILABLE if amounts untrusted or outputs not committed; FULL only if the fee is
-// trustworthy too (whole input+output set fixed); else SPENT_ONLY (net exact, fee unknown).
+// trustworthy too (whole input+output set fixed); else NET_ONLY (net exact, fee unknown).
 static inline tx_display_mode_t decide_tx_display_mode(bool fee_trustworthy,
                                                        bool commits_all_outputs,
                                                        bool amounts_trustworthy) {
     if (!amounts_trustworthy || !commits_all_outputs) {
         return TX_DISPLAY_UNAVAILABLE;
     }
-    return fee_trustworthy ? TX_DISPLAY_FULL : TX_DISPLAY_SPENT_ONLY;
+    return fee_trustworthy ? TX_DISPLAY_FULL : TX_DISPLAY_NET_ONLY;
 }

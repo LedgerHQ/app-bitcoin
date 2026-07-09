@@ -189,15 +189,23 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
     return io_ui_process(context);
 }
 
-void ui_prepare_authorize_wallet_spend(const char *wallet_name, account_role_t account_role) {
+static void prepare_tx_summary(ui_validate_transaction_state_t *state,
+                               const tx_summary_t *summary);
+
+void ui_prepare_authorize_wallet_spend(const char *wallet_name,
+                                       account_role_t account_role,
+                                       bool account_is_default,
+                                       const tx_summary_t *summary) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
     state->account_role = account_role;
+    state->account_is_default = account_is_default;
     if (wallet_name == NULL) {
         state->has_wallet_policy = false;
     } else {
         strncpy(state->wallet_policy_name, wallet_name, sizeof(state->wallet_policy_name));
         state->has_wallet_policy = true;
     }
+    prepare_tx_summary(state, summary);
 }
 
 bool ui_warn_external_inputs(dispatcher_context_t *context) {
@@ -279,7 +287,7 @@ static void prepare_tx_summary(ui_validate_transaction_state_t *state,
     state->sighash_mixed = summary->sighash_mixed;
     if (summary->mode == TX_DISPLAY_FULL) {
         format_sats_amount(COIN_COINID_SHORT, summary->fee, state->fee);
-    } else if (summary->mode == TX_DISPLAY_SPENT_ONLY) {
+    } else if (summary->mode == TX_DISPLAY_NET_ONLY) {
         state->spent_is_receive = summary->total_spent < 0;
         uint64_t magnitude = summary->total_spent < 0 ? (uint64_t) -summary->total_spent
                                                       : (uint64_t) summary->total_spent;
@@ -289,7 +297,6 @@ static void prepare_tx_summary(ui_validate_transaction_state_t *state,
 }
 
 bool ui_transaction_streaming_validate(dispatcher_context_t *context,
-                                       const tx_summary_t *summary,
                                        tx_ux_warning_t warnings,
                                        bool is_self_transfer) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
@@ -298,7 +305,7 @@ bool ui_transaction_streaming_validate(dispatcher_context_t *context,
 
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    prepare_tx_summary(state, summary);
+    // the summary was already applied in ui_prepare_authorize_wallet_spend
     state->warnings = warnings;
 
     ui_display_transaction_streaming_flow(is_self_transfer);
@@ -309,7 +316,9 @@ bool ui_transaction_streaming_validate(dispatcher_context_t *context,
 void ui_transaction_simplified_init(const char *wallet_policy_name,
                                     unsigned int outputs_num,
                                     tx_ux_warning_t warnings,
-                                    account_role_t account_role) {
+                                    account_role_t account_role,
+                                    bool account_is_default,
+                                    const tx_summary_t *summary) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     memset(state, 0, sizeof(ui_validate_transaction_state_t));
@@ -323,6 +332,11 @@ void ui_transaction_simplified_init(const char *wallet_policy_name,
     state->n_outputs = outputs_num;
     state->warnings = warnings;
     state->account_role = account_role;
+    state->account_is_default = account_is_default;
+
+    // Apply the summary up front so the account/"Signing rule" context page and the
+    // per-output page breaks can all consult the mode and sighash.
+    prepare_tx_summary(state, summary);
 
     ui_display_transaction_simplified_flow_init();
 }
@@ -346,14 +360,11 @@ void ui_transaction_simplified_add(uint64_t amount, const char *address_or_descr
     state->output_index++;
 }
 
-bool ui_transaction_simplified_show(dispatcher_context_t *context, const tx_summary_t *summary) {
+bool ui_transaction_simplified_show(dispatcher_context_t *context) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
     return true;
 #endif
-    ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
-
-    prepare_tx_summary(state, summary);
-
+    // the summary was already applied in ui_transaction_simplified_init
     ui_display_transaction_simplified_flow_show();
 
     return io_ui_process(context);

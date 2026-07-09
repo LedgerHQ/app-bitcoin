@@ -205,8 +205,7 @@ static bool __attribute__((noinline)) display_warnings(dispatcher_context_t *dc,
     return true;
 }
 
-// Human-readable label for a default (unregistered) account, e.g. "Native SegWit account
-// #2". Returns false for an unknown purpose (no label shown).
+// Human-readable label for a default (unregistered) account, e.g. "Native SegWit #2"
 static bool format_default_account_label(int bip44_purpose,
                                          uint32_t account,
                                          char *out,
@@ -228,7 +227,7 @@ static bool format_default_account_label(int bip44_purpose,
         default:
             return false;
     }
-    return snprintf(out, out_len, "%s account #%u", type, (unsigned int) account) > 0;
+    return snprintf(out, out_len, "%s #%u", type, (unsigned int) account) > 0;
 }
 
 // The account label to show on the review, or NULL for no account row. Registered policies
@@ -260,6 +259,8 @@ bool __attribute__((noinline)) display_transaction(
 
     char account_label_buf[MAX_WALLET_NAME_LENGTH + 1];
 
+    // only used (and shown) for a default sighash; can underflow otherwise, but then FULL
+    // is never selected so this value is not displayed
     uint64_t fee = st->inputs_total_amount - st->outputs.total_amount;
     int64_t total_spent =
         (int64_t) st->internal_inputs_total_amount - (int64_t) st->outputs.change_total_amount;
@@ -291,7 +292,7 @@ bool __attribute__((noinline)) display_transaction(
     account_role_t account_role = ACCOUNT_ROLE_FROM;
     if (mode == TX_DISPLAY_UNAVAILABLE) {
         account_role = ACCOUNT_ROLE_NEUTRAL;
-    } else if (mode == TX_DISPLAY_SPENT_ONLY && total_spent < 0) {
+    } else if (mode == TX_DISPLAY_NET_ONLY && total_spent < 0) {
         account_role = ACCOUNT_ROLE_TO;
     }
 
@@ -319,9 +320,11 @@ bool __attribute__((noinline)) display_transaction(
             account_review_label(st, mode, account_label_buf, sizeof(account_label_buf)),
             0,
             st->warnings,
-            account_role);
+            account_role,
+            st->account.is_default,
+            &summary);
         ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
-        if (!ui_transaction_simplified_show(dc, &summary)) {
+        if (!ui_transaction_simplified_show(dc)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
@@ -335,9 +338,9 @@ bool __attribute__((noinline)) display_transaction(
 
         bool is_self_transfer = st->n_external_outputs == 0;
 
-        // In SPENT_ONLY the account-level "You spend/receive" line already states the
+        // In NET_ONLY the account-level "You spend/receive" line already states the
         // amount; a "0 (self-transfer)" row would contradict a net-receive, so omit it.
-        bool show_self_transfer_row = is_self_transfer && mode != TX_DISPLAY_SPENT_ONLY;
+        bool show_self_transfer_row = is_self_transfer && mode != TX_DISPLAY_NET_ONLY;
 
         /** TRANSACTION CONFIRMATION */
         /* Init*/
@@ -345,7 +348,9 @@ bool __attribute__((noinline)) display_transaction(
             account_review_label(st, mode, account_label_buf, sizeof(account_label_buf)),
             is_self_transfer ? (show_self_transfer_row ? 1 : 0) : st->n_external_outputs,
             st->warnings,
-            account_role);
+            account_role,
+            st->account.is_default,
+            &summary);
 
         /* Adding outputs */
         if (!is_self_transfer) {
@@ -370,7 +375,7 @@ bool __attribute__((noinline)) display_transaction(
 
         /* Start the review */
         ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
-        if (!ui_transaction_simplified_show(dc, &summary)) {
+        if (!ui_transaction_simplified_show(dc)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
@@ -382,7 +387,9 @@ bool __attribute__((noinline)) display_transaction(
         // confirmation
         ui_prepare_authorize_wallet_spend(
             account_review_label(st, mode, account_label_buf, sizeof(account_label_buf)),
-            account_role);
+            account_role,
+            st->account.is_default,
+            &summary);
 
         // "Review transaction to send Bitcoin"
         if (!ui_transaction_streaming_prompt(dc)) {
@@ -402,7 +409,7 @@ bool __attribute__((noinline)) display_transaction(
          */
         // Show final user validation UI
         ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
-        if (!ui_transaction_streaming_validate(dc, &summary, st->warnings, false)) {
+        if (!ui_transaction_streaming_validate(dc, st->warnings, false)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
