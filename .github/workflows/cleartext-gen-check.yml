@@ -1,0 +1,32 @@
+name: Cleartext codegen check
+
+# Ensures the generated BIP388 cleartext files committed to the repo are in sync
+# with the TOML specs they are derived from. If someone edits
+# specs/bip388/*.toml without re-running specs/bip388/gen.py, this
+# job fails and points at the drifted files.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+
+jobs:
+  check_cleartext_codegen:
+    name: Check generated cleartext files are up to date
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          # 3.11+ for the stdlib tomllib used by gen.py.
+          python-version: '3.12'
+
+      - name: Check codegen is in sync with the TOML specs
+        run: python3 specs/bip388/gen.py --check

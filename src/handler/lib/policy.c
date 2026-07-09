@@ -1906,8 +1906,8 @@ static int compare_uint16(const void *a, const void *b) {
     return (num1 > num2) - (num1 < num2);
 }
 
-static bool are_key_placeholders_identical(const policy_node_keyexpr_t *kp1,
-                                           const policy_node_keyexpr_t *kp2) {
+bool are_key_placeholders_identical(const policy_node_keyexpr_t *kp1,
+                                    const policy_node_keyexpr_t *kp2) {
     if (kp1->type != kp2->type) {
         return false;
     }

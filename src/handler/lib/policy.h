@@ -219,6 +219,20 @@ __attribute__((warn_unused_result)) int get_keyexpr_by_index(const policy_node_t
                                                              policy_node_keyexpr_t **out_keyexpr);
 
 /**
+ * Determines whether two key expressions refer to the same key, independently of the derivation
+ * steps. Normal key expressions are identical iff they share the same key index; musig key
+ * expressions are identical iff they aggregate exactly the same (unordered) set of key indexes.
+ *
+ * @param[in] kp1
+ *   Pointer to the first key expression.
+ * @param[in] kp2
+ *   Pointer to the second key expression.
+ * @return true if the two key expressions refer to the same key, false otherwise.
+ */
+bool are_key_placeholders_identical(const policy_node_keyexpr_t *kp1,
+                                    const policy_node_keyexpr_t *kp2);
+
+/**
  * Determines the expected number of unique keys in the provided policy's key information.
  * The function calculates this by finding the maximum key index from key expressions and increments
  * it by 1. For instance, if the maximum key index found in the key expressions is `n`, then the
