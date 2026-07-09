@@ -128,19 +128,57 @@ static void test_sighash_commit_predicates(void **state) {
     }
 }
 
+// sighash_commits_provided_outputs is relative to the outputs *present in the PSBT*:
+// base ALL/DEFAULT always; base SINGLE only with a single output.
 typedef struct {
-    bool commits_inputs;
+    uint32_t sighash_type;
+    unsigned int n_outputs;
+    bool expected;
+} provided_outputs_case_t;
+
+static const provided_outputs_case_t provided_outputs_cases[] = {
+    // base ALL/DEFAULT: all provided outputs committed, regardless of count (or ANYONECANPAY)
+    {SIGHASH_ALL, 1, true},
+    {SIGHASH_ALL, 3, true},
+    {SIGHASH_DEFAULT, 5, true},
+    {SIGHASH_ANYONECANPAY | SIGHASH_ALL, 4, true},
+    // SINGLE / ACP|SINGLE: committed only when there is exactly one output
+    {SIGHASH_SINGLE, 1, true},
+    {SIGHASH_SINGLE, 2, false},
+    {SIGHASH_SINGLE, 0, false},
+    {SIGHASH_ANYONECANPAY | SIGHASH_SINGLE, 1, true},
+    {SIGHASH_ANYONECANPAY | SIGHASH_SINGLE, 3, false},
+    // NONE: never commits outputs
+    {SIGHASH_NONE, 1, false},
+    {SIGHASH_ANYONECANPAY | SIGHASH_NONE, 1, false},
+};
+
+static void test_sighash_commits_provided_outputs(void **state) {
+    (void) state;
+    for (size_t i = 0; i < sizeof(provided_outputs_cases) / sizeof(provided_outputs_cases[0]);
+         i++) {
+        const provided_outputs_case_t *c = &provided_outputs_cases[i];
+        bool got = sighash_commits_provided_outputs(c->sighash_type, c->n_outputs);
+        if (got != c->expected) {
+            fail_msg("case[%zu]: commits_provided_outputs(0x%02x, %u) = %d, expected %d",
+                     i, c->sighash_type, c->n_outputs, got, c->expected);
+        }
+    }
+}
+
+typedef struct {
+    bool fee_trustworthy;
     bool commits_outputs;
     bool amounts_trustworthy;
     tx_display_mode_t expected;
 } mode_case_t;
 
 static const mode_case_t mode_cases[] = {
-    // trustworthy + both committed -> FULL
+    // fee trustworthy + outputs committed + amounts trustworthy -> FULL
     {true, true, true, TX_DISPLAY_FULL},
-    // trustworthy + outputs committed, inputs open -> SPENT_ONLY
+    // outputs committed + amounts trustworthy, fee not trustworthy -> SPENT_ONLY
     {false, true, true, TX_DISPLAY_SPENT_ONLY},
-    // outputs open -> UNAVAILABLE (regardless of inputs)
+    // outputs not committed -> UNAVAILABLE (regardless of the fee)
     {true, false, true, TX_DISPLAY_UNAVAILABLE},
     {false, false, true, TX_DISPLAY_UNAVAILABLE},
     // amounts not trustworthy -> UNAVAILABLE (regardless of commitment)
@@ -155,10 +193,10 @@ static void test_tx_display_mode(void **state) {
     for (size_t i = 0; i < sizeof(mode_cases) / sizeof(mode_cases[0]); i++) {
         const mode_case_t *c = &mode_cases[i];
         tx_display_mode_t got =
-            decide_tx_display_mode(c->commits_inputs, c->commits_outputs, c->amounts_trustworthy);
+            decide_tx_display_mode(c->fee_trustworthy, c->commits_outputs, c->amounts_trustworthy);
         if (got != c->expected) {
-            fail_msg("case[%zu]: decide(in=%d,out=%d,trust=%d) = %d, expected %d",
-                     i, c->commits_inputs, c->commits_outputs, c->amounts_trustworthy,
+            fail_msg("case[%zu]: decide(fee=%d,out=%d,trust=%d) = %d, expected %d",
+                     i, c->fee_trustworthy, c->commits_outputs, c->amounts_trustworthy,
                      (int) got, (int) c->expected);
         }
     }
@@ -168,6 +206,7 @@ int main() {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_classify_sighash),
         cmocka_unit_test(test_sighash_commit_predicates),
+        cmocka_unit_test(test_sighash_commits_provided_outputs),
         cmocka_unit_test(test_tx_display_mode),
     };
 
