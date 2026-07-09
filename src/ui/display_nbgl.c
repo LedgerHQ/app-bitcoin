@@ -245,15 +245,16 @@ void ui_display_transaction_simplified_flow_show(void) {
     const char *signing_rule = signing_rule_str(state->signed_sighash, state->sighash_mixed);
 
     if (state->display_mode == TX_DISPLAY_UNAVAILABLE) {
-        // No amount is reliable: just show a notice, plus the signing rule in effect.
-        pairs[n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_AMOUNTS_UNAVAILABLE_TITLE,
-                                                     .value = GA_AMOUNTS_UNAVAILABLE,
-                                                     .centeredInfo = true,
-                                                     .valueIcon = &ICON_APP_WARNING};
+        // Show the signing rule first, then the notice. The centeredInfo notice must remain
+        // the last pair: a normal row after it breaks tap-to-advance in the review.
         if (signing_rule != NULL) {
             pairs[n_pairs++] =
                 (nbgl_layoutTagValue_t) {.item = GA_SIGNING_RULE_TITLE, .value = signing_rule};
         }
+        pairs[n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_AMOUNTS_UNAVAILABLE_TITLE,
+                                                     .value = GA_AMOUNTS_UNAVAILABLE,
+                                                     .centeredInfo = true,
+                                                     .valueIcon = &ICON_APP_WARNING};
     } else if (state->display_mode == TX_DISPLAY_SPENT_ONLY) {
         // total_spent is reliable, fee is not.
         pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
