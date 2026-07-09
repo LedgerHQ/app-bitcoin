@@ -41,6 +41,7 @@
 #include "policy.h"
 #include "sw.h"
 #include "wallet.h"
+#include "common/cleartext.h"
 
 static bool is_policy_acceptable(const policy_node_t *policy);
 static bool is_policy_name_acceptable(const char *name, size_t name_len);
@@ -223,10 +224,46 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         return;
     }
 
+    // Try to compute the cleartext spending-path lines. If the descriptor
+    // doesn't classify (DC_OTHER), has non-canonical derivations, or its
+    // confusion score exceeds the threshold, the cleartext block is skipped
+    // and the UX falls back to the existing raw-descriptor-template screen.
+    char cleartext_lines[CT_MAX_LINES][CT_MAX_LINE_LEN + 1];
+    size_t n_cleartext_lines = 0;
+    bool has_cleartext = false;
+    descriptor_class_e cleartext_class = DC_OTHER;
+
+    if (cleartext_confusion_score(&policy_map.parsed) <= CLEARTEXT_MAX_CONFUSION_SCORE) {
+        int rc = cleartext_encode(&policy_map.parsed,
+                                  NULL,
+                                  cleartext_lines,
+                                  &n_cleartext_lines,
+                                  &has_cleartext,
+                                  &cleartext_class);
+        if (rc <= 0 || !has_cleartext) {
+            // Either the descriptor doesn't classify (rc == 0), an internal
+            // error occurred (rc == -1), or at least one part of the
+            // descriptor lacks a cleartext rendering — in all cases keep
+            // the current behaviour (raw descriptor template only).
+            n_cleartext_lines = 0;
+        }
+    }
+
+    // For multisig policies (all coalesced into DC_MULTISIG),
+    // the cleartext "Any K of <keys> must sign" captures the spending policy
+    // with little risk of ambiguity. Therefore, it is safe to hide the
+    // raw descriptor template, simplifying the UX.
+    const char *descriptor_to_show = (char *) policy_map_descriptor;
+    if (has_cleartext && n_cleartext_lines > 0 && cleartext_class == DC_MULTISIG) {
+        descriptor_to_show = NULL;
+    }
+
     // show wallet policy
     if (!ui_display_register_wallet_policy(dc,
                                            &wallet_header,
-                                           (char *) policy_map_descriptor,
+                                           descriptor_to_show,
+                                           &cleartext_lines,
+                                           n_cleartext_lines,
                                            &keys_info,
                                            &keys_type)) {
         SEND_SW(dc, SW_DENY);

@@ -20,6 +20,7 @@ wallet_name = "Cold storage"
 expected_wallet_id = "1d150ed425a871a5ca7e2c55db1b3295c1fd97147fd0a7b188d4327f4ba7402a"
 expected_wallet_hmac = "fa73e36119324fbe4cc1ca94aa842c6261526d44112a22164bc57c3335102b04"
 expected_key_types = ["external", "internal"]
+descriptor_hidden = true
 
 [[case]]
 name = "multisig_sh_wit_2of2"
@@ -33,6 +34,7 @@ wallet_name = "Cold storage"
 expected_wallet_id = "763926f53be53ad89a9248dc15bc2f3ed577a59a87d81cd88f14279b263b31f6"
 expected_wallet_hmac = "1f498e7444841b883c4a63e2b88a5cad297c289d235794f8e3e17cf559ed0654"
 expected_key_types = ["external", "internal"]
+descriptor_hidden = true
 
 [[case]]
 name = "multisig_wit_2of2"
@@ -46,6 +48,7 @@ wallet_name = "Cold storage"
 expected_wallet_id = "cd9474ae9e74403128477789789db43a215e996af80d60120f0d844f8404ac64"
 expected_wallet_hmac = "d7c7a60b4ab4a14c1bf8901ba627d72140b2fb907f2b4e35d2e693bce9fbb371"
 expected_key_types = ["external", "internal"]
+descriptor_hidden = true
 
 [[case]]
 name = "multisig_wit_2of2_long_name"
@@ -59,6 +62,7 @@ wallet_name = "Cold storage with a pretty long name that requires 64 characters"
 expected_wallet_id = "57f64b36153b819c624dedd0ba3ba491000c41652087b5b265b2460508b09620"
 expected_wallet_hmac = "42ea7900175227ee3ea259a0a061dda232dce3e93707d0940f9dc63bab50d35a"
 expected_key_types = ["external", "internal"]
+descriptor_hidden = true
 
 [[case]]
 name = "unusual_singlesig_legacy"
@@ -401,4 +405,5 @@ wallet_name = "Collision and internal"
 expected_wallet_id = "25bbdfdbc7d7f184ddbea79d52bd1235d95cce799d06b4e7aced22b253d4e266"
 expected_wallet_hmac = "f82f318bdd7d7db9f586b34c2f4985614ec9abf0d9c9ef48b3e57ba246ef0cf2"
 expected_key_types = ["external", "internal"]
+descriptor_hidden = true
 
