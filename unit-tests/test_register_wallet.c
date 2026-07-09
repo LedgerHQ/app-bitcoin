@@ -77,6 +77,9 @@ typedef struct {
     bool has_key_types;
     key_type_e key_types[MAX_KEYS_PER_CASE];
     size_t n_key_types;
+    /* When true, the handler is expected to hide the raw descriptor template and
+     * confirm via the cleartext block only (the case for multisig policies). */
+    bool descriptor_hidden;
 } testcase_t;
 
 static testcase_t *g_cases = NULL;
@@ -92,7 +95,11 @@ static struct {
     bool called;
     size_t n_keys;
     key_type_e keys_type[MAX_N_KEYS_IN_WALLET_POLICY];
+    /* The handler passes a NULL descriptor template when it chooses to hide the
+     * raw descriptor in favour of the cleartext block (multisig policies). */
+    bool descriptor_shown;
     char descriptor_template[MAX_TPL_LEN];
+    size_t n_cleartext_lines;
     char name[MAX_NAME_LEN];
     uint8_t version;
 } g_ui_capture;
@@ -104,21 +111,32 @@ bool ui_display_register_wallet_policy(
     dispatcher_context_t *context,
     const policy_map_wallet_header_t *wallet_header,
     const char *descriptor_template,
+    const char (*cleartext_lines)[CT_MAX_LINES][CT_MAX_LINE_LEN + 1],
+    size_t n_cleartext_lines,
     const char (*keys_info)[MAX_N_KEYS_IN_WALLET_POLICY][MAX_POLICY_KEY_INFO_LEN + 1],
     const key_type_e (*keys_type)[MAX_N_KEYS_IN_WALLET_POLICY]) {
     (void) keys_info;
+    (void) cleartext_lines;
 
     g_ui_capture.called = true;
     g_ui_capture.n_keys = wallet_header->n_keys;
     g_ui_capture.version = wallet_header->version;
+    g_ui_capture.n_cleartext_lines = n_cleartext_lines;
     for (size_t i = 0; i < wallet_header->n_keys && i < MAX_N_KEYS_IN_WALLET_POLICY; i++) {
         g_ui_capture.keys_type[i] = (*keys_type)[i];
     }
     snprintf(g_ui_capture.name, sizeof(g_ui_capture.name), "%s", wallet_header->name);
-    snprintf(g_ui_capture.descriptor_template,
-             sizeof(g_ui_capture.descriptor_template),
-             "%s",
-             descriptor_template);
+    /* A NULL template means the handler hid the raw descriptor (cleartext-only
+     * multisig screen); record that rather than capturing the "(null)" string. */
+    g_ui_capture.descriptor_shown = (descriptor_template != NULL);
+    if (g_ui_capture.descriptor_shown) {
+        snprintf(g_ui_capture.descriptor_template,
+                 sizeof(g_ui_capture.descriptor_template),
+                 "%s",
+                 descriptor_template);
+    } else {
+        g_ui_capture.descriptor_template[0] = '\0';
+    }
 
     (void) context;
     return true;
@@ -275,6 +293,18 @@ static void parse_vectors(const char *path) {
             cur->keys_info[k][key_node.u.str.len] = '\0';
         }
 
+        /* Optional: whether the handler should hide the raw descriptor template
+         * in favour of the cleartext-only screen. Defaults to false. */
+        toml_datum_t dh = toml_get(tc_node, "descriptor_hidden");
+        if (dh.type == TOML_BOOLEAN) {
+            cur->descriptor_hidden = dh.u.boolean;
+        } else if (dh.type != TOML_UNKNOWN) {
+            fprintf(stderr, "%s: descriptor_hidden must be a boolean\n", cur->name);
+            abort();
+        } else {
+            cur->descriptor_hidden = false;
+        }
+
         /* Optional per-key classification (one entry per key, @0,@1,... order). */
         toml_datum_t kt = toml_get(tc_node, "expected_key_types");
         cur->has_key_types = (kt.type != TOML_UNKNOWN);
@@ -426,7 +456,14 @@ static void test_one_case(void **state) {
     assert_true(g_ui_capture.called);
     assert_int_equal(g_ui_capture.version, WALLET_POLICY_VERSION_V2);
     assert_int_equal(g_ui_capture.n_keys, tc->n_keys);
-    assert_string_equal(g_ui_capture.descriptor_template, tc->descriptor_template);
+    if (tc->descriptor_hidden) {
+        /* The raw descriptor is hidden; the cleartext block must stand in for it. */
+        assert_false(g_ui_capture.descriptor_shown);
+        assert_true(g_ui_capture.n_cleartext_lines > 0);
+    } else {
+        assert_true(g_ui_capture.descriptor_shown);
+        assert_string_equal(g_ui_capture.descriptor_template, tc->descriptor_template);
+    }
     assert_string_equal(g_ui_capture.name, tc->wallet_name);
 
     /* When pinned, verify the per-key classification (NUMS / internal-key
