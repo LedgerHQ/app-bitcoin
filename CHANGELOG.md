@@ -15,6 +15,7 @@ Dates are in `dd-mm-yyyy` format.
 
 ### Changed
 
+- Improved the registration UX for multisig and many taproot miniscript wallet policies by showing the *clear-text, human-readable* meaning of the policy. For simple multisig policies, the clear-text description replaces the descriptor template. For a large class of supported taproot miniscript policies, it is shown *in addition to*, and *before*, the raw descriptor template. This lets the user understand the policy while still being able to compare the template against their backup.
 - Standard BIP-87 xpubs can now be exported without explicit user confirmation.
 
 ## [2.4.6] - 30-03-2026
