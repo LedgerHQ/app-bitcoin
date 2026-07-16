@@ -2,7 +2,7 @@
  * Unit tests for handler_register_wallet (and, indirectly, its static helpers
  * is_policy_acceptable / is_policy_name_acceptable).
  *
- * Test cases are loaded from TEST_VECTORS_PATH (a TOML file) at runtime; see
+ * Most test cases are loaded from TEST_VECTORS_PATH (a TOML file) at runtime; see
  * the file's header comment for the schema. For each vector we:
  *   1. Register the descriptor template as a preimage and the keys-info list as
  *      a Merkle tree with the mock dispatcher (this gives us the keys Merkle
@@ -19,9 +19,8 @@
  * speculos bridge, which uses the standard test seed), so the pinned wallet
  * HMACs reproduce without a device or emulator.
  *
- * A final, hand-written case (not from the vectors file) checks the
- * SW_WRONG_DATA_LENGTH framing branch, which the portable wallet-policy schema
- * cannot express.
+ * A few final, hand-written cases follow (not from the vectors file) for things that
+ * the portable wallet-policy schema cannot express.
  */
 #include <limits.h>
 #include <stdarg.h>
@@ -44,6 +43,7 @@
 #include "buffer.h"
 #include "varint.h"
 #include "common/wallet.h"
+#include "common/cleartext.h"  // cleartext_confusion_score, CLEARTEXT_MAX_CONFUSION_SCORE
 #include "constants.h"
 #include "handler/handlers.h"
 #include "sw.h"
@@ -58,9 +58,9 @@
 #define MAX_TPL_LEN       (MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 + 1)
 /* One slot more than MAX_WALLET_NAME_LENGTH so the over-long-name reject vector
  * still fits in the buffer (the handler is what rejects it, not the loader). */
-#define MAX_NAME_LEN      (MAX_WALLET_NAME_LENGTH + 2)
-#define MAX_ERROR_LEN     32
-#define HASH_HEX_LEN      64
+#define MAX_NAME_LEN  (MAX_WALLET_NAME_LENGTH + 2)
+#define MAX_ERROR_LEN 32
+#define HASH_HEX_LEN  64
 
 typedef struct {
     char name[MAX_NAME_LEN];
@@ -336,12 +336,18 @@ static void parse_vectors(const char *path) {
  * =========================================================================== */
 
 /* Per-case cmocka state: pairs a heap-allocated mock dispatcher with the
- * testcase. Mirrors test_get_wallet_address.c. */
+ * testcase. Mirrors test_get_wallet_address.c. `tc` is NULL for the
+ * hand-written cases, which drive the handler directly and never read it. */
 typedef struct {
     void *mock_state;
     const testcase_t *tc;
 } case_state_t;
 
+/* Setup for every test (vector-driven and hand-written alike): allocate the
+ * case state, stand up a fresh mock dispatcher, and reset the UI capture. The
+ * incoming *state is the testcase_t pointer for vector cases or NULL for the
+ * hand-written ones. Centralizing the g_ui_capture reset here keeps it out of
+ * the test bodies. */
 static int case_setup(void **state) {
     const testcase_t *tc = (const testcase_t *) *state;
     case_state_t *cs = calloc(1, sizeof(case_state_t));
@@ -407,10 +413,12 @@ static size_t serialize_request(const testcase_t *tc,
     return clen;
 }
 
-static void test_one_case(void **state) {
-    case_state_t *cs = *state;
-    mock_dispatcher_t *mock = cs->mock_state;
-    const testcase_t *tc = cs->tc;
+/* Register the descriptor-template preimage and the keys-info list with the mock
+ * dispatcher, serialize the register_wallet command, and drive the handler.
+ * Shared by the vector-driven case and the hand-written cases; results land in
+ * mock->last_sw / mock->request_buf and (via the UI stub) g_ui_capture. */
+static void drive_register_wallet(mock_dispatcher_t *mock, const testcase_t *tc) {
+    assert_true(tc->n_keys <= MAX_KEYS_PER_CASE);
 
     /* The descriptor template is fetched by the device via call_get_preimage. */
     mock_dispatcher_add_preimage(mock,
@@ -436,6 +444,14 @@ static void test_one_case(void **state) {
     dc->read_buffer = buffer_create(cdata, cdata_len);
 
     handler_register_wallet(dc, 0);
+}
+
+static void test_one_case(void **state) {
+    case_state_t *cs = *state;
+    mock_dispatcher_t *mock = cs->mock_state;
+    const testcase_t *tc = cs->tc;
+
+    drive_register_wallet(mock, tc);
 
     if (tc->has_error) {
         assert_int_equal(mock->last_sw, error_name_to_sw(tc->error));
@@ -479,7 +495,8 @@ static void test_one_case(void **state) {
  * buffer_read_varint fail, which the handler reports as SW_WRONG_DATA_LENGTH.
  * This branch can't be expressed via the portable wallet-policy schema. */
 static void test_wrong_data_length(void **state) {
-    mock_dispatcher_t *mock = *state;
+    case_state_t *cs = *state;
+    mock_dispatcher_t *mock = cs->mock_state;
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
 
     dc->read_buffer = buffer_create((void *) "", 0);
@@ -488,14 +505,85 @@ static void test_wrong_data_length(void **state) {
     assert_int_equal(mock->last_sw, SW_WRONG_DATA_LENGTH);
 }
 
+/* Hand-written case: a policy whose cleartext confusion score exceeds
+ * CLEARTEXT_MAX_CONFUSION_SCORE must not be shown in cleartext; the handler falls
+ * back to the raw descriptor template.
+ *
+ * The policy is a taproot key-path plus a balanced tree of eight single-sig
+ * pk() tapleaves. Its confusion score is the taptree-shape factor (2n-3)!! for
+ * n=8 leaves, i.e. 13!! = 1*3*5*7*9*11*13 = 135135.
+ */
+static void test_confusion_score_over_threshold_shows_raw(void **state) {
+    case_state_t *cs = *state;
+    mock_dispatcher_t *mock = cs->mock_state;
+
+    static const char *const keys[9] = {
+        "[f5acc2fd/48'/1'/0'/"
+        "2']"
+        "tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaq"
+        "Fo9VsybY1J5FuedLfm4dK",
+        "tpubDD814oESVM3uG2yZZDnJDex6gLeeahu2cmK2AL26ozTtDouQCY4NA8xcTW5oiJLp1cydFtDPdWxWDpLPGyLo6s"
+        "GbemykJm4ocjjvt5cwvtv",
+        "tpubDCz2AbmcM5cVir5UiGjdPgtY6Tugwg44VZYJjpPxyZAg9vMsztGVjcgW9wkQF3oDF4mK2vRxzeXY7d31KYStsR"
+        "QtuhPNpLFJgz3A3Np9Vc8",
+        "tpubDCbN8YbwHgkEVHc3kYfJirFiHaQaR9brzgF6KNhnceLe58hWiHMDXrovq3SBbHBcHHhNiXNSY7wKWRUGb3pYDT"
+        "eEnVJBqthwG3FhgeuUQjb",
+        "tpubDD3GzZF6koScghQdMUZ1VT6UnNyvvhVGwwEaReiHSPrKxFguBhp6K2kpbKUwudodaQy44EDbUz4rLgGGN5XJmq"
+        "CTrydxwY9sRmErUGmK8XA",
+        "tpubDDi6fvvXrjwNvm9tRrAowv5MmxajeptXACMAoVTGSS7dCfabntWJk6eaxFYTy3SLnphoLDs8wzkuQF54x5fiT6"
+        "3dYQ8FBQZWxVSVgNqZUCb",
+        "tpubDDtawMw95R6dzwnW6ptNwAHJVHQRS8vYCyXBVrycd6hnqDfPjBpyMxBbgFgZCdp5oX5L34Z42tvetavdvzcRub"
+        "V7Yc6mh639uDjRvHDFTrB",
+        "tpubDCDtoPWjoKyu8BurUA6erB4hDBtN18xybX2mFSY1AWXy5qem2j79MbzGiJiNUZsqzLXUuoxjDhwCvACr8NSTuk"
+        "FLWPpgLZSS7KGawZSkTKQ",
+        "tpubDCXuqAmWrb4Zv2wRsjW3iaCN4EddaxFwMDnrfBaonLKDKvnkAzR5yar6CpAU6XiQpXJtirSfjJ1UjTs4ZnUXFp"
+        "CM3Jr6Y8WgbPGhRgo7vXW",
+    };
+    const size_t n_keys = 9;
+    const char *tmpl =
+        "tr(@0/**,{{{pk(@1/**),pk(@2/**)},{pk(@3/**),pk(@4/**)}},"
+        "{{pk(@5/**),pk(@6/**)},{pk(@7/**),pk(@8/**)}}})";
+    const uint64_t EXPECTED_CONFUSION_SCORE = 135135ULL;
+
+    /* (a) The chosen template's confusion score is above the threshold. */
+    uint8_t policy_buf[MAX_WALLET_POLICY_BYTES];
+    buffer_t tb = buffer_create((void *) tmpl, strlen(tmpl));
+    int plen =
+        parse_descriptor_template(&tb, policy_buf, sizeof(policy_buf), WALLET_POLICY_VERSION_V2);
+    assert_true(plen > 0);
+    uint64_t score = cleartext_confusion_score((const policy_node_t *) policy_buf);
+    assert_int_equal(score, EXPECTED_CONFUSION_SCORE);
+    assert_true(score > CLEARTEXT_MAX_CONFUSION_SCORE);
+
+    /* (b) Drive the handler and check that it falls back to the raw template. */
+    testcase_t tc = {0};
+    snprintf(tc.wallet_name, sizeof(tc.wallet_name), "%s", "Confusing taproot tree");
+    snprintf(tc.descriptor_template, sizeof(tc.descriptor_template), "%s", tmpl);
+    tc.n_keys = n_keys;
+    for (size_t i = 0; i < n_keys; i++) {
+        snprintf(tc.keys_info[i], sizeof(tc.keys_info[i]), "%s", keys[i]);
+    }
+
+    drive_register_wallet(mock, &tc);
+
+    assert_int_equal(mock->last_sw, SW_OK);
+    assert_true(g_ui_capture.called);
+    /* Score too high: no cleartext, and the raw descriptor template stands in. */
+    assert_true(g_ui_capture.descriptor_shown);
+    assert_string_equal(g_ui_capture.descriptor_template, tmpl);
+    assert_int_equal(g_ui_capture.n_cleartext_lines, 0);
+}
+
 int main(void) {
     parse_vectors(TEST_VECTORS_PATH);
 
+    const size_t N_HANDWRITTEN_CASES = 2;
+
     /* VLA so that the cmocka_run_group_tests_name macro's sizeof-based count
-     * computes correctly; the +1 is the hand-written framing case. */
-    struct CMUnitTest tests[g_n_cases + 1];
+     * computes correctly; the +2 are the hand-written cases below. */
+    struct CMUnitTest tests[g_n_cases + N_HANDWRITTEN_CASES];
     for (size_t i = 0; i < g_n_cases; i++) {
-        tests[i] = (struct CMUnitTest){
+        tests[i] = (struct CMUnitTest) {
             .name = g_cases[i].name,
             .test_func = test_one_case,
             .setup_func = case_setup,
@@ -503,13 +591,25 @@ int main(void) {
             .initial_state = &g_cases[i],
         };
     }
-    tests[g_n_cases] = (struct CMUnitTest){
+
+    size_t n_testcase = g_n_cases;
+    tests[n_testcase++] = (struct CMUnitTest) {
         .name = "wrong_data_length",
         .test_func = test_wrong_data_length,
-        .setup_func = mock_dispatcher_setup,
-        .teardown_func = mock_dispatcher_teardown,
+        .setup_func = case_setup,
+        .teardown_func = case_teardown,
         .initial_state = NULL,
     };
+    tests[n_testcase++] = (struct CMUnitTest) {
+        .name = "confusion_score_over_threshold_shows_raw",
+        .test_func = test_confusion_score_over_threshold_shows_raw,
+        .setup_func = case_setup,
+        .teardown_func = case_teardown,
+        .initial_state = NULL,
+    };
+
+    // sanity: make sure the N_HANDWRITTEN_CASES constant matches the declared number
+    assert(n_testcase == g_n_cases + N_HANDWRITTEN_CASES);
 
     int rc = cmocka_run_group_tests_name("register_wallet", tests, NULL, NULL);
     free(g_cases);
