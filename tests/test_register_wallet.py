@@ -74,6 +74,23 @@ def test_register_wallet_accept_wit(navigator: Navigator, firmware: Firmware, cl
         test_name=test_name)
 
 
+def test_register_wallet_accept_wit_2of3(navigator: Navigator, firmware: Firmware, client:
+                                         RaggerClient, test_name: str, speculos_globals):
+    # A k-of-n multisig (k < n): the cleartext uses the "Any K of ..." wording
+    # (as opposed to the n-of-n "Each of ...").
+    run_register_test(navigator, client, speculos_globals, WalletPolicy(
+        name="Cold storage",
+        descriptor_template="wsh(sortedmulti(2,@0/**,@1/**,@2/**))",
+        keys_info=[
+            "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        ],
+    ),
+        instructions=register_wallet_instruction_approve_long(firmware),
+        test_name=test_name)
+
+
 def test_register_wallet_with_long_name(navigator: Navigator, firmware: Firmware, client:
                                         RaggerClient, test_name: str, speculos_globals):
     name = "Cold storage with a pretty long name that requires 64 characters"
@@ -492,6 +509,24 @@ def test_register_wallet_tr_script_sortedmulti(navigator: Navigator, firmware: F
     ),
         instructions=register_wallet_instruction_approve_long(firmware),
         test_name=test_name)
+
+def test_register_wallet_tr_script_multi_leaf(navigator: Navigator, firmware: Firmware, client:
+                                              RaggerClient, test_name: str, speculos_globals):
+    # A taproot with a two-leaf script tree, so the cleartext renders MORE THAN TWO
+    # spending paths: the key path ("Primary spending path") plus one "Spending path #N"
+    # per leaf. Exercises the numbered multi-path layout (Primary + #1 + #2).
+    run_register_test(navigator, client, speculos_globals, WalletPolicy(
+        name="Taproot key or one of two script keys",
+        descriptor_template="tr(@0/**,{pk(@1/**),pk(@2/**)})",
+        keys_info=[
+            "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        ],
+    ),
+        instructions=register_wallet_instruction_approve_long(firmware),
+        test_name=test_name)
+
 
 def test_register_wallet_max_derivation_steps(navigator: Navigator, firmware: Firmware, client:
                                                RaggerClient, test_name: str, speculos_globals):
