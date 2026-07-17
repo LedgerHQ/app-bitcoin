@@ -895,6 +895,30 @@ def test_sign_psbt_with_external_inputs(navigator: Navigator, firmware: Firmware
         assert len(hww_sigs) == 1
 
 
+def test_sign_psbt_with_external_inputs_net_receive(navigator: Navigator, firmware: Firmware, client:
+                                                               RaggerClient, test_name: str):
+    # Three inputs and two outputs. Only the Taproot input belongs to this wallet; the change
+    # output is larger than that internal input, making the transaction a net receive. The review
+    # shows the external-input warning, external-input total, and net amount received.
+    psbt_b64 = "cHNidP8BAM8CAAAAA6G4I9IzbWlLSTTvm25bfeF6BVE9qKKdsCouy8eppv5tAQAAAAD9////USLCzeaCPlV1QXW5LJxXoKjhrIPDjheH/Tof8zSOlRMBAAAAAP3///96Kpl5VsCfjqf9KBnBqYe7FOIr+a3NryCol2NyLO7iZAEAAAAA/f///wKghgEAAAAAABYAFBOZuKCYR6A5sDUvWNISwYC6sX93ATboAAAAAAAiUSDY9PHRiZbbYbscr1Qj3iXYoe7pyVDTfm/6AjAS1eYuDQAAAAAAAQErp4apAAAAAAAiUSDY9PHRiZbbYbscr1Qj3iXYoe7pyVDTfm/6AjAS1eYuDSEWIS6ihWpc8RDmaivp1zUxR5P9vLOIsrjxPytq3pguevUZAPWswv1WAACAAQAAgAAAAIABAAAAAAAAAAEXICEuooVqXPEQ5mor6dc1MUeT/byziLK48T8rat6YLnr1AAEAjAIAAAAB7CMOUwlSVgUqJCgnDuwEmJRLEPbxxXj0McI9AJi0rloBAAAAFxYAFCgVOYIOLelzrkG6YAS0MckhxNht/v///wJycnUAAAAAABepFMi5Bq8pjHDmA6KMPvwvrhnmqygPh0BCDwAAAAAAGXapFMuuW1DPk55vUxuKa3q9eI/hSwKXiKyE8hwAIgYC7oYIIH4hAoQm9p52RH1+PV4HcEn15oPDE2wjFHYqRxgY9azC/SwAAIABAACAAAAAgAAAAAAAAAAAAAEAfQIAAAABr7+uBlkPdB/xr1m2rEYRJjNqTEqC21U99v76tzesM/MBAAAAAP3///8CcBEBAAAAAAAiACD97kQcVuWwbQ34LBJMcHAUpcoZZYvguYVryhbx7TJZ96X0MAAAAAAAFgAUOvhCmtWVSqXuijPJg/2KHoZ5kksAAAAAAQEfpfQwAAAAAAAWABQ6+EKa1ZVKpe6KM8mD/YoehnmSSyIGA+4sPZjrH5PAoaqOWkAJtw63tE6tFfFmbxNrASrVjTBoGPWswv1UAACAAQAAgAAAAIABAAAACAAAAAAAAQUgIS6ihWpc8RDmaivp1zUxR5P9vLOIsrjxPytq3pguevUhByEuooVqXPEQ5mor6dc1MUeT/byziLK48T8rat6YLnr1GQD1rML9VgAAgAEAAIAAAACAAQAAAAAAAAAA"
+    psbt = PSBT()
+    psbt.deserialize(psbt_b64)
+
+    wallet = WalletPolicy(
+        "",
+        "tr(@0/**)",
+        [
+            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
+        ],
+    )
+
+    hww_sigs = client.sign_psbt(psbt, wallet, None, navigator,
+                                instructions=sign_psbt_instruction_approve(firmware, has_external_inputs=True),
+                                testname=test_name)
+
+    assert len(hww_sigs) == 1
+
+
 def test_sign_psbt_miniscript_multikey(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
     # An earlier (unreleased) version of the app had issues in recognizing the internal key in
