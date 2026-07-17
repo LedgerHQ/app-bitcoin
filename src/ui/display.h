@@ -124,9 +124,21 @@ typedef enum {
 typedef struct {
     tx_display_mode_t mode;
     uint64_t fee;           // for TX_DISPLAY_FULL
-    int64_t total_spent;    // for TX_DISPLAY_NET_ONLY (negative = net receive)
+    int64_t total_spent;    // net amount leaving the account (negative = net receive); used for
+                            // TX_DISPLAY_NET_ONLY and, in FULL mode, when there are external inputs
     uint32_t seen_sighash;  // effective sighash, for the "Signing rule" row
     bool sighash_mixed;     // signed inputs disagree -> shown as "Mixed"
+
+    // With external (unverified) inputs, the outputs and fee alone don't tell the user how much
+    // really leaves (or enters) their wallet, so we additionally show the net amount actually
+    // spent/received (has_external_inputs, FULL mode) and the total amount of the external inputs.
+    bool has_external_inputs;
+    // Whether to show the "External inputs amount" row: only when there are external inputs
+    // *and* the input set is closed (no ANYONECANPAY), so their total is fixed after signing.
+    // This is trustworthy independently of the output/fee display mode, hence shown in both FULL
+    // and NET_ONLY.
+    bool show_external_inputs_amount;
+    uint64_t external_inputs_amount;  // total amount of the external inputs
 } tx_summary_t;
 
 typedef struct {
@@ -142,10 +154,14 @@ typedef struct {
     char amount[MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER][MAX_AMOUNT_LENGTH + 1];
     char fee[MAX_AMOUNT_LENGTH + 1];         // formatted network fee (FULL only)
     char net_amount[MAX_AMOUNT_LENGTH + 1];  // formatted |total_spent|, the "You spend/receive"
-                                             // value (NET_ONLY only)
+                                             // value (NET_ONLY, or FULL with external inputs)
+
+    char unverified_inputs[MAX_AMOUNT_LENGTH + 1];  // formatted external_inputs_amount
+    bool has_external_inputs;                       // net "You spend/receive" row in FULL mode
+    bool show_external_inputs_amount;  // "External inputs amount" row (FULL and NET_ONLY)
 
     tx_display_mode_t display_mode;
-    bool spent_is_receive;        // for TX_DISPLAY_NET_ONLY: total_spent < 0
+    bool spent_is_receive;        // for NET_ONLY, or FULL with external inputs: total_spent < 0
     account_role_t account_role;  // From / To / unknown for the account row
     bool account_is_default;      // default derivation vs registered policy, for the row label
     uint32_t seen_sighash;        // for the "Signing rule" row
