@@ -347,7 +347,7 @@ void ui_display_transaction_streaming_output_address_amount(void) {
     pairs[1].item = "Amount";
     pairs[1].value = state->amount[0];
 
-    pairs[2].item = "Address";
+    pairs[2].item = "To";
     pairs[2].value = state->address_or_description[0];
 
     nbgl_useCaseReviewStreamingContinue(make_pair_list(3, false), start_transaction_callback);
