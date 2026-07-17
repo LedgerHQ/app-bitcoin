@@ -165,13 +165,19 @@ int get_policy_address_type(const policy_node_t *policy);
  *   Pointer the wallet policy header
  * @param[in] descriptor_template
  *   Pointer to the root node of the policy
+ * @param[out] out_bip44_purpose
+ *   If not NULL and the policy is standard, receives the BIP-44 purpose (44/49/84/86).
+ * @param[out] out_bip44_account
+ *   If not NULL and the policy is standard, receives the (unhardened) account index.
  *
  * @return true if the descriptor_template is not standard; false if not, or in case of error.
  */
 __attribute__((warn_unused_result)) bool is_wallet_policy_standard(
     dispatcher_context_t *dispatcher_context,
     const policy_map_wallet_header_t *wallet_policy_header,
-    const policy_node_t *descriptor_template);
+    const policy_node_t *descriptor_template,
+    int *out_bip44_purpose,
+    uint32_t *out_bip44_account);
 
 /**
  * Computes and returns the wallet_hmac, using the symmetric key derived
