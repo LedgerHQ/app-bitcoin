@@ -11,6 +11,7 @@ Dates are in `dd-mm-yyyy` format.
 
 ### Added
 
+- Support for [BIP-0322](https://github.com/bitcoin/bips/blob/master/bip-0322.mediawiki) generic signed messages: a PSBT carrying the `PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE` global field (0x09) is now verified to have the exact BIP-322 *to_sign* structure and reviewed on-screen as a message signature (account, address and message), instead of being shown as a transaction with an `OP_RETURN` output and no fees. Proof-of-funds requests (additional inputs spending real coins of the account) are supported, with the total proven amount shown in the review. Works with any supported wallet policy, including multisig and miniscript.
 - Enable stack protector
 
 ### Changed
