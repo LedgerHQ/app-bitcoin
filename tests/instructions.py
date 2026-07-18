@@ -20,6 +20,20 @@ def message_instruction_approve(model: Firmware, save_screenshot=True) -> Instru
     return instructions
 
 
+def bip322_instruction_approve(model: Firmware, save_screenshot=True) -> Instructions:
+    # Navigation for the BIP-322 message review (account/address/message pairs, then sign)
+    instructions = Instructions(model)
+
+    if model.name.startswith("nano"):
+        instructions.nano_skip_screen("Address", save_screenshot=save_screenshot)
+        instructions.same_request("Sign message", save_screenshot=save_screenshot)
+    else:
+        instructions.review_message(save_screenshot=save_screenshot)
+        instructions.confirm_message(save_screenshot=save_screenshot)
+
+    return instructions
+
+
 def message_instruction_approve_long(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
