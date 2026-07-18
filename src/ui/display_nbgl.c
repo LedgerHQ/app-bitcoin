@@ -53,6 +53,7 @@ const char GA_REVIEW_MESSAGE[] = "Review message";
 const char GA_LOADING_TRANSACTION[] = "Loading transaction";
 const char GA_SIGNING_TRANSACTION[] = "Signing transaction";
 const char GA_LOADING_MESSAGE[] = "Loading message";
+const char GA_SIGNING_MESSAGE[] = "Signing message";
 
 // Non-default-sighash transaction summary labels (trustworthy-or-bust display)
 const char GA_FEE_NOT_AVAILABLE[] = "Not available";
@@ -511,6 +512,46 @@ void ui_sign_message_and_confirm_flow(bool is_hash) {
 
     nbgl_useCaseReview(TYPE_MESSAGE,
                        make_pair_list(2, true),
+                       &ICON_APP_ACTION,
+                       GA_REVIEW_MESSAGE,
+                       NULL,
+                       GA_SIGN_MESSAGE,
+                       start_processing_message_callback);
+}
+
+// BIP-322 message review: account (optional), the address being proven, the total amount of
+// the coins being proven (proof-of-funds only), and the message.
+void ui_display_bip322_message_flow(bool has_account, bool is_hash, bool has_proven_funds) {
+    unsigned int np = 0;
+
+    if (has_account) {
+        pairs[np++] =
+            (nbgl_layoutTagValue_t) {.item = "Account", .value = g_ui_state.bip322_message.account};
+    }
+
+    pairs[np++] =
+        (nbgl_layoutTagValue_t) {.item = "Address", .value = g_ui_state.bip322_message.address};
+
+    if (has_proven_funds) {
+        pairs[np++] = (nbgl_layoutTagValue_t) {.item = "Proving funds",
+                                               .value = g_ui_state.bip322_message.proven_amount};
+    }
+
+    const char *message_label;
+    if (!is_hash) {
+#ifdef SCREEN_SIZE_WALLET
+        message_label = "Message content";
+#else
+        message_label = "Message";
+#endif
+    } else {
+        message_label = "Message hash";
+    }
+    pairs[np++] =
+        (nbgl_layoutTagValue_t) {.item = message_label, .value = g_ui_state.bip322_message.message};
+
+    nbgl_useCaseReview(TYPE_MESSAGE,
+                       make_pair_list(np, true),
                        &ICON_APP_ACTION,
                        GA_REVIEW_MESSAGE,
                        NULL,

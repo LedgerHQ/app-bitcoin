@@ -68,6 +68,30 @@
 // in the application settings. Enable "Allow non-standard sighash" in the app settings to proceed.
 #define EC_SIGN_PSBT_NONDEFAULT_SIGHASH_NOT_ALLOWED 0x000d
 
+// The PSBT has the PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE field, but the transaction does not have
+// the structure mandated by BIP-322 for a to_sign transaction (single OP_RETURN output with
+// zero value, transaction version 0 or 2, zero input amount).
+#define EC_SIGN_PSBT_BIP322_INVALID_STRUCTURE 0x000e
+
+// The input of the BIP-322 to_sign transaction does not spend the to_spend transaction
+// recomputed from the signed message and the input's scriptPubKey. The message in the PSBT is
+// not the message that would be signed.
+#define EC_SIGN_PSBT_BIP322_TOSPEND_MISMATCH 0x000f
+
+// BIP-322 requires all signatures to use SIGHASH_ALL (or SIGHASH_DEFAULT for taproot inputs).
+#define EC_SIGN_PSBT_BIP322_FORBIDDEN_SIGHASH 0x0010
+
+// The PSBT is a valid BIP-322 message signing request, but uses features that are not yet
+// supported: timelocks (non-zero locktime or sequence).
+#define EC_SIGN_PSBT_BIP322_UNSUPPORTED 0x0011
+
+// BIP-322 message signing is not allowed when called from the Exchange app.
+#define EC_SIGN_PSBT_BIP322_NOT_ALLOWED_IN_SWAP 0x0012
+
+// All the inputs of a BIP-322 proof-of-funds must belong to the wallet policy: the total
+// proven amount shown to the user must be trustworthy, and external inputs cannot be signed.
+#define EC_SIGN_PSBT_BIP322_EXTERNAL_INPUTS 0x0013
+
 /**
  * Swap
  */
