@@ -50,6 +50,7 @@ from bitcoin_client.ledger_bitcoin.client_base import Client  # noqa: E402
 from bitcoin_client.ledger_bitcoin.psbt import PSBT  # noqa: E402
 
 from presets import (  # noqa: E402
+    build_psbt_from_spec,
     cache_file_path,
     cached_registration,
     store_registration,
@@ -313,9 +314,15 @@ def cmd_sign_psbt(args: argparse.Namespace) -> None:
         master_fpr = client.get_master_fingerprint().hex()
         hmac = ensure_registered(client, master_fpr, policy, refresh=args.no_cache)
 
+        psbt_spec = getattr(args, "psbt_spec", None)
         if args.fixture:
             print(f"[psbt] loading {args.fixture}", file=sys.stderr)
             psbt = load_psbt(Path(args.fixture))
+        elif psbt_spec is not None:
+            # TUI-only: a declarative PSBT shape (defines its own inputs/outputs,
+            # so --inputs/--outputs are ignored). Not exposed via argparse.
+            print("[psbt] building PSBT from preset spec", file=sys.stderr)
+            psbt = build_psbt_from_spec(policy, psbt_spec)
         else:
             print(
                 f"[psbt] generating fake PSBT ({args.inputs} in / {args.outputs} out)...",
@@ -323,12 +330,13 @@ def cmd_sign_psbt(args: argparse.Namespace) -> None:
             )
             psbt = make_fake_psbt(policy, args.inputs, args.outputs)
 
-            # TUI-only hook: a callable that mutates the generated PSBT
-            # before signing. Not exposed via argparse.
-            mutator = getattr(args, "psbt_mutator", None)
-            if mutator is not None:
-                print("[psbt] applying preset mutator", file=sys.stderr)
-                psbt = mutator(psbt)
+        # TUI-only hook: a callable that tweaks the generated PSBT before
+        # signing (escape hatch; composes on top of a spec). Not exposed via
+        # argparse, and never applied to a loaded fixture.
+        mutator = getattr(args, "psbt_mutator", None)
+        if mutator is not None and not args.fixture:
+            print("[psbt] applying preset mutator", file=sys.stderr)
+            psbt = mutator(psbt)
 
         if "musig(" in policy.descriptor_template:
             results = sign_psbt_musig2(client, policy, hmac, psbt, external_xprivs)
