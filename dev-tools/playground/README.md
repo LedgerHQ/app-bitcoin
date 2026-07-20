@@ -78,11 +78,19 @@ fields:
   fields so you can review or tweak it before pressing Run.
 
 - The `sign-psbt` tab also exposes **scenario presets** (e.g.
-  `huge-fee-wpkh`, `zero-outputs-tr`): same wallet-policy form, plus a
-  Python mutator that's applied to the auto-generated fake PSBT just before
-  signing. Useful for poking at edge-case device UX (high-fee warning,
-  zero outputs, …). Mutators only run when the PSBT textarea is empty; if
-  you paste a fixture the mutator is ignored.
+  `huge-fee-wpkh`, `external-inputs-net-receive`): same wallet-policy form,
+  plus a way to shape the auto-generated fake PSBT into an interesting state
+  before signing. Two mechanisms:
+  - a declarative **`PsbtSpec`** (preferred, used by both presets above) —
+    describes the inputs and outputs as data, including *external* inputs the
+    wallet can't sign and the exact fee; the spec defines its own input/output
+    set, so the "Generated inputs/outputs" fields are ignored;
+  - a **`psbt_mutator`** escape hatch — a Python callable `(psbt) -> psbt`
+    that tweaks the generated PSBT, for the rare tweak a spec can't express
+    (no preset currently needs it).
+  When a preset carries both, the spec builds the PSBT and the mutator tweaks
+  it. Both only run when the PSBT textarea is empty; if you paste a fixture
+  they're ignored.
 
 Pick `(no preset)` to keep editing the fields by hand.
 
@@ -159,9 +167,14 @@ Edit [presets.py](presets.py) and append to the relevant list:
   template, keys=[KeySpec(...), ...])` for a new wallet policy. Use
   `wallet_name=""` for standard single-sig (no registration); any
   non-empty string makes it a registrable policy.
-- `SIGN_PSBT_SCENARIO_PRESETS`: a `PolicyPreset` with `psbt_mutator`
-  set to a function `(psbt) -> psbt` that mutates the auto-generated fake
-  PSBT to put the device in some interesting state.
+- `SIGN_PSBT_SCENARIO_PRESETS`: a `PolicyPreset` that shapes the
+  auto-generated fake PSBT with a declarative `psbt_spec=PsbtSpec(...)`
+  describing the inputs (`PsbtInputSpec(amount, external=...)`), the outputs
+  (`PsbtOutputSpec(amount=..., is_change=...)`), and the exact `fee`. Leave one
+  output's `amount` unset to make it absorb the remainder. Keep at least one
+  internal (non-`external`) input so the device has something to sign. For the
+  rare tweak a spec can't express, `psbt_mutator=(psbt) -> psbt` is available
+  as an escape hatch (applied on top of the spec).
 
 `KeySpec(path, external_index=None)` means the key is sourced from the
 device at `path`; pass an `external_index` (`0`, `1`, or `2`) to use one
