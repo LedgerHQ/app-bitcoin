@@ -79,6 +79,15 @@ typedef struct {
     char message[MAX_DISPLAYBLE_MESSAGE_LENGTH + 1];
 } ui_path_and_message_state_t;
 
+// State for the BIP-322 message review. The message field is filled directly by the caller
+// (streamed from the client) before ui_display_bip322_message_and_confirm is invoked.
+typedef struct {
+    char account[MAX_WALLET_NAME_LENGTH + 1];
+    char address[MAX_ADDRESS_LENGTH_STR + 1];
+    char proven_amount[MAX_AMOUNT_LENGTH + 1];  // total of the proof-of-funds inputs
+    char message[MAX_DISPLAYBLE_MESSAGE_LENGTH + 1];
+} ui_bip322_message_state_t;
+
 typedef struct {
     char wallet_name[MAX_WALLET_NAME_LENGTH + 1];
 
@@ -159,6 +168,7 @@ typedef union {
     ui_path_and_pubkey_state_t path_and_pubkey;
     ui_path_and_address_state_t path_and_address;
     ui_path_and_message_state_t path_and_message;
+    ui_bip322_message_state_t bip322_message;
     ui_wallet_state_t wallet;
     ui_cosigner_pubkey_and_index_state_t cosigner_pubkey_and_index;
     ui_register_wallet_policy_state_t register_wallet_policy;
@@ -184,6 +194,20 @@ bool ui_display_message_and_confirm(dispatcher_context_t *context,
                                     const char *path_str,
                                     const char *message,
                                     bool is_hash);
+
+/**
+ * Shows the BIP-322 message review and asks for confirmation to sign.
+ * The message (or its hash) must already be in g_ui_state.bip322_message.message; account
+ * (NULL to hide the row) and address are copied into the UI state by this function.
+ * If has_proven_funds is true, a "Proving funds" row with the formatted proven_amount is
+ * shown (proof-of-funds variant).
+ */
+bool ui_display_bip322_message_and_confirm(dispatcher_context_t *context,
+                                           const char *account,
+                                           const char *address,
+                                           bool is_hash,
+                                           bool has_proven_funds,
+                                           uint64_t proven_amount);
 
 // Reviews a wallet policy to register. Pass `descriptor_template == NULL` to
 // hide the raw descriptor template (when the cleartext lines already fully
@@ -253,6 +277,8 @@ void set_ux_flow_response(bool approved);
 void ui_display_pubkey_flow(void);
 
 void ui_sign_message_and_confirm_flow(bool is_hash);
+
+void ui_display_bip322_message_flow(bool has_account, bool is_hash, bool has_proven_funds);
 
 void ui_display_receive_in_wallet_flow(void);
 

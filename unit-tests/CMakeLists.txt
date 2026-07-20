@@ -330,6 +330,16 @@ if(SPECULOS AND SPECULOS_SRC)
   target_link_libraries(test_script PRIVATE cmocka app_crypto)
   add_test(test_script test_script)
 
+  # test_bip322 exercises the BIP-322 to_spend construction (serialization and txid) against
+  # the vectors of the BIP. bip322.c is compiled into the test directly (it is not part of
+  # app_crypto); the UI/flow symbols it references are stubbed in the test file.
+  add_executable(test_bip322 test_bip322.c ../src/handler/sign_psbt/bip322.c)
+  app_apply_real_sdk_config(test_bip322)
+  target_include_directories(test_bip322 BEFORE PRIVATE ../src/ui)
+  target_link_libraries(test_bip322 PRIVATE cmocka mock_dispatcher app_crypto buffer buffer_ext
+                        varint read write bip32)
+  add_test(test_bip322 test_bip322)
+
   # test_sighash exercises classify_sighash (src/common/sighash.h), which only
   # depends on constants.h (and therefore the real SDK headers). No app object
   # code or syscalls are needed, so it just links cmocka.

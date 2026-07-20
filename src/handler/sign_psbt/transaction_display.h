@@ -44,3 +44,19 @@ bool display_transaction(
     dispatcher_context_t *dc,
     sign_psbt_state_t *st,
     const uint8_t internal_outputs[static BITVECTOR_REAL_SIZE(MAX_N_OUTPUTS_CAN_SIGN)]);
+
+/**
+ * Formats the human-readable label for a default (unregistered) account, e.g.
+ * "Native SegWit #2". Returns false if the purpose is not one of the default policies.
+ */
+bool format_default_account_label(int bip44_purpose, uint32_t account, char *out, size_t out_len);
+
+/**
+ * Shows the input verification warnings (external inputs, non-default sighash, missing
+ * non-witness UTXO), letting the user abort. Called by both the transaction review and the
+ * BIP-322 message review, so that any warning added in the future is surfaced in both flows.
+ *
+ * Returns true if the user did not abort; returns false and sends an error status word
+ * otherwise.
+ */
+bool display_warnings(dispatcher_context_t *dc, sign_psbt_state_t *st);

@@ -181,8 +181,7 @@ static bool __attribute__((noinline)) display_external_outputs(
     return true;
 }
 
-static bool __attribute__((noinline)) display_warnings(dispatcher_context_t *dc,
-                                                       sign_psbt_state_t *st) {
+bool __attribute__((noinline)) display_warnings(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     // If any input has non-default sighash, we warn the user
     if (st->warnings.non_default_sighash && !ui_warn_nondefault_sighash(dc)) {
         SEND_SW(dc, SW_DENY);
@@ -206,10 +205,7 @@ static bool __attribute__((noinline)) display_warnings(dispatcher_context_t *dc,
 }
 
 // Human-readable label for a default (unregistered) account, e.g. "Native SegWit #2"
-static bool format_default_account_label(int bip44_purpose,
-                                         uint32_t account,
-                                         char *out,
-                                         size_t out_len) {
+bool format_default_account_label(int bip44_purpose, uint32_t account, char *out, size_t out_len) {
     const char *type;
     switch (bip44_purpose) {
         case 44:

@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include "sign_psbt.h"
+#include "sign_psbt/bip322.h"
 #include "sign_psbt/init_global_state.h"
 #include "sign_psbt/preprocess_inputs.h"
 #include "sign_psbt/preprocess_outputs.h"
@@ -34,6 +35,7 @@
 #include "constants.h"
 #include "display.h"
 #include "dispatcher.h"
+#include "error_codes.h"
 #include "handle_swap_sign_transaction.h"
 #include "musig_sessions.h"
 #include "sign_psbt_cache.h"
@@ -62,6 +64,14 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     // read APDU inputs, initialize global state and read global PSBT map
     if (!init_global_state(dc, &st)) return;
 
+#ifdef HAVE_SWAP
+    if (G_called_from_swap && st.bip322.is_message_signing) {
+        PRINTF("BIP-322 message signing is not allowed during swap\n");
+        SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_SIGN_PSBT_BIP322_NOT_ALLOWED_IN_SWAP);
+        return;
+    }
+#endif /* HAVE_SWAP */
+
     sign_psbt_cache_t *cache = &G_sign_psbt_cache;
     init_sign_psbt_cache(cache);
 
@@ -89,6 +99,13 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
      *  Check if it's an acceptable output.
      */
     if (!preprocess_outputs(dc, &st, cache, internal_outputs)) return;
+
+    /** BIP-322 STRUCTURAL VALIDATION
+     *
+     *  If the PSBT declares itself as a BIP-322 message signing request, enforce the exact
+     *  to_sign structure; the PSBT is never reviewed as a transaction once the field is present.
+     */
+    if (st.bip322.is_message_signing && !bip322_validate(dc, &st)) return;
 
     // check if we're only executing the MuSig2 Round 1
     bool only_signing_for_musig = true;
@@ -137,11 +154,21 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
         } else
 #endif /* HAVE_SWAP */
         {
-            /** TRANSACTION CONFIRMATION
-             *
-             *  Display each non-change output, and transaction fees, and acquire user confirmation,
-             */
-            if (!display_transaction(dc, &st, internal_outputs)) return;
+            if (st.bip322.is_message_signing) {
+                /** BIP-322 MESSAGE CONFIRMATION
+                 *
+                 *  Review as a message signature (account, address, message), never as a
+                 *  transaction.
+                 */
+                if (!bip322_display_message(dc, &st)) return;
+            } else {
+                /** TRANSACTION CONFIRMATION
+                 *
+                 *  Display each non-change output, and transaction fees, and acquire user
+                 *  confirmation,
+                 */
+                if (!display_transaction(dc, &st, internal_outputs)) return;
+            }
         }
 
         // Signing always takes some time, so we rather not wait before showing the spinner
@@ -158,7 +185,11 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
         if (!G_called_from_swap)
 #endif /* HAVE_SWAP */
         {
-            ui_post_processing_confirm_transaction(dc, sign_result);
+            if (st.bip322.is_message_signing) {
+                ui_post_processing_confirm_message(dc, sign_result);
+            } else {
+                ui_post_processing_confirm_transaction(dc, sign_result);
+            }
         }
 
         if (!sign_result) {
