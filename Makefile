@@ -183,9 +183,6 @@ ifneq ($(AUTOAPPROVE_FOR_PERF_TESTS),0)
     endif
 endif
 
-# debugging helper functions and macros
-CFLAGS    += -include debug-helpers/debug.h
-
 # DEFINES   += HAVE_PRINT_STACK_POINTER
 
 ifeq ($(DEBUG),10)
