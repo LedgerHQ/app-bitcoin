@@ -295,8 +295,28 @@ static void prepare_tx_summary(ui_validate_transaction_state_t *state,
     state->spent_is_receive = false;
     state->seen_sighash = summary->seen_sighash;
     state->sighash_mixed = summary->sighash_mixed;
+    state->has_external_inputs = summary->has_external_inputs;
+    state->show_external_inputs_amount = summary->show_external_inputs_amount;
+
+    // The "External inputs amount" row is shown in both FULL and NET_ONLY when the input set
+    // is closed, so format it up front (independently of the mode).
+    if (summary->show_external_inputs_amount) {
+        format_sats_amount(COIN_COINID_SHORT,
+                           summary->external_inputs_amount,
+                           state->unverified_inputs);
+    }
+
     if (summary->mode == TX_DISPLAY_FULL) {
         format_sats_amount(COIN_COINID_SHORT, summary->fee, state->fee);
+
+        if (summary->has_external_inputs) {
+            // Also show the net amount actually spent/received, so the outputs and fee alone don't
+            // mislead the user.
+            state->spent_is_receive = summary->total_spent < 0;
+            uint64_t magnitude = summary->total_spent < 0 ? (uint64_t) -summary->total_spent
+                                                          : (uint64_t) summary->total_spent;
+            format_sats_amount(COIN_COINID_SHORT, magnitude, state->net_amount);
+        }
     } else if (summary->mode == TX_DISPLAY_NET_ONLY) {
         state->spent_is_receive = summary->total_spent < 0;
         uint64_t magnitude = summary->total_spent < 0 ? (uint64_t) -summary->total_spent

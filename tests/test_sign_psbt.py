@@ -895,6 +895,94 @@ def test_sign_psbt_with_external_inputs(navigator: Navigator, firmware: Firmware
         assert len(hww_sigs) == 1
 
 
+def test_sign_psbt_with_external_inputs_net_receive(navigator: Navigator, firmware: Firmware, client:
+                                                               RaggerClient, test_name: str):
+    # Three inputs and two outputs. Only the Taproot input belongs to this wallet; the change
+    # output is larger than that internal input, making the transaction a net receive. The review
+    # shows the external-input warning, external-input total, and net amount received.
+    psbt_b64 = "cHNidP8BAM8CAAAAA6G4I9IzbWlLSTTvm25bfeF6BVE9qKKdsCouy8eppv5tAQAAAAD9////USLCzeaCPlV1QXW5LJxXoKjhrIPDjheH/Tof8zSOlRMBAAAAAP3///96Kpl5VsCfjqf9KBnBqYe7FOIr+a3NryCol2NyLO7iZAEAAAAA/f///wKghgEAAAAAABYAFBOZuKCYR6A5sDUvWNISwYC6sX93ATboAAAAAAAiUSDY9PHRiZbbYbscr1Qj3iXYoe7pyVDTfm/6AjAS1eYuDQAAAAAAAQErp4apAAAAAAAiUSDY9PHRiZbbYbscr1Qj3iXYoe7pyVDTfm/6AjAS1eYuDSEWIS6ihWpc8RDmaivp1zUxR5P9vLOIsrjxPytq3pguevUZAPWswv1WAACAAQAAgAAAAIABAAAAAAAAAAEXICEuooVqXPEQ5mor6dc1MUeT/byziLK48T8rat6YLnr1AAEAjAIAAAAB7CMOUwlSVgUqJCgnDuwEmJRLEPbxxXj0McI9AJi0rloBAAAAFxYAFCgVOYIOLelzrkG6YAS0MckhxNht/v///wJycnUAAAAAABepFMi5Bq8pjHDmA6KMPvwvrhnmqygPh0BCDwAAAAAAGXapFMuuW1DPk55vUxuKa3q9eI/hSwKXiKyE8hwAIgYC7oYIIH4hAoQm9p52RH1+PV4HcEn15oPDE2wjFHYqRxgY9azC/SwAAIABAACAAAAAgAAAAAAAAAAAAAEAfQIAAAABr7+uBlkPdB/xr1m2rEYRJjNqTEqC21U99v76tzesM/MBAAAAAP3///8CcBEBAAAAAAAiACD97kQcVuWwbQ34LBJMcHAUpcoZZYvguYVryhbx7TJZ96X0MAAAAAAAFgAUOvhCmtWVSqXuijPJg/2KHoZ5kksAAAAAAQEfpfQwAAAAAAAWABQ6+EKa1ZVKpe6KM8mD/YoehnmSSyIGA+4sPZjrH5PAoaqOWkAJtw63tE6tFfFmbxNrASrVjTBoGPWswv1UAACAAQAAgAAAAIABAAAACAAAAAAAAQUgIS6ihWpc8RDmaivp1zUxR5P9vLOIsrjxPytq3pguevUhByEuooVqXPEQ5mor6dc1MUeT/byziLK48T8rat6YLnr1GQD1rML9VgAAgAEAAIAAAACAAQAAAAAAAAAA"
+    psbt = PSBT()
+    psbt.deserialize(psbt_b64)
+
+    wallet = WalletPolicy(
+        "",
+        "tr(@0/**)",
+        [
+            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
+        ],
+    )
+
+    hww_sigs = client.sign_psbt(psbt, wallet, None, navigator,
+                                instructions=sign_psbt_instruction_approve(firmware, has_external_inputs=True),
+                                testname=test_name)
+
+    assert len(hww_sigs) == 1
+
+
+def test_sign_psbt_external_input_unverified_segwitv0_net_only(navigator: Navigator, firmware: Firmware, client:
+                                                               RaggerClient, test_name: str):
+    # A wpkh (segwit v0) spend with an external input that provides only a (foreign) witness UTXO:
+    # its amount is never hash-verified against the prevout txid, and segwit v0 signatures don't
+    # commit to external inputs' amounts. A malicious host could therefore forge the external
+    # amount and the fee while the transaction stays valid (the external party signs its input with
+    # the real amount), so neither is trustworthy. The review must fall back to NET_ONLY: the
+    # trustworthy net "You spend" is shown, but the external-inputs total is omitted and the fee is
+    # shown as "Not available".
+    wallet = WalletPolicy(
+        "",
+        "wpkh(@0/**)",
+        [
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
+        ],
+    )
+
+    # Input 1 is external (foreign witness-utxo only, no non-witness-utxo).
+    psbt = txmaker.createPsbt(
+        wallet,
+        [3 * 100_000_000, 1 * 100_000_000],
+        [350_000_000, 49_000_000],
+        [False, True],
+        input_is_external=[False, True],
+    )
+
+    hww_sigs = client.sign_psbt(psbt, wallet, None, navigator,
+                                instructions=sign_psbt_instruction_approve(firmware, has_external_inputs=True),
+                                testname=test_name)
+
+    assert len(hww_sigs) == 1
+
+
+def test_sign_psbt_external_input_unverified_taproot_full(navigator: Navigator, firmware: Firmware, client:
+                                                          RaggerClient, test_name: str):
+    # Same shape as the segwit v0 test above, but signing a tr (taproot) account. A BIP341
+    # signature commits sha_amounts over *every* input, so even an external input with only an
+    # (unverified) witness UTXO is pinned to the transaction: lying about its amount would
+    # invalidate our signature. The review therefore stays FULL, showing the external-inputs total
+    # and the fee.
+    wallet = WalletPolicy(
+        "",
+        "tr(@0/**)",
+        [
+            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
+        ],
+    )
+
+    # Input 1 is external (foreign witness-utxo only, no non-witness-utxo).
+    psbt = txmaker.createPsbt(
+        wallet,
+        [3 * 100_000_000, 1 * 100_000_000],
+        [350_000_000, 49_000_000],
+        [False, True],
+        input_is_external=[False, True],
+    )
+
+    hww_sigs = client.sign_psbt(psbt, wallet, None, navigator,
+                                instructions=sign_psbt_instruction_approve(firmware, has_external_inputs=True),
+                                testname=test_name)
+
+    assert len(hww_sigs) == 1
+
+
 def test_sign_psbt_miniscript_multikey(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
     # An earlier (unreleased) version of the app had issues in recognizing the internal key in

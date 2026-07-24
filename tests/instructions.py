@@ -225,19 +225,24 @@ def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True,
             run_num = run_num + 1
 
     else:
+        # All the warnings below, plus the review that follows, are shown by the firmware
+        # within a single APDU exchange. They must therefore live in one request group
         if has_sighashwarning:
             # This transaction uses non-standard signing rules- actually clicking "Continue anyway"
-            instructions.choice_reject("Continue anyway")
+            funcdict[which_func]("Continue anyway", NavInsID.USE_CASE_REVIEW_TAP,
+                                 NavInsID.USE_CASE_CHOICE_REJECT, save_screenshot=save_screenshot)
             which_func = 'same_request'
 
         if has_external_inputs:
             # This transaction has external inputs- actually clicking "Continue anyway"
-            instructions.choice_reject("Continue anyway")
+            funcdict[which_func]("Continue anyway", NavInsID.USE_CASE_REVIEW_TAP,
+                                 NavInsID.USE_CASE_CHOICE_REJECT, save_screenshot=save_screenshot)
             which_func = 'same_request'
 
         if has_unverifiedwarning:
             # Non-default sighash - actually clicking "Continue anyway"
-            instructions.choice_reject("Continue anyway")
+            funcdict[which_func]("Continue anyway", NavInsID.USE_CASE_REVIEW_TAP,
+                                 NavInsID.USE_CASE_CHOICE_REJECT, save_screenshot=save_screenshot)
             which_func = 'same_request'
 
         funcdict[which_func]("Review", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,

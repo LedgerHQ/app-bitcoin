@@ -68,9 +68,17 @@ const char GA_AMOUNTS_UNAVAILABLE[] = "Cannot be verified\nReject if not sure";
 #endif
 const char GA_SIGNING_RULE_TITLE[] = "Signing rule";
 
-// Size of the tag/value pool for a transaction review; see the breakdown in the
-// static assert below (account row, per-output rows, fees, high-fee, "Signing rule").
-#define N_UX_PAIRS 52
+// Shown in FULL mode, and in NET_ONLY with a closed input set, when the transaction has external
+// (unverified) inputs.
+#ifdef SCREEN_SIZE_WALLET
+const char GA_UNVERIFIED_INPUTS_TITLE[] = "External inputs amount";
+#else
+const char GA_UNVERIFIED_INPUTS_TITLE[] = "External amounts";
+#endif
+
+// Size of the tag/value pool for a transaction review; see the breakdown in the static assert
+// below (account row, per-output rows, external-inputs rows, fees, high-fee, "Signing rule").
+#define N_UX_PAIRS 54
 
 static nbgl_layoutTagValue_t pairs[N_UX_PAIRS];
 static unsigned int n_pairs;
@@ -150,6 +158,28 @@ static unsigned int append_net_only_pairs(const ui_validate_transaction_state_t 
                                  .value = state->net_amount,
                                  .forcePageStart = force_page};
     pairs[idx++] = (nbgl_layoutTagValue_t) {.item = "Fees", .value = GA_FEE_NOT_AVAILABLE};
+    return idx;
+}
+
+// Appends the "External inputs amount" row (external inputs total, closed input set).
+static unsigned int append_external_amounts_row(const ui_validate_transaction_state_t *state,
+                                                unsigned int idx,
+                                                bool force_page) {
+    pairs[idx++] = (nbgl_layoutTagValue_t) {.item = GA_UNVERIFIED_INPUTS_TITLE,
+                                            .value = state->unverified_inputs,
+                                            .forcePageStart = force_page};
+    return idx;
+}
+
+// Appends, for a FULL-mode transaction with external inputs, the "External inputs amount" row
+// and the net "You spend/receive" row. The trustworthy "Fees" row is still added by the caller.
+static unsigned int append_external_inputs_pairs(const ui_validate_transaction_state_t *state,
+                                                 unsigned int idx,
+                                                 bool force_page) {
+    idx = append_external_amounts_row(state, idx, force_page);
+    pairs[idx++] =
+        (nbgl_layoutTagValue_t) {.item = state->spent_is_receive ? GA_YOU_RECEIVE : GA_YOU_SPEND,
+                                 .value = state->net_amount};
     return idx;
 }
 
@@ -250,8 +280,10 @@ static void start_transaction_callback(bool confirm) {
 #define SELF_TRANSFER_DESCRIPTION COMBINE("0 ", COMBINE(COIN_COINID_SHORT, " (self-transfer)"))
 
 void ui_display_transaction_simplified_flow_init(void) {
-    /* 1 From/To + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER*3 + 1 Fees + 1 High fees + 1 Signing rule */
-    _Static_assert(N_UX_PAIRS >= (1 + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER * 3 + 1 + 1 + 1),
+    /* 1 From/To + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER*3 + 2 external-inputs rows + 1 Fees + 1 High
+     * fees
+     * + 1 Signing rule */
+    _Static_assert(N_UX_PAIRS >= (1 + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER * 3 + 2 + 1 + 1 + 1),
                    "Insufficient pairs for this flow");
     n_pairs = 0;
 
@@ -299,8 +331,14 @@ void ui_display_transaction_simplified_flow_show(void) {
                                                      .centeredInfo = true,
                                                      .valueIcon = &ICON_APP_WARNING};
     } else if (state->display_mode == TX_DISPLAY_NET_ONLY) {
-        // Money-summary page: the net "You spend/receive" + untrusted fee on their own page.
-        n_pairs = append_net_only_pairs(state, n_pairs, /* force_page */ true);
+        // Money-summary page: with external inputs (closed set) the "External inputs amount"
+        // starts the page, followed by the net "You spend/receive" + untrusted fee.
+        if (state->show_external_inputs_amount) {
+            n_pairs = append_external_amounts_row(state, n_pairs, /* force_page */ true);
+            n_pairs = append_net_only_pairs(state, n_pairs, /* force_page */ false);
+        } else {
+            n_pairs = append_net_only_pairs(state, n_pairs, /* force_page */ true);
+        }
     } else {  // TX_DISPLAY_FULL
         if (state->warnings.high_fee) {
             pairs[n_pairs++] = (nbgl_contentTagValue_t) {.item = GA_WARN_HIGH_FEES_TITLE,
@@ -308,9 +346,15 @@ void ui_display_transaction_simplified_flow_show(void) {
                                                          .centeredInfo = true,
                                                          .valueIcon = &ICON_APP_IMPORTANT};
         }
+        bool force_summary_page = state->n_outputs > 1;
+        if (state->has_external_inputs) {
+            // "External inputs amount" + net "You spend/receive", then the fee flows after.
+            n_pairs = append_external_inputs_pairs(state, n_pairs, force_summary_page);
+            force_summary_page = false;
+        }
         pairs[n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Fees",
                                                     .value = state->fee,
-                                                    .forcePageStart = state->n_outputs > 1 ? 1 : 0};
+                                                    .forcePageStart = force_summary_page};
     }
 
     nbgl_useCaseReview(TYPE_TRANSACTION,
@@ -371,9 +415,17 @@ void ui_display_transaction_streaming_flow(bool is_self_transfer) {
     }
 
     if (state->display_mode == TX_DISPLAY_NET_ONLY) {
-        // net "You spend/receive" + untrusted fee (the "Signing rule" is on the context page)
+        // "External inputs amount" (closed set) + net "You spend/receive" + untrusted fee
+        // (the "Signing rule" is on the context page)
+        if (state->show_external_inputs_amount) {
+            l_n_pairs = append_external_amounts_row(state, l_n_pairs, /* force_page */ false);
+        }
         l_n_pairs = append_net_only_pairs(state, l_n_pairs, /* force_page */ false);
     } else {  // TX_DISPLAY_FULL
+        if (state->has_external_inputs) {
+            // "External inputs amount" + net "You spend/receive", then the trustworthy fee.
+            l_n_pairs = append_external_inputs_pairs(state, l_n_pairs, /* force_page */ false);
+        }
         pairs[l_n_pairs].item = "Fees";
         pairs[l_n_pairs++].value = state->fee;
     }

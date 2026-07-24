@@ -768,6 +768,39 @@ def test_sighash_two_outputs_anyonecanpay_net_only(navigator: Navigator, firmwar
     assert result[0][1].signature[-1] == 0x81
 
 
+def test_sighash_single_external_inputs_net_only(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    # NET_ONLY (SIGHASH_SINGLE, one committed output) with an external input and a closed input set.
+    # The input set being closed is not enough to trust the external amount: this is a segwit v0
+    # (wpkh) signing, whose signatures don't commit to external inputs' amounts, and the external
+    # input provides only an (unverified) witness UTXO. So the "External inputs amount" row must be
+    # omitted; only the net "You spend"/"You receive" and "Fees: Not available" are shown.
+    toggle_nonstandard_sighash_setting(navigator, firmware)
+    # Two-input P2WPKH PSBT: input 0 is ours with SIGHASH_SINGLE, input 1 is an external
+    # 500,000-sat input, and the single output includes those external funds minus a 145-sat fee.
+    psbt = PSBT()
+    psbt.deserialize("cHNidP8BAH4CAAAAAnoqmXlWwJ+Op/0oGcGph7sU4iv5rc2vIKiXY3Is7uJkAQAAAAD9////EREREREREREREREREREREREREREREREREREREREREREAAAAAAP////8BNJU4AAAAAAAZdqkUNEoPSMoVDsK5A4F2YLm2ixOmcCaIrAAAAAAAAQB9AgAAAAGvv64GWQ90H/GvWbasRhEmM2pMSoLbVT32/vq3N6wz8wEAAAAA/f///wJwEQEAAAAAACIAIP3uRBxW5bBtDfgsEkxwcBSlyhlli+C5hWvKFvHtMln3pfQwAAAAAAAWABQ6+EKa1ZVKpe6KM8mD/YoehnmSSwAAAAABAR+l9DAAAAAAABYAFDr4QprVlUql7oozyYP9ih6GeZJLAQMEAwAAACIGA+4sPZjrH5PAoaqOWkAJtw63tE6tFfFmbxNrASrVjTBoGPWswv1UAACAAQAAgAAAAIABAAAACAAAAAABAR8goQcAAAAAABYAFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+    result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, has_external_inputs=True),
+                              testname=test_name)
+    assert len(result) == 1
+    assert result[0][1].signature[-1] == 0x03
+
+
+def test_sighash_all_anyonecanpay_external_inputs_net_only(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    # NET_ONLY (ANYONECANPAY | ALL) with an external input and an open input set: the output and
+    # net "You spend" are shown, but the mutable "External inputs amount" must be omitted.
+    toggle_nonstandard_sighash_setting(navigator, firmware)
+    # Same two-input P2WPKH structure as above, but input 0 uses ANYONECANPAY | ALL, leaving the
+    # input set open even though the single output is committed.
+    psbt = PSBT()
+    psbt.deserialize("cHNidP8BAH4CAAAAAnoqmXlWwJ+Op/0oGcGph7sU4iv5rc2vIKiXY3Is7uJkAQAAAAD9////EREREREREREREREREREREREREREREREREREREREREREAAAAAAP////8BNJU4AAAAAAAZdqkUNEoPSMoVDsK5A4F2YLm2ixOmcCaIrAAAAAAAAQB9AgAAAAGvv64GWQ90H/GvWbasRhEmM2pMSoLbVT32/vq3N6wz8wEAAAAA/f///wJwEQEAAAAAACIAIP3uRBxW5bBtDfgsEkxwcBSlyhlli+C5hWvKFvHtMln3pfQwAAAAAAAWABQ6+EKa1ZVKpe6KM8mD/YoehnmSSwAAAAABAR+l9DAAAAAAABYAFDr4QprVlUql7oozyYP9ih6GeZJLAQMEgQAAACIGA+4sPZjrH5PAoaqOWkAJtw63tE6tFfFmbxNrASrVjTBoGPWswv1UAACAAQAAgAAAAIABAAAACAAAAAABAR8goQcAAAAAABYAFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+    result = client.sign_psbt(psbt, wpkh_wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True, has_external_inputs=True),
+                              testname=test_name)
+    assert len(result) == 1
+    assert result[0][1].signature[-1] == 0x81
+
+
 def test_sighash_mixed_across_inputs_unavailable(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     # Two internal inputs signed with different (non-default) sighashes: the signed inputs
     # disagree on what is committed, so no coherent amount/fee can be shown -> UNAVAILABLE.
