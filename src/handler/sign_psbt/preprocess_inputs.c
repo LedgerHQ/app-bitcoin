@@ -249,6 +249,12 @@ bool __attribute__((noinline)) preprocess_inputs(
         } else if (is_internal == 0) {
             ++st->n_external_inputs;
             st->warnings.external_inputs = true;
+            if (!input.has_nonWitnessUtxo) {
+                // The amount comes only from the (unverified) witness-utxo, not hash-verified
+                // against the prevout txid. Trustworthy only if we sign taproot inputs (which
+                // commit sha_amounts over all inputs).
+                st->external_amount_unverified = true;
+            }
             PRINTF("INPUT %d is external\n", cur_input_index);
             continue;
         }

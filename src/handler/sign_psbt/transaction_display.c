@@ -35,6 +35,7 @@
 #include "script.h"
 #include "sighash.h"
 #include "sw.h"
+#include "wallet.h"
 
 static bool __attribute__((noinline)) display_output(
     dispatcher_context_t *dc,
@@ -268,11 +269,20 @@ bool __attribute__((noinline)) display_transaction(
     bool has_external_inputs = st->warnings.external_inputs;
     uint64_t external_inputs_amount = st->inputs_total_amount - st->internal_inputs_total_amount;
 
-    // The external inputs total is only meaningful once their set is fixed: if any signed input is
-    // ANYONECANPAY the set is open and more inputs could be appended after signing. When closed,
-    // the amount is trustworthy regardless of the output/fee display mode, so we show it in
-    // NET_ONLY too.
-    bool show_external_inputs_amount = has_external_inputs && !st->sighash_inputs_open;
+    // The external inputs total (and the fee, consequently) can only be trusted when those amounts
+    // are committed to in the signatures: the input set must be closed (no ANYONECANPAY, else
+    // more inputs can be appended after signing) and either we sign taproot (BIP341 commits
+    // sha_amounts over every input) or each external amount was hash-verified via its
+    // non-witness-utxo.
+    // Otherwise a malicious host could forge them via an unverified witness-utxo while the
+    // transaction stays valid (the external party signs with the real one).
+    bool signing_taproot = (get_policy_segwit_version(st->account.policy_map) == 1);
+    bool external_amounts_committed =
+        !st->sighash_inputs_open && (signing_taproot || !st->external_amount_unverified);
+
+    // When pinned, the external inputs total is correct regardless of the output/fee display mode,
+    // so we show it in NET_ONLY too.
+    bool show_external_inputs_amount = has_external_inputs && external_amounts_committed;
 
     // Default sighash => FULL. Non-default => show only what the signed inputs commit to.
     tx_display_mode_t mode = TX_DISPLAY_FULL;
@@ -281,11 +291,16 @@ bool __attribute__((noinline)) display_transaction(
             mode = TX_DISPLAY_UNAVAILABLE;  // signed inputs disagree: nothing coherent
         } else {
             // uniform non-default sighash never fixes the whole set => fee never trustworthy
-            bool fee_trustworthy = false;
             bool outputs_committed =
                 sighash_commits_provided_outputs(st->seen_sighash, st->n_outputs);
-            mode = decide_tx_display_mode(fee_trustworthy, outputs_committed);
+            mode = decide_tx_display_mode(/*fee_trustworthy=*/false, outputs_committed);
         }
+    } else if (has_external_inputs && !external_amounts_committed) {
+        // Default sighash closes both the input and output sets, but the fee sums external
+        // amounts that are not committed to in the signature, so it isn't trustworthy. The outputs
+        // and the net amount from/to the spending account still are, so fall back to NET_ONLY (fee
+        // shown as "Not available").
+        mode = decide_tx_display_mode(/*fee_trustworthy=*/false, /*commits_all_outputs=*/true);
     }
 
     tx_summary_t summary = {.mode = mode,

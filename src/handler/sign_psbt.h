@@ -169,6 +169,12 @@ typedef struct {
     bool sighash_inputs_open;
     bool sighash_outputs_open;
 
+    // Set if some external input's amount is not verified by recomputing the txid (only a
+    // witness-utxo is provided, never validated against the prevout txid).
+    // Unless the internal inputs we sign are taproot inputs (which commit sha_amounts which
+    // includes all amounts), external amounts can't be trusted, nor can the fee.
+    bool external_amount_unverified;
+
     // Common sighash seen across the inputs we sign (DEFAULT canonicalized to ALL); valid if
     // !sighash_mixed.
     uint32_t seen_sighash;

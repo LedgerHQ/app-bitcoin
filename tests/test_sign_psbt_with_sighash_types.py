@@ -769,9 +769,11 @@ def test_sighash_two_outputs_anyonecanpay_net_only(navigator: Navigator, firmwar
 
 
 def test_sighash_single_external_inputs_net_only(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
-    # NET_ONLY (SIGHASH_SINGLE, one committed output) with an external input and a closed input set:
-    # the "External inputs amount" row is trustworthy here too, so it is shown alongside the net
-    # "You spend" and the untrusted "Fees: Not available".
+    # NET_ONLY (SIGHASH_SINGLE, one committed output) with an external input and a closed input set.
+    # The input set being closed is not enough to trust the external amount: this is a segwit v0
+    # (wpkh) signing, whose signatures don't commit to external inputs' amounts, and the external
+    # input provides only an (unverified) witness UTXO. So the "External inputs amount" row must be
+    # omitted; only the net "You spend"/"You receive" and "Fees: Not available" are shown.
     toggle_nonstandard_sighash_setting(navigator, firmware)
     # Two-input P2WPKH PSBT: input 0 is ours with SIGHASH_SINGLE, input 1 is an external
     # 500,000-sat input, and the single output includes those external funds minus a 145-sat fee.
