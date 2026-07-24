@@ -98,7 +98,8 @@ While the application only signs for the inputs that are proven as internal to t
 involved in the spend, certain attacks remain possible where a user is tricked into spending more
 than expected by approving multiple signing requests. Therefore, the application shows a
 **warning** when attempting to sign such transactions. Users **must not approve** such
-transactions unless they fully understand the warning and its consequences, and were expecting it.
+a transaction unless they fully understand the warning and its consequences, and were already
+expecting it.
 
 For transactions with external inputs, the following additional information is shown:
 - the total amount of external inputs, when it can be reliably determined

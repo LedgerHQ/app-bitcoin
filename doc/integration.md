@@ -181,13 +181,16 @@ example `SINGLE`, `ACP | ALL`, or `Mixed`).
 ### External inputs
 
 An *external input* is an input that the app cannot verify as belonging to the signing wallet
-policy. The app always **warns** about external inputs and, so the user can gauge the transaction's
-real effect, additionally shows:
+policy. The app always **warns** about external inputs and additionally shows the following, so the
+user can gauge the transaction's real effect:
 
 - the account's net **You spend** / **You receive** amount, since with external inputs the outputs
   and fee alone can be misleading (the transaction may even be a net *receive*);
 - the **total amount of the external inputs** — unless signing with `SIGHASH_ANYONECANPAY`, which
-  would make that quantity meaningless.
+  would make that quantity meaningless; or unless signing non-taproot transactions where the PSBT
+  does not include the non-witness-utxo for the external inputs, which makes the amounts not
+  trustworthy, as they are not committed to in the legacy or [SegWit](https://github.com/bitcoin/bips/blob/master/bip-0143.mediawiki)
+  signature algorithm.
 
 Both figures assume the external inputs indeed do not belong to the account used for signing the
 transaction, which is not something that the app can verify for sure; see
