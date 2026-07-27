@@ -73,6 +73,40 @@ Taproot policies may use `musig()` key expressions to aggregate several keys int
 single on-chain key, following [BIP-0327](https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki).
 The signing-flow details are covered in [musig.md](musig.md).
 
+## Advanced signing behaviors
+
+### Sighash flags
+
+The app normally signs its internal inputs with the default sighash type (`SIGHASH_ALL`, or
+`SIGHASH_DEFAULT` for taproot), committing to the whole transaction. Non-default sighash types
+(`SIGHASH_NONE`, `SIGHASH_SINGLE`, and the `SIGHASH_ANYONECANPAY` variants) on inputs the app
+would sign are an advanced use case and are **rejected unless the user first enables them** through
+the *Sighash types* application setting.
+When enabled, each such transaction is still confirmed with a warning. See [integration.md](integration.md#sighash-flags)
+for the setting, the error returned, and the client-side impact (none beyond the PSBT).
+
+### External inputs
+
+Any input of the transaction that is not recognized as belonging to the account the transaction
+is spending from is considered *external* by the application.
+
+The application *cannot* prove with certainty that such inputs are actually external, since
+malicious software wallets might (for example) not reveal the necessary BIP-32 derivations
+in the PSBT.
+
+While the application only signs for the inputs that are proven as internal to the wallet policy
+involved in the spend, certain attacks remain possible where a user is tricked into spending more
+than expected by approving multiple signing requests. Therefore, the application shows a
+**warning** when attempting to sign such transactions. Users **must not approve** such
+a transaction unless they fully understand the warning and its consequences, and were already
+expecting it.
+
+For transactions with external inputs, the following additional information is shown:
+- the total amount of external inputs, when it can be reliably determined
+  (see [integration.md](integration.md#external-inputs));
+- the net amount spent from (or received into) the account involved in the transaction,
+  *assuming that the external inputs are indeed external*.
+
 ## Networks
 
 The app is built per network: the mainnet build is named **Bitcoin**, and the testnet

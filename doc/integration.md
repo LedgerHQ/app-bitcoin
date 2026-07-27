@@ -132,6 +132,70 @@ signature may be returned for that input.
 The host is responsible for placing the returned signatures into the PSBT, **finalizing** it,
 **extracting** the signed transaction and (possibly) broadcasting it to the network.
 
+### Sighash flags
+
+By default, the app only signs PSBTs whose internal inputs use the *default* sighash type —
+`SIGHASH_ALL`, or `SIGHASH_DEFAULT` for taproot inputs — so the signature commits to the entire
+transaction. This is what virtually every wallet uses, and it lets the device show full,
+trustworthy details of what is being signed.
+
+The app can also sign with **non-default sighash types** (`SIGHASH_NONE`, `SIGHASH_SINGLE`, and
+any of the `SIGHASH_ANYONECANPAY` combinations), which are needed by certain advanced protocols.
+Because these signatures leave part of the transaction free to change after signing, they are
+**disabled by default**: if an input the app would sign carries a non-default sighash, the PSBT is
+rejected with
+`SW_SECURITY_STATUS_NOT_SATISFIED` (error code `0x000d`, `EC_SIGN_PSBT_NONDEFAULT_SIGHASH_NOT_ALLOWED`),
+and the device briefly shows a notice explaining that the feature is turned off.
+
+For `SIGHASH_SINGLE`, each signed input must have a corresponding output at the same index. If a
+signed input's index is greater than or equal to the number of outputs, the app rejects the PSBT
+with `SW_NOT_SUPPORTED` (error code `0x0008`, `EC_SIGN_PSBT_UNALLOWED_SIGHASH_SINGLE`).
+
+To use them, the user must first opt in through the application settings. Once enabled, signing
+with a non-default sighash is allowed, but still *always* requires explicit user confirmation,
+after a warning and a clear description of the signing rule in use.
+
+### What the device shows when signing
+
+The trusted-screen review adapts to *what the signatures actually commit to*, so the amounts the
+user approves are always meaningful. Depending on the sighash flags of the signed inputs, one of
+three levels of detail is shown:
+
+- **Full details** — used for the default sighash (`SIGHASH_ALL` / `SIGHASH_DEFAULT`) on every
+  signed input. The review lists each external output with its amount and destination, plus the fee.
+  (If the transaction also has external inputs, a couple of extra rows are added; see
+  [External inputs](#external-inputs) below.)
+- **Net amount only** — used for a uniform non-default sighash that still commits to a certain net
+  spend or net receive. The exact fee cannot be known, so in addition to the output list, the device
+  shows the amount spent from (or received into) the account involved in the transaction being signed.
+  The fee is displayed as **Not available**.
+- **Amounts unavailable** — used when nothing coherent can be shown: the signed inputs use different
+  (*mixed*) sighash flags, or a sighash that does not even fix the set of outputs (`NONE`, or
+  `SINGLE` with more than one output, and their `ANYONECANPAY` variants). The device then shows only
+  a notice, and the user merely confirms that they expected and trust the transaction. This is
+  inherently dangerous.
+
+For any non-default sighash, a **Signing rule** row additionally names the effective flag (for
+example `SINGLE`, `ACP | ALL`, or `Mixed`).
+
+### External inputs
+
+An *external input* is an input that the app cannot verify as belonging to the signing wallet
+policy. The app always **warns** about external inputs and additionally shows the following, so the
+user can gauge the transaction's real effect:
+
+- the account's net **You spend** / **You receive** amount, since with external inputs the outputs
+  and fee alone can be misleading (the transaction may even be a net *receive*);
+- the **total amount of the external inputs** — unless signing with `SIGHASH_ANYONECANPAY`, which
+  would make that quantity meaningless; or unless signing non-taproot transactions where the PSBT
+  does not include the non-witness-utxo for the external inputs, which makes the amounts not
+  trustworthy, as they are not committed to in the legacy or [SegWit](https://github.com/bitcoin/bips/blob/master/bip-0143.mediawiki)
+  signature algorithm.
+
+Both figures assume the external inputs indeed do not belong to the account used for signing the
+transaction, which is not something that the app can verify for sure; see
+[features.md](features.md#external-inputs) for why that assumption, and the warning, matter.
+
 ### Transactions with Wallet Policies using MuSig2
 
 For policies that use `musig()` key expressions, signing is a two-round protocol: the first round
