@@ -1,13 +1,16 @@
 import hmac
 from hashlib import sha256
+from io import BytesIO
 
 import pytest
 
 from ledger_bitcoin import MultisigWallet, WalletPolicy, AddressType, PartialSignature
 from ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 from ledger_bitcoin.exception.device_exception import DeviceException
+from ledger_bitcoin.key import ExtendedKey
 from ledger_bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
 from ledger_bitcoin.tx import CTxIn, CTxOut, COutPoint
+from ledger_bitcoin._embit.descriptor.miniscript import Miniscript
 
 from ragger.navigator import Navigator
 from ragger.error import ExceptionRAPDU
@@ -28,9 +31,11 @@ from test_utils.bip0322 import (
     encode_simple_signature,
     PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE,
 )
+from test_utils.musig2 import HotMusig2Cosigner, derive_plain_descriptor, run_musig2_test
 from test_utils.taproot_sighash import TaprootSignatureHash
 
 from .instructions import bip322_instruction_approve
+from .test_sign_psbt_musig import LedgerMusig2Cosigner
 
 # error codes defined in error_codes.h
 EC_SIGN_PSBT_BIP322_INVALID_STRUCTURE = 0x000E
@@ -345,3 +350,82 @@ def test_sign_bip322_pof_external_input(navigator: Navigator, firmware: Firmware
 
     expect_sign_psbt_error(client, navigator, firmware, test_name, psbt,
                            IncorrectDataError, EC_SIGN_PSBT_BIP322_EXTERNAL_INPUTS)
+
+
+def test_sign_bip322_musig_keypath(navigator: Navigator, firmware: Firmware, client: RaggerClient,
+                                   test_name: str, speculos_globals: SpeculosGlobals):
+    # BIP-322 message signing for a taproot keypath musig() policy. The device controls one of
+    # the two musig participants; the two-round MuSig2 flow runs exactly as for a transaction,
+    # except the request is reviewed (and displayed) as a message signature.
+    cosigner_1_xpub = "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
+
+    cosigner_2_xpriv = "tprv8gFWbQBTLFhbX3EK3cS7LmenwE3JjXbD9kN9yXfq7LcBm81RSf8vPGPqGPjZSeX41LX9ZN14St3z8YxW48aq5Yhr9pQZVAyuBthfi6quTCf"
+    cosigner_2_xpub = "tpubDCwYjpDhUdPGQWG6wG6hkBJuWFZEtrn7j3xwG3i8XcQabcGC53xWZm1hSXrUPFS5UvZ3QhdPSjXWNfWmFGTioARHuG5J7XguEjgg7p8PxAm"
+
+    wallet_policy = WalletPolicy(
+        name="Musig message signer",
+        descriptor_template="tr(musig(@0,@1)/**)",
+        keys_info=[cosigner_1_xpub, cosigner_2_xpub],
+    )
+    wallet_hmac = hmac.new(
+        speculos_globals.wallet_registration_key, wallet_policy.id, sha256).digest()
+
+    message = b"I control this musig address"
+    psbt = build_bip322_psbt(wallet_policy, message)
+
+    # the to_sign transaction spends the single virtual to_spend output (a zero-value taproot
+    # output), so the sighash is the SIGHASH_DEFAULT taproot keypath sighash over it
+    challenge_script = bytes(psbt.inputs[0].witness_utxo.scriptPubKey)
+    sighash = TaprootSignatureHash(psbt.tx, [CTxOut(0, challenge_script)], 0, 0)
+
+    # the device controls one musig participant; a hot cosigner supplies the other
+    signer_1 = LedgerMusig2Cosigner(
+        client, wallet_policy, wallet_hmac, navigator=navigator,
+        instructions=bip322_instruction_approve(firmware, save_screenshot=False),
+        testname=test_name)
+    signer_2 = HotMusig2Cosigner(wallet_policy, cosigner_2_xpriv)
+
+    run_musig2_test(wallet_policy, psbt, [signer_1, signer_2], [sighash])
+
+
+def test_sign_bip322_musig_scriptpath(navigator: Navigator, firmware: Firmware, client: RaggerClient,
+                                      test_name: str, speculos_globals: SpeculosGlobals):
+    # BIP-322 message signing for a musig() key expression sitting in a tapscript leaf. The
+    # device signs the leaf script path, so the sighash uses the tapscript (leaf) variant.
+    cosigner_1_xpub = "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
+
+    cosigner_2_xpriv = "tprv8gFWbQBTLFhbX3EK3cS7LmenwE3JjXbD9kN9yXfq7LcBm81RSf8vPGPqGPjZSeX41LX9ZN14St3z8YxW48aq5Yhr9pQZVAyuBthfi6quTCf"
+    cosigner_2_xpub = ExtendedKey.deserialize(cosigner_2_xpriv).neutered().to_string()
+
+    wallet_policy = WalletPolicy(
+        name="Musig script msg",
+        descriptor_template="tr(@0/**,pk(musig(@1,@2)/**))",
+        keys_info=[
+            "tpubD6NzVbkrYhZ4WLczPJWReQycCJdd6YVWXubbVUFnJ5KgU5MDQrD998ZJLSmaB7GVcCnJSDWprxmrGkJ6SvgQC6QAffVpqSvonXmeizXcrkN",
+            cosigner_1_xpub,
+            cosigner_2_xpub,
+        ],
+    )
+    wallet_hmac = hmac.new(
+        speculos_globals.wallet_registration_key, wallet_policy.id, sha256).digest()
+
+    message = b"Musig in a tapscript leaf"
+    psbt = build_bip322_psbt(wallet_policy, message)
+
+    # the device signs the tapscript leaf that contains the musig() key; recompute the leaf
+    # script (change=0, address_index=0) to derive the corresponding tapscript sighash
+    challenge_script = bytes(psbt.inputs[0].witness_utxo.scriptPubKey)
+    leaf_desc = derive_plain_descriptor(
+        "pk(musig(@1,@2)/**)", wallet_policy.keys_info, False, 0)
+    leaf_script = Miniscript.read_from(
+        BytesIO(leaf_desc.encode()), taproot=True).compile()
+    sighash = TaprootSignatureHash(psbt.tx, [CTxOut(0, challenge_script)], 0, 0,
+                                   scriptpath=True, script=leaf_script)
+
+    signer_1 = LedgerMusig2Cosigner(
+        client, wallet_policy, wallet_hmac, navigator=navigator,
+        instructions=bip322_instruction_approve(firmware, save_screenshot=False),
+        testname=test_name)
+    signer_2 = HotMusig2Cosigner(wallet_policy, cosigner_2_xpriv)
+
+    run_musig2_test(wallet_policy, psbt, [signer_1, signer_2], [sighash])
