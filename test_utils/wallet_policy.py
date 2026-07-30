@@ -177,7 +177,7 @@ class Tree:
             assert self.left is not None and self.right is not None
             left_h = self.left.get_taptree_hash(
                 keys_info, is_change, address_index)
-            right_h = self.left.get_taptree_hash(
+            right_h = self.right.get_taptree_hash(
                 keys_info, is_change, address_index)
             if left_h <= right_h:
                 return tagged_hash("TapBranch", left_h + right_h)
