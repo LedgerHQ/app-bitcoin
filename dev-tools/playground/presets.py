@@ -212,6 +212,9 @@ def build_psbt_from_spec(policy, spec: PsbtSpec) -> PSBT:
     explicit_total = sum(o.amount for o in spec.outputs if o.amount is not None)
 
     if unbalanced:
+        if spec.fee != 0:
+            raise ValueError("fee must be 0 (or omitted) when a sighash doesn't commit to all amounts")
+
         # No fee to spread around: such a sighash leaves the transaction open, so
         # there is nothing for a remainder output to absorb.
         if remainder_indices:
@@ -342,6 +345,23 @@ POLICY_PRESETS: List[PolicyPreset] = [
             KeySpec("m/48'/1'/0'/2'", external_index=0),
         ],
     ),
+
+    PolicyPreset(
+        name="tr-miniscript-3key",
+        description=(
+            "Taproot miniscript: internal keypath"
+            " + external single-key"
+            " + external timelocked single-sig"
+        ),
+        wallet_name="TR miniscript 3key",
+        template="tr(@0/**,{pk(@1/**),and_v(v:pk(@2/<0;1>/*),older(52560))})",
+        keys=[
+            KeySpec("m/86'/1'/0'"),                    # device: key-path spend
+            KeySpec("m/86'/1'/0'", external_index=0),  # ext1: immediate script-path
+            KeySpec("m/86'/1'/0'", external_index=1),  # ext2: timelock script-path
+        ],
+    ),
+
 
     # --- musig2 -------------------------------------------------------------
     PolicyPreset(
