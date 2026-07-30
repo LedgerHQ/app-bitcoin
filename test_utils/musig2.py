@@ -230,7 +230,7 @@ class Tree:
             assert self.left is not None and self.right is not None
             left_h = self.left.get_taptree_hash(
                 keys_info, is_change, address_index)
-            right_h = self.left.get_taptree_hash(
+            right_h = self.right.get_taptree_hash(
                 keys_info, is_change, address_index)
             if left_h <= right_h:
                 return taproot.tagged_hash("TapBranch", left_h + right_h)
@@ -359,10 +359,10 @@ class TrDescriptorTemplate:
             for placeholder, script in self.tree.placeholders():
                 yield (placeholder, script)
 
-    def get_taptree_hash(self, is_change: bool, address_index: int) -> bytes:
+    def get_taptree_hash(self, keys_info: List[str], is_change: bool, address_index: int) -> bytes:
         if self.tree is None:
             raise ValueError("There is no taptree")
-        return self.tree.get_taptree_hash(is_change, address_index)
+        return self.tree.get_taptree_hash(keys_info, is_change, address_index)
 
 
 class PsbtMusig2Cosigner(ABC):
@@ -506,7 +506,8 @@ def process_placeholder(
     if tapleaf_desc is None:
         t = der_key.pubkey[-32:]
         if desc_tmpl.tree is not None:
-            t += desc_tmpl.get_taptree_hash(is_change, address_index)
+            t += desc_tmpl.get_taptree_hash(
+                wallet_policy.keys_info, is_change, address_index)
         tweaks.append(taproot.tagged_hash("TapTweak", t))
         is_xonly_tweak.append(True)
 

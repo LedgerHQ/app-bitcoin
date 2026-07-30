@@ -167,6 +167,11 @@ class PsbtSpec:
     small `fee` with a change remainder gives a net receive. If every output has
     an explicit amount there is no free variable, so `fee` must equal
     `total_in - sum(outputs)` exactly (else it's a mistake and we raise).
+
+    All of that assumes the transaction is complete, which holds only as long as
+    every input commits to all the amounts — i.e. uses SIGHASH_DEFAULT or
+    SIGHASH_ALL (or omits the field). If there are other sighash flags, every
+    output must set `amount` explicitly, and `fee` is ignored.
     """
     inputs: List[PsbtInputSpec]
     outputs: List[PsbtOutputSpec]
@@ -181,19 +186,45 @@ def build_psbt_from_spec(policy, spec: PsbtSpec) -> PSBT:
     verbatim. `spec.fee` is always honored — via the remainder if there is one,
     otherwise as a checked invariant against `total_in - sum(outputs)`. A
     per-input `sighash` is copied onto the built PSBT input.
+
+    Exception: if any input sets a `sighash` that doesn't commit to all the
+    amounts, the transaction is not required to balance (see `PsbtSpec`), so every
+    output must set `amount`, and `spec.fee` is neither used nor checked — outputs
+    may exceed the inputs.
     """
-    from test_utils.txmaker import createPsbt  # local import (heavy)
+    # local imports (heavy module)
+    from test_utils.txmaker import createPsbt, sighash_commits_to_all_amounts
 
     input_amounts = [i.amount for i in spec.inputs]
     input_is_external = [i.external for i in spec.inputs]
+    input_sighashes = [i.sighash for i in spec.inputs]
     total_in = sum(input_amounts)
+
+    # SIGHASH_DEFAULT / SIGHASH_ALL still fix every amount, so they keep the
+    # ordinary balanced treatment, exactly like an unset sighash.
+    unbalanced = not all(
+        sighash_commits_to_all_amounts(sighash) for sighash in input_sighashes
+    )
 
     remainder_indices = [n for n, o in enumerate(spec.outputs) if o.amount is None]
     if len(remainder_indices) > 1:
         raise ValueError("at most one output may omit `amount` (the remainder)")
     explicit_total = sum(o.amount for o in spec.outputs if o.amount is not None)
 
-    if remainder_indices:
+    if unbalanced:
+        if spec.fee != 0:
+            raise ValueError("fee must be 0 (or omitted) when a sighash doesn't commit to all amounts")
+
+        # No fee to spread around: such a sighash leaves the transaction open, so
+        # there is nothing for a remainder output to absorb.
+        if remainder_indices:
+            raise ValueError(
+                "every output must set `amount` when an input sets a `sighash` "
+                "that doesn't commit to all the amounts: such a transaction need "
+                "not balance, so there is no fee for a remainder output to absorb"
+            )
+        output_amounts = [o.amount for o in spec.outputs]
+    elif remainder_indices:
         remainder = total_in - explicit_total - spec.fee
         if remainder < 0:
             raise ValueError(
@@ -220,15 +251,10 @@ def build_psbt_from_spec(policy, spec: PsbtSpec) -> PSBT:
         output_amounts = [o.amount for o in spec.outputs]
     output_is_change = [o.is_change for o in spec.outputs]
 
-    psbt = createPsbt(
-        policy, input_amounts, output_amounts, output_is_change, input_is_external
+    return createPsbt(
+        policy, input_amounts, output_amounts, output_is_change, input_is_external,
+        input_sighashes,
     )
-
-    for i, inp in enumerate(spec.inputs):
-        if inp.sighash is not None:
-            psbt.inputs[i].sighash = inp.sighash
-
-    return psbt
 
 
 # ----- wallet-policy presets -------------------------------------------------
@@ -319,6 +345,23 @@ POLICY_PRESETS: List[PolicyPreset] = [
             KeySpec("m/48'/1'/0'/2'", external_index=0),
         ],
     ),
+
+    PolicyPreset(
+        name="tr-miniscript-3key",
+        description=(
+            "Taproot miniscript: internal keypath"
+            " + external single-key"
+            " + external timelocked single-sig"
+        ),
+        wallet_name="TR miniscript 3key",
+        template="tr(@0/**,{pk(@1/**),and_v(v:pk(@2/<0;1>/*),older(52560))})",
+        keys=[
+            KeySpec("m/86'/1'/0'"),                    # device: key-path spend
+            KeySpec("m/86'/1'/0'", external_index=0),  # ext1: immediate script-path
+            KeySpec("m/86'/1'/0'", external_index=1),  # ext2: timelock script-path
+        ],
+    ),
+
 
     # --- musig2 -------------------------------------------------------------
     PolicyPreset(
@@ -412,8 +455,8 @@ SIGN_PSBT_SCENARIO_PRESETS: List[PolicyPreset] = [
                 PsbtInputSpec(50_000_000, sighash=SIGHASH_ALL | SIGHASH_ANYONECANPAY),
             ],
             outputs=[
-                PsbtOutputSpec(amount=120_000_000),  # recipient
-                PsbtOutputSpec(is_change=True),      # change
+                PsbtOutputSpec(amount=120_000_000),              # recipient
+                PsbtOutputSpec(amount=80_999_000, is_change=True),  # change
             ],
         ),
     ),
@@ -429,8 +472,8 @@ SIGN_PSBT_SCENARIO_PRESETS: List[PolicyPreset] = [
                 PsbtInputSpec(50_000_000, sighash=SIGHASH_NONE),
             ],
             outputs=[
-                PsbtOutputSpec(amount=120_000_000),  # recipient
-                PsbtOutputSpec(is_change=True),      # change
+                PsbtOutputSpec(amount=120_000_000),              # recipient
+                PsbtOutputSpec(amount=80_999_000, is_change=True),  # change
             ],
         ),
     ),

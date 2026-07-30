@@ -397,9 +397,22 @@ def fill_inout(wallet_policy: WalletPolicy, inout: Union[PartiallySignedInput, P
                 derived_key_origin = KeyOriginInfo(fpr, placeholder_der_subpath)
                 inout.hd_keypaths[derived_pubkey.pubkey] = derived_key_origin
 
-def createPsbt(wallet_policy: WalletPolicy, input_amounts: List[int], output_amounts: List[int], output_is_change: List[bool], input_is_external: Optional[List[bool]] = None) -> PSBT:
+# Sighash types that commit to every input and output: SIGHASH_DEFAULT (0x00,
+# taproot only) and SIGHASH_ALL (0x01).
+_SIGHASH_TYPES_COMMITTING_TO_ALL = (0x00, 0x01)
+
+
+def sighash_commits_to_all_amounts(sighash: Optional[int]) -> bool:
+    """True if `sighash` fixes both the input and the output set, so that a
+    transaction signed with it must balance. `None` means PSBT_IN_SIGHASH_TYPE is
+    omitted, i.e. the default, which does. Everything else (NONE or SINGLE, which
+    leave outputs open, and any type with ANYONECANPAY OR-ed on top, which leaves
+    the inputs open) does not."""
+    return sighash is None or sighash in _SIGHASH_TYPES_COMMITTING_TO_ALL
+
+
+def createPsbt(wallet_policy: WalletPolicy, input_amounts: List[int], output_amounts: List[int], output_is_change: List[bool], input_is_external: Optional[List[bool]] = None, input_sighashes: Optional[List[Optional[int]]] = None) -> PSBT:
     assert len(output_amounts) == len(output_is_change)
-    assert sum(output_amounts) <= sum(input_amounts)
 
     # input_is_external marks inputs the wallet policy does NOT own: they get a
     # foreign prevout and no key-derivation info, so the app treats them as
@@ -407,6 +420,19 @@ def createPsbt(wallet_policy: WalletPolicy, input_amounts: List[int], output_amo
     if input_is_external is None:
         input_is_external = [False] * len(input_amounts)
     assert len(input_is_external) == len(input_amounts)
+
+    # input_sighashes[i] is the PSBT_IN_SIGHASH_TYPE of input i; None means the
+    # field is omitted, i.e. the default sighash. Defaults to all-default.
+    if input_sighashes is None:
+        input_sighashes = [None] * len(input_amounts)
+    assert len(input_sighashes) == len(input_amounts)
+
+    # A complete transaction cannot spend more than it receives. A sighash that
+    # doesn't commit to all the amounts leaves the transaction open — under
+    # ANYONECANPAY the missing value comes from inputs another signer adds — so it
+    # need not balance, and the check doesn't apply.
+    if all(sighash_commits_to_all_amounts(sighash) for sighash in input_sighashes):
+        assert sum(output_amounts) <= sum(input_amounts)
 
     vin: List[CTxIn] = [CTxIn() for _ in input_amounts]
     vout: List[CTxOut] = [CTxOut() for _ in output_amounts]
@@ -491,6 +517,9 @@ def createPsbt(wallet_policy: WalletPolicy, input_amounts: List[int], output_amo
         wallet_policy.descriptor_template)
 
     for input_index, input in enumerate(psbt.inputs):
+        if input_sighashes[input_index] is not None:
+            input.sighash = input_sighashes[input_index]
+
         if input_is_external[input_index]:
             # External input: only the (foreign) witness UTXO, so its amount is
             # known, but deliberately no derivation info => seen as external.
