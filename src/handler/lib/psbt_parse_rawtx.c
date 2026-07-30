@@ -125,11 +125,11 @@ static int parse_rawtxinput_scriptsig(parse_rawtxinput_state_t *state, buffer_t 
     uint8_t data[32];
 
     while (true) {
-        int remaining_len = state->scriptsig_size - state->scriptsig_counter;
+        size_t remaining_len = state->scriptsig_size - state->scriptsig_counter;
 
         // We read in chunks of at most 32 bytes, so that we can always interrupt with less than 32
         // unparsed bytes
-        int data_len = MIN(32, remaining_len);
+        size_t data_len = MIN(32, remaining_len);
 
         bool read_result = dbuffer_read_bytes(buffers, data, data_len);
         if (!read_result) {
@@ -193,6 +193,12 @@ static int parse_rawtxoutput_scriptpubkey_size(parse_rawtxoutput_state_t *state,
     uint64_t scriptpubkey_size;
     bool result = dbuffer_read_varint(buffers, &scriptpubkey_size);
     if (result) {
+        // Every output is streamed and hashed here, since that is what the txid is computed from;
+        // therefore, we have to tolerate sizes larger than MAX_PREVOUT_SCRIPTPUBKEY_LEN
+        if (scriptpubkey_size > UINT32_MAX) {
+            return -1;
+        }
+
         state->scriptpubkey_size = (unsigned int) scriptpubkey_size;
 
         crypto_hash_update_varint(&state->parent_state->hash_context->header, scriptpubkey_size);
@@ -200,6 +206,12 @@ static int parse_rawtxoutput_scriptpubkey_size(parse_rawtxoutput_state_t *state,
         if (state->parent_state->output_index != -1) {
             unsigned int relevant_output_index = (unsigned int) state->parent_state->output_index;
             if (state->parent_state->out_counter == relevant_output_index) {
+                if (scriptpubkey_size > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
+                    // the requested output's scriptPubKey must fit in parser_outputs; such an
+                    // output is not spendable anyway
+                    return -1;
+                }
+
                 state->parent_state->parser_outputs->vout_scriptpubkey_len =
                     (unsigned int) scriptpubkey_size;
             }
@@ -221,11 +233,11 @@ static int parse_rawtxoutput_scriptpubkey(parse_rawtxoutput_state_t *state, buff
     uint8_t data[32];
 
     while (true) {
-        int remaining_len = state->scriptpubkey_size - state->scriptpubkey_counter;
+        size_t remaining_len = state->scriptpubkey_size - state->scriptpubkey_counter;
 
         // We read in chunks of at most 32 bytes, so that we can always interrupt with less than 32
         // unparsed bytes
-        int data_len = MIN(32, remaining_len);
+        size_t data_len = MIN(32, remaining_len);
 
         bool read_result = dbuffer_read_bytes(buffers, data, data_len);
         if (!read_result) {
@@ -454,11 +466,11 @@ static int parse_rawtx_witnesses(parse_rawtx_state_t *state, buffer_t *buffers[2
 
             while (state->cur_wit_el_bytes_read < state->cur_wit_elem_len) {
                 uint8_t data[32];
-                int remaining_len = state->cur_wit_elem_len - state->cur_wit_el_bytes_read;
+                size_t remaining_len = state->cur_wit_elem_len - state->cur_wit_el_bytes_read;
 
                 // We read in chunks of at most 32 bytes, so that we can always interrupt with less
                 // than 32 unparsed bytes
-                int data_len = MIN(32, remaining_len);
+                size_t data_len = MIN(32, remaining_len);
                 if (!dbuffer_read_bytes(buffers, data, data_len)) {
                     return 0;
                 }
@@ -556,6 +568,11 @@ int call_psbt_parse_rawtx(dispatcher_context_t *dispatcher_context,
 
     res = call_stream_preimage(dispatcher_context, value_hash, NULL, cb_process_data, &flow_state);
     if (res < 0 || flow_state.parser_error) {
+        return -1;
+    }
+
+    if (flow_state.parser_context.cur_step != n_parse_rawtx_steps) {
+        // incomplete parsing
         return -1;
     }
 
