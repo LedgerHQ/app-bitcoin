@@ -88,10 +88,7 @@ def _preset_choices(presets) -> list[tuple[str, str]]:
     """
     out: list[tuple[str, str]] = [("(no preset)", NO_PRESET)]
     for p in presets:
-        desc = p.description
-        if len(desc) > 70:
-            desc = desc[:67] + "..."
-        out.append((f"{p.name} — {desc}", p.name))
+        out.append((f"{p.name} — {p.description}", p.name))
     return out
 
 
@@ -246,6 +243,14 @@ class PlaygroundApp(App):
     }
     .form-row Input {
         width: 1fr;
+    }
+    /* Preset dropdowns. Without this, a long `name — description` label wraps
+       onto several lines, which pushes most of the preset names out of the
+       overlay; one line per preset keeps every name in view. */
+    Select > SelectOverlay {
+        max-height: 20;
+        text-wrap: nowrap;
+        text-overflow: ellipsis;
     }
     .keys-area {
         height: 6;
