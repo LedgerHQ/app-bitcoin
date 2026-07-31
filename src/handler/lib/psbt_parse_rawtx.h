@@ -16,10 +16,17 @@ typedef struct {
  * Given a commitment to a merkleized map and a key, this flow parses it as a serialized bitcoin
  * transaction, computes the transaction id and optionally keeps track of the vout amount and
  * scriptPubkey of one of the outputs.
+ *
+ * If output_index is SIZE_MAX, no output is queried, and only the txid field of outputs is
+ * meaningful on success. Otherwise, the flow fails unless the transaction has an output with that
+ * index, and its value and scriptPubKey are returned in outputs.
+ *
+ * On failure, the content of outputs is unspecified; on success, any field that is not filled in
+ * is zeroed.
  */
 int call_psbt_parse_rawtx(dispatcher_context_t *dispatcher_context,
                           const merkleized_map_commitment_t *map,
                           const uint8_t *key,
-                          int key_len,
-                          int output_index,
+                          size_t key_len,
+                          size_t output_index,
                           txid_parser_outputs_t *outputs);
