@@ -671,6 +671,76 @@ static void test_stream_preimage_communication_failure(void **state) {
     assert_true(result < 0);
 }
 
+/**
+ * Adversarial: the client serves a preimage that is not tagged with the 0x00 leaf domain
+ * separator.  Here it is a well-formed internal node preimage (0x01 || left || right), whose
+ * hash is a genuine internal node hash of a Merkle tree, so the SHA-256 check passes and only
+ * the domain separator check can reject it.  Nothing must be streamed to the callbacks.
+ */
+static void test_stream_preimage_internal_node_preimage(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    /* Build a 2-element tree so that the internal node is the root of a real tree. */
+    const uint8_t e0[] = {0xAA, 0xBB};
+    const uint8_t e1[] = {0xCC, 0xDD};
+    const uint8_t *elems[] = {e0, e1};
+    size_t lens[] = {sizeof(e0), sizeof(e1)};
+    mock_dispatcher_add_list(mock, elems, lens, 2);
+
+    /* Internal node preimage: 0x01 || h(leaf 0) || h(leaf 1) */
+    uint8_t node_preimage[1 + 32 + 32];
+    node_preimage[0] = 0x01;
+    merkle_compute_element_hash(e0, sizeof(e0), node_preimage + 1);
+    merkle_compute_element_hash(e1, sizeof(e1), node_preimage + 33);
+
+    mock_dispatcher_add_preimage(mock, node_preimage, sizeof(node_preimage));
+
+    uint8_t hash[32];
+    compute_sha256(node_preimage, sizeof(node_preimage), hash);
+
+    /* Sanity check: this really is the root of the tree we registered. */
+    assert_memory_equal(hash, mock->trees[0].root, 32);
+
+    stream_accumulator_t acc;
+    memset(&acc, 0, sizeof(acc));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+    int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
+
+    assert_int_equal(result, -11);
+    assert_false(acc.len_called);
+    assert_int_equal(acc.offset, 0);
+}
+
+/**
+ * Adversarial: same rejection for an arbitrary non-zero prefix byte, including for a preimage
+ * long enough to need GET_MORE_ELEMENTS (the rejection happens on the first chunk).
+ */
+static void test_stream_preimage_bad_prefix(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    uint8_t preimage[300];
+    preimage[0] = 0x01;
+    for (size_t i = 1; i < sizeof(preimage); i++) {
+        preimage[i] = (uint8_t) (i * 7);
+    }
+
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
+
+    uint8_t hash[32];
+    compute_sha256(preimage, sizeof(preimage), hash);
+
+    stream_accumulator_t acc;
+    memset(&acc, 0, sizeof(acc));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+    int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
+
+    assert_int_equal(result, -11);
+    assert_false(acc.len_called);
+    assert_int_equal(acc.offset, 0);
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -693,6 +763,8 @@ int main(void) {
         T(test_stream_preimage_bad_element_size),
         T(test_stream_preimage_more_bytes_than_remaining),
         T(test_stream_preimage_communication_failure),
+        T(test_stream_preimage_internal_node_preimage),
+        T(test_stream_preimage_bad_prefix),
     };
 #undef T
 

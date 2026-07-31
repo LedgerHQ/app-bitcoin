@@ -596,6 +596,75 @@ static void test_get_merkle_preimage_more_bytes(void **state) {
     assert_int_equal(result, -9);
 }
 
+/**
+ * Adversarial: the client serves a preimage that is not tagged with the 0x00 leaf domain
+ * separator.  Here it is a well-formed internal node preimage (0x01 || left || right), whose
+ * hash is a genuine internal node hash of a Merkle tree, so the SHA-256 check passes and only
+ * the domain separator check can reject it.
+ */
+static void test_get_merkle_preimage_internal_node_preimage(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    /* Build a 2-element tree so that the internal node is the root of a real tree. */
+    const uint8_t e0[] = {0xAA, 0xBB};
+    const uint8_t e1[] = {0xCC, 0xDD};
+    const uint8_t *elems[] = {e0, e1};
+    size_t lens[] = {sizeof(e0), sizeof(e1)};
+    mock_dispatcher_add_list(mock, elems, lens, 2);
+
+    /* Internal node preimage: 0x01 || h(leaf 0) || h(leaf 1) */
+    uint8_t node_preimage[1 + 32 + 32];
+    node_preimage[0] = 0x01;
+    merkle_compute_element_hash(e0, sizeof(e0), node_preimage + 1);
+    merkle_compute_element_hash(e1, sizeof(e1), node_preimage + 33);
+
+    mock_dispatcher_add_preimage(mock, node_preimage, sizeof(node_preimage));
+
+    uint8_t hash[32];
+    compute_sha256(node_preimage, sizeof(node_preimage), hash);
+
+    /* Sanity check: this really is the root of the tree we registered. */
+    assert_memory_equal(hash, mock->trees[0].root, 32);
+
+    uint8_t out[256];
+    memset(out, 0xAA, sizeof(out));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+    int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
+
+    assert_int_equal(result, -12);
+}
+
+/**
+ * Adversarial: same rejection for an arbitrary non-zero prefix byte, and nothing is written to
+ * the output buffer.
+ */
+static void test_get_merkle_preimage_bad_prefix(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    uint8_t preimage[20];
+    preimage[0] = 0x01;
+    for (size_t i = 1; i < sizeof(preimage); i++) {
+        preimage[i] = (uint8_t) i;
+    }
+
+    mock_dispatcher_add_preimage(mock, preimage, sizeof(preimage));
+
+    uint8_t hash[32];
+    compute_sha256(preimage, sizeof(preimage), hash);
+
+    uint8_t out[64];
+    memset(out, 0xAA, sizeof(out));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+    int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
+
+    assert_int_equal(result, -12);
+    for (size_t i = 0; i < sizeof(out); i++) {
+        assert_int_equal(out[i], 0xAA);
+    }
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -618,6 +687,8 @@ int main(void) {
         T(test_get_merkle_preimage_truncated_more),
         T(test_get_merkle_preimage_bad_element_size),
         T(test_get_merkle_preimage_more_bytes),
+        T(test_get_merkle_preimage_internal_node_preimage),
+        T(test_get_merkle_preimage_bad_prefix),
     };
 #undef T
 
