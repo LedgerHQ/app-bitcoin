@@ -57,6 +57,13 @@
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH \
     MAX(MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1, MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2)
 
+// As parse_script is recursive, we set a maximum reasonable recursion depth in order to avoid the
+// risk of stack exhaustion.
+// This depth is unlikely to be hit in practice.
+// Miniscript wrappers are counted as well: while they are not parsed recursively, they still
+// increase the depth of the parsed policy, which affects other recursive walkers.
+#define MAX_PARSE_SCRIPT_RECURSION_DEPTH 16
+
 // at most 92 bytes
 // wallet type (1 byte)
 // name length (1 byte)

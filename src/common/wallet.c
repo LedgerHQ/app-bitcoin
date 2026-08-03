@@ -23,12 +23,6 @@ typedef struct {
     const char *name;
 } token_descriptor_t;
 
-// As parse_script is recursive, we set a maximum reasonable recursion depth in order to avoid the
-// risk of stack exhaustion.
-// At the time of writing, the maximum depth measured across all the tests is 10, so 16 still
-// leaves a margin for much more complex scripts and seems unlikely to be hit in practice.
-#define MAX_PARSE_SCRIPT_RECURSION_DEPTH 16
-
 static const token_descriptor_t KNOWN_TOKENS[] = {
     {.type = TOKEN_SH, .name = "sh"},
     {.type = TOKEN_WSH, .name = "wsh"},
@@ -688,6 +682,15 @@ static int parse_script(buffer_t *in_buf,
         }
 
         if (can_read && c == ':') {
+            // The wrappers are parsed in this same stack frame, but each of them creates a node
+            // containing the following one; therefore, they must be charged to the recursion
+            // budget explicitly. Otherwise, a short chain of wrappers that type-checks for any
+            // length (for example "nnn...n:pk(@0/**)") would produce an arbitrarily deep policy,
+            // exhausting the stack in the functions that walk it recursively.
+            if (depth + (size_t) n_wrappers > MAX_PARSE_SCRIPT_RECURSION_DEPTH) {
+                return WITH_ERROR(-1, "Script is too deeply nested");
+            }
+
             // parse wrappers
             for (int i = 0; i < n_wrappers; i++) {
                 policy_node_with_script_t *node =
@@ -740,6 +743,9 @@ static int parse_script(buffer_t *in_buf,
                 inner_wrapper = node;
             }
             buffer_seek_cur(in_buf, 1);  // skip ":"
+
+            // the wrapped script is nested n_wrappers levels below the current one
+            depth += n_wrappers;
         } else {
             n_wrappers = 0;  // it was not a wrapper
         }
