@@ -954,6 +954,45 @@ static void test_parse_policy_max_depth_wrappers(void **state) {
     assert_int_equal(ext_info.ops.count, n_wrappers + 1);
 }
 
+// Builds "wsh(" + n_levels copies of "thresh(1," + "pk(@0/**)" + the closing parentheses.
+static void make_thresh_chain(char *out, size_t out_size, int n_levels) {
+    assert_true((size_t) n_levels * 10 + sizeof("wsh(pk(@0/**))") <= out_size);
+    char *p = out + sprintf(out, "wsh(");
+    for (int i = 0; i < n_levels; i++) p += sprintf(p, "thresh(1,");
+    p += sprintf(p, "pk(@0/**)");
+    for (int i = 0; i < n_levels; i++) *p++ = ')';
+    strcpy(p, ")");
+}
+
+static void test_parse_policy_max_thresh_nesting(void **state) {
+    (void) state;
+
+    uint8_t out[4 * MAX_WALLET_POLICY_MEMORY_SIZE];
+    char policy[MAX_DESCRIPTOR_TEMPLATE_LENGTH + 1];
+
+    make_thresh_chain(policy, sizeof(policy), MAX_THRESH_NESTING);
+    assert_true(0 <= parse_policy(policy, out, sizeof(out)));
+
+    // the deepest accepted nesting must also be processed by the recursive walkers
+    const policy_node_t *inner = r_policy_node(&((policy_node_with_script_t *) out)->script);
+    policy_node_ext_info_t ext_info;
+    assert_int_equal(compute_miniscript_policy_ext_info(inner, &ext_info, MINISCRIPT_CONTEXT_P2WSH),
+                     0);
+
+    make_thresh_chain(policy, sizeof(policy), MAX_THRESH_NESTING + 1);
+    assert_true(0 > parse_policy(policy, out, sizeof(out)));
+
+    // a chain of nested thresh still fits in a descriptor template well beyond the depth limit
+    make_thresh_chain(policy, sizeof(policy), MAX_PARSE_SCRIPT_RECURSION_DEPTH + 1);
+    assert_true(0 > parse_policy(policy, out, sizeof(out)));
+
+    // the limit is on nested thresh only: many thresh nodes as siblings are still accepted
+    assert_true(0 <=
+                parse_policy("wsh(thresh(1,thresh(1,pk(@0/**)),sc:pk_k(@1/**),sc:pk_k(@2/**)))",
+                             out,
+                             sizeof(out)));
+}
+
 int main() {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_parse_policy_map_singlesig_1),
@@ -981,6 +1020,7 @@ int main() {
         cmocka_unit_test(test_traverse_tr_nested_tree),
         cmocka_unit_test(test_traverse_callback_abort),
         cmocka_unit_test(test_parse_policy_max_depth_wrappers),
+        cmocka_unit_test(test_parse_policy_max_thresh_nesting),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

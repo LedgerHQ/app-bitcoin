@@ -598,6 +598,13 @@ static int parse_keyexpr(buffer_t *in_buf,
 #define CONTEXT_WITHIN_WSH 2  // parsing a direct child of WSH
 #define CONTEXT_WITHIN_TR  4  // parsing a child of TR (direct or not)
 
+// The remaining bits of the context flags count the THRESH nodes that contain the script being
+// parsed. Each of them costs about 600 bytes of stack while the extended info of the policy is
+// computed (see compute_thresh_ops), therefore their nesting is limited by MAX_THRESH_NESTING;
+// policies with thresh expressions with more nesting seem unlikely to be used in practice.
+#define CONTEXT_THRESH_NESTING_UNIT   8
+#define CONTEXT_THRESH_NESTING(flags) ((flags) / CONTEXT_THRESH_NESTING_UNIT)
+
 // forward declaration
 static int parse_script(buffer_t *in_buf,
                         buffer_t *out_buf,
@@ -1376,6 +1383,12 @@ static int parse_script(buffer_t *in_buf,
             break;
         }
         case TOKEN_THRESH: {
+            if (CONTEXT_THRESH_NESTING(context_flags) >= MAX_THRESH_NESTING) {
+                return WITH_ERROR(-1, "Too many nested thresh expressions");
+            }
+            // the children of this node (and all their descendants) are within one more thresh
+            unsigned int inner_context_flags = context_flags + CONTEXT_THRESH_NESTING_UNIT;
+
             policy_node_thresh_t *node =
                 (policy_node_thresh_t *) buffer_alloc(out_buf, sizeof(policy_node_thresh_t), true);
             if (node == NULL) {
@@ -1421,7 +1434,7 @@ static int parse_script(buffer_t *in_buf,
                 // parse a script into cur->script
                 buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
                 i_policy_node(&cur->script, buffer_get_cur(out_buf));
-                if (0 > parse_script(in_buf, out_buf, version, depth + 1, context_flags)) {
+                if (0 > parse_script(in_buf, out_buf, version, depth + 1, inner_context_flags)) {
                     // failed while parsing internal script
                     return -1;
                 }
@@ -2117,9 +2130,14 @@ static int16_t maxcheck(int16_t a, int16_t b) {
 // Maximum supported value for n in a thresh miniscript operator (technical limitation)
 #define MAX_N_IN_THRESH 128
 
-static int compute_thresh_ops(const policy_node_thresh_t *node,
-                              miniscript_ops_t *out,
-                              MiniscriptContext ctx) {
+// The two functions below are kept out of line on purpose: their arrays would otherwise be part of
+// the stack frame of compute_miniscript_policy_ext_info(), which is recursive, and would therefore
+// be reserved once per level of the policy even for the nodes that are not thresh. As they are,
+// they only use stack while a thresh node is being processed, and the nesting of thresh nodes is
+// limited to MAX_THRESH_NESTING while parsing.
+__attribute__((noinline)) static int compute_thresh_ops(const policy_node_thresh_t *node,
+                                                        miniscript_ops_t *out,
+                                                        MiniscriptContext ctx) {
     uint16_t sats[MAX_N_IN_THRESH + 1 + 1] = {0};
     uint16_t next_sats[MAX_N_IN_THRESH + 1 + 1] = {0};  // it temporarily uses an extra element
 
@@ -2156,9 +2174,9 @@ static int compute_thresh_ops(const policy_node_thresh_t *node,
     return 0;
 }
 
-static int compute_thresh_stacksize(const policy_node_thresh_t *node,
-                                    miniscript_stacksize_t *out,
-                                    MiniscriptContext ctx) {
+__attribute__((noinline)) static int compute_thresh_stacksize(const policy_node_thresh_t *node,
+                                                              miniscript_stacksize_t *out,
+                                                              MiniscriptContext ctx) {
     uint16_t sats[MAX_N_IN_THRESH + 1 + 1] = {0};
     uint16_t next_sats[MAX_N_IN_THRESH + 1 + 1] = {0};  // it temporarily uses an extra element
 

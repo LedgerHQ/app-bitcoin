@@ -64,6 +64,9 @@
 // increase the depth of the parsed policy, which affects other recursive walkers.
 #define MAX_PARSE_SCRIPT_RECURSION_DEPTH 16
 
+// Maximum supported nesting of thresh operators
+#define MAX_THRESH_NESTING 4
+
 // at most 92 bytes
 // wallet type (1 byte)
 // name length (1 byte)
