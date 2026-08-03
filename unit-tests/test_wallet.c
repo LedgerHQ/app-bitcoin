@@ -993,6 +993,35 @@ static void test_parse_policy_max_thresh_nesting(void **state) {
                              sizeof(out)));
 }
 
+// Builds "wsh(thresh(1,pk(@0/**)" + n_branches - 1 copies of ",a:0" + "))".
+static void make_wide_thresh(char *out, size_t out_size, int n_branches) {
+    assert_true((size_t) n_branches * 4 + sizeof("wsh(thresh(1,pk(@0/**)))") <= out_size);
+    char *p = out + sprintf(out, "wsh(thresh(1,pk(@0/**)");
+    for (int i = 1; i < n_branches; i++) p += sprintf(p, ",a:0");
+    strcpy(p, "))");
+}
+
+// A thresh with more branches than the analysis supports must be reported as an error, rather
+// than being analyzed with a truncated (or overflowing) dynamic programming table.
+static void test_max_n_in_thresh(void **state) {
+    (void) state;
+
+    uint8_t out[4 * MAX_WALLET_POLICY_MEMORY_SIZE];
+    char policy[MAX_DESCRIPTOR_TEMPLATE_LENGTH + 1];
+    policy_node_ext_info_t ext_info;
+
+    make_wide_thresh(policy, sizeof(policy), MAX_N_IN_THRESH);
+    assert_true(0 <= parse_policy(policy, out, sizeof(out)));
+    const policy_node_t *inner = r_policy_node(&((policy_node_with_script_t *) out)->script);
+    assert_int_equal(compute_miniscript_policy_ext_info(inner, &ext_info, MINISCRIPT_CONTEXT_P2WSH),
+                     0);
+
+    make_wide_thresh(policy, sizeof(policy), MAX_N_IN_THRESH + 1);
+    assert_true(0 <= parse_policy(policy, out, sizeof(out)));
+    inner = r_policy_node(&((policy_node_with_script_t *) out)->script);
+    assert_true(0 > compute_miniscript_policy_ext_info(inner, &ext_info, MINISCRIPT_CONTEXT_P2WSH));
+}
+
 int main() {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_parse_policy_map_singlesig_1),
@@ -1021,6 +1050,7 @@ int main() {
         cmocka_unit_test(test_traverse_callback_abort),
         cmocka_unit_test(test_parse_policy_max_depth_wrappers),
         cmocka_unit_test(test_parse_policy_max_thresh_nesting),
+        cmocka_unit_test(test_max_n_in_thresh),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

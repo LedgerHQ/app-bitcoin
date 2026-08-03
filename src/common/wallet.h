@@ -67,6 +67,14 @@
 // Maximum supported nesting of thresh operators
 #define MAX_THRESH_NESTING 4
 
+// Maximum supported value for n in a thresh miniscript operator (technical limitation).
+// It also bounds the stack used while analyzing a policy: the arrays of compute_thresh_ops() and
+// compute_thresh_stacksize() are proportional to it, and up to MAX_THRESH_NESTING of them are
+// alive at the same time due to recursion, therefore this ends up eating a substantial amount of
+// memory.
+// This limit is extremely unlikely to be hit in practice.
+#define MAX_N_IN_THRESH 24
+
 // at most 92 bytes
 // wallet type (1 byte)
 // name length (1 byte)

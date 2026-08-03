@@ -2127,9 +2127,6 @@ static int16_t maxcheck(int16_t a, int16_t b) {
         return a > b ? a : b;
 }
 
-// Maximum supported value for n in a thresh miniscript operator (technical limitation)
-#define MAX_N_IN_THRESH 128
-
 // The two functions below are kept out of line on purpose: their arrays would otherwise be part of
 // the stack frame of compute_miniscript_policy_ext_info(), which is recursive, and would therefore
 // be reserved once per level of the policy even for the nodes that are not thresh. As they are,
