@@ -54,6 +54,16 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
             return -1;
         }
 
+        // The proof length must be exactly the depth of the leaf in the tree
+        if (merkle_get_ith_direction(tree_size, leaf_index, proof_size) != -1 ||
+            (proof_size > 0 &&
+             merkle_get_ith_direction(tree_size, leaf_index, (size_t) proof_size - 1) < 0)) {
+            PRINTF("Merkle proof length does not match the depth of the leaf.\n");
+
+            // Wrong length of the Merkle proof.
+            return -1;
+        }
+
         if (n_proof_elements > proof_size) {
             PRINTF("Received more proof data than expected.\n");
 

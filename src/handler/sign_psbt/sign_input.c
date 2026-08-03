@@ -275,6 +275,12 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
             return false;
         }
 
+        if (input->in_out.scriptPubKey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
+            // this should never happen
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+
         uint8_t sighash_byte =
             input->has_sighash_type ? (uint8_t) input->sighash_type : SIGHASH_ALL;
 

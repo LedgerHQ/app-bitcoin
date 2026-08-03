@@ -50,13 +50,18 @@ int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness(
         return -1;
     }
 
+    // SIZE_MAX is reserved by call_psbt_parse_rawtx to mean "no output is queried"
+    if (prevout_n >= SIZE_MAX) {
+        return -1;
+    }
+
     txid_parser_outputs_t parser_outputs;
     // request non-witness utxo, and get the prevout's value and scriptpubkey
     int res = call_psbt_parse_rawtx(dc,
                                     input_map,
                                     (uint8_t[]) {PSBT_IN_NON_WITNESS_UTXO},
                                     1,
-                                    prevout_n,
+                                    (size_t) prevout_n,
                                     &parser_outputs);
     if (res < 0) {
         PRINTF("Parsing rawtx failed\n");
@@ -72,6 +77,11 @@ int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness(
     }
 
     *amount = parser_outputs.vout_value;
+
+    if (parser_outputs.vout_scriptpubkey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
+        return -1;
+    }
+
     *scriptPubKey_len = parser_outputs.vout_scriptpubkey_len;
     memcpy(scriptPubKey, parser_outputs.vout_scriptpubkey, parser_outputs.vout_scriptpubkey_len);
 
@@ -113,6 +123,10 @@ int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_witness(
 
     uint8_t *wit_utxo_scriptPubkey = raw_witnessUtxo + 9;
     uint64_t wit_utxo_prevout_amount = read_u64_le(&raw_witnessUtxo[0], 0);
+
+    if (wit_utxo_scriptPubkey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
+        return -1;
+    }
 
     *amount = wit_utxo_prevout_amount;
     *scriptPubKey_len = wit_utxo_scriptPubkey_len;

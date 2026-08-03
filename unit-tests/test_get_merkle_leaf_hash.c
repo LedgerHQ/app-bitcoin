@@ -48,6 +48,18 @@ static void compute_leaf_hash(const uint8_t *elem, size_t len, uint8_t out[32]) 
     compute_sha256(buf, 1 + len, out);
 }
 
+/**
+ * Depth of a leaf in the tree (= the number of steps of its Merkle proof), computed from
+ * merkle_get_ith_direction.
+ */
+static uint8_t leaf_depth(uint32_t tree_size, uint32_t leaf_index) {
+    uint8_t depth = 0;
+    while (merkle_get_ith_direction(tree_size, leaf_index, depth) >= 0) {
+        ++depth;
+    }
+    return depth;
+}
+
 /* ---------- Test cases ---------- */
 
 /**
@@ -688,6 +700,182 @@ static void test_get_leaf_hash_more_proof_overflow(void **state) {
     assert_true(result < 0);
 }
 
+/**
+ * The proof length must be exactly the depth of the leaf: an internal node must never be
+ * accepted as a leaf.
+ *
+ * In a 4-element tree, root = H(H01, H23) with H01 = H(h0, h1) and H23 = H(h2, h3).  A client
+ * that answers with leaf_hash = H01, proof = [H23] and proof_size = 1 produces a proof that
+ * recomputes the root exactly (the first direction for leaf 0 is "left"), so the only thing
+ * that rejects it is the requirement that proof_size equals the leaf depth (2 here).
+ */
+static int tamper_internal_node_as_leaf(uint8_t *response_buf,
+                                        size_t *response_len,
+                                        uint8_t cmd,
+                                        int call_count,
+                                        void *user_data) {
+    (void) call_count;
+
+    /* forged[0] = the internal node presented as a leaf, forged[1] = its sibling */
+    const uint8_t (*forged)[32] = (const uint8_t (*)[32]) user_data;
+
+    if (cmd == CCMD_GET_MERKLE_LEAF_PROOF) {
+        memcpy(response_buf, forged[0], 32);
+        response_buf[32] = 1; /* proof_size: one step short of the real leaf depth */
+        response_buf[33] = 1; /* n_proof_elements */
+        memcpy(response_buf + 34, forged[1], 32);
+        *response_len = 34 + 32;
+    }
+    return 0;
+}
+
+static void test_get_leaf_hash_internal_node_as_leaf(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    uint8_t e0[] = {0x00, 0x01};
+    uint8_t e1[] = {0x10, 0x11};
+    uint8_t e2[] = {0x20, 0x21};
+    uint8_t e3[] = {0x30, 0x31};
+
+    const uint8_t *elems[] = {e0, e1, e2, e3};
+    size_t lens[] = {sizeof(e0), sizeof(e1), sizeof(e2), sizeof(e3)};
+
+    uint8_t root[32];
+    build_tree(mock, elems, lens, 4, root);
+
+    /* Recompute the two internal nodes at depth 1 */
+    uint8_t h[4][32];
+    for (size_t i = 0; i < 4; i++) {
+        compute_leaf_hash(elems[i], lens[i], h[i]);
+    }
+
+    uint8_t forged[2][32];
+    merkle_combine_hashes(h[0], h[1], forged[0]); /* H01, claimed as a leaf */
+    merkle_combine_hashes(h[2], h[3], forged[1]); /* H23, its sibling */
+
+    /* Sanity check: the forged 1-step proof does recompute the real root, so rejecting it can
+     * only come from the proof length check. */
+    uint8_t recomputed_root[32];
+    merkle_combine_hashes(forged[0], forged[1], recomputed_root);
+    assert_memory_equal(recomputed_root, root, 32);
+
+    mock_dispatcher_set_tamper_hook(mock, tamper_internal_node_as_leaf, forged);
+
+    uint8_t out[32];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+    int result = call_get_merkle_leaf_hash(dc, root, 4, 0, out);
+
+    assert_true(result < 0);
+}
+
+/**
+ * Positive counterpart of the length check: an honest client sends a proof of exactly the leaf
+ * depth, and it is accepted.  Uses a 5-element tree, where leaves 0..3 have depth 3 while leaf
+ * 4 has depth 1, so the accepted length really does track the individual leaf.
+ *
+ * (test_get_leaf_hash_zero_proof_size does not cover this: proof_size = 0 there is rejected
+ * even without the length check, because the leaf hash alone doesn't match the root.)
+ */
+static int tamper_record_proof_size(uint8_t *response_buf,
+                                    size_t *response_len,
+                                    uint8_t cmd,
+                                    int call_count,
+                                    void *user_data) {
+    (void) response_len;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MERKLE_LEAF_PROOF) {
+        *(uint8_t *) user_data = response_buf[32];
+    }
+    return 0;
+}
+
+static void test_get_leaf_hash_proof_size_equals_depth(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    uint8_t e0[] = {0xAA};
+    uint8_t e1[] = {0xBB, 0xCC};
+    uint8_t e2[] = {0xDD, 0xEE, 0xFF};
+    uint8_t e3[] = {0x11, 0x22};
+    uint8_t e4[] = {0x33};
+
+    const uint8_t *elems[] = {e0, e1, e2, e3, e4};
+    size_t lens[] = {sizeof(e0), sizeof(e1), sizeof(e2), sizeof(e3), sizeof(e4)};
+
+    uint8_t root[32];
+    build_tree(mock, elems, lens, 5, root);
+
+    uint8_t observed_proof_size = 0xFF;
+    mock_dispatcher_set_tamper_hook(mock, tamper_record_proof_size, &observed_proof_size);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+
+    /* The tree is unbalanced, so not all leaves have the same depth. */
+    assert_int_not_equal(leaf_depth(5, 0), leaf_depth(5, 4));
+
+    for (size_t i = 0; i < 5; i++) {
+        uint8_t expected_hash[32];
+        compute_leaf_hash(elems[i], lens[i], expected_hash);
+
+        uint8_t out[32];
+        memset(out, 0, sizeof(out));
+
+        observed_proof_size = 0xFF;
+        int result = call_get_merkle_leaf_hash(dc, root, 5, (uint32_t) i, out);
+
+        assert_int_equal(result, 0);
+        assert_int_equal(observed_proof_size, leaf_depth(5, (uint32_t) i));
+        assert_memory_equal(out, expected_hash, 32);
+    }
+}
+
+/**
+ * Adversarial: a proof longer than the leaf depth must be rejected.  Leaf 4 of a 5-element
+ * tree has depth 1; the client claims a proof of 2 steps (padding the extra sibling hash).
+ */
+static int tamper_overlong_proof(uint8_t *response_buf,
+                                 size_t *response_len,
+                                 uint8_t cmd,
+                                 int call_count,
+                                 void *user_data) {
+    (void) user_data;
+    (void) call_count;
+
+    if (cmd == CCMD_GET_MERKLE_LEAF_PROOF && *response_len == 34 + 32) {
+        response_buf[32] = 2; /* proof_size: one more than the real leaf depth */
+        response_buf[33] = 2; /* n_proof_elements */
+        memset(response_buf + 34 + 32, 0x00, 32);
+        *response_len = 34 + 64;
+    }
+    return 0;
+}
+
+static void test_get_leaf_hash_overlong_proof(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    uint8_t e0[] = {0xAA};
+    uint8_t e1[] = {0xBB, 0xCC};
+    uint8_t e2[] = {0xDD, 0xEE, 0xFF};
+    uint8_t e3[] = {0x11, 0x22};
+    uint8_t e4[] = {0x33};
+
+    const uint8_t *elems[] = {e0, e1, e2, e3, e4};
+    size_t lens[] = {sizeof(e0), sizeof(e1), sizeof(e2), sizeof(e3), sizeof(e4)};
+
+    uint8_t root[32];
+    build_tree(mock, elems, lens, 5, root);
+
+    assert_int_equal(leaf_depth(5, 4), 1);
+
+    mock_dispatcher_set_tamper_hook(mock, tamper_overlong_proof, NULL);
+
+    uint8_t out[32];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+    int result = call_get_merkle_leaf_hash(dc, root, 5, 4, out);
+
+    assert_true(result < 0);
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -710,6 +898,9 @@ int main(void) {
         T(test_get_leaf_hash_more_comm_failure),
         T(test_get_leaf_hash_truncated_more),
         T(test_get_leaf_hash_more_proof_overflow),
+        T(test_get_leaf_hash_internal_node_as_leaf),
+        T(test_get_leaf_hash_proof_size_equals_depth),
+        T(test_get_leaf_hash_overlong_proof),
     };
 #undef T
 

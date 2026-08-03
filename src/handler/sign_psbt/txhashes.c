@@ -248,6 +248,12 @@ bool __attribute__((noinline)) compute_tx_hashes(dispatcher_context_t *dc,
                 return false;
             }
 
+            if (in_scriptPubKey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
+                // this should never happen
+                SEND_SW(dc, SW_INCORRECT_DATA);
+                return false;
+            }
+
             uint8_t in_amount_le[8];
             write_u64_le(in_amount_le, 0, in_amount);
             crypto_hash_update(&sha_amounts_context.header, in_amount_le, 8);
