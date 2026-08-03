@@ -125,15 +125,6 @@ static uint8_t admitting_pattern_count(const cleartext_spec_t *spec, const ct_bi
 // but in practice ≤ ~30 occurrences).
 #define CT_MAX_KEYEXPRS 32
 
-typedef struct {
-    // Canonical identity: the first key expression seen in the group. Equality
-    // is determined via are_key_placeholders_identical (from policy.h).
-    const policy_node_keyexpr_t *repr;
-    // Derivation pairs collected for this class.
-    uint32_t pairs[CT_MAX_KEYEXPRS][2];
-    uint8_t n_pairs;
-} ct_keyexpr_class_t;
-
 // Saturating factorial.
 static uint64_t sat_factorial(uint32_t n) {
     uint64_t f = 1;
@@ -183,60 +174,62 @@ static uint64_t key_orderings_count(const policy_node_t *root, bool *out_canonic
         kx[i] = k;
     }
 
-    // Group by identity. classes[i].repr is the first keyexpr in the group;
-    // classes[i].pairs collects (num_first, num_second) for each occurrence.
-    ct_keyexpr_class_t classes[CT_MAX_KEYEXPRS];
+    // Group by identity: class_of[i] is the class of kx[i], and class_repr[c] is the index of the
+    // first keyexpr seen in class c (its canonical identity). Equality is determined via
+    // are_key_placeholders_identical (from policy.h).
+    uint8_t class_of[CT_MAX_KEYEXPRS];
+    uint8_t class_repr[CT_MAX_KEYEXPRS];
     int n_classes = 0;
 
     for (int i = 0; i < n; i++) {
-        const policy_node_keyexpr_t *k = kx[i];
         int idx = -1;
         for (int j = 0; j < n_classes; j++) {
-            if (are_key_placeholders_identical(classes[j].repr, k)) {
+            if (are_key_placeholders_identical(kx[class_repr[j]], kx[i])) {
                 idx = j;
                 break;
             }
         }
         if (idx < 0) {
-            if (n_classes >= CT_MAX_KEYEXPRS) {
-                *out_canonical = false;
-                return UINT64_MAX;
-            }
-            classes[n_classes].repr = k;
-            classes[n_classes].n_pairs = 0;
+            // there can't be more classes than key expressions, hence no bound check is needed
+            class_repr[n_classes] = (uint8_t) i;
             idx = n_classes++;
         }
-        if (classes[idx].n_pairs >= CT_MAX_KEYEXPRS) {
-            *out_canonical = false;
-            return UINT64_MAX;
-        }
-        classes[idx].pairs[classes[idx].n_pairs][0] = k->num_first;
-        classes[idx].pairs[classes[idx].n_pairs][1] = k->num_second;
-        classes[idx].n_pairs++;
+        class_of[i] = (uint8_t) idx;
     }
 
     // Canonical check: group by full key identity (musig groups stay whole) and
     // require each group's sorted derivation pairs to be (0,1),(2,3),(4,5),...
+    // The pairs are collected one class at a time, since all the classes together have exactly n
+    // pairs in total.
+    uint32_t pairs[CT_MAX_KEYEXPRS][2];
     *out_canonical = true;
-    for (int i = 0; i < n_classes; i++) {
-        sort_pairs(classes[i].pairs, classes[i].n_pairs);
-        for (uint8_t j = 0; j < classes[i].n_pairs; j++) {
-            if (classes[i].pairs[j][0] != (uint32_t) (2 * j) ||
-                classes[i].pairs[j][1] != (uint32_t) (2 * j + 1)) {
+    for (int c = 0; c < n_classes; c++) {
+        uint8_t n_pairs = 0;
+        for (int i = 0; i < n; i++) {
+            if (class_of[i] != c) continue;
+            pairs[n_pairs][0] = kx[i]->num_first;
+            pairs[n_pairs][1] = kx[i]->num_second;
+            ++n_pairs;
+        }
+
+        sort_pairs(pairs, n_pairs);
+        for (uint8_t j = 0; j < n_pairs; j++) {
+            if (pairs[j][0] != (uint32_t) (2 * j) || pairs[j][1] != (uint32_t) (2 * j + 1)) {
                 *out_canonical = false;
             }
         }
     }
 
     // Compute an upper bound on the possible number of orderings for the
-    // derivation pairs.
-    uint32_t idx_vals[CT_MAX_KEYEXPRS * MAX_PUBKEYS_PER_MUSIG];
-    uint32_t idx_cnts[CT_MAX_KEYEXPRS * MAX_PUBKEYS_PER_MUSIG];
+    // derivation pairs. Each of the at most CT_MAX_KEYEXPRS key expressions contributes at most
+    // MAX_PUBKEYS_PER_MUSIG plain keys, therefore each count fits in a uint8_t.
+    uint16_t idx_vals[CT_MAX_KEYEXPRS * MAX_PUBKEYS_PER_MUSIG];
+    uint8_t idx_cnts[CT_MAX_KEYEXPRS * MAX_PUBKEYS_PER_MUSIG];
     int n_idx = 0;
     for (int i = 0; i < n; i++) {
         const policy_node_keyexpr_t *k = kx[i];
         // Build the list of plain key indices contributed by this keyexpr.
-        uint32_t members[MAX_PUBKEYS_PER_MUSIG];
+        uint16_t members[MAX_PUBKEYS_PER_MUSIG];
         uint16_t n_members;
         if (k->type == KEY_EXPRESSION_NORMAL) {
             members[0] = k->k.key_index;
