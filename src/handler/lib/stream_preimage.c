@@ -50,12 +50,19 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
         return -4;
     }
 
+    uint8_t *data_ptr =
+        dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
+
+    // Merkle tree leaves are hashes of 0x00 || element
+    // Checked before any callback, so that nothing is streamed out for an invalid preimage.
+    if (data_ptr[0] != 0x00) {
+        PRINTF("Not a Merkle tree leaf preimage\n");
+        return -11;
+    }
+
     if (len_callback != NULL) {
         len_callback(preimage_len - 1, callback_state);
     }
-
-    uint8_t *data_ptr =
-        dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
 
     cx_sha256_t hash_context;
     cx_sha256_init(&hash_context);

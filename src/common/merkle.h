@@ -69,7 +69,12 @@ static inline uint8_t ceil_lg(uint32_t n) {
 }
 
 // Returns the ith member of the directions array for the leaf with the given index in a Merkle tree
-// of the given size. Returns -1 on error.
+// of the given size, where 0 = left and 1 = right. Returns -1 on error.
+//
+// A non-negative direction is returned exactly for the indexes i that are within the path from the
+// root to the leaf, that is, for i < depth of the leaf; -1 is returned for any larger i (and if
+// size or index are out of range). Therefore, this can also be used to compute the depth of a leaf,
+// or to check that it equals a given value.
 int merkle_get_ith_direction(size_t size, size_t index, size_t i);
 
 /**

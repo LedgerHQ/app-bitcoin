@@ -60,6 +60,12 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
     uint8_t *data_ptr =
         dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
 
+    // Merkle tree leaves are hashes of 0x00 || element
+    if (data_ptr[0] != 0x00) {
+        PRINTF("Not a Merkle tree leaf preimage\n");
+        return -12;
+    }
+
 #ifdef USE_CXRAM_SECTION
     // allocate buffers inside the cxram section to save memory
     // this is safe as there are no syscalls here that use the cxram
