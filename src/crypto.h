@@ -381,6 +381,9 @@ void crypto_tr_tagged_hash_init(cx_sha256_t *hash_context, const uint8_t *tag, u
  *   Pointer to a 32-byte array.
  * @param[out]  out
  *   Pointer to an array that will received the output as an uncompressed 65-bytes pubkey.
+ *
+ * @return 0 on success, -1 if x is not the x-coordinate of a point on the curve. On failure, the
+ *   content of `out` is unspecified and must not be used.
  */
 int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]);
 

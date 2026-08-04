@@ -90,7 +90,10 @@ static bool has_even_y(const point_t *P) {
 }
 
 static int cpoint(const uint8_t x[33], point_t *out) {
-    crypto_tr_lift_x(&x[1], out->raw);
+    if (0 > crypto_tr_lift_x(&x[1], out->raw)) {
+        PRINTF("Invalid compressed point: not on curve\n");
+        return -1;
+    }
     if (is_point_infinite(out)) {
         PRINTF("Invalid compressed point\n");
         return -1;
