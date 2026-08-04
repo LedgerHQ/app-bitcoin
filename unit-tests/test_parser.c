@@ -32,7 +32,7 @@ const parsing_step_t parse_ABC_steps[] = {(parsing_step_t) parse_A,
                                           (parsing_step_t) parse_B,
                                           (parsing_step_t) parse_C};
 
-const int n_ABC_STEPS = sizeof(parse_ABC_steps) / sizeof(parse_ABC_steps[0]);
+const size_t n_ABC_STEPS = sizeof(parse_ABC_steps) / sizeof(parse_ABC_steps[0]);
 
 // A function that simulates a parsing error while parsing B
 static int parse_B_error(parse_ABC_state_t *state, buffer_t *buffers[2]) {

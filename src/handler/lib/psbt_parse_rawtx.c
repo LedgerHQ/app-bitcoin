@@ -21,13 +21,13 @@ struct parse_rawtx_state_s;  // forward declaration
 
 typedef struct {
     struct parse_rawtx_state_s *parent_state;  // subparsers can access parent's state
-    unsigned int scriptsig_size;               // max 10_000 bytes
-    unsigned int scriptsig_counter;            // counter of scriptsig bytes already received
+    unsigned int scriptsig_size;
+    unsigned int scriptsig_counter;  // counter of scriptsig bytes already received
 } parse_rawtxinput_state_t;
 
 typedef struct {
     struct parse_rawtx_state_s *parent_state;
-    unsigned int scriptpubkey_size;     // max 10_000 bytes
+    unsigned int scriptpubkey_size;
     unsigned int scriptpubkey_counter;  // counter of scriptpubkey bytes already received
 } parse_rawtxoutput_state_t;
 
@@ -165,7 +165,7 @@ static const parsing_step_t parse_rawtxinput_steps[] = {
     (parsing_step_t) parse_rawtxinput_sequence,
 };
 
-const int n_parse_rawtxinput_steps =
+const size_t n_parse_rawtxinput_steps =
     sizeof(parse_rawtxinput_steps) / sizeof(parse_rawtxinput_steps[0]);
 
 /*   PARSER FOR A RAWTX OUTPUT */
@@ -283,7 +283,7 @@ static const parsing_step_t parse_rawtxoutput_steps[] = {
     (parsing_step_t) parse_rawtxoutput_scriptpubkey,
 };
 
-const int n_parse_rawtxoutput_steps =
+const size_t n_parse_rawtxoutput_steps =
     sizeof(parse_rawtxoutput_steps) / sizeof(parse_rawtxoutput_steps[0]);
 
 /*   PARSER FOR A FULL RAWTX */
@@ -510,7 +510,7 @@ static const parsing_step_t parse_rawtx_steps[] = {(parsing_step_t) parse_rawtx_
                                                    (parsing_step_t) parse_rawtx_witnesses,
                                                    (parsing_step_t) parse_rawtx_locktime};
 
-const int n_parse_rawtx_steps = sizeof(parse_rawtx_steps) / sizeof(parse_rawtx_steps[0]);
+const size_t n_parse_rawtx_steps = sizeof(parse_rawtx_steps) / sizeof(parse_rawtx_steps[0]);
 
 static void cb_process_data(buffer_t *data, void *cb_state) {
     psbt_parse_rawtx_state_t *state = (psbt_parse_rawtx_state_t *) cb_state;
