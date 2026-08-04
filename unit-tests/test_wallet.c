@@ -899,6 +899,129 @@ static void test_traverse_callback_abort(void **state) {
     assert_int_equal(s.types[1], TOKEN_OR_I);
 }
 
+/* ------------------------------------------------------------------------
+ * Maximum policy depth
+ *
+ * The parser bounds the depth of the parsed policy, as several functions walk
+ * it recursively. Miniscript wrappers create a node each, exactly like nested
+ * script expressions, and are therefore charged to the same budget: without
+ * that, a template as short as "wsh(nnn...n:pk(@0/**))" produces a policy
+ * hundreds of levels deep, and the recursive walkers (in particular
+ * compute_miniscript_policy_ext_info, used to check that a policy is sane) run
+ * out of stack while processing it.
+ * ------------------------------------------------------------------------ */
+
+// Builds "wsh(" + n_wrappers copies of "n" + ":pk(@0/**))" into out.
+// The wrapped script is at depth 1 + n_wrappers.
+static void make_wrapper_chain(char *out, size_t out_size, int n_wrappers) {
+    assert_true((size_t) n_wrappers + sizeof("wsh(:pk(@0/**))") <= out_size);
+    char *p = out + sprintf(out, "wsh(");
+    for (int i = 0; i < n_wrappers; i++) *p++ = 'n';
+    strcpy(p, ":pk(@0/**))");
+}
+
+static void test_parse_policy_max_depth_wrappers(void **state) {
+    (void) state;
+
+    // deep policies need more memory than the simple ones of the other tests
+    uint8_t out[4 * MAX_WALLET_POLICY_MEMORY_SIZE];
+    char policy[MAX_DESCRIPTOR_TEMPLATE_LENGTH + 1];
+
+    // the script inside wsh() is at depth 1, therefore one wrapper less than the limit fits
+    make_wrapper_chain(policy, sizeof(policy), MAX_PARSE_SCRIPT_RECURSION_DEPTH - 1);
+    assert_true(0 <= parse_policy(policy, out, sizeof(out)));
+
+    // ...and the chain is rejected as soon as it exceeds the budget, even by one
+    make_wrapper_chain(policy, sizeof(policy), MAX_PARSE_SCRIPT_RECURSION_DEPTH);
+    assert_true(0 > parse_policy(policy, out, sizeof(out)));
+
+    // a much longer chain still fits in a descriptor template; it must be rejected while parsing,
+    // before any recursive walk of the parsed policy
+    make_wrapper_chain(policy, sizeof(policy), 200);
+    assert_true(0 > parse_policy(policy, out, sizeof(out)));
+
+    // the deepest policy that is accepted must be processed correctly (and within the available
+    // stack) by the recursive functions that walk it afterwards
+    const int n_wrappers = MAX_PARSE_SCRIPT_RECURSION_DEPTH - 1;
+    make_wrapper_chain(policy, sizeof(policy), n_wrappers);
+    assert_true(0 <= parse_policy(policy, out, sizeof(out)));
+
+    const policy_node_t *inner = r_policy_node(&((policy_node_with_script_t *) out)->script);
+    policy_node_ext_info_t ext_info;
+    assert_int_equal(compute_miniscript_policy_ext_info(inner, &ext_info, MINISCRIPT_CONTEXT_P2WSH),
+                     0);
+    // n:X adds a single OP_0NOTEQUAL on top of the 1 opcode of pk(key)
+    assert_int_equal(ext_info.ops.count, n_wrappers + 1);
+}
+
+// Builds "wsh(" + n_levels copies of "thresh(1," + "pk(@0/**)" + the closing parentheses.
+static void make_thresh_chain(char *out, size_t out_size, int n_levels) {
+    assert_true((size_t) n_levels * 10 + sizeof("wsh(pk(@0/**))") <= out_size);
+    char *p = out + sprintf(out, "wsh(");
+    for (int i = 0; i < n_levels; i++) p += sprintf(p, "thresh(1,");
+    p += sprintf(p, "pk(@0/**)");
+    for (int i = 0; i < n_levels; i++) *p++ = ')';
+    strcpy(p, ")");
+}
+
+static void test_parse_policy_max_thresh_nesting(void **state) {
+    (void) state;
+
+    uint8_t out[4 * MAX_WALLET_POLICY_MEMORY_SIZE];
+    char policy[MAX_DESCRIPTOR_TEMPLATE_LENGTH + 1];
+
+    make_thresh_chain(policy, sizeof(policy), MAX_THRESH_NESTING);
+    assert_true(0 <= parse_policy(policy, out, sizeof(out)));
+
+    // the deepest accepted nesting must also be processed by the recursive walkers
+    const policy_node_t *inner = r_policy_node(&((policy_node_with_script_t *) out)->script);
+    policy_node_ext_info_t ext_info;
+    assert_int_equal(compute_miniscript_policy_ext_info(inner, &ext_info, MINISCRIPT_CONTEXT_P2WSH),
+                     0);
+
+    make_thresh_chain(policy, sizeof(policy), MAX_THRESH_NESTING + 1);
+    assert_true(0 > parse_policy(policy, out, sizeof(out)));
+
+    // a chain of nested thresh still fits in a descriptor template well beyond the depth limit
+    make_thresh_chain(policy, sizeof(policy), MAX_PARSE_SCRIPT_RECURSION_DEPTH + 1);
+    assert_true(0 > parse_policy(policy, out, sizeof(out)));
+
+    // the limit is on nested thresh only: many thresh nodes as siblings are still accepted
+    assert_true(0 <=
+                parse_policy("wsh(thresh(1,thresh(1,pk(@0/**)),sc:pk_k(@1/**),sc:pk_k(@2/**)))",
+                             out,
+                             sizeof(out)));
+}
+
+// Builds "wsh(thresh(1,pk(@0/**)" + n_branches - 1 copies of ",a:0" + "))".
+static void make_wide_thresh(char *out, size_t out_size, int n_branches) {
+    assert_true((size_t) n_branches * 4 + sizeof("wsh(thresh(1,pk(@0/**)))") <= out_size);
+    char *p = out + sprintf(out, "wsh(thresh(1,pk(@0/**)");
+    for (int i = 1; i < n_branches; i++) p += sprintf(p, ",a:0");
+    strcpy(p, "))");
+}
+
+// A thresh with more branches than the analysis supports must be reported as an error, rather
+// than being analyzed with a truncated (or overflowing) dynamic programming table.
+static void test_max_n_in_thresh(void **state) {
+    (void) state;
+
+    uint8_t out[4 * MAX_WALLET_POLICY_MEMORY_SIZE];
+    char policy[MAX_DESCRIPTOR_TEMPLATE_LENGTH + 1];
+    policy_node_ext_info_t ext_info;
+
+    make_wide_thresh(policy, sizeof(policy), MAX_N_IN_THRESH);
+    assert_true(0 <= parse_policy(policy, out, sizeof(out)));
+    const policy_node_t *inner = r_policy_node(&((policy_node_with_script_t *) out)->script);
+    assert_int_equal(compute_miniscript_policy_ext_info(inner, &ext_info, MINISCRIPT_CONTEXT_P2WSH),
+                     0);
+
+    make_wide_thresh(policy, sizeof(policy), MAX_N_IN_THRESH + 1);
+    assert_true(0 <= parse_policy(policy, out, sizeof(out)));
+    inner = r_policy_node(&((policy_node_with_script_t *) out)->script);
+    assert_true(0 > compute_miniscript_policy_ext_info(inner, &ext_info, MINISCRIPT_CONTEXT_P2WSH));
+}
+
 int main() {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_parse_policy_map_singlesig_1),
@@ -925,6 +1048,9 @@ int main() {
         cmocka_unit_test(test_traverse_tr_two_leaves),
         cmocka_unit_test(test_traverse_tr_nested_tree),
         cmocka_unit_test(test_traverse_callback_abort),
+        cmocka_unit_test(test_parse_policy_max_depth_wrappers),
+        cmocka_unit_test(test_parse_policy_max_thresh_nesting),
+        cmocka_unit_test(test_max_n_in_thresh),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

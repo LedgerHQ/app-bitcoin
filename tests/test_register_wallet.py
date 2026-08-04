@@ -560,3 +560,54 @@ def test_register_wallet_too_many_derivation_steps(navigator: Navigator, firmwar
         client.register_wallet(wallet)
 
     assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+
+
+# an app that does not bound the policy depth accepts the policy below and waits for a confirmation
+# that never comes, as no navigator is passed; the timeout turns that wait into a failure
+@pytest.mark.timeout(60)
+def test_register_wallet_deep_wrapper_chain(client: RaggerClient):
+    """A policy far deeper than its template must be refused, without crashing the app."""
+    # "n:" maps B -> B, so the chain type-checks whatever its length, and each wrapper adds an AST
+    # level for one template byte. 59 of them describe a 60-level policy in 74 bytes, and still fit
+    # the app's 896-byte policy buffer, so the deep walk is really reached.
+    wallet = WalletPolicy(
+        name="Wrapper chain",
+        descriptor_template="wsh(" + "n" * 59 + ":pk(@0/**))",
+        keys_info=["[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK"],
+    )
+
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.register_wallet(wallet)
+
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
+
+    # a crash would have closed the connection
+    assert len(client.get_master_fingerprint()) == 4
+
+
+def test_register_wallet_max_depth(navigator: Navigator, firmware: Firmware, client:
+                                   RaggerClient):
+    """Registers the deepest policies that the app accepts, which must succeed."""
+
+    # limits copied from the app; keep in sync
+    MAX_DEPTH = 16          # MAX_PARSE_SCRIPT_RECURSION_DEPTH, src/common/wallet.h
+    MAX_THRESH_NESTING = 4  # src/common/wallet.h
+
+    policies = [
+        # wsh() takes one level, leaving MAX_DEPTH - 1 for the wrappers
+        "wsh(" + "n" * (MAX_DEPTH - 1) + ":pk(@0/**))",
+        ("wsh(" + "thresh(1," * MAX_THRESH_NESTING + "pk(@0/**)"
+         + ")" * MAX_THRESH_NESTING + ")"),
+    ]
+
+    for descriptor_template in policies:
+        wallet = WalletPolicy(name="Deep policy",
+                              descriptor_template=descriptor_template,
+                              keys_info=["[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK"])
+
+        wallet_id, _ = client.register_wallet(
+            wallet,
+            navigator,
+            instructions=register_wallet_instruction_approve_no_save(firmware))
+        assert wallet_id == wallet.id

@@ -52,6 +52,176 @@ static const uint8_t BIP0341_NUMS_PUBKEY[] = {0x02, 0x50, 0x92, 0x9b, 0x74, 0xc1
                                               0xee, 0x9a, 0xce, 0x80, 0x3a, 0xc0};
 
 /**
+ * Fetches and validates the keys of the wallet policy, asks the user to confirm the registration,
+ * and sends the response.
+ *
+ * This is a separate (and explicitly not inlined) function because of its large buffers: they
+ * would otherwise be part of the stack frame of handler_register_wallet() while the descriptor
+ * template is parsed and validated, and those steps recurse over the parsed policy.
+ */
+__attribute__((noinline)) static void confirm_and_register_wallet(
+    dispatcher_context_t *dc,
+    const policy_map_wallet_header_t *wallet_header,
+    const uint8_t *policy_map_descriptor,
+    const policy_node_t *policy,
+    const uint8_t wallet_id[static 32]) {
+    size_t n_internal_keys = 0;
+
+    uint32_t master_key_fingerprint = crypto_get_master_key_fingerprint();
+
+    char keys_info[MAX_N_KEYS_IN_WALLET_POLICY][MAX_POLICY_KEY_INFO_LEN + 1];
+    key_type_e keys_type[MAX_N_KEYS_IN_WALLET_POLICY];
+    memset(keys_type, 0, sizeof(keys_type));
+
+    for (size_t cosigner_index = 0; cosigner_index < wallet_header->n_keys; cosigner_index++) {
+        /**
+         * Receives and parses the next pubkey info.
+         * Asks the user to validate the pubkey info.
+         */
+
+        int key_info_len = call_get_merkle_leaf_element(dc,
+                                                        wallet_header->keys_info_merkle_root,
+                                                        wallet_header->n_keys,
+                                                        cosigner_index,
+                                                        (uint8_t *) keys_info[cosigner_index],
+                                                        MAX_POLICY_KEY_INFO_LEN);
+
+        if (key_info_len < 0) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        keys_info[cosigner_index][key_info_len] = 0;
+
+        // Make a sub-buffer for the pubkey info
+        buffer_t key_info_buffer = buffer_create(keys_info[cosigner_index], key_info_len);
+
+        policy_map_key_info_t key_info;
+        if (parse_policy_map_key_info(&key_info_buffer, &key_info, wallet_header->version) == -1) {
+            PRINTF("Incorrect policy map.\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        if (read_u32_be(key_info.ext_pubkey.version, 0) != BIP32_PUBKEY_VERSION) {
+            PRINTF("Invalid pubkey version. Wrong network?\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        // We refuse to register wallets without key origin information, or whose keys don't end
+        // with the wildcard ('/**'). The key origin information is necessary when signing to
+        // identify which one is our key. Using addresses without a wildcard could potentially be
+        // supported, but disabled for now (question to address: can only _some_ of the keys have a
+        // wildcard?).
+
+        if (memcmp(key_info.ext_pubkey.compressed_pubkey,
+                   BIP0341_NUMS_PUBKEY,
+                   sizeof(BIP0341_NUMS_PUBKEY)) == 0) {
+            // this public key is known to be unspendable
+            keys_type[cosigner_index] = PUBKEY_TYPE_UNSPENDABLE;
+        } else {
+            keys_type[cosigner_index] = PUBKEY_TYPE_EXTERNAL;
+
+            // if there is key origin information and the fingerprint matches, we make sure it's not
+            // a false positive (it could be wrong info, or a collision).
+            if (key_info.has_key_origin &&
+                read_u32_be(key_info.master_key_fingerprint, 0) == master_key_fingerprint) {
+                // we verify that we can actually generate the same pubkey
+                serialized_extended_pubkey_t pubkey_derived;
+                uint16_t sw =
+                    cx_err_to_sw(get_extended_pubkey_at_path(key_info.master_key_derivation,
+                                                             key_info.master_key_derivation_len,
+                                                             BIP32_PUBKEY_VERSION,
+                                                             &pubkey_derived));
+                if (SW_OK != sw) {
+                    SEND_SW(dc, sw);
+                    return;
+                }
+
+                if (memcmp(&key_info.ext_pubkey, &pubkey_derived, sizeof(pubkey_derived)) == 0) {
+                    keys_type[cosigner_index] = PUBKEY_TYPE_INTERNAL;
+                    ++n_internal_keys;
+                }
+            }
+        }
+    }
+
+    if (n_internal_keys < 1) {
+        // Unclear if there is any use case for registering policies with no internal keys.
+        // We disallow that, might reconsider in future versions if needed.
+        PRINTF("Wallet policy with no internal keys\n");
+        SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_REGISTER_WALLET_POLICY_HAS_NO_INTERNAL_KEY);
+        return;
+    } else if (n_internal_keys != 1 && wallet_header->version == WALLET_POLICY_VERSION_V1) {
+        // for legacy policies, we keep the restriction to exactly 1 internal key
+        PRINTF("V1 policies must have exactly 1 internal key\n");
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
+
+    // Try to compute the cleartext spending-path lines. If the descriptor
+    // doesn't classify (DC_OTHER), has non-canonical derivations, or its
+    // confusion score exceeds the threshold, the cleartext block is skipped
+    // and the UX falls back to the existing raw-descriptor-template screen.
+    char cleartext_lines[CT_MAX_LINES][CT_MAX_LINE_LEN + 1];
+    size_t n_cleartext_lines = 0;
+    bool has_cleartext = false;
+    descriptor_class_e cleartext_class = DC_OTHER;
+
+    if (cleartext_confusion_score(policy) <= CLEARTEXT_MAX_CONFUSION_SCORE) {
+        int rc = cleartext_encode(policy,
+                                  NULL,
+                                  cleartext_lines,
+                                  &n_cleartext_lines,
+                                  &has_cleartext,
+                                  &cleartext_class);
+        if (rc <= 0 || !has_cleartext) {
+            // Either the descriptor doesn't classify (rc == 0), an internal
+            // error occurred (rc == -1), or at least one part of the
+            // descriptor lacks a cleartext rendering — in all cases keep
+            // the current behaviour (raw descriptor template only).
+            n_cleartext_lines = 0;
+        }
+    }
+
+    // For multisig policies (all coalesced into DC_MULTISIG),
+    // the cleartext "Any K of <keys> must sign" captures the spending policy
+    // with little risk of ambiguity. Therefore, it is safe to hide the
+    // raw descriptor template, simplifying the UX.
+    const char *descriptor_to_show = (const char *) policy_map_descriptor;
+    if (has_cleartext && n_cleartext_lines > 0 && cleartext_class == DC_MULTISIG) {
+        descriptor_to_show = NULL;
+    }
+
+    // show wallet policy
+    if (!ui_display_register_wallet_policy(dc,
+                                           wallet_header,
+                                           descriptor_to_show,
+                                           &cleartext_lines,
+                                           n_cleartext_lines,
+                                           &keys_info,
+                                           &keys_type)) {
+        SEND_SW(dc, SW_DENY);
+        return;
+    }
+
+    struct {
+        uint8_t wallet_id[32];
+        uint8_t hmac[32];
+    } response;
+
+    memcpy(response.wallet_id, wallet_id, 32);
+
+    if (!compute_wallet_hmac(wallet_id, response.hmac)) {
+        SEND_SW(dc, SW_BAD_STATE);  // this should never fail
+        return;
+    }
+
+    SEND_RESPONSE(dc, &response, sizeof(response), SW_OK);
+}
+
+/**
  * Validates the input, initializes the hash context and starts accumulating the wallet header in
  * it.
  */
@@ -67,8 +237,6 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         uint8_t bytes[MAX_WALLET_POLICY_BYTES];
         policy_node_t parsed;
     } policy_map;
-
-    size_t n_internal_keys = 0;
 
     uint64_t serialized_policy_map_len;
     if (!buffer_read_varint(&dc->read_buffer, &serialized_policy_map_len)) {
@@ -131,158 +299,11 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         return;
     }
 
-    uint32_t master_key_fingerprint = crypto_get_master_key_fingerprint();
-
-    char keys_info[MAX_N_KEYS_IN_WALLET_POLICY][MAX_POLICY_KEY_INFO_LEN + 1];
-    key_type_e keys_type[MAX_N_KEYS_IN_WALLET_POLICY];
-    memset(keys_type, 0, sizeof(keys_type));
-
-    for (size_t cosigner_index = 0; cosigner_index < wallet_header.n_keys; cosigner_index++) {
-        /**
-         * Receives and parses the next pubkey info.
-         * Asks the user to validate the pubkey info.
-         */
-
-        int key_info_len = call_get_merkle_leaf_element(dc,
-                                                        wallet_header.keys_info_merkle_root,
-                                                        wallet_header.n_keys,
-                                                        cosigner_index,
-                                                        (uint8_t *) keys_info[cosigner_index],
-                                                        MAX_POLICY_KEY_INFO_LEN);
-
-        if (key_info_len < 0) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        keys_info[cosigner_index][key_info_len] = 0;
-
-        // Make a sub-buffer for the pubkey info
-        buffer_t key_info_buffer = buffer_create(keys_info[cosigner_index], key_info_len);
-
-        policy_map_key_info_t key_info;
-        if (parse_policy_map_key_info(&key_info_buffer, &key_info, wallet_header.version) == -1) {
-            PRINTF("Incorrect policy map.\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        if (read_u32_be(key_info.ext_pubkey.version, 0) != BIP32_PUBKEY_VERSION) {
-            PRINTF("Invalid pubkey version. Wrong network?\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        // We refuse to register wallets without key origin information, or whose keys don't end
-        // with the wildcard ('/**'). The key origin information is necessary when signing to
-        // identify which one is our key. Using addresses without a wildcard could potentially be
-        // supported, but disabled for now (question to address: can only _some_ of the keys have a
-        // wildcard?).
-
-        if (memcmp(key_info.ext_pubkey.compressed_pubkey,
-                   BIP0341_NUMS_PUBKEY,
-                   sizeof(BIP0341_NUMS_PUBKEY)) == 0) {
-            // this public key is known to be unspendable
-            keys_type[cosigner_index] = PUBKEY_TYPE_UNSPENDABLE;
-        } else {
-            keys_type[cosigner_index] = PUBKEY_TYPE_EXTERNAL;
-
-            // if there is key origin information and the fingerprint matches, we make sure it's not
-            // a false positive (it could be wrong info, or a collision).
-            if (key_info.has_key_origin &&
-                read_u32_be(key_info.master_key_fingerprint, 0) == master_key_fingerprint) {
-                // we verify that we can actually generate the same pubkey
-                serialized_extended_pubkey_t pubkey_derived;
-                uint16_t sw =
-                    cx_err_to_sw(get_extended_pubkey_at_path(key_info.master_key_derivation,
-                                                             key_info.master_key_derivation_len,
-                                                             BIP32_PUBKEY_VERSION,
-                                                             &pubkey_derived));
-                if (SW_OK != sw) {
-                    SEND_SW(dc, sw);
-                    return;
-                }
-
-                if (memcmp(&key_info.ext_pubkey, &pubkey_derived, sizeof(pubkey_derived)) == 0) {
-                    keys_type[cosigner_index] = PUBKEY_TYPE_INTERNAL;
-                    ++n_internal_keys;
-                }
-            }
-        }
-    }
-
-    if (n_internal_keys < 1) {
-        // Unclear if there is any use case for registering policies with no internal keys.
-        // We disallow that, might reconsider in future versions if needed.
-        PRINTF("Wallet policy with no internal keys\n");
-        SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_REGISTER_WALLET_POLICY_HAS_NO_INTERNAL_KEY);
-        return;
-    } else if (n_internal_keys != 1 && wallet_header.version == WALLET_POLICY_VERSION_V1) {
-        // for legacy policies, we keep the restriction to exactly 1 internal key
-        PRINTF("V1 policies must have exactly 1 internal key\n");
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
-
-    // Try to compute the cleartext spending-path lines. If the descriptor
-    // doesn't classify (DC_OTHER), has non-canonical derivations, or its
-    // confusion score exceeds the threshold, the cleartext block is skipped
-    // and the UX falls back to the existing raw-descriptor-template screen.
-    char cleartext_lines[CT_MAX_LINES][CT_MAX_LINE_LEN + 1];
-    size_t n_cleartext_lines = 0;
-    bool has_cleartext = false;
-    descriptor_class_e cleartext_class = DC_OTHER;
-
-    if (cleartext_confusion_score(&policy_map.parsed) <= CLEARTEXT_MAX_CONFUSION_SCORE) {
-        int rc = cleartext_encode(&policy_map.parsed,
-                                  NULL,
-                                  cleartext_lines,
-                                  &n_cleartext_lines,
-                                  &has_cleartext,
-                                  &cleartext_class);
-        if (rc <= 0 || !has_cleartext) {
-            // Either the descriptor doesn't classify (rc == 0), an internal
-            // error occurred (rc == -1), or at least one part of the
-            // descriptor lacks a cleartext rendering — in all cases keep
-            // the current behaviour (raw descriptor template only).
-            n_cleartext_lines = 0;
-        }
-    }
-
-    // For multisig policies (all coalesced into DC_MULTISIG),
-    // the cleartext "Any K of <keys> must sign" captures the spending policy
-    // with little risk of ambiguity. Therefore, it is safe to hide the
-    // raw descriptor template, simplifying the UX.
-    const char *descriptor_to_show = (char *) policy_map_descriptor;
-    if (has_cleartext && n_cleartext_lines > 0 && cleartext_class == DC_MULTISIG) {
-        descriptor_to_show = NULL;
-    }
-
-    // show wallet policy
-    if (!ui_display_register_wallet_policy(dc,
-                                           &wallet_header,
-                                           descriptor_to_show,
-                                           &cleartext_lines,
-                                           n_cleartext_lines,
-                                           &keys_info,
-                                           &keys_type)) {
-        SEND_SW(dc, SW_DENY);
-        return;
-    }
-
-    struct {
-        uint8_t wallet_id[32];
-        uint8_t hmac[32];
-    } response;
-
-    memcpy(response.wallet_id, wallet_id, sizeof(wallet_id));
-
-    if (!compute_wallet_hmac(wallet_id, response.hmac)) {
-        SEND_SW(dc, SW_BAD_STATE);  // this should never fail
-        return;
-    }
-
-    SEND_RESPONSE(dc, &response, sizeof(response), SW_OK);
+    confirm_and_register_wallet(dc,
+                                &wallet_header,
+                                policy_map_descriptor,
+                                &policy_map.parsed,
+                                wallet_id);
 }
 
 static bool is_policy_acceptable(const policy_node_t *policy) {
