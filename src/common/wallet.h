@@ -395,7 +395,7 @@ typedef struct {
     int16_t k;                  // threshold
     int16_t n;                  // number of child scripts
     rptr_policy_node_scriptlist_t
-        scriptlist;  // pointer to array of exactly n pointers to child scripts
+        scriptlist;  // pointer to a linked list of exactly n child scripts
 } policy_node_thresh_t;
 
 typedef struct {
