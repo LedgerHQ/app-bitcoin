@@ -437,7 +437,7 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
  * - Single key index:
  *   - @IDX/**
  *   - @IDX/<M;N>/*
- * - MuSig2 aggregate key (only if is_taproot is true):
+ * - MuSig2 aggregate key (only if allow_musig is true):
  *   - musig(@IDX,@IDX,...,@IDX)/**
  *   - musig(@IDX,@IDX,...,@IDX)/<M;N>/*
  * where IDX is a key index.
@@ -446,7 +446,7 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
 static int parse_keyexpr(buffer_t *in_buf,
                          int version,
                          policy_node_keyexpr_t *out,
-                         bool is_taproot,
+                         bool allow_musig,
                          buffer_t *out_buf,
                          uint16_t *keyexpr_index) {
     char c;
@@ -469,7 +469,7 @@ static int parse_keyexpr(buffer_t *in_buf,
             return WITH_ERROR(-1, "Expected musig key expression");
         }
 
-        if (!is_taproot) {
+        if (!allow_musig) {
             return WITH_ERROR(-1, "musig is only allowed in taproot");
         }
 
@@ -1525,7 +1525,7 @@ static int parse_script(buffer_t *in_buf,
             if (0 > parse_keyexpr(in_buf,
                                   version,
                                   key_expr,
-                                  is_taproot,
+                                  is_taproot,  // musig is only allowed in taproot
                                   out_buf,
                                   &key_expression_count)) {
                 return WITH_ERROR(-1, "Couldn't parse key expression");
@@ -1597,6 +1597,7 @@ static int parse_script(buffer_t *in_buf,
             }
             i_policy_node_keyexpr(&node->key, key_expr);
 
+            // the taproot internal key can be a musig
             if (0 >
                 parse_keyexpr(in_buf, version, key_expr, true, out_buf, &key_expression_count)) {
                 return WITH_ERROR(-1, "Couldn't parse key expression");
@@ -1712,7 +1713,9 @@ static int parse_script(buffer_t *in_buf,
             node->k = (int16_t) k;
 
             // We allocate the array of key indices at the current position in the output buffer
-            // (on success)
+            // (on success).
+            // Note: this is incompatible with musig keys, therefore we don't currently support
+            // musig nested inside multi_a or sortedmulti_a.
             buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
             i_policy_node_keyexpr(&node->keys, buffer_get_cur(out_buf));
 
@@ -1738,12 +1741,14 @@ static int parse_script(buffer_t *in_buf,
                     return WITH_ERROR(-1, "Out of memory");
                 }
 
-                if (0 > parse_keyexpr(in_buf,
-                                      version,
-                                      key_expr,
-                                      is_taproot,
-                                      out_buf,
-                                      &key_expression_count)) {
+                if (0 >
+                    parse_keyexpr(
+                        in_buf,
+                        version,
+                        key_expr,
+                        false,  // musig is not currently supported in keys of multisig fragments
+                        out_buf,
+                        &key_expression_count)) {
                     return WITH_ERROR(-1, "Error parsing key expression");
                 }
 
