@@ -18,8 +18,6 @@
 #include "segwit_addr.h"
 #include "wallet.h"
 
-#define MAX_POLICY_DEPTH 10
-
 // The last opcode must be processed as a VERIFY flag
 #define PROCESSOR_FLAG_V 1
 
@@ -46,7 +44,8 @@ typedef struct {
     const wallet_derivation_info_t *wdi;
     bool is_taproot;
 
-    policy_parser_node_state_t nodes[MAX_POLICY_DEPTH];  // stack of nodes being processed
+    policy_parser_node_state_t
+        nodes[MAX_PARSE_SCRIPT_RECURSION_DEPTH];  // stack of nodes being processed
     int node_stack_eos;  // index of node being processed within nodes; will be set -1 at the end of
                          // processing
 
@@ -374,7 +373,7 @@ __attribute__((warn_unused_result)) static int state_stack_push(policy_parser_st
                                                                 uint8_t flags) {
     ++state->node_stack_eos;
 
-    if (state->node_stack_eos >= MAX_POLICY_DEPTH) {
+    if (state->node_stack_eos >= MAX_PARSE_SCRIPT_RECURSION_DEPTH) {
         return WITH_ERROR(-1, "Reached maximum policy depth");
     }
 
