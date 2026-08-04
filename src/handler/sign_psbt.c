@@ -282,13 +282,18 @@ static int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitnes
         return -1;
     }
 
+    // SIZE_MAX is reserved by call_psbt_parse_rawtx to mean "no output is queried"
+    if (prevout_n >= SIZE_MAX) {
+        return -1;
+    }
+
     txid_parser_outputs_t parser_outputs;
     // request non-witness utxo, and get the prevout's value and scriptpubkey
     int res = call_psbt_parse_rawtx(dc,
                                     input_map,
                                     (uint8_t[]){PSBT_IN_NON_WITNESS_UTXO},
                                     1,
-                                    prevout_n,
+                                    (size_t) prevout_n,
                                     &parser_outputs);
     if (res < 0) {
         PRINTF("Parsing rawtx failed\n");

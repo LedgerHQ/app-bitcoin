@@ -62,7 +62,7 @@ typedef struct parse_rawtx_state_s {
         };
     };
 
-    int output_index;  // index of queried output, or -1
+    size_t output_index;  // index of queried output, or SIZE_MAX if no output is queried
 
     txid_parser_outputs_t *parser_outputs;
 
@@ -105,6 +105,12 @@ static int parse_rawtxinput_scriptsig_size(parse_rawtxinput_state_t *state, buff
     bool result = dbuffer_read_varint(buffers, &scriptsig_size);
 
     if (result) {
+        // The scriptSig is streamed and hashed, but never stored; still, the size must fit in the
+        // counters used to track the parsing progress.
+        if (scriptsig_size > UINT32_MAX) {
+            return -1;
+        }
+
         state->scriptsig_size = (unsigned int) scriptsig_size;
 
         crypto_hash_update_varint(&state->parent_state->hash_context->header, scriptsig_size);
@@ -165,7 +171,7 @@ static const parsing_step_t parse_rawtxinput_steps[] = {
     (parsing_step_t) parse_rawtxinput_sequence,
 };
 
-const size_t n_parse_rawtxinput_steps =
+static const size_t n_parse_rawtxinput_steps =
     sizeof(parse_rawtxinput_steps) / sizeof(parse_rawtxinput_steps[0]);
 
 /*   PARSER FOR A RAWTX OUTPUT */
@@ -178,8 +184,8 @@ static int parse_rawtxoutput_value(parse_rawtxoutput_state_t *state, buffer_t *b
 
         crypto_hash_update(&state->parent_state->hash_context->header, value_bytes, 8);
 
-        if (state->parent_state->output_index != -1) {
-            unsigned int relevant_output_index = (unsigned int) state->parent_state->output_index;
+        if (state->parent_state->output_index != SIZE_MAX) {
+            size_t relevant_output_index = state->parent_state->output_index;
             if (state->parent_state->out_counter == relevant_output_index) {
                 state->parent_state->parser_outputs->vout_value = value;
             }
@@ -203,8 +209,8 @@ static int parse_rawtxoutput_scriptpubkey_size(parse_rawtxoutput_state_t *state,
 
         crypto_hash_update_varint(&state->parent_state->hash_context->header, scriptpubkey_size);
 
-        if (state->parent_state->output_index != -1) {
-            unsigned int relevant_output_index = (unsigned int) state->parent_state->output_index;
+        if (state->parent_state->output_index != SIZE_MAX) {
+            size_t relevant_output_index = state->parent_state->output_index;
             if (state->parent_state->out_counter == relevant_output_index) {
                 if (scriptpubkey_size > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
                     // the requested output's scriptPubKey must fit in parser_outputs; such an
@@ -246,8 +252,8 @@ static int parse_rawtxoutput_scriptpubkey(parse_rawtxoutput_state_t *state, buff
 
         crypto_hash_update(&state->parent_state->hash_context->header, data, data_len);
 
-        if (state->parent_state->output_index != -1) {
-            unsigned int relevant_output_index = (unsigned int) state->parent_state->output_index;
+        if (state->parent_state->output_index != SIZE_MAX) {
+            size_t relevant_output_index = state->parent_state->output_index;
             if (state->parent_state->out_counter == relevant_output_index) {
                 unsigned int scriptpubkey_len =
                     state->parent_state->parser_outputs->vout_scriptpubkey_len;
@@ -283,7 +289,7 @@ static const parsing_step_t parse_rawtxoutput_steps[] = {
     (parsing_step_t) parse_rawtxoutput_scriptpubkey,
 };
 
-const size_t n_parse_rawtxoutput_steps =
+static const size_t n_parse_rawtxoutput_steps =
     sizeof(parse_rawtxoutput_steps) / sizeof(parse_rawtxoutput_steps[0]);
 
 /*   PARSER FOR A FULL RAWTX */
@@ -338,6 +344,10 @@ static int parse_rawtx_input_count(parse_rawtx_state_t *state, buffer_t *buffers
     uint64_t n_inputs;
     bool result = dbuffer_read_varint(buffers, &n_inputs);
     if (result) {
+        if (n_inputs > UINT32_MAX) {
+            return -1;
+        }
+
         state->n_inputs = (unsigned int) n_inputs;
 
         crypto_hash_update_varint(&state->hash_context->header, n_inputs);
@@ -381,6 +391,10 @@ static int parse_rawtx_output_count(parse_rawtx_state_t *state, buffer_t *buffer
     uint64_t n_outputs;
     bool result = dbuffer_read_varint(buffers, &n_outputs);
     if (result) {
+        if (n_outputs > UINT32_MAX) {
+            return -1;
+        }
+
         state->n_outputs = (unsigned int) n_outputs;
 
         crypto_hash_update_varint(&state->hash_context->header, n_outputs);
@@ -444,6 +458,9 @@ static int parse_rawtx_witnesses(parse_rawtx_state_t *state, buffer_t *buffers[2
             if (!dbuffer_read_varint(buffers, &cur_wit_stack_elements)) {
                 return 0;  // incomplete, read more data
             }
+            if (cur_wit_stack_elements > UINT32_MAX) {
+                return -1;
+            }
             state->is_cur_wit_stack_elements_read = true;
             state->cur_wit_stack_elements = (unsigned int) cur_wit_stack_elements;
             state->is_cur_wit_elem_len_read = false;
@@ -458,6 +475,9 @@ static int parse_rawtx_witnesses(parse_rawtx_state_t *state, buffer_t *buffers[2
                 uint64_t cur_wit_elem_len;
                 if (!dbuffer_read_varint(buffers, &cur_wit_elem_len)) {
                     return 0;  // incomplete, read more data
+                }
+                if (cur_wit_elem_len > UINT32_MAX) {
+                    return -1;
                 }
                 state->is_cur_wit_elem_len_read = true;
                 state->cur_wit_elem_len = (unsigned int) cur_wit_elem_len;
@@ -510,7 +530,7 @@ static const parsing_step_t parse_rawtx_steps[] = {(parsing_step_t) parse_rawtx_
                                                    (parsing_step_t) parse_rawtx_witnesses,
                                                    (parsing_step_t) parse_rawtx_locktime};
 
-const size_t n_parse_rawtx_steps = sizeof(parse_rawtx_steps) / sizeof(parse_rawtx_steps[0]);
+static const size_t n_parse_rawtx_steps = sizeof(parse_rawtx_steps) / sizeof(parse_rawtx_steps[0]);
 
 static void cb_process_data(buffer_t *data, void *cb_state) {
     psbt_parse_rawtx_state_t *state = (psbt_parse_rawtx_state_t *) cb_state;
@@ -526,21 +546,38 @@ static void cb_process_data(buffer_t *data, void *cb_state) {
     int result =
         parser_run(parse_rawtx_steps, n_parse_rawtx_steps, &state->parser_context, buffers, pic);
     if (result == 0) {
-        parser_consolidate_buffers(buffers, sizeof(state->store));
+        // Each parsing step reads at most 32 bytes at a time, therefore the leftovers always fit
+        // in the store; still, we bail out rather than silently dropping data if that ever fails.
+        if (!parser_consolidate_buffers(buffers, sizeof(state->store))) {
+            PRINTF("Too many unparsed bytes\n");
+            state->parser_error = true;
+            return;
+        }
         state->store_data_length = store_buf.size;
     } else if (result < 0) {
         PRINTF("Parser error\n");
         state->parser_error = true;  // abort any remaining parsing
+    } else {
+        // Parsing is complete; no byte is expected after the end of the transaction.
+        if (dbuffer_get_length(buffers) > 0) {
+            PRINTF("Trailing data after the end of the transaction\n");
+            state->parser_error = true;
+            return;
+        }
+        state->store_data_length = 0;
     }
 }
 
 int call_psbt_parse_rawtx(dispatcher_context_t *dispatcher_context,
                           const merkleized_map_commitment_t *map,
                           const uint8_t *key,
-                          int key_len,
-                          int output_index,
+                          size_t key_len,
+                          size_t output_index,
                           txid_parser_outputs_t *outputs) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
+
+    // no field is left with an indeterminate value if a parsing step does not fill it in
+    memset(outputs, 0, sizeof(*outputs));
 
     cx_sha256_t hash_context;
     cx_sha256_init(&hash_context);
@@ -577,7 +614,7 @@ int call_psbt_parse_rawtx(dispatcher_context_t *dispatcher_context,
     }
 
     // If a specific output was requested, verify it was actually found
-    if (output_index >= 0 && (unsigned int) output_index >= flow_state.parser_state.n_outputs) {
+    if (output_index != SIZE_MAX && output_index >= flow_state.parser_state.n_outputs) {
         return -1;
     }
 
