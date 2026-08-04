@@ -300,7 +300,7 @@ static void test_parse_policy_tr_musig_keypath(void **state) {
     assert_int_equal(root->base.type, TOKEN_TR);
     assert_true(isnull_policy_node_tree(&root->tree));
 
-    check_key_expr_musig(r_policy_node_keyexpr(&root->key), 3, (uint16_t[]){2, 0, 1}, 3, 13);
+    check_key_expr_musig(r_policy_node_keyexpr(&root->key), 3, (uint16_t[]) {2, 0, 1}, 3, 13);
 }
 
 static void test_parse_policy_tr_musig_scriptpath(void **state) {
@@ -324,7 +324,7 @@ static void test_parse_policy_tr_musig_scriptpath(void **state) {
     policy_node_with_key_t *script_pk = (policy_node_with_key_t *) r_policy_node(&tree->script);
     assert_int_equal(script_pk->base.type, TOKEN_PK);
 
-    check_key_expr_musig(r_policy_node_keyexpr(&script_pk->key), 3, (uint16_t[]){2, 0, 3}, 0, 1);
+    check_key_expr_musig(r_policy_node_keyexpr(&script_pk->key), 3, (uint16_t[]) {2, 0, 3}, 0, 1);
 }
 
 static void test_get_policy_segwit_version(void **state) {
@@ -438,6 +438,12 @@ static void test_failures(void **state) {
     assert_true(0 > parse_policy("wpkh(musig(@0,@1)/**)", out, sizeof(out)));  // not taproot
     assert_true(
         0 > parse_policy("tr(musig(@0,musig(@1,@2))/**)", out, sizeof(out)));  // can't nest musig
+
+    // musig is currently disabled in multi_a/sortedmulti_a, until the parsing
+    // of such expressions is properly fixed in parse_policy
+    assert_true(0 > parse_policy("tr(@0/**,multi_a(1,musig(@1,@2)/**))", out, sizeof(out)));
+    assert_true(0 >
+                parse_policy("tr(@0/**,sortedmulti_a(2,musig(@1,@2)/**,@3/**))", out, sizeof(out)));
 }
 
 enum TestMode {
