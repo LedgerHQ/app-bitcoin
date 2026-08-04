@@ -204,7 +204,10 @@ int musig_key_agg(const plain_pk_t pubkeys[], size_t n_keys, musig_keyagg_contex
             return -1;
         }
 
-        point_add(&ctx->Q, &P, &ctx->Q);
+        if (CX_OK != point_add(&ctx->Q, &P, &ctx->Q)) {
+            PRINTF("Point addition failed in musig_key_agg\n");
+            return -1;
+        }
     }
 
     if (is_point_infinite(&ctx->Q)) {
@@ -303,9 +306,13 @@ int musig_nonce_agg(const musig_pubnonce_t pubnonces[], size_t n_keys, musig_pub
             point_t R_ij;
             if (0 > cpoint(&pubnonces[i].raw[(j - 1) * sizeof(plain_pk_t)], &R_ij)) {
                 PRINTF("Musig2 nonce aggregation: invalid contribution from cosigner %d\n", i);
-                return -i - 1;
+                return -(int) i - 1;
             }
-            point_add(&R_j, &R_ij, &R_j);
+            if (CX_OK != point_add(&R_j, &R_ij, &R_j)) {
+                // this should never happen
+                PRINTF("Point addition failed for cosigner %d in musig_nonce_agg\n", i);
+                return -(int) i - 1;
+            }
         }
 
         if (is_point_infinite(&R_j)) {
@@ -354,7 +361,9 @@ static int apply_tweak(musig_keyagg_context_t *ctx, const uint8_t tweak[static 3
     }
 
     // compute the resulting tweaked point g * Q + tweak * G
-    point_add(&ctx->Q, &T, &ctx->Q);
+    if (CX_OK != point_add(&ctx->Q, &T, &ctx->Q)) {
+        return -1;
+    }
     if (is_point_infinite(&ctx->Q)) {
         PRINTF("The result of tweaking cannot be infinity\n");
         return -1;
