@@ -424,7 +424,7 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
     musig_pubnonce_t aggnonce;
     int res = musig_nonce_agg(nonces, musig_info->n, &aggnonce);
     if (res < 0) {
-        PRINTF("Musig aggregation failed; disruptive signer has index %d\n", -res);
+        PRINTF("Musig aggregation failed; disruptive signer has index %d\n", -res - 1);
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }
