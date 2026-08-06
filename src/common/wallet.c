@@ -16,24 +16,12 @@
 #include "segwit_addr.h"
 #include "sw.h"
 
-#ifndef SKIP_FOR_CMOCKA
 #include "../crypto.h"
-#else
-// disable problematic macros when compiling unit tests with CMOCKA
-#define PRINTF(...)
-#define PIC(x) (x)
-#endif
 
 typedef struct {
     PolicyNodeType type;
     const char *name;
 } token_descriptor_t;
-
-// As parse_script is recursive, we set a maximum reasonable recursion depth in order to avoid the
-// risk of stack exhaustion.
-// At the time of writing, the maximum depth measured across all the tests is 10, so 16 still
-// leaves a margin for much more complex scripts and seems unlikely to be hit in practice.
-#define MAX_PARSE_SCRIPT_RECURSION_DEPTH 16
 
 static const token_descriptor_t KNOWN_TOKENS[] = {
     {.type = TOKEN_SH, .name = "sh"},
@@ -443,7 +431,7 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
  * - Single key index:
  *   - @IDX/**
  *   - @IDX/<M;N>/*
- * - MuSig2 aggregate key (only if is_taproot is true):
+ * - MuSig2 aggregate key (only if allow_musig is true):
  *   - musig(@IDX,@IDX,...,@IDX)/**
  *   - musig(@IDX,@IDX,...,@IDX)/<M;N>/*
  * where IDX is a key index.
@@ -452,7 +440,7 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
 static int parse_keyexpr(buffer_t *in_buf,
                          int version,
                          policy_node_keyexpr_t *out,
-                         bool is_taproot,
+                         bool allow_musig,
                          buffer_t *out_buf,
                          uint16_t *keyexpr_index) {
     char c;
@@ -475,7 +463,7 @@ static int parse_keyexpr(buffer_t *in_buf,
             return WITH_ERROR(-1, "Expected musig key expression");
         }
 
-        if (!is_taproot) {
+        if (!allow_musig) {
             return WITH_ERROR(-1, "musig is only allowed in taproot");
         }
 
@@ -610,6 +598,13 @@ static int parse_keyexpr(buffer_t *in_buf,
 #define CONTEXT_WITHIN_WSH 2  // parsing a direct child of WSH
 #define CONTEXT_WITHIN_TR  4  // parsing a child of TR (direct or not)
 
+// The remaining bits of the context flags count the THRESH nodes that contain the script being
+// parsed. Each of them costs about 600 bytes of stack while the extended info of the policy is
+// computed (see compute_thresh_ops), therefore their nesting is limited by MAX_THRESH_NESTING;
+// policies with thresh expressions with more nesting seem unlikely to be used in practice.
+#define CONTEXT_THRESH_NESTING_UNIT   8
+#define CONTEXT_THRESH_NESTING(flags) ((flags) / CONTEXT_THRESH_NESTING_UNIT)
+
 // forward declaration
 static int parse_script(buffer_t *in_buf,
                         buffer_t *out_buf,
@@ -694,6 +689,15 @@ static int parse_script(buffer_t *in_buf,
         }
 
         if (can_read && c == ':') {
+            // The wrappers are parsed in this same stack frame, but each of them creates a node
+            // containing the following one; therefore, they must be charged to the recursion
+            // budget explicitly. Otherwise, a short chain of wrappers that type-checks for any
+            // length (for example "nnn...n:pk(@0/**)") would produce an arbitrarily deep policy,
+            // exhausting the stack in the functions that walk it recursively.
+            if (depth + (size_t) n_wrappers > MAX_PARSE_SCRIPT_RECURSION_DEPTH) {
+                return WITH_ERROR(-1, "Script is too deeply nested");
+            }
+
             // parse wrappers
             for (int i = 0; i < n_wrappers; i++) {
                 policy_node_with_script_t *node =
@@ -746,6 +750,9 @@ static int parse_script(buffer_t *in_buf,
                 inner_wrapper = node;
             }
             buffer_seek_cur(in_buf, 1);  // skip ":"
+
+            // the wrapped script is nested n_wrappers levels below the current one
+            depth += n_wrappers;
         } else {
             n_wrappers = 0;  // it was not a wrapper
         }
@@ -1376,6 +1383,12 @@ static int parse_script(buffer_t *in_buf,
             break;
         }
         case TOKEN_THRESH: {
+            if (CONTEXT_THRESH_NESTING(context_flags) >= MAX_THRESH_NESTING) {
+                return WITH_ERROR(-1, "Too many nested thresh expressions");
+            }
+            // the children of this node (and all their descendants) are within one more thresh
+            unsigned int inner_context_flags = context_flags + CONTEXT_THRESH_NESTING_UNIT;
+
             policy_node_thresh_t *node =
                 (policy_node_thresh_t *) buffer_alloc(out_buf, sizeof(policy_node_thresh_t), true);
             if (node == NULL) {
@@ -1421,7 +1434,7 @@ static int parse_script(buffer_t *in_buf,
                 // parse a script into cur->script
                 buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
                 i_policy_node(&cur->script, buffer_get_cur(out_buf));
-                if (0 > parse_script(in_buf, out_buf, version, depth + 1, context_flags)) {
+                if (0 > parse_script(in_buf, out_buf, version, depth + 1, inner_context_flags)) {
                     // failed while parsing internal script
                     return -1;
                 }
@@ -1477,6 +1490,10 @@ static int parse_script(buffer_t *in_buf,
                 }
             }
 
+            if (node->k > node->n) {
+                return WITH_ERROR(-1, "thresh: k exceeds n");
+            }
+
             // thresh(k, X1, ..., Xn)
             // X1 is Bdu; others are Wdu
 
@@ -1527,7 +1544,7 @@ static int parse_script(buffer_t *in_buf,
             if (0 > parse_keyexpr(in_buf,
                                   version,
                                   key_expr,
-                                  is_taproot,
+                                  is_taproot,  // musig is only allowed in taproot
                                   out_buf,
                                   &key_expression_count)) {
                 return WITH_ERROR(-1, "Couldn't parse key expression");
@@ -1599,6 +1616,7 @@ static int parse_script(buffer_t *in_buf,
             }
             i_policy_node_keyexpr(&node->key, key_expr);
 
+            // the taproot internal key can be a musig
             if (0 >
                 parse_keyexpr(in_buf, version, key_expr, true, out_buf, &key_expression_count)) {
                 return WITH_ERROR(-1, "Couldn't parse key expression");
@@ -1714,7 +1732,9 @@ static int parse_script(buffer_t *in_buf,
             node->k = (int16_t) k;
 
             // We allocate the array of key indices at the current position in the output buffer
-            // (on success)
+            // (on success).
+            // Note: this is incompatible with musig keys, therefore we don't currently support
+            // musig nested inside multi_a or sortedmulti_a.
             buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
             i_policy_node_keyexpr(&node->keys, buffer_get_cur(out_buf));
 
@@ -1740,12 +1760,14 @@ static int parse_script(buffer_t *in_buf,
                     return WITH_ERROR(-1, "Out of memory");
                 }
 
-                if (0 > parse_keyexpr(in_buf,
-                                      version,
-                                      key_expr,
-                                      is_taproot,
-                                      out_buf,
-                                      &key_expression_count)) {
+                if (0 >
+                    parse_keyexpr(
+                        in_buf,
+                        version,
+                        key_expr,
+                        false,  // musig is not currently supported in keys of multisig fragments
+                        out_buf,
+                        &key_expression_count)) {
                     return WITH_ERROR(-1, "Error parsing key expression");
                 }
 
@@ -2105,12 +2127,14 @@ static int16_t maxcheck(int16_t a, int16_t b) {
         return a > b ? a : b;
 }
 
-// Maximum supported value for n in a thresh miniscript operator (technical limitation)
-#define MAX_N_IN_THRESH 128
-
-static int compute_thresh_ops(const policy_node_thresh_t *node,
-                              miniscript_ops_t *out,
-                              MiniscriptContext ctx) {
+// The two functions below are kept out of line on purpose: their arrays would otherwise be part of
+// the stack frame of compute_miniscript_policy_ext_info(), which is recursive, and would therefore
+// be reserved once per level of the policy even for the nodes that are not thresh. As they are,
+// they only use stack while a thresh node is being processed, and the nesting of thresh nodes is
+// limited to MAX_THRESH_NESTING while parsing.
+__attribute__((noinline)) static int compute_thresh_ops(const policy_node_thresh_t *node,
+                                                        miniscript_ops_t *out,
+                                                        MiniscriptContext ctx) {
     uint16_t sats[MAX_N_IN_THRESH + 1 + 1] = {0};
     uint16_t next_sats[MAX_N_IN_THRESH + 1 + 1] = {0};  // it temporarily uses an extra element
 
@@ -2147,9 +2171,9 @@ static int compute_thresh_ops(const policy_node_thresh_t *node,
     return 0;
 }
 
-static int compute_thresh_stacksize(const policy_node_thresh_t *node,
-                                    miniscript_stacksize_t *out,
-                                    MiniscriptContext ctx) {
+__attribute__((noinline)) static int compute_thresh_stacksize(const policy_node_thresh_t *node,
+                                                              miniscript_stacksize_t *out,
+                                                              MiniscriptContext ctx) {
     uint16_t sats[MAX_N_IN_THRESH + 1 + 1] = {0};
     uint16_t next_sats[MAX_N_IN_THRESH + 1 + 1] = {0};  // it temporarily uses an extra element
 
@@ -2206,8 +2230,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = 1;
 
-            out->ops = (miniscript_ops_t){0, -1, 0};
-            out->ss = (miniscript_stacksize_t){-1, 0};
+            out->ops = (miniscript_ops_t) {0, -1, 0};
+            out->ss = (miniscript_stacksize_t) {-1, 0};
 
             return 0;
         case TOKEN_1:
@@ -2215,8 +2239,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = 1;
 
-            out->ops = (miniscript_ops_t){0, 0, -1};
-            out->ss = (miniscript_stacksize_t){0, -1};
+            out->ops = (miniscript_ops_t) {0, 0, -1};
+            out->ss = (miniscript_stacksize_t) {0, -1};
 
             return 0;
         case TOKEN_PK_K:
@@ -2225,8 +2249,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = (ctx == MINISCRIPT_CONTEXT_TAPSCRIPT ? 33 : 34);
 
-            out->ops = (miniscript_ops_t){0, 0, 0};
-            out->ss = (miniscript_stacksize_t){1, 1};
+            out->ops = (miniscript_ops_t) {0, 0, 0};
+            out->ss = (miniscript_stacksize_t) {1, 1};
 
             return 0;
         case TOKEN_PK_H:
@@ -2235,8 +2259,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = 3 + 21;
 
-            out->ops = (miniscript_ops_t){3, 0, 0};
-            out->ss = (miniscript_stacksize_t){2, 2};
+            out->ops = (miniscript_ops_t) {3, 0, 0};
+            out->ss = (miniscript_stacksize_t) {2, 2};
 
             return 0;
         case TOKEN_PK:  // pk(key) = c:pk_k(key)
@@ -2247,8 +2271,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = (ctx == MINISCRIPT_CONTEXT_TAPSCRIPT ? 34 : 35);
 
-            out->ops = (miniscript_ops_t){1, 0, 0};
-            out->ss = (miniscript_stacksize_t){1, 1};
+            out->ops = (miniscript_ops_t) {1, 0, 0};
+            out->ss = (miniscript_stacksize_t) {1, 1};
 
             return 0;
         case TOKEN_PKH:  // pkh(key) = c:pk_h(key)
@@ -2259,8 +2283,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = 3 + 21 + 1;
 
-            out->ops = (miniscript_ops_t){4, 0, 0};
-            out->ss = (miniscript_stacksize_t){2, 2};
+            out->ops = (miniscript_ops_t) {4, 0, 0};
+            out->ss = (miniscript_stacksize_t) {2, 2};
 
             return 0;
         case TOKEN_MULTI: {
@@ -2274,8 +2298,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->script_size = (uint16_t) (1 + get_push_script_size(node->k) +
                                            get_push_script_size(node->n) + 34 * node->n);
 
-            out->ops = (miniscript_ops_t){1, node->n, node->n};
-            out->ss = (miniscript_stacksize_t){node->k + 1, node->k + 1};
+            out->ops = (miniscript_ops_t) {1, node->n, node->n};
+            out->ss = (miniscript_stacksize_t) {node->k + 1, node->k + 1};
 
             return 0;
         }
@@ -2289,8 +2313,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = (uint16_t) (1 + get_push_script_size(node->k) + 34 * node->n);
 
-            out->ops = (miniscript_ops_t){node->n + 1, 0, 0};
-            out->ss = (miniscript_stacksize_t){node->n, node->n};
+            out->ops = (miniscript_ops_t) {node->n + 1, 0, 0};
+            out->ss = (miniscript_stacksize_t) {node->n, node->n};
 
             return 0;
         }
@@ -2307,8 +2331,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = (uint16_t) (1 + get_push_script_size(node->n));
 
-            out->ops = (miniscript_ops_t){1, 0, -1};
-            out->ss = (miniscript_stacksize_t){0, -1};
+            out->ops = (miniscript_ops_t) {1, 0, -1};
+            out->ss = (miniscript_stacksize_t) {0, -1};
 
             return 0;
         }
@@ -2325,8 +2349,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = (uint16_t) (1 + get_push_script_size(node->n));
 
-            out->ops = (miniscript_ops_t){1, 0, -1};
-            out->ss = (miniscript_stacksize_t){0, -1};
+            out->ops = (miniscript_ops_t) {1, 0, -1};
+            out->ss = (miniscript_stacksize_t) {0, -1};
 
             return 0;
         }
@@ -2336,8 +2360,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = 4 + 2 + 33;
 
-            out->ops = (miniscript_ops_t){4, 0, -1};
-            out->ss = (miniscript_stacksize_t){1, -1};
+            out->ops = (miniscript_ops_t) {4, 0, -1};
+            out->ss = (miniscript_stacksize_t) {1, -1};
 
             return 0;
         case TOKEN_RIPEMD160:
@@ -2346,8 +2370,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = 4 + 2 + 21;
 
-            out->ops = (miniscript_ops_t){4, 0, -1};
-            out->ss = (miniscript_stacksize_t){1, -1};
+            out->ops = (miniscript_ops_t) {4, 0, -1};
+            out->ss = (miniscript_stacksize_t) {1, -1};
 
             return 0;
         case TOKEN_ANDOR: {
@@ -2381,11 +2405,11 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = 3 + x.script_size + y.script_size + z.script_size;
 
-            out->ops = (miniscript_ops_t){
+            out->ops = (miniscript_ops_t) {
                 3 + x.ops.count + y.ops.count + z.ops.count,
                 maxcheck(sumcheck(y.ops.sat, x.ops.sat), sumcheck(y.ops.dsat, z.ops.sat)),
                 sumcheck(x.ops.dsat, z.ops.dsat)};
-            out->ss = (miniscript_stacksize_t){
+            out->ss = (miniscript_stacksize_t) {
                 maxcheck(sumcheck(x.ss.sat, y.ss.sat), sumcheck(x.ss.dsat, z.ss.sat)),
                 sumcheck(x.ss.dsat, z.ss.dsat)};
 
@@ -2421,8 +2445,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->script_size = x.script_size + y.script_size;
 
             out->ops =
-                (miniscript_ops_t){x.ops.count + y.ops.count, sumcheck(x.ops.sat, y.ops.sat), -1};
-            out->ss = (miniscript_stacksize_t){sumcheck(x.ss.sat, y.ss.sat), -1};
+                (miniscript_ops_t) {x.ops.count + y.ops.count, sumcheck(x.ops.sat, y.ops.sat), -1};
+            out->ss = (miniscript_stacksize_t) {sumcheck(x.ss.sat, y.ss.sat), -1};
             return 0;
         }
         case TOKEN_AND_B: {
@@ -2453,11 +2477,11 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = 1 + x.script_size + y.script_size;
 
-            out->ops = (miniscript_ops_t){1 + x.ops.count + y.ops.count,
-                                          sumcheck(x.ops.sat, y.ops.sat),
-                                          sumcheck(x.ops.dsat, y.ops.dsat)};
-            out->ss = (miniscript_stacksize_t){sumcheck(x.ss.sat, y.ss.sat),
-                                               sumcheck(x.ss.dsat, y.ss.dsat)};
+            out->ops = (miniscript_ops_t) {1 + x.ops.count + y.ops.count,
+                                           sumcheck(x.ops.sat, y.ops.sat),
+                                           sumcheck(x.ops.dsat, y.ops.dsat)};
+            out->ss = (miniscript_stacksize_t) {sumcheck(x.ss.sat, y.ss.sat),
+                                                sumcheck(x.ss.dsat, y.ss.dsat)};
 
             return 0;
         }
@@ -2488,10 +2512,10 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = 4 + x.script_size + y.script_size;
 
-            out->ops = (miniscript_ops_t){3 + x.ops.count + y.ops.count,
-                                          maxcheck(sumcheck(y.ops.sat, x.ops.sat), y.ops.dsat),
-                                          x.ops.dsat};
-            out->ss = (miniscript_stacksize_t){sumcheck(x.ss.sat, y.ss.sat), x.ss.dsat};
+            out->ops = (miniscript_ops_t) {3 + x.ops.count + y.ops.count,
+                                           maxcheck(sumcheck(y.ops.sat, x.ops.sat), y.ops.dsat),
+                                           x.ops.dsat};
+            out->ss = (miniscript_stacksize_t) {sumcheck(x.ss.sat, y.ss.sat), x.ss.dsat};
             return 0;
         }
         case TOKEN_OR_B: {
@@ -2519,11 +2543,11 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = 1 + x.script_size + z.script_size;
 
-            out->ops = (miniscript_ops_t){
+            out->ops = (miniscript_ops_t) {
                 1 + x.ops.count + z.ops.count,
                 maxcheck(sumcheck(x.ops.sat, z.ops.dsat), sumcheck(z.ops.sat, x.ops.dsat)),
                 sumcheck(x.ops.dsat, z.ops.dsat)};
-            out->ss = (miniscript_stacksize_t){
+            out->ss = (miniscript_stacksize_t) {
                 maxcheck(sumcheck(x.ss.dsat, z.ss.sat), sumcheck(x.ss.sat, z.ss.dsat)),
                 sumcheck(x.ss.dsat, z.ss.dsat)};
             return 0;
@@ -2553,11 +2577,11 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = 2 + x.script_size + z.script_size;
 
-            out->ops = (miniscript_ops_t){2 + x.ops.count + z.ops.count,
-                                          maxcheck(x.ops.sat, sumcheck(z.ops.sat, x.ops.dsat)),
-                                          -1};
+            out->ops = (miniscript_ops_t) {2 + x.ops.count + z.ops.count,
+                                           maxcheck(x.ops.sat, sumcheck(z.ops.sat, x.ops.dsat)),
+                                           -1};
             out->ss =
-                (miniscript_stacksize_t){maxcheck(x.ss.sat, sumcheck(x.ss.dsat, z.ss.sat)), -1};
+                (miniscript_stacksize_t) {maxcheck(x.ss.sat, sumcheck(x.ss.dsat, z.ss.sat)), -1};
             return 0;
         }
         case TOKEN_OR_D: {
@@ -2586,11 +2610,11 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = 3 + x.script_size + z.script_size;
 
-            out->ops = (miniscript_ops_t){3 + x.ops.count + z.ops.count,
-                                          maxcheck(x.ops.sat, sumcheck(z.ops.sat, x.ops.dsat)),
-                                          sumcheck(x.ops.dsat, z.ops.dsat)};
-            out->ss = (miniscript_stacksize_t){maxcheck(x.ss.sat, sumcheck(x.ss.dsat, z.ss.sat)),
-                                               sumcheck(x.ss.dsat, z.ss.dsat)};
+            out->ops = (miniscript_ops_t) {3 + x.ops.count + z.ops.count,
+                                           maxcheck(x.ops.sat, sumcheck(z.ops.sat, x.ops.dsat)),
+                                           sumcheck(x.ops.dsat, z.ops.dsat)};
+            out->ss = (miniscript_stacksize_t) {maxcheck(x.ss.sat, sumcheck(x.ss.dsat, z.ss.sat)),
+                                                sumcheck(x.ss.dsat, z.ss.dsat)};
             return 0;
         }
         case TOKEN_OR_I: {
@@ -2619,12 +2643,12 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = 3 + x.script_size + z.script_size;
 
-            out->ops = (miniscript_ops_t){3 + x.ops.count + z.ops.count,
-                                          maxcheck(x.ops.sat, z.ops.sat),
-                                          maxcheck(x.ops.dsat, z.ops.dsat)};
+            out->ops = (miniscript_ops_t) {3 + x.ops.count + z.ops.count,
+                                           maxcheck(x.ops.sat, z.ops.sat),
+                                           maxcheck(x.ops.dsat, z.ops.dsat)};
             out->ss =
-                (miniscript_stacksize_t){maxcheck(sumcheck(x.ss.sat, 1), sumcheck(z.ss.sat, 1)),
-                                         maxcheck(sumcheck(x.ss.dsat, 1), sumcheck(z.ss.dsat, 1))};
+                (miniscript_stacksize_t) {maxcheck(sumcheck(x.ss.sat, 1), sumcheck(z.ss.sat, 1)),
+                                          maxcheck(sumcheck(x.ss.dsat, 1), sumcheck(z.ss.dsat, 1))};
 
             return 0;
         }
@@ -2709,7 +2733,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = x.script_size + 2;
 
-            out->ops = (miniscript_ops_t){2 + x.ops.count, x.ops.sat, x.ops.dsat};
+            out->ops = (miniscript_ops_t) {2 + x.ops.count, x.ops.sat, x.ops.dsat};
             out->ss = x.ss;
 
             return 0;
@@ -2738,7 +2762,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = x.script_size + 1;
 
-            out->ops = (miniscript_ops_t){1 + x.ops.count, x.ops.sat, x.ops.dsat};
+            out->ops = (miniscript_ops_t) {1 + x.ops.count, x.ops.sat, x.ops.dsat};
             out->ss = x.ss;
 
             return 0;
@@ -2768,7 +2792,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->x = 0;
 
-            out->ops = (miniscript_ops_t){1 + x.ops.count, x.ops.sat, x.ops.dsat};
+            out->ops = (miniscript_ops_t) {1 + x.ops.count, x.ops.sat, x.ops.dsat};
             out->ss = x.ss;
 
             return 0;
@@ -2793,8 +2817,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = x.script_size + 3;
 
-            out->ops = (miniscript_ops_t){3 + x.ops.count, x.ops.sat, 0};
-            out->ss = (miniscript_stacksize_t){sumcheck(1, x.ss.sat), 1};
+            out->ops = (miniscript_ops_t) {3 + x.ops.count, x.ops.sat, 0};
+            out->ss = (miniscript_stacksize_t) {sumcheck(1, x.ss.sat), 1};
 
             return 0;
         }
@@ -2818,9 +2842,9 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = x.script_size + 1;
 
-            out->ops = (miniscript_ops_t){x.ops.count, x.ops.sat, -1};
+            out->ops = (miniscript_ops_t) {x.ops.count, x.ops.sat, -1};
 
-            out->ss = (miniscript_stacksize_t){x.ss.sat, -1};
+            out->ss = (miniscript_stacksize_t) {x.ss.sat, -1};
 
             return 0;
         }
@@ -2844,8 +2868,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = x.script_size + x.x;
 
-            out->ops = (miniscript_ops_t){x.ops.count + x.x, x.ops.sat, -1};
-            out->ss = (miniscript_stacksize_t){x.ss.sat, -1};
+            out->ops = (miniscript_ops_t) {x.ops.count + x.x, x.ops.sat, -1};
+            out->ss = (miniscript_stacksize_t) {x.ss.sat, -1};
 
             return 0;
         }
@@ -2869,8 +2893,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = x.script_size + 4;
 
-            out->ops = (miniscript_ops_t){4 + x.ops.count, x.ops.sat, 0};
-            out->ss = (miniscript_stacksize_t){x.ss.sat, 1};
+            out->ops = (miniscript_ops_t) {4 + x.ops.count, x.ops.sat, 0};
+            out->ss = (miniscript_stacksize_t) {x.ss.sat, 1};
 
             return 0;
         }
@@ -2896,9 +2920,9 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = x.script_size + 4;
 
-            out->ops = (miniscript_ops_t){3 + x.ops.count, x.ops.sat, x.ops.dsat};
-            out->ss = (miniscript_stacksize_t){sumcheck(x.ss.sat, 1),
-                                               maxcheck(1, sumcheck(x.ss.dsat, 1))};
+            out->ops = (miniscript_ops_t) {3 + x.ops.count, x.ops.sat, x.ops.dsat};
+            out->ss = (miniscript_stacksize_t) {sumcheck(x.ss.sat, 1),
+                                                maxcheck(1, sumcheck(x.ss.dsat, 1))};
 
             return 0;
         }
@@ -3037,8 +3061,6 @@ int traverse_policy_dfs(const policy_node_t *policy_node,
     }
 }
 
-#ifndef SKIP_FOR_CMOCKA
-
 void get_policy_wallet_id(policy_map_wallet_header_t *wallet_header, uint8_t out[static 32]) {
     cx_sha256_t wallet_hash_context;
     cx_sha256_init(&wallet_hash_context);
@@ -3065,5 +3087,3 @@ void get_policy_wallet_id(policy_map_wallet_header_t *wallet_header, uint8_t out
 
     crypto_hash_digest(&wallet_hash_context.header, out, 32);
 }
-
-#endif

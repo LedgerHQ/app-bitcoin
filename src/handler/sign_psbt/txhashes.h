@@ -1,3 +1,20 @@
+/*****************************************************************************
+ *   Ledger App Bitcoin.
+ *   (c) 2025, 2026 Ledger SAS.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *****************************************************************************/
+
 #pragma once
 
 /* Local headers */
@@ -12,8 +29,9 @@
  * @param[out] hashes Pointer to the structure where the computed hashes will be stored.
  * @return true if the computation is successful, false otherwise.
  */
-bool __attribute__((noinline))
-compute_tx_hashes(dispatcher_context_t *dc, sign_psbt_state_t *st, tx_hashes_t *hashes);
+bool __attribute__((noinline)) compute_tx_hashes(dispatcher_context_t *dc,
+                                                 sign_psbt_state_t *st,
+                                                 tx_hashes_t *hashes);
 
 /**
  * @brief Computes the legacy sighash for a given input.
@@ -56,16 +74,16 @@ bool __attribute__((noinline)) compute_sighash_legacy(dispatcher_context_t *dc,
  * @param[out] sighash Array where the computed sighash will be stored (must be at least 32 bytes).
  * @return true if the computation is successful, false otherwise.
  */
-bool __attribute__((noinline))
-compute_sighash_segwitv0(dispatcher_context_t *dc,
-                         const sign_psbt_state_t *st,
-                         const tx_hashes_t *hashes,
-                         const merkleized_map_commitment_t *input_map,
-                         unsigned int input_index,
-                         const uint8_t *script,
-                         size_t script_len,
-                         uint8_t sighash_byte,
-                         uint8_t sighash[static 32]);
+bool __attribute__((noinline)) compute_sighash_segwitv0(
+    dispatcher_context_t *dc,
+    const sign_psbt_state_t *st,
+    const tx_hashes_t *hashes,
+    const merkleized_map_commitment_t *input_map,
+    unsigned int input_index,
+    const uint8_t *script,
+    size_t script_len,
+    uint8_t sighash_byte,
+    uint8_t sighash[static 32]);
 
 /**
  * Computes the SegWit v1 (Taproot) sighash for a given input.
@@ -84,14 +102,14 @@ compute_sighash_segwitv0(dispatcher_context_t *dc,
  * @param[out] sighash Array where the computed sighash will be stored (must be at least 32 bytes).
  * @return true if the computation is successful, false otherwise.
  */
-bool __attribute__((noinline))
-compute_sighash_segwitv1(dispatcher_context_t *dc,
-                         const sign_psbt_state_t *st,
-                         const tx_hashes_t *hashes,
-                         const merkleized_map_commitment_t *input_map,
-                         unsigned int input_index,
-                         const uint8_t *scriptPubKey,
-                         size_t scriptPubKey_len,
-                         const uint8_t *tapleaf_hash,
-                         uint8_t sighash_byte,
-                         uint8_t sighash[static 32]);
+bool __attribute__((noinline)) compute_sighash_segwitv1(
+    dispatcher_context_t *dc,
+    const sign_psbt_state_t *st,
+    const tx_hashes_t *hashes,
+    const merkleized_map_commitment_t *input_map,
+    unsigned int input_index,
+    const uint8_t *scriptPubKey,
+    size_t scriptPubKey_len,
+    const uint8_t *tapleaf_hash,
+    uint8_t sighash_byte,
+    uint8_t sighash[static 32]);

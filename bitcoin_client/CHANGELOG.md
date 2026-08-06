@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [0.4.1] - 16-04-2026
+
+### Added
+
+- Support for `INS_GET_MASTER_FINGERPRINT` (for legacy app)
+
 ## [0.4.0] - 06-03-2025
 
 ### Added

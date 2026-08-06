@@ -1,0 +1,223 @@
+# Integration concepts and security model
+
+This document explains the concepts an integrator needs in order to build on top of the
+Ledger Bitcoin app using one of the existing client libraries
+([Python](../bitcoin_client), [JavaScript](../bitcoin_client_js),
+[Rust](../bitcoin_client_rs)). It complements the feature overview in
+[features.md](features.md) and the protocol-level specifications in
+[bitcoin.md](bitcoin.md) and [wallet.md](wallet.md).
+
+## The device is stateless
+
+The app does **not** persist any wallet-related or transaction-related information between
+calls. There is no notion of "the wallet currently loaded on the device": every request that
+involves an account (deriving an address, signing a transaction) must carry the full
+description of that account, supplied by the host.
+
+This means the **host application is responsible for storing** the account definitions
+(and, for registered wallets, the authorization HMAC described below) and providing them
+on each call. The host is *not* trusted, however: it merely supplies the information the
+device needs. Anything that matters for security is verified by the user on the device's
+trusted screen (see [On-device verification](#on-device-verification-and-the-trusted-screen)
+below), so a compromised host cannot make the device sign or display something the user
+did not approve.
+
+## Wallet policies
+
+An account is described by a **wallet policy** — the representation standardized in
+[BIP-388](https://github.com/bitcoin/bips/blob/master/bip-0388.mediawiki). It pairs a
+*descriptor template*, which captures the script's shape with keys replaced by
+placeholders (`@0`, `@1`, …), with a *key information vector* that holds the actual keys
+(`xpub`s) and their key origin information. [wallet.md](wallet.md) defines the format,
+grammar, serialization, and implementation-specific restrictions.
+
+Separating the template from the keys lets the device recognize the *shape* of a policy
+independently of the specific keys, and lets `sortedmulti`-style policies be order
+independent.
+
+### Examples
+
+A single-key taproot account (a *default wallet*, see below — no registration needed):
+
+```
+tr(@0/**)
+keys: ["[f5acc2fd/86'/0'/0']xpub6C..."]
+```
+
+Other more complex wallet types must be registered before use.
+
+This is a 2-of-3 native SegWit multisig:
+
+```
+wsh(sortedmulti(2,@0/**,@1/**,@2/**))
+keys: [
+  "[f5acc2fd/48'/0'/0'/2']xpub6E...",   // this device
+  "[1a2b3c4d/48'/0'/0'/2']xpub6E...",   // cosigner 2
+  "[5e6f7a8b/48'/0'/0'/2']xpub6E..."    // cosigner 3
+]
+```
+
+The following is a miniscript "recovery vault" — spendable by the primary key at any time, or by a backup
+key after a relative timelock of `65535` blocks:
+
+```
+wsh(or_d(pk(@0/**),and_v(v:pkh(@1/**),older(65535))))
+keys: [
+  "[f5acc2fd/48'/0'/0'/2']xpub6E...",   // primary key
+  "[1a2b3c4d/48'/0'/0'/2']xpub6E..."    // recovery key
+]
+```
+
+## Default vs registered wallets
+
+- **Default (standard) wallet accounts** are the four single-key account types
+  (`pkh`, `sh(wpkh)`, `wpkh`, `tr`), with the corresponding standard derivation paths
+  (see [wallet.md](wallet.md#default-wallets) for the templates and bounds). They can be used for address derivation and signing **without registration**. In the serialization, a default wallet has an empty name.
+- **Any other policy** (multisig, miniscript, taproot trees, MuSig2, or even a standard
+  single-key account using a non-standard path) must be **registered** before it can be
+  used.
+
+This guarantees the following security property (except on default accounts):
+- **Strong Account Segregation**: address verification and transaction signing will always
+  inform the user about the involved account.
+
+This is particularly important for accounts involving multiple parties (multisig,
+miniscript, etc).
+
+## Registration and the HMAC
+
+Registration is the step where the user reviews a non-standard policy — its name, the
+script template, and every key — on the trusted screen and approves it once. This protects
+the user from a compromised host silently substituting a malicious policy.
+
+Because the device is stateless, it does not store the approved policy: registration
+instead returns an HMAC that authorizes that exact policy. The host wallet **must persist
+exactly** the wallet policy and its name together with the returned HMAC, and supply them
+on every later call related to the same account (address derivation, signing). See
+[wallet.md](wallet.md#registration-and-usage) for the HMAC mechanics, its seed-derived key,
+the resulting non-revocability, and the *wallet policy id*.
+
+## On-device verification and the trusted screen
+
+The device's security guarantee rests on the **trusted screen**: anything the user
+approves there cannot be forged by a compromised host, because the host has no control
+over what the device displays.
+
+In practice:
+
+- When showing a **receive address** to a user, an integration should derive it with the
+  display option enabled so the user verifies, on the device, that the address belongs to
+  their wallet — a compromised host cannot then swap in an attacker's address. It is also
+  possible to display a **change address**, if desired.
+- The same applies to **public keys / xpubs**: displaying them on-device lets the user
+  confirm them out of band.
+- During **signing**, the device shows the amounts, destinations, and (for registered
+  policies) the wallet account involved. The user is approving what the device displays,
+  not what the host claims. For the user's convenience, *change addresses* are *not* displayed when signing a transaction. The device verifies that they indeed belong to the same account the transaction is spending from.
+
+The client libraries expose this as a `display` (or equivalent) flag on the relevant
+methods.
+
+## Transaction signing model
+
+To sign, the host builds a [PSBT](https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki)
+and passes it to the app together with the wallet policy and, for registered wallet accounts, the
+HMAC. The app verifies that it can sign, has the user approve the transaction on the trusted
+screen, and returns the **partial signatures** it is able to produce, keyed by input index.
+
+**Only inputs whose corresponding BIP-32 derivations are present in the PSBT are signed**; if the
+wallet policy has multiple spending paths involving the device for a given input, more than one
+signature may be returned for that input.
+
+The host is responsible for placing the returned signatures into the PSBT, **finalizing** it,
+**extracting** the signed transaction and (possibly) broadcasting it to the network.
+
+### Sighash flags
+
+By default, the app only signs PSBTs whose internal inputs use the *default* sighash type —
+`SIGHASH_ALL`, or `SIGHASH_DEFAULT` for taproot inputs — so the signature commits to the entire
+transaction. This is what virtually every wallet uses, and it lets the device show full,
+trustworthy details of what is being signed.
+
+The app can also sign with **non-default sighash types** (`SIGHASH_NONE`, `SIGHASH_SINGLE`, and
+any of the `SIGHASH_ANYONECANPAY` combinations), which are needed by certain advanced protocols.
+Because these signatures leave part of the transaction free to change after signing, they are
+**disabled by default**: if an input the app would sign carries a non-default sighash, the PSBT is
+rejected with
+`SW_SECURITY_STATUS_NOT_SATISFIED` (error code `0x000d`, `EC_SIGN_PSBT_NONDEFAULT_SIGHASH_NOT_ALLOWED`),
+and the device briefly shows a notice explaining that the feature is turned off.
+
+For `SIGHASH_SINGLE`, each signed input must have a corresponding output at the same index. If a
+signed input's index is greater than or equal to the number of outputs, the app rejects the PSBT
+with `SW_NOT_SUPPORTED` (error code `0x0008`, `EC_SIGN_PSBT_UNALLOWED_SIGHASH_SINGLE`).
+
+To use them, the user must first opt in through the application settings. Once enabled, signing
+with a non-default sighash is allowed, but still *always* requires explicit user confirmation,
+after a warning and a clear description of the signing rule in use.
+
+### What the device shows when signing
+
+The trusted-screen review adapts to *what the signatures actually commit to*, so the amounts the
+user approves are always meaningful. Depending on the sighash flags of the signed inputs, one of
+three levels of detail is shown:
+
+- **Full details** — used for the default sighash (`SIGHASH_ALL` / `SIGHASH_DEFAULT`) on every
+  signed input. The review lists each external output with its amount and destination, plus the fee.
+  (If the transaction also has external inputs, a couple of extra rows are added; see
+  [External inputs](#external-inputs) below.)
+- **Net amount only** — used for a uniform non-default sighash that still commits to a certain net
+  spend or net receive. The exact fee cannot be known, so in addition to the output list, the device
+  shows the amount spent from (or received into) the account involved in the transaction being signed.
+  The fee is displayed as **Not available**.
+- **Amounts unavailable** — used when nothing coherent can be shown: the signed inputs use different
+  (*mixed*) sighash flags, or a sighash that does not even fix the set of outputs (`NONE`, or
+  `SINGLE` with more than one output, and their `ANYONECANPAY` variants). The device then shows only
+  a notice, and the user merely confirms that they expected and trust the transaction. This is
+  inherently dangerous.
+
+For any non-default sighash, a **Signing rule** row additionally names the effective flag (for
+example `SINGLE`, `ACP | ALL`, or `Mixed`).
+
+### External inputs
+
+An *external input* is an input that the app cannot verify as belonging to the signing wallet
+policy. The app always **warns** about external inputs and additionally shows the following, so the
+user can gauge the transaction's real effect:
+
+- the account's net **You spend** / **You receive** amount, since with external inputs the outputs
+  and fee alone can be misleading (the transaction may even be a net *receive*);
+- the **total amount of the external inputs** — unless signing with `SIGHASH_ANYONECANPAY`, which
+  would make that quantity meaningless; or unless signing non-taproot transactions where the PSBT
+  does not include the non-witness-utxo for the external inputs, which makes the amounts not
+  trustworthy, as they are not committed to in the legacy or [SegWit](https://github.com/bitcoin/bips/blob/master/bip-0143.mediawiki)
+  signature algorithm.
+
+Both figures assume the external inputs indeed do not belong to the account used for signing the
+transaction, which is not something that the app can verify for sure; see
+[features.md](features.md#external-inputs) for why that assumption, and the warning, matter.
+
+### Transactions with Wallet Policies using MuSig2
+
+For policies that use `musig()` key expressions, signing is a two-round protocol: the first round
+produces the *public nonces* (pubnonces), while the second round produces the MuSig2 Partial
+Signatures. More details are described in [musig.md](musig.md).
+
+The app uses the presence of pubnonces in the PSBT to determine which MuSig2 round should be
+performed:
+- if no pubnonces are present in the PSBT, the app executes MuSig2 Round 1, producing and returning
+  the public nonces;
+- if the PSBT contains pubnonces, the app executes the MuSig2 Round 2, and (on success) produces
+  and returns the MuSig2 Partial Signatures.
+
+If the app is only participating in MuSig2 Round 1 and not producing any signature, then user
+confirmation on the trusted screen is not required. With careful coordination from the software
+wallet, this can be used in many cases to provide a seamless MuSig2 signing experience, without
+increasing the user's UX burden.
+
+However, user confirmation is required if, for the same PSBT, the device is able to produce a
+signature (for any spending path), including a MuSig2 Partial Signature (as produced by MuSig2
+Round 2).
+
+It is recommended to *never rely on the signing behavior for PSBTs that contain some pubnonces*,
+but not all: signing is likely to fail in this case, and exact behavior might change in future
+releases.

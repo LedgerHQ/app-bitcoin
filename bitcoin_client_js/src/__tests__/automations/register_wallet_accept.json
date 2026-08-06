@@ -2,7 +2,7 @@
   "version": 1,
   "rules": [
     {
-      "regexp": "Review account|Account name|Wallet policy|Review co-signer|Our|Their",
+      "regexp": "Review account|Account name|Spending policy|Wallet policy|Review co-signer|Our|Their",
       "actions": [
         ["button", 2, true],
         ["button", 2, false]

@@ -1,5 +1,23 @@
+/*****************************************************************************
+ *   Ledger App Bitcoin.
+ *   (c) 2025, 2026 Ledger SAS.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *****************************************************************************/
+
 #include <stdint.h>
 #include <string.h>
+#include <limits.h>
 
 #include "extract_bip32_derivation.h"
 
@@ -21,7 +39,15 @@ typedef struct {
 } fpt_der_callback_data_t;
 
 static void fpt_der_data_len_callback(size_t data_length, void *callback_state) {
-    ((fpt_der_callback_data_t *) callback_state)->total_data_length = data_length;
+    fpt_der_callback_data_t *cs = (fpt_der_callback_data_t *) callback_state;
+
+    if (data_length > INT_MAX) {
+        // fail early if the conversion to int would overflow
+        // by setting the error result in the callback state
+        cs->result = -1;
+        return;
+    }
+    cs->total_data_length = data_length;
 }
 
 static void fpt_der_data_callback(buffer_t *data, void *callback_state) {

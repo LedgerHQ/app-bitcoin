@@ -1,3 +1,20 @@
+/*****************************************************************************
+ *   Ledger App Bitcoin.
+ *   (c) 2025, 2026 Ledger SAS.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *****************************************************************************/
+
 #include <stdlib.h>
 
 #include "musig_signing.h"
@@ -21,12 +38,12 @@ bool compute_musig_per_input_info(dispatcher_context_t *dc,
                                   musig_per_input_info_t *out) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    if (st->wallet_policy_map->type != TOKEN_TR) {
+    if (st->account.policy_map->type != TOKEN_TR) {
         SEND_SW(dc, SW_BAD_STATE);  // should never happen
         return false;
     }
 
-    const policy_node_tr_t *tr_policy = (policy_node_tr_t *) st->wallet_policy_map;
+    const policy_node_tr_t *tr_policy = (policy_node_tr_t *) st->account.policy_map;
 
     // plan:
     // 1) compute aggregate pubkey
@@ -34,12 +51,13 @@ bool compute_musig_per_input_info(dispatcher_context_t *dc,
     // 3) compute taproot tweak (if keypath spend)
     // 4) compute the psbt_session_id that identifies the psbt-level signing session
 
-    wallet_derivation_info_t wdi = {.n_keys = st->wallet_header.n_keys,
-                                    .wallet_version = st->wallet_header.version,
-                                    .keys_merkle_root = st->wallet_header.keys_info_merkle_root,
-                                    .change = input->in_out.is_change,
-                                    .address_index = input->in_out.address_index,
-                                    .sign_psbt_cache = NULL};
+    wallet_derivation_info_t wdi = {
+        .n_keys = st->account.wallet_header.n_keys,
+        .wallet_version = st->account.wallet_header.version,
+        .keys_merkle_root = st->account.wallet_header.keys_info_merkle_root,
+        .change = input->in_out.is_change,
+        .address_index = input->in_out.address_index,
+        .sign_psbt_cache = NULL};
 
     serialized_extended_pubkey_t ext_pubkey;
 
@@ -135,9 +153,10 @@ bool compute_musig_per_input_info(dispatcher_context_t *dc,
     // Malicious collisions are not a concern, as they would only result in a signing failure (since
     // the nonces would be incorrectly regenerated during round 2 of MuSig2).
     crypto_tr_tagged_hash(
-        (uint8_t[]){'P', 's', 'b', 't', 'S', 'e', 's', 's', 'i', 'o', 'n', 'I', 'd'},
+        (uint8_t[]) {'P', 's', 'b', 't', 'S', 'e', 's', 's', 'i', 'o', 'n', 'I', 'd'},
         13,
-        st->wallet_header.keys_info_merkle_root,  // TODO: wallet policy id would be more precise
+        st->account.wallet_header
+            .keys_info_merkle_root,  // TODO: wallet policy id would be more precise
         32,
         (uint8_t *) &signing_state->tx_hashes,
         sizeof(tx_hashes_t),
@@ -405,7 +424,7 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
     musig_pubnonce_t aggnonce;
     int res = musig_nonce_agg(nonces, musig_info->n, &aggnonce);
     if (res < 0) {
-        PRINTF("Musig aggregation failed; disruptive signer has index %d\n", -res);
+        PRINTF("Musig aggregation failed; disruptive signer has index %d\n", -res - 1);
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }

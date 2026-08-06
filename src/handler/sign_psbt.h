@@ -1,3 +1,20 @@
+/*****************************************************************************
+ *   Ledger App Bitcoin.
+ *   (c) 2025, 2026 Ledger SAS.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *****************************************************************************/
+
 #pragma once
 
 /* Local headers */
@@ -108,13 +125,32 @@ typedef struct signing_state_s {
 // Moreover, that is needed for the swap checks.
 #define N_CACHED_EXTERNAL_OUTPUTS MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER
 
+// Per-wallet-account context used during signing.
+// Groups the wallet policy AST, its header, the standard/registered flag, and
+// the device-controlled key expressions discovered in the policy.
+typedef struct {
+    policy_map_wallet_header_t wallet_header;
+
+    // true iff the wallet policy is a default (BIP-44/49/84/86) policy used without HMAC.
+    bool is_default;
+
+    // BIP-44 purpose/account from m/purpose'/coin'/account'; only when is_default.
+    int bip44_purpose;
+    uint32_t bip44_account;
+
+    __attribute__((aligned(4))) uint8_t policy_map_bytes[MAX_WALLET_POLICY_BYTES];
+    policy_node_t *policy_map;
+
+    unsigned int n_internal_key_expressions;
+    keyexpr_info_t internal_key_expressions[MAX_INTERNAL_KEY_EXPRESSIONS];
+} account_ctx_t;
+
 typedef struct {
     uint32_t master_key_fingerprint;
     uint32_t tx_version;
     uint32_t locktime;
 
-    unsigned int n_internal_key_expressions;
-    keyexpr_info_t internal_key_expressions[MAX_INTERNAL_KEY_EXPRESSIONS];
+    merkleized_map_commitment_t global_map;
 
     unsigned int n_inputs;
     uint8_t inputs_root[32];  // merkle root of the vector of input maps commitments
@@ -123,10 +159,27 @@ typedef struct {
 
     uint64_t inputs_total_amount;
 
-    policy_map_wallet_header_t wallet_header;
+    // Sum of the internal (signed) inputs only; used for total_spent.
+    uint64_t internal_inputs_total_amount;
 
     unsigned int n_external_inputs;
     unsigned int n_external_outputs;
+
+    // Set if any signed input opens the inputs (ANYONECANPAY) / outputs (NONE/SINGLE).
+    bool sighash_inputs_open;
+    bool sighash_outputs_open;
+
+    // Set if some external input's amount is not verified by recomputing the txid (only a
+    // witness-utxo is provided, never validated against the prevout txid).
+    // Unless the internal inputs we sign are taproot inputs (which commit sha_amounts which
+    // includes all amounts), external amounts can't be trusted, nor can the fee.
+    bool external_amount_unverified;
+
+    // Common sighash seen across the inputs we sign (DEFAULT canonicalized to ALL); valid if
+    // !sighash_mixed.
+    uint32_t seen_sighash;
+    bool seen_sighash_set;
+    bool sighash_mixed;  // seen inputs disagree on sighash -> can't display coherently
 
     // set to true if at least a PSBT_IN_MUSIG2_PUB_NONCE field is present in the PSBT
     bool has_musig2_pub_nonces;
@@ -141,73 +194,11 @@ typedef struct {
         uint64_t output_amounts[N_CACHED_EXTERNAL_OUTPUTS];
     } outputs;
 
-    bool is_wallet_default;
-
     uint8_t protocol_version;
 
-    __attribute__((aligned(4))) uint8_t wallet_policy_map_bytes[MAX_WALLET_POLICY_BYTES];
-    policy_node_t *wallet_policy_map;
+    // The wallet account used to sign this transaction.
+    account_ctx_t account;
 
     tx_ux_warning_t warnings;
 
 } sign_psbt_state_t;
-
-/**
- * Signs a legacy or SegwitV0 sighash using the ECDSA algorithm, and yields the necessary
- * info for the partial signature.
- *
- * @param[in] dc The dispatcher context
- * @param[in] st The signing state
- * @param[in] input_index The index of the input whose sighash is being signed
- * @param[in] sign_path The BIP32 path of the key being used to sign
- * @param[in] sign_path_len The number of derivation steps of the BIP32 path
- * @param[in] sighash_byte The sighash type byte
- * @param[out] sighash Pointer to a 32-byte array that will receive the computed sighash
- * @return true if the computation is successful, false otherwise. On failure, an error status word
- * is already sent.
- */
-bool __attribute__((noinline)) sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
-                                                            sign_psbt_state_t *st,
-                                                            unsigned int input_index,
-                                                            const uint32_t sign_path[],
-                                                            size_t sign_path_len,
-                                                            uint8_t sighash_byte,
-                                                            uint8_t sighash[static 32]);
-
-/**
- * Signs a legacy or SegwitV0 sighash using the ECDSA algorithm, and yields the necessary
- * info for the partial signature.
- *
- * This function allows to select the tweak_data to be used after the BIP-32 derivation. This should
- * be:
- * - a zero-length array for key conforming to BIP-86 and BIP-386.abort
- * - a 32-byte array containing the taproot Merkle tree root for taproot Script path spends.
- * Passing NULL allows to sign with an untweaked key, for example in case this is used for a
- * protocol using the `rawtr()` expression.
- *
- * @param[in] dc The dispatcher context
- * @param[in] st The signing state
- * @param[in] input_index The index of the input whose sighash is being signed
- * @param[in] sign_path The BIP32 path of the key being used to sign
- * @param[in] sign_path_len The number of derivation steps of the BIP32 path
- * @param[in] tweak_data If the key used to sign has to be tweaked, a pointer to an array containing
- * the tweak data. NULL otherwise.
- * @param[in] tweak_data_len The length of the `tweak_data` array. If `tweak_data` is NULL, this
- * should be 0.
- * @param[in] tapleaf_hash NULL if the sighash was signed using the keypath spend, or the tapleaf
- * hash if the sighash was signed using a script path spend.
- * @param[in] sighash_byte The sighash type byte
- * @param[in] sighash Pointer to a 32-byte array containing the sighash to sign
- * @return true if the computation is successful, false otherwise. On failure, an error status word
- * is already sent.
- */
-bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
-                                                              sign_psbt_state_t *st,
-                                                              unsigned int input_index,
-                                                              const uint32_t sign_path[],
-                                                              size_t sign_path_len,
-                                                              const uint8_t *tweak_data,
-                                                              size_t tweak_data_len,
-                                                              const uint8_t *tapleaf_hash,
-                                                              uint8_t sighash_byte,
-                                                              const uint8_t sighash[static 32]);

@@ -1,3 +1,20 @@
+/*****************************************************************************
+ *   Ledger App Bitcoin.
+ *   (c) 2025, 2026 Ledger SAS.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *****************************************************************************/
+
 #include "amount_from_psbt.h"
 
 /* Local headers */
@@ -27,9 +44,14 @@ int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness(
     uint32_t prevout_n;
     if (4 != call_get_merkleized_map_value_u32_le(dc,
                                                   input_map,
-                                                  (uint8_t[]){PSBT_IN_OUTPUT_INDEX},
+                                                  (uint8_t[]) {PSBT_IN_OUTPUT_INDEX},
                                                   1,
                                                   &prevout_n)) {
+        return -1;
+    }
+
+    // SIZE_MAX is reserved by call_psbt_parse_rawtx to mean "no output is queried"
+    if (prevout_n >= SIZE_MAX) {
         return -1;
     }
 
@@ -37,9 +59,9 @@ int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness(
     // request non-witness utxo, and get the prevout's value and scriptpubkey
     int res = call_psbt_parse_rawtx(dc,
                                     input_map,
-                                    (uint8_t[]){PSBT_IN_NON_WITNESS_UTXO},
+                                    (uint8_t[]) {PSBT_IN_NON_WITNESS_UTXO},
                                     1,
-                                    prevout_n,
+                                    (size_t) prevout_n,
                                     &parser_outputs);
     if (res < 0) {
         PRINTF("Parsing rawtx failed\n");
@@ -55,6 +77,11 @@ int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness(
     }
 
     *amount = parser_outputs.vout_value;
+
+    if (parser_outputs.vout_scriptpubkey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
+        return -1;
+    }
+
     *scriptPubKey_len = parser_outputs.vout_scriptpubkey_len;
     memcpy(scriptPubKey, parser_outputs.vout_scriptpubkey, parser_outputs.vout_scriptpubkey_len);
 
@@ -66,17 +93,17 @@ int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness(
  a PSBTv2.
  Returns -1 on failure, 0 on success.
 */
-int __attribute__((noinline))
-get_amount_scriptpubkey_from_psbt_witness(dispatcher_context_t *dc,
-                                          const merkleized_map_commitment_t *input_map,
-                                          uint64_t *amount,
-                                          uint8_t scriptPubKey[static MAX_PREVOUT_SCRIPTPUBKEY_LEN],
-                                          size_t *scriptPubKey_len) {
+int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_witness(
+    dispatcher_context_t *dc,
+    const merkleized_map_commitment_t *input_map,
+    uint64_t *amount,
+    uint8_t scriptPubKey[static MAX_PREVOUT_SCRIPTPUBKEY_LEN],
+    size_t *scriptPubKey_len) {
     uint8_t raw_witnessUtxo[8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN];
 
     int wit_utxo_len = call_get_merkleized_map_value(dc,
                                                      input_map,
-                                                     (uint8_t[]){PSBT_IN_WITNESS_UTXO},
+                                                     (uint8_t[]) {PSBT_IN_WITNESS_UTXO},
                                                      1,
                                                      raw_witnessUtxo,
                                                      sizeof(raw_witnessUtxo));
@@ -96,6 +123,10 @@ get_amount_scriptpubkey_from_psbt_witness(dispatcher_context_t *dc,
 
     uint8_t *wit_utxo_scriptPubkey = raw_witnessUtxo + 9;
     uint64_t wit_utxo_prevout_amount = read_u64_le(&raw_witnessUtxo[0], 0);
+
+    if (wit_utxo_scriptPubkey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
+        return -1;
+    }
 
     *amount = wit_utxo_prevout_amount;
     *scriptPubKey_len = wit_utxo_scriptPubkey_len;

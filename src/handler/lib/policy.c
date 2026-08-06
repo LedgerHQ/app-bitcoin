@@ -18,8 +18,6 @@
 #include "segwit_addr.h"
 #include "wallet.h"
 
-#define MAX_POLICY_DEPTH 10
-
 // The last opcode must be processed as a VERIFY flag
 #define PROCESSOR_FLAG_V 1
 
@@ -46,7 +44,8 @@ typedef struct {
     const wallet_derivation_info_t *wdi;
     bool is_taproot;
 
-    policy_parser_node_state_t nodes[MAX_POLICY_DEPTH];  // stack of nodes being processed
+    policy_parser_node_state_t
+        nodes[MAX_PARSE_SCRIPT_RECURSION_DEPTH];  // stack of nodes being processed
     int node_stack_eos;  // index of node being processed within nodes; will be set -1 at the end of
                          // processing
 
@@ -348,6 +347,9 @@ int read_and_parse_wallet_policy(
         if (descriptor_template_len < 0) {
             return WITH_ERROR(-1, "Failed getting wallet policy descriptor template");
         }
+        if ((size_t) descriptor_template_len != wallet_header->descriptor_template_len) {
+            return WITH_ERROR(-1, "Descriptor template length mismatch");
+        }
     }
 
     buffer_t policy_map_buffer =
@@ -371,7 +373,7 @@ __attribute__((warn_unused_result)) static int state_stack_push(policy_parser_st
                                                                 uint8_t flags) {
     ++state->node_stack_eos;
 
-    if (state->node_stack_eos >= MAX_POLICY_DEPTH) {
+    if (state->node_stack_eos >= MAX_PARSE_SCRIPT_RECURSION_DEPTH) {
         return WITH_ERROR(-1, "Reached maximum policy depth");
     }
 
@@ -589,123 +591,117 @@ __attribute__((warn_unused_result)) static int process_generic_node(policy_parse
 
     const generic_processor_command_t *commands = (const generic_processor_command_t *) arg;
 
-    size_t n_commands = 0;
-    while (commands[n_commands].code != CMD_CODE_END) ++n_commands;
-
-    if (node->step > n_commands) {
-        return WITH_ERROR(-1, "Inconsistent state");
-    } else if (node->step == n_commands) {
-        return 1;
-    } else {
-        uint8_t cmd_code = commands[node->step].code;
-        uint8_t cmd_data = commands[node->step].data;
-
-        switch (cmd_code) {
-            case CMD_CODE_OP: {
-                update_output_u8(state, cmd_data);
-                break;
-            }
-            case CMD_CODE_OP_V: {
-                update_output_op_v(state, cmd_data);
-                break;
-            }
-            case CMD_CODE_PUSH_PK: {
-                const policy_node_with_key_t *policy =
-                    (const policy_node_with_key_t *) node->policy_node;
-                uint8_t compressed_pubkey[33];
-                if (-1 == get_derived_pubkey(state->dispatcher_context,
-                                             state->wdi,
-                                             r_policy_node_keyexpr(&policy->key),
-                                             compressed_pubkey)) {
-                    return -1;
-                }
-
-                if (!state->is_taproot) {
-                    update_output_u8(state, 33);  // PUSH 33 bytes
-                    update_output(state, compressed_pubkey, 33);
-                } else {
-                    // x-only pubkey if within taproot
-                    update_output_u8(state, 32);  // PUSH 32 bytes
-                    update_output(state, compressed_pubkey + 1, 32);
-                }
-                break;
-            }
-            case CMD_CODE_PUSH_PKH: {
-                const policy_node_with_key_t *policy =
-                    (const policy_node_with_key_t *) node->policy_node;
-                uint8_t compressed_pubkey[33];
-                if (-1 == get_derived_pubkey(state->dispatcher_context,
-                                             state->wdi,
-                                             r_policy_node_keyexpr(&policy->key),
-                                             compressed_pubkey)) {
-                    return -1;
-                }
-                if (!state->is_taproot) {
-                    crypto_hash160(compressed_pubkey, 33, compressed_pubkey);  // reuse memory
-                } else {
-                    // x-only pubkey if within taproot
-                    crypto_hash160(compressed_pubkey + 1, 32, compressed_pubkey);  // reuse memory
-                }
-
-                update_output_u8(state, 20);  // PUSH 20 bytes
-                update_output(state, compressed_pubkey, 20);
-                break;
-            }
-            case CMD_CODE_PUSH_UINT32: {
-                const policy_node_with_uint32_t *policy =
-                    (const policy_node_with_uint32_t *) node->policy_node;
-                update_output_push_u32(state, policy->n);
-                break;
-            }
-            case CMD_CODE_PUSH_HASH20: {
-                const policy_node_with_hash_160_t *policy =
-                    (const policy_node_with_hash_160_t *) node->policy_node;
-                update_output_u8(state, 20);
-                update_output(state, policy->h, 20);
-                break;
-            }
-            case CMD_CODE_PUSH_HASH32: {
-                const policy_node_with_hash_256_t *policy =
-                    (const policy_node_with_hash_256_t *) node->policy_node;
-                update_output_u8(state, 32);
-                update_output(state, policy->h, 32);
-                break;
-            }
-            case CMD_CODE_PROCESS_CHILD: {
-                const policy_node_with_scripts_t *policy =
-                    (const policy_node_with_scripts_t *) node->policy_node;
-                if (0 > state_stack_push(state, r_policy_node(&policy->scripts[cmd_data]), 0)) {
-                    return -1;
-                }
-                break;
-            }
-            case CMD_CODE_PROCESS_CHILD_V: {
-                const policy_node_with_scripts_t *policy =
-                    (const policy_node_with_scripts_t *) node->policy_node;
-                if (0 > state_stack_push(state,
-                                         r_policy_node(&policy->scripts[cmd_data]),
-                                         node->flags)) {
-                    return -1;
-                }
-                break;
-            }
-            case CMD_CODE_PROCESS_CHILD_VV: {
-                const policy_node_with_scripts_t *policy =
-                    (const policy_node_with_scripts_t *) node->policy_node;
-                if (0 > state_stack_push(state,
-                                         r_policy_node(&policy->scripts[cmd_data]),
-                                         node->flags | PROCESSOR_FLAG_V)) {
-                    return -1;
-                }
-                break;
-            }
-            default:
-                PRINTF("Unexpected command code: %d\n", cmd_code);
-                return -1;
-        }
-        ++node->step;
-        return 0;
+    uint8_t cmd_code = commands[node->step].code;
+    if (cmd_code == CMD_CODE_END) {
+        return 1;  // reached the end of the command list
     }
+
+    uint8_t cmd_data = commands[node->step].data;
+
+    switch (cmd_code) {
+        case CMD_CODE_OP: {
+            update_output_u8(state, cmd_data);
+            break;
+        }
+        case CMD_CODE_OP_V: {
+            update_output_op_v(state, cmd_data);
+            break;
+        }
+        case CMD_CODE_PUSH_PK: {
+            const policy_node_with_key_t *policy =
+                (const policy_node_with_key_t *) node->policy_node;
+            uint8_t compressed_pubkey[33];
+            if (-1 == get_derived_pubkey(state->dispatcher_context,
+                                         state->wdi,
+                                         r_policy_node_keyexpr(&policy->key),
+                                         compressed_pubkey)) {
+                return -1;
+            }
+
+            if (!state->is_taproot) {
+                update_output_u8(state, 33);  // PUSH 33 bytes
+                update_output(state, compressed_pubkey, 33);
+            } else {
+                // x-only pubkey if within taproot
+                update_output_u8(state, 32);  // PUSH 32 bytes
+                update_output(state, compressed_pubkey + 1, 32);
+            }
+            break;
+        }
+        case CMD_CODE_PUSH_PKH: {
+            const policy_node_with_key_t *policy =
+                (const policy_node_with_key_t *) node->policy_node;
+            uint8_t compressed_pubkey[33];
+            if (-1 == get_derived_pubkey(state->dispatcher_context,
+                                         state->wdi,
+                                         r_policy_node_keyexpr(&policy->key),
+                                         compressed_pubkey)) {
+                return -1;
+            }
+            if (!state->is_taproot) {
+                crypto_hash160(compressed_pubkey, 33, compressed_pubkey);  // reuse memory
+            } else {
+                // x-only pubkey if within taproot
+                crypto_hash160(compressed_pubkey + 1, 32, compressed_pubkey);  // reuse memory
+            }
+
+            update_output_u8(state, 20);  // PUSH 20 bytes
+            update_output(state, compressed_pubkey, 20);
+            break;
+        }
+        case CMD_CODE_PUSH_UINT32: {
+            const policy_node_with_uint32_t *policy =
+                (const policy_node_with_uint32_t *) node->policy_node;
+            update_output_push_u32(state, policy->n);
+            break;
+        }
+        case CMD_CODE_PUSH_HASH20: {
+            const policy_node_with_hash_160_t *policy =
+                (const policy_node_with_hash_160_t *) node->policy_node;
+            update_output_u8(state, 20);
+            update_output(state, policy->h, 20);
+            break;
+        }
+        case CMD_CODE_PUSH_HASH32: {
+            const policy_node_with_hash_256_t *policy =
+                (const policy_node_with_hash_256_t *) node->policy_node;
+            update_output_u8(state, 32);
+            update_output(state, policy->h, 32);
+            break;
+        }
+        case CMD_CODE_PROCESS_CHILD: {
+            const policy_node_with_scripts_t *policy =
+                (const policy_node_with_scripts_t *) node->policy_node;
+            if (0 > state_stack_push(state, r_policy_node(&policy->scripts[cmd_data]), 0)) {
+                return -1;
+            }
+            break;
+        }
+        case CMD_CODE_PROCESS_CHILD_V: {
+            const policy_node_with_scripts_t *policy =
+                (const policy_node_with_scripts_t *) node->policy_node;
+            if (0 >
+                state_stack_push(state, r_policy_node(&policy->scripts[cmd_data]), node->flags)) {
+                return -1;
+            }
+            break;
+        }
+        case CMD_CODE_PROCESS_CHILD_VV: {
+            const policy_node_with_scripts_t *policy =
+                (const policy_node_with_scripts_t *) node->policy_node;
+            if (0 > state_stack_push(state,
+                                     r_policy_node(&policy->scripts[cmd_data]),
+                                     node->flags | PROCESSOR_FLAG_V)) {
+                return -1;
+            }
+            break;
+        }
+        default:
+            PRINTF("Unexpected command code: %d\n", cmd_code);
+            return -1;
+    }
+    ++node->step;
+    return 0;
 }
 
 __attribute__((warn_unused_result)) static int process_pkh_wpkh_node(policy_parser_state_t *state,
@@ -891,6 +887,9 @@ __attribute__((warn_unused_result)) static int process_multi_sortedmulti_node(
                     }
                 }
             }
+            if (smallest_pubkey_index < 0) {
+                return WITH_ERROR(-1, "No unused key found");  // can never happen
+            }
             bitvector_set(used, smallest_pubkey_index, true);  // mark the key as used
         }
 
@@ -957,6 +956,9 @@ __attribute__((warn_unused_result)) static int process_multi_a_sortedmulti_a_nod
                         smallest_pubkey_index = j;
                     }
                 }
+            }
+            if (smallest_pubkey_index < 0) {
+                return WITH_ERROR(-1, "No unused key found");  // can never happen
             }
             bitvector_set(used, smallest_pubkey_index, true);  // mark the key as used
         }
@@ -1223,7 +1225,7 @@ __attribute__((noinline)) int get_wallet_internal_script_hash(
                                    .hash_context = hash_context};
 
     state.nodes[0] =
-        (policy_parser_node_state_t){.length = 0, .flags = 0, .step = 0, .policy_node = policy};
+        (policy_parser_node_state_t) {.length = 0, .flags = 0, .step = 0, .policy_node = policy};
 
     int ret;
     do {
@@ -1434,7 +1436,9 @@ static int get_bip44_purpose(const policy_node_t *descriptor_template) {
 
 bool is_wallet_policy_standard(dispatcher_context_t *dispatcher_context,
                                const policy_map_wallet_header_t *wallet_policy_header,
-                               const policy_node_t *descriptor_template) {
+                               const policy_node_t *descriptor_template,
+                               int *out_bip44_purpose,
+                               uint32_t *out_bip44_account) {
     // Based on the address type, we set the expected bip44 purpose
     int bip44_purpose = get_bip44_purpose(descriptor_template);
     if (bip44_purpose < 0) {
@@ -1503,6 +1507,13 @@ bool is_wallet_policy_standard(dispatcher_context_t *dispatcher_context,
         key_info.master_key_derivation[2] < H ||
         key_info.master_key_derivation[2] > H + MAX_BIP44_ACCOUNT_RECOMMENDED) {
         return false;
+    }
+
+    if (out_bip44_purpose != NULL) {
+        *out_bip44_purpose = bip44_purpose;
+    }
+    if (out_bip44_account != NULL) {
+        *out_bip44_account = key_info.master_key_derivation[2] - H;
     }
 
     return true;
@@ -1903,8 +1914,8 @@ static int compare_uint16(const void *a, const void *b) {
     return (num1 > num2) - (num1 < num2);
 }
 
-static bool are_key_placeholders_identical(const policy_node_keyexpr_t *kp1,
-                                           const policy_node_keyexpr_t *kp2) {
+bool are_key_placeholders_identical(const policy_node_keyexpr_t *kp1,
+                                    const policy_node_keyexpr_t *kp2) {
     if (kp1->type != kp2->type) {
         return false;
     }

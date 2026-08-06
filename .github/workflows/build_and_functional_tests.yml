@@ -20,6 +20,11 @@ on:
         options:
           - 'Raise an error (default)'
           - 'Open a PR'
+      delete_obsolete_snapshots:
+        type: boolean
+        required: false
+        default: false
+        description: When opening a PR, also delete snapshots that are no longer generated (e.g. for removed/renamed tests). Only safe for a full-suite regeneration.
   push:
     branches:
       - master
@@ -34,6 +39,8 @@ jobs:
     with:
       upload_app_binaries_artifact: "compiled_app_binaries"
       flags: "DEBUG=0 COIN=bitcoin_testnet"
+      build_comparison: true
+      enable_stack_consumption: true
 
   ragger_tests:
     name: Run ragger tests using the reusable workflow
@@ -41,7 +48,22 @@ jobs:
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@v1
     with:
       download_app_binaries_artifact: "compiled_app_binaries"
-      container_image: "ghcr.io/ledgerhq/app-bitcoin-new/speculos-bitcoin:latest"
+      container_image: "ghcr.io/ledgerhq/app-bitcoin/speculos-bitcoin:latest"
       # when merging a PR, we run the tests with the --enable_slow_tests parameter
       test_options: ${{ github.event_name == 'push' && '--enable_slow_tests' || '' }}
       regenerate_snapshots: ${{ github.event_name == 'workflow_dispatch' && inputs.golden_run == 'Open a PR' }}
+      also_delete_snapshots: ${{ github.event_name == 'workflow_dispatch' && inputs.golden_run == 'Open a PR' && inputs.delete_obsolete_snapshots }}
+      post_stack_consumption: true
+
+  ragger_coverage:
+    name: Functional tests coverage using the reusable workflow
+    # Builds the app with debug symbols and runs the ragger
+    # tests with coverage tracing; uploads the lcov file + HTML report as the
+    # 'coverage-<device>' artifact(s) and to codecov under the 'functionaltests' flag.
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_coverage.yml@v1
+    with:
+      run_for_devices: '["flex"]'
+      flags: "DEBUG=1 COIN=bitcoin_testnet"
+      container_image: "ghcr.io/ledgerhq/app-bitcoin-new/speculos-bitcoin:latest"
+    secrets:
+      codecov_token: ${{ secrets.CODECOV_TOKEN }}

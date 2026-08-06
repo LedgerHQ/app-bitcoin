@@ -23,4 +23,3 @@
       with:
         source: './src'
         extensions: 'h,c'
-        version: 12

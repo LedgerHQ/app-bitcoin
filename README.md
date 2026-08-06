@@ -2,6 +2,13 @@
 
 This is the Bitcoin application for Ledger devices.
 
+> [!NOTE]
+> **This repository was renamed.** It was previously `LedgerHQ/app-bitcoin-new` and is
+> the current, actively developed Ledger Bitcoin application.
+>
+> The older Bitcoin app that used to live at `LedgerHQ/app-bitcoin` has been renamed to
+> [`LedgerHQ/app-bitcoin-legacy`](https://github.com/LedgerHQ/app-bitcoin-legacy).
+
 ## Quick start guide
 
 ### With VSCode
@@ -16,8 +23,8 @@ It will allow you, whether you are developing on macOS, Windows or Linux to quic
     * On macOS, install and launch [XQuartz](https://www.xquartz.org/) (make sure to go to XQuartz > Preferences > Security and check "Allow client connections").
     * On Windows, install and launch [VcXsrv](https://sourceforge.net/projects/vcxsrv/) (make sure to configure it to disable access control).
 * Install [VScode](https://code.visualstudio.com/download) and add [Ledger's extension](https://marketplace.visualstudio.com/items?itemName=LedgerHQ.ledger-dev-tools).
-* Open a terminal and clone `app-bitcoin-new` with `git clone git@github.com:LedgerHQ/app-bitcoin-new.git`.
-* Open the `app-bitcoin-new` folder with VSCode.
+* Open a terminal and clone `app-bitcoin` with `git clone git@github.com:LedgerHQ/app-bitcoin.git`.
+* Open the `app-bitcoin` folder with VSCode.
 * Use Ledger extension's sidebar menu or open the tasks menu with `ctrl + shift + b` (`command + shift + b` on a Mac) to conveniently execute actions :
     * Build the app for the device model of your choice with `Build`.
     * Test your binary on [Speculos](https://github.com/LedgerHQ/speculos) with `Run with Speculos`.
@@ -138,15 +145,20 @@ python3 -m ledgerblue.runScript --scp --fileName bin/app.apdu --elfFile bin/app.
 
 ## Documentation
 
-For many use cases, the code examples provided in the following client libraries might be sufficient to get started:
+If you want to understand what the app does or build an integration on top of an existing client library, start here:
+- [features.md](doc/features.md): Overview of the app's features and the account/script types it supports.
+- [integration.md](doc/integration.md): Concepts and security model for integrators — wallet policies, registration, and on-device verification.
+
+For many use cases, the code examples provided in the following client libraries are enough to get started:
 - [Python client library](bitcoin_client)
 - [JavaScript client library](bitcoin_client_js)
 - [Rust client library](bitcoin_client_rs)
 
-If you need to go deeper into the rabbit hole 🐇🕳️, refer to the following documents:
+If you need to go deeper into the rabbit hole 🐇🕳️ (for example to implement a client library or work at the protocol level), refer to the following documents:
 - [bitcoin.md](doc/bitcoin.md): Low-level documentation of the Bitcoin app's communication protocol and commands.
+- [wallet.md](doc/wallet.md): Formal definition of the wallet policy language, its serialization, and the supported scripts.
 - [merkle.md](doc/merkle.md): Advanced details on techniques used in the Bitcoin app's secured and scalable communication protocol.
-- [wallet.md](doc/wallet.md): Information on the types of scripts supported by the Ledger Bitcoin app and the security requirements for multi-user or multi-key spending policies.
+- [musig.md](doc/musig.md): Details of the MuSig2 implementation and its on-device state management.
 - [debugging.md](doc/debugging.md): Guidance on how to diagnose and resolve issues.
 
 ## Tests

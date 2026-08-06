@@ -1,12 +1,15 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
 /* SDK headers */
 #include "bip32.h"
+#include "bolos_target.h"
 #include "format.h"
 
 /* Local headers */
+#include "sighash.h"  // tx_display_mode_t
 #include "constants.h"
 #include "dispatcher.h"
 #include "display.h"
@@ -15,11 +18,15 @@
 #include "script.h"
 #include "sw.h"
 #include "wallet.h"
+#include "common/cleartext.h"
 
 #define MESSAGE_CHUNK_SIZE 64  // Protocol specific
 // Displayed message length - if the message is too long we will not display it
 #define MAX_DISPLAYBLE_MESSAGE_LENGTH (10 * MESSAGE_CHUNK_SIZE)
 
+#ifndef TARGET_ID
+#error "bolos_target.h must be included (TARGET_* constants unavailable)"
+#endif
 #if defined(TARGET_STAX) || defined(TARGET_FLEX)
 #define ICON_APP_IMPORTANT IMPORTANT_CIRCLE_ICON
 #define ICON_APP_WARNING   LARGE_WARNING_ICON
@@ -87,7 +94,15 @@ typedef struct {
 
 typedef struct {
     const char *wallet_name;
+    // The raw descriptor template, displayed after the cleartext lines.
+    // `NULL` means "do not show the descriptor template" (used for very
+    // simple multisig wallet policies, that have little ambiguity).
     const char *descriptor_template;
+    // Cleartext spending-path lines, displayed before the descriptor template.
+    // Pointer to caller-owned memory (the register-wallet handler's stack).
+    // `n_cleartext_lines == 0` means "no cleartext to display".
+    const char (*cleartext_lines)[CT_MAX_LINE_LEN + 1];
+    size_t n_cleartext_lines;
     size_t n_keys;
     char keys_label[MAX_N_KEYS_IN_WALLET_POLICY][MAX_KEY_LABEL_LENGTH];
     const char *keys_info[MAX_N_KEYS_IN_WALLET_POLICY];
@@ -97,6 +112,34 @@ typedef struct {
     char pubkey[MAX_POLICY_KEY_INFO_LEN + 1];
     char signer_index[sizeof("Key @999 <theirs>")];
 } ui_cosigner_pubkey_and_index_state_t;
+
+// Which side of the transaction the wallet account is on, for the account review row.
+typedef enum {
+    ACCOUNT_ROLE_FROM,     // net spend (and the default/FULL case)
+    ACCOUNT_ROLE_TO,       // net receive
+    ACCOUNT_ROLE_UNKNOWN,  // direction not knowable (UNAVAILABLE)
+} account_role_t;
+
+// Amount summary for the transaction review (mode from decide_tx_display_mode).
+typedef struct {
+    tx_display_mode_t mode;
+    uint64_t fee;           // for TX_DISPLAY_FULL
+    int64_t total_spent;    // net amount leaving the account (negative = net receive); used for
+                            // TX_DISPLAY_NET_ONLY and, in FULL mode, when there are external inputs
+    uint32_t seen_sighash;  // effective sighash, for the "Signing rule" row
+    bool sighash_mixed;     // signed inputs disagree -> shown as "Mixed"
+
+    // With external (unverified) inputs, the outputs and fee alone don't tell the user how much
+    // really leaves (or enters) their wallet, so we additionally show the net amount actually
+    // spent/received (has_external_inputs, FULL mode) and the total amount of the external inputs.
+    bool has_external_inputs;
+    // Whether to show the "External inputs amount" row: only when there are external inputs
+    // *and* the input set is closed (no ANYONECANPAY), so their total is fixed after signing.
+    // This is trustworthy independently of the output/fee display mode, hence shown in both FULL
+    // and NET_ONLY.
+    bool show_external_inputs_amount;
+    uint64_t external_inputs_amount;  // total amount of the external inputs
+} tx_summary_t;
 
 typedef struct {
     tx_ux_warning_t warnings;
@@ -109,7 +152,20 @@ typedef struct {
     char address_or_description[MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER]
                                [MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
     char amount[MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER][MAX_AMOUNT_LENGTH + 1];
-    char fee[MAX_AMOUNT_LENGTH + 1];
+    char fee[MAX_AMOUNT_LENGTH + 1];         // formatted network fee (FULL only)
+    char net_amount[MAX_AMOUNT_LENGTH + 1];  // formatted |total_spent|, the "You spend/receive"
+                                             // value (NET_ONLY, or FULL with external inputs)
+
+    char unverified_inputs[MAX_AMOUNT_LENGTH + 1];  // formatted external_inputs_amount
+    bool has_external_inputs;                       // net "You spend/receive" row in FULL mode
+    bool show_external_inputs_amount;  // "External inputs amount" row (FULL and NET_ONLY)
+
+    tx_display_mode_t display_mode;
+    bool spent_is_receive;        // for NET_ONLY, or FULL with external inputs: total_spent < 0
+    account_role_t account_role;  // From / To / unknown for the account row
+    bool account_is_default;      // default derivation vs registered policy, for the row label
+    uint32_t seen_sighash;        // for the "Signing rule" row
+    bool sighash_mixed;
 } ui_validate_transaction_state_t;
 
 /**
@@ -145,10 +201,15 @@ bool ui_display_message_and_confirm(dispatcher_context_t *context,
                                     const char *message,
                                     bool is_hash);
 
+// Reviews a wallet policy to register. Pass `descriptor_template == NULL` to
+// hide the raw descriptor template (when the cleartext lines already fully
+// capture the policy); otherwise it is shown after the cleartext block.
 bool ui_display_register_wallet_policy(
     dispatcher_context_t *context,
     const policy_map_wallet_header_t *wallet_header,
     const char *descriptor_template,
+    const char (*cleartext_lines)[CT_MAX_LINES][CT_MAX_LINE_LEN + 1],
+    size_t n_cleartext_lines,
     const char (*keys_info)[MAX_N_KEYS_IN_WALLET_POLICY][MAX_POLICY_KEY_INFO_LEN + 1],
     const key_type_e (*keys_type)[MAX_N_KEYS_IN_WALLET_POLICY]);
 
@@ -158,7 +219,10 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
 
 bool ui_display_unusual_path(dispatcher_context_t *context, const char *bip32_path_str);
 
-void ui_prepare_authorize_wallet_spend(const char *wallet_name);
+void ui_prepare_authorize_wallet_spend(const char *wallet_name,
+                                       account_role_t account_role,
+                                       bool account_is_default,
+                                       const tx_summary_t *summary);
 
 bool ui_warn_external_inputs(dispatcher_context_t *context);
 
@@ -166,19 +230,26 @@ bool ui_warn_unverified_segwit_inputs(dispatcher_context_t *context);
 
 bool ui_warn_nondefault_sighash(dispatcher_context_t *context);
 
+// Shows a terminal status explaining that a non-standard sighash was rejected
+void ui_warn_nondefault_sighash_disabled(dispatcher_context_t *context);
+
 bool ui_warn_high_fee(dispatcher_context_t *context);
 
 /* These 3 functions have to be called in following order:
- * 1. init - to initialize the transaction signature flow with basic parameters.
+ * 1. init - initialize the flow; the summary is applied here so the account row, the
+ *           "Signing rule" line and the per-output page breaks are all available up front.
  * 2. add  - to add information for an output.
  * 3. show - to actually start showing the transaction screens.
  * These functions call respectively init, add and show functions from display_nbgl module.
  */
 void ui_transaction_simplified_init(const char *wallet_policy_name,
                                     unsigned int outputs_num,
-                                    tx_ux_warning_t warnings);
+                                    tx_ux_warning_t warnings,
+                                    account_role_t account_role,
+                                    bool account_is_default,
+                                    const tx_summary_t *summary);
 void ui_transaction_simplified_add(uint64_t amount, const char *address_or_description);
-bool ui_transaction_simplified_show(dispatcher_context_t *context, uint64_t fee);
+bool ui_transaction_simplified_show(dispatcher_context_t *context);
 
 bool ui_transaction_streaming_prompt(dispatcher_context_t *context);
 bool ui_transaction_streaming_validate_output(dispatcher_context_t *context,
@@ -187,7 +258,6 @@ bool ui_transaction_streaming_validate_output(dispatcher_context_t *context,
                                               const char *address_or_description,
                                               uint64_t amount);
 bool ui_transaction_streaming_validate(dispatcher_context_t *context,
-                                       uint64_t fee,
                                        tx_ux_warning_t warnings,
                                        bool is_self_transfer);
 
@@ -211,6 +281,8 @@ void ui_display_warning_external_inputs_flow(void);
 void ui_display_unverified_segwit_inputs_flows(void);
 
 void ui_display_nondefault_sighash_flow(void);
+
+void ui_display_nondefault_sighash_disabled_flow(void);
 
 void ui_warn_high_fee_flow(void);
 

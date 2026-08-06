@@ -15,7 +15,7 @@ from ragger.firmware import Firmware
 from ledger_bitcoin.wallet import WalletPolicy
 from ragger_bitcoin import RaggerClient
 from test_utils import SpeculosGlobals, bip0327
-from test_utils.musig2 import HotMusig2Cosigner, Musig2KeyPlaceholder, PsbtMusig2Cosigner, TrDescriptorTemplate, run_musig2_test
+from test_utils.musig2 import HotMusig2Cosigner, MuSig2KeyPlaceholder, PsbtMusig2Cosigner, TrDescriptorTemplate, run_musig2_test
 from .instructions import *
 
 tests_root: Path = Path(__file__).parent
@@ -46,7 +46,7 @@ class LedgerMusig2Cosigner(PsbtMusig2Cosigner):
 
         self.pubkey = None
         for _, (placeholder, _) in enumerate(desc_tmpl.placeholders()):
-            if not isinstance(placeholder, Musig2KeyPlaceholder):
+            if not isinstance(placeholder, MuSig2KeyPlaceholder):
                 continue
 
             for i in placeholder.key_indexes:

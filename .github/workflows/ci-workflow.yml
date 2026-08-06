@@ -95,13 +95,6 @@ jobs:
 
     container:
       image: ghcr.io/ledgerhq/speculos:latest
-      ports:
-        - 1234:1234
-        - 9999:9999
-        - 40000:40000
-        - 41000:41000
-        - 42000:42000
-        - 43000:43000
       options: --entrypoint /bin/bash
 
     steps:
@@ -131,13 +124,6 @@ jobs:
     container:
       # As for the test we use v1.6.5 Nano S BTC binary we freeze the last Speculos version supporting this device
       image: ghcr.io/ledgerhq/speculos:0.25.5
-      ports:
-        - 1234:1234
-        - 9999:9999
-        - 40000:40000
-        - 41000:41000
-        - 42000:42000
-        - 43000:43000
       options: --entrypoint /bin/bash
 
     steps:
@@ -161,13 +147,6 @@ jobs:
 
     container:
       image: ghcr.io/ledgerhq/speculos:latest
-      ports:
-        - 1234:1234
-        - 9999:9999
-        - 40000:40000
-        - 41000:41000
-        - 42000:42000
-        - 43000:43000
       options: --entrypoint /bin/bash
 
     steps:
@@ -201,11 +180,8 @@ jobs:
     with:
       package_name: ledger_bitcoin
       package_directory: ./bitcoin_client/
-      jfrog_deployment: true
       release: false
       publish: true
-    secrets:
-      pypi_token: ${{ secrets.PYPI_PUBLIC_API_TOKEN }}
 
   job_test_js_lib:
     name: Tests with the JS library
@@ -214,13 +190,6 @@ jobs:
 
     container:
       image: ghcr.io/ledgerhq/speculos:latest
-      ports:
-        - 1234:1234
-        - 9999:9999
-        - 40000:40000
-        - 41000:41000
-        - 42000:42000
-        - 43000:43000
       options: --entrypoint /bin/bash
 
     steps:
@@ -303,6 +272,3 @@ jobs:
       package_directory: "bitcoin_client_rs"
       publish: true
       release: false
-      jfrog_deployment: true
-    secrets:
-      cargo_token: ${{ secrets.CARGO_CRATES_TOKEN }}

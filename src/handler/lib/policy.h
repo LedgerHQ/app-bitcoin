@@ -165,13 +165,19 @@ int get_policy_address_type(const policy_node_t *policy);
  *   Pointer the wallet policy header
  * @param[in] descriptor_template
  *   Pointer to the root node of the policy
+ * @param[out] out_bip44_purpose
+ *   If not NULL and the policy is standard, receives the BIP-44 purpose (44/49/84/86).
+ * @param[out] out_bip44_account
+ *   If not NULL and the policy is standard, receives the (unhardened) account index.
  *
  * @return true if the descriptor_template is not standard; false if not, or in case of error.
  */
 __attribute__((warn_unused_result)) bool is_wallet_policy_standard(
     dispatcher_context_t *dispatcher_context,
     const policy_map_wallet_header_t *wallet_policy_header,
-    const policy_node_t *descriptor_template);
+    const policy_node_t *descriptor_template,
+    int *out_bip44_purpose,
+    uint32_t *out_bip44_account);
 
 /**
  * Computes and returns the wallet_hmac, using the symmetric key derived
@@ -217,6 +223,20 @@ __attribute__((warn_unused_result)) int get_keyexpr_by_index(const policy_node_t
                                                              unsigned int i,
                                                              const policy_node_t **out_tapleaf_ptr,
                                                              policy_node_keyexpr_t **out_keyexpr);
+
+/**
+ * Determines whether two key expressions refer to the same key, independently of the derivation
+ * steps. Normal key expressions are identical iff they share the same key index; musig key
+ * expressions are identical iff they aggregate exactly the same (unordered) set of key indexes.
+ *
+ * @param[in] kp1
+ *   Pointer to the first key expression.
+ * @param[in] kp2
+ *   Pointer to the second key expression.
+ * @return true if the two key expressions refer to the same key, false otherwise.
+ */
+bool are_key_placeholders_identical(const policy_node_keyexpr_t *kp1,
+                                    const policy_node_keyexpr_t *kp2);
 
 /**
  * Determines the expected number of unique keys in the provided policy's key information.

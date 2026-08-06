@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.5.0] - 24-07-2026
+
+### Changed
+
+- Improved the registration UX for multisig and many taproot miniscript wallet policies by showing the *clear-text, human-readable* meaning of the policy. For simple multisig policies, the clear-text description replaces the descriptor template. For a large class of supported taproot miniscript policies, it is shown *in addition to*, and *before*, the raw descriptor template. This lets the user understand the policy while still being able to compare the template against their backup.
+- Signing transactions using non-standard sighash flags now requires enabling the corresponding persistent application setting.
+- Improved the signing display for transactions using non-default sighash flags: the effective signing rule is shown, and the trusted screen now only presents amounts that the signatures actually commit to, falling back to the net amount spent/received (or a warning when nothing can be shown reliably) instead of a potentially misleading breakdown.
+- Improved the signing display for transactions with external inputs: in addition to the existing warning and external outputs, the trusted screen now shows the total amount of the external inputs when it can be reliably determined, and the net amount spent from or received into the account.
+- Standard BIP-87 xpubs can now be exported without explicit user confirmation.
+- Enabled stack protector.
+
 ## [2.4.6] - 30-03-2026
 
 ### Changed

@@ -1,10 +1,10 @@
 [package]
 name = "ledger_bitcoin_client"
-version = "0.5.0"
+version = "0.6.2"
 authors = ["Ledger"]
 edition = "2018"
 description = "Ledger Bitcoin application client"
-repository = "https://github.com/LedgerHQ/app-bitcoin-new"
+repository = "https://github.com/LedgerHQ/app-bitcoin"
 license = "Apache-2.0"
 documentation = "https://docs.rs/ledger_bitcoin_client/"
 
@@ -30,6 +30,7 @@ members = ["examples/ledger_hwi"]
 # Dependencies used for tests and examples only.
 [dev-dependencies]
 hex = "0.4.3"
+hex-literal = "1.1.0"
 tokio = { version = "1.21", features = ["macros", "rt", "rt-multi-thread"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

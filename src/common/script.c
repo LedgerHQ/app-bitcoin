@@ -12,10 +12,7 @@
 
 /* Local headers */
 #include "segwit_addr.h"
-
-#ifndef SKIP_FOR_CMOCKA
 #include "../crypto.h"
-#endif
 
 size_t get_push_script_size(uint32_t n) {
     if (n <= 16)
@@ -68,8 +65,6 @@ int get_script_type(const uint8_t script[], size_t script_len) {
     return -1;
 }
 
-#ifndef SKIP_FOR_CMOCKA
-
 // TODO: add unit tests
 int get_script_address(const uint8_t script[], size_t script_len, char *out, size_t out_len) {
     int script_type = get_script_type(script, script_len);
@@ -120,8 +115,6 @@ int get_script_address(const uint8_t script[], size_t script_len, char *out, siz
     }
     return addr_len;
 }
-
-#endif
 
 int format_opscript_script(const uint8_t script[],
                            size_t script_len,
@@ -227,8 +220,6 @@ int format_opscript_script(const uint8_t script[],
     return out_ctr;
 }
 
-#ifndef SKIP_FOR_CMOCKA
-
 bool format_script(const uint8_t script[],
                    size_t script_len,
                    char out[static MAX_OUTPUT_SCRIPT_DESC_SIZE]) {
@@ -245,5 +236,3 @@ bool format_script(const uint8_t script[],
     }
     return true;
 }
-
-#endif

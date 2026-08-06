@@ -1,0 +1,409 @@
+# Test vectors for register_wallet.
+#
+# Schema and conventions are documented in test_vectors/README.md.
+# Source: tests/test_register_wallet.py
+#
+# `expected_wallet_id` is the policy id (sha256 of the registration) and can be
+# checked by any framework with no secrets. `expected_wallet_hmac` is the device
+# HMAC over that id, reproducible only with the Speculos registration key
+# (see fixtures.toml). Pure UI reject flows (DENY) are not captured here.
+
+[[case]]
+name = "multisig_legacy_2of2"
+description = "2-of-2 sortedmulti, legacy P2SH"
+descriptor_template = "sh(sortedmulti(2,@0/**,@1/**))"
+keys_info = [
+    "[5c9e228d/48'/1'/0'/0']tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW",
+    "[f5acc2fd/48'/1'/0'/0']tpubDFAqEGNyad35WQAZMmPD4vgBXnjH16RGciLdWekPe4f4d5JzoHVu1PS86Sy4Tm63vDf8rfV3UjifhrRuSUDfiZj5KPffTPyZ4ZXBKvjD8jm",
+]
+wallet_name = "Cold storage"
+expected_wallet_id = "1d150ed425a871a5ca7e2c55db1b3295c1fd97147fd0a7b188d4327f4ba7402a"
+expected_wallet_hmac = "fa73e36119324fbe4cc1ca94aa842c6261526d44112a22164bc57c3335102b04"
+expected_key_types = ["external", "internal"]
+descriptor_hidden = true
+
+[[case]]
+name = "multisig_sh_wit_2of2"
+description = "2-of-2 sortedmulti, wrapped segwit P2SH-P2WSH"
+descriptor_template = "sh(wsh(sortedmulti(2,@0/**,@1/**)))"
+keys_info = [
+    "[76223a6e/48'/1'/0'/1']tpubDE7NQymr4AFtcJXi9TaWZtrhAdy8QyKmT4U6b9qYByAxCzoyMJ8zw5d8xVLVpbTRAEqP8pVUxjLE2vDt1rSFjaiS8DSz1QcNZ8D1qxUMx1g",
+    "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+]
+wallet_name = "Cold storage"
+expected_wallet_id = "763926f53be53ad89a9248dc15bc2f3ed577a59a87d81cd88f14279b263b31f6"
+expected_wallet_hmac = "1f498e7444841b883c4a63e2b88a5cad297c289d235794f8e3e17cf559ed0654"
+expected_key_types = ["external", "internal"]
+descriptor_hidden = true
+
+[[case]]
+name = "multisig_wit_2of2"
+description = "2-of-2 sortedmulti, native segwit P2WSH"
+descriptor_template = "wsh(sortedmulti(2,@0/**,@1/**))"
+keys_info = [
+    "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+wallet_name = "Cold storage"
+expected_wallet_id = "cd9474ae9e74403128477789789db43a215e996af80d60120f0d844f8404ac64"
+expected_wallet_hmac = "d7c7a60b4ab4a14c1bf8901ba627d72140b2fb907f2b4e35d2e693bce9fbb371"
+expected_key_types = ["external", "internal"]
+descriptor_hidden = true
+
+[[case]]
+name = "multisig_wit_2of2_long_name"
+description = "2-of-2 native segwit with a 64-char name"
+descriptor_template = "wsh(sortedmulti(2,@0/**,@1/**))"
+keys_info = [
+    "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+wallet_name = "Cold storage with a pretty long name that requires 64 characters"
+expected_wallet_id = "57f64b36153b819c624dedd0ba3ba491000c41652087b5b265b2460508b09620"
+expected_wallet_hmac = "42ea7900175227ee3ea259a0a061dda232dce3e93707d0940f9dc63bab50d35a"
+expected_key_types = ["external", "internal"]
+descriptor_hidden = true
+
+[[case]]
+name = "unusual_singlesig_legacy"
+description = "single-key legacy on an unusual account path (44'/1'/3')"
+descriptor_template = "pkh(@0/**)"
+keys_info = [
+    "[f5acc2fd/44'/1'/3']tpubDCwYjpDhUdPGW815u9VExvLRXDAHehcnkNfjqiwSvJp7NizpAGsX3Qfq9A173rES9vF17HgeqXBUvodRTyeTHCeAvg7gVgDE19mudggheN1",
+]
+wallet_name = "Unusual legacy"
+expected_wallet_id = "409d4fb1e165e94fb7a822f82ce648e3cc263f06311b790d7f6299ee7fcb5987"
+expected_wallet_hmac = "5d4a77a905b1be578a638f5c037a9a646af5ad71c16f813913bb9aba7abac795"
+expected_key_types = ["internal"]
+
+[[case]]
+name = "unusual_singlesig_nested_segwit"
+description = "single-key nested_segwit on an unusual account path (44'/1'/3')"
+descriptor_template = "sh(wpkh(@0/**))"
+keys_info = [
+    "[f5acc2fd/44'/1'/3']tpubDCwYjpDhUdPGW815u9VExvLRXDAHehcnkNfjqiwSvJp7NizpAGsX3Qfq9A173rES9vF17HgeqXBUvodRTyeTHCeAvg7gVgDE19mudggheN1",
+]
+wallet_name = "Unusual nested_segwit"
+expected_wallet_id = "70e97d1e974a5cf46cd13b8c3358850c51873a1a1ab8b60647ed35520a76e870"
+expected_wallet_hmac = "f7e49a379e71cfe6645a564c641f1b5232aeb6696c862f4f3df581236bd451c4"
+expected_key_types = ["internal"]
+
+[[case]]
+name = "unusual_singlesig_native_segwit"
+description = "single-key native_segwit on an unusual account path (44'/1'/3')"
+descriptor_template = "wpkh(@0/**)"
+keys_info = [
+    "[f5acc2fd/44'/1'/3']tpubDCwYjpDhUdPGW815u9VExvLRXDAHehcnkNfjqiwSvJp7NizpAGsX3Qfq9A173rES9vF17HgeqXBUvodRTyeTHCeAvg7gVgDE19mudggheN1",
+]
+wallet_name = "Unusual native_segwit"
+expected_wallet_id = "d5de0973b368d69f67166391d66b8ead31478a6e7dda5c9acbeff185523e1f64"
+expected_wallet_hmac = "b9c66ce0adb1684c2f2cf51e280c3a95746393ddfe32ebfb6938922a37b438d9"
+expected_key_types = ["internal"]
+
+[[case]]
+name = "unusual_singlesig_taproot"
+description = "single-key taproot on an unusual account path (44'/1'/3')"
+descriptor_template = "tr(@0/**)"
+keys_info = [
+    "[f5acc2fd/44'/1'/3']tpubDCwYjpDhUdPGW815u9VExvLRXDAHehcnkNfjqiwSvJp7NizpAGsX3Qfq9A173rES9vF17HgeqXBUvodRTyeTHCeAvg7gVgDE19mudggheN1",
+]
+wallet_name = "Unusual taproot"
+expected_wallet_id = "4e9679b3f4aaf54a3ffdef160963bc5b4d6ac706499d2317e8514819a9777921"
+expected_wallet_hmac = "9006e41fe8ba29dd93aeae79dc6b3513db42d2fbcf18dbda5df860342e137fec"
+expected_key_types = ["internal"]
+
+[[case]]
+name = "miniscript_long_policy"
+description = "miniscript policy longer than 256 bytes"
+descriptor_template = "wsh(and_v(and_v(v:pk(@0/**),or_c(pk(@1/**),or_c(pk(@2/**),v:older(1000)))),and_v(v:hash256(0563fb3e85cbc61b134941ad6610a2b0dfd77543dfb77a5433ff3cb538213807),and_v(v:hash256(ad3391a00bad00a6a03f907b3fcc2f369a88be038c63c7db7f43b01e097efbbe),hash256(137dfa9b54a538200c94e3c9dd1a59b431e3b89aef8093fc910df48a98cb06d9)))))"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+    "tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
+]
+wallet_name = "Long policy"
+expected_wallet_id = "71b806a6ef8102626f8c9126a0bac51efca19fadd295c42245be240138bb0b57"
+expected_wallet_hmac = "c018966ba0416569d3510c93f5c6cd88c4338a9192e3de3a94db9d27f58615b3"
+expected_key_types = ["internal", "external", "external"]
+
+[[case]]
+name = "miniscript_minmax_relative_timelocks"
+description = "min/max relative timelocks in a taptree"
+descriptor_template = "tr(@0/<0;1>/*,{thresh(3,pk(@0/<2;3>/*),s:pk(@1/<2;3>/*),s:pk(@2/<2;3>/*),sln:older(1),sln:older(65535)),thresh(3,pk(@0/<4;5>/*),s:pk(@1/<4;5>/*),s:pk(@2/<4;5>/*),sln:older(4194305),sln:older(4259839))})"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+    "tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
+]
+wallet_name = "Relative timelocks"
+expected_wallet_id = "3d9900113d87d80c72ca9d036d1f7aa163cea194629afa4c4946409e05b00fcb"
+expected_wallet_hmac = "65fda496184f9f720c2d3eb47169b94d2390fe2a085e6d2c43eb6d12d7608af3"
+expected_key_types = ["internal", "external", "external"]
+
+[[case]]
+name = "tr_script_pk"
+description = "taproot, foreign internal key and our script key"
+descriptor_template = "tr(@0/**,pk(@1/**))"
+keys_info = [
+    "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+wallet_name = "Taproot foreign internal key, and our script key"
+expected_wallet_id = "ba1a89c470ab0c36c38beaebb577b754c33d90b51df53977e2b01018fbe25f33"
+expected_wallet_hmac = "dae925660e20859ed8833025d46444483ce264fdb77e34569aabe9d590da8fb7"
+expected_key_types = ["external", "internal"]
+
+[[case]]
+name = "tr_nums_keypath"
+description = "taproot with an unspendable (NUMS) internal key"
+descriptor_template = "tr(@0/**,pk(@1/**))"
+keys_info = [
+    "tpubD6NzVbkrYhZ4WLczPJWReQycCJdd6YVWXubbVUFnJ5KgU5MDQrD998ZJLSmaB7GVcCnJSDWprxmrGkJ6SvgQC6QAffVpqSvonXmeizXcrkN",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+wallet_name = "Taproot unspendable keypath"
+expected_wallet_id = "ba6c11196b604c062a27e195bcbdfe6c1fe1fa61e92256974b5c53c2fc2e2172"
+expected_wallet_hmac = "7af8844fb3f176337acd66fb76113b5e250e1be75a0845964587219b297fda59"
+expected_key_types = ["unspendable", "internal"]
+
+[[case]]
+name = "tr_script_sortedmulti_a"
+description = "taproot single-key or 2-of-2 sortedmulti_a script"
+descriptor_template = "tr(@0/**,sortedmulti_a(2,@1/**,@2/**))"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+    "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+wallet_name = "Taproot single-key or multisig 2-of-2"
+expected_wallet_id = "46c498a049e164ec7feaf167c3ae0f4282217645a338f66f5377bfe67f6a8aa0"
+expected_wallet_hmac = "a3f31e9d7b70d1d967413488bae136a8b6c7afd1de0524deb6cf74f5c509b9ab"
+expected_key_types = ["internal", "external", "internal"]
+
+[[case]]
+name = "max_derivation_steps"
+description = "key with the maximum (8) BIP-388 derivation steps"
+descriptor_template = "wpkh(@0/**)"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/2'/0'/1'/2'/3']tpubDNTK3WZ6g6eZBbCYCdFMpkCNvEqMxYexWRyqrGDkC5WDsNJdUk95z9wHWm6rBZeeMRxKafnuJzT8TqUs94A11KKkW9wT1pcFQShC9p3Vcxi",
+]
+wallet_name = "Max derivation"
+expected_wallet_id = "71b58446a17ebc98e654560f4f1fb9003bad49ddde1d3ee9384221f7f2d3dda2"
+expected_wallet_hmac = "e3bb8a13e19d74079ee209a99438da0b47f3f430a88130ba18b1c05e626d22c8"
+expected_key_types = ["internal"]
+
+# ---- Deterministic rejections ----
+
+[[case]]
+name = "invalid_pubkey_version"
+description = "external key uses a mainnet xpub version instead of testnet tpub"
+descriptor_template = "wsh(sortedmulti(2,@0/**,@1/**))"
+keys_info = [
+    "[76223a6e/48'/1'/0'/2']xpub6DjjtjxALtJSP9dKRKuhejeTpZc711gUGZyS9nCM5GAtrNTDuMBZD2FcndJoHst6LYNbJktm4NmJyKqspLi5uRmtnDMAdcPAf2jiSj9gFTX",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+wallet_name = "Cold storage"
+error = "INCORRECT_DATA"
+
+[[case]]
+name = "invalid_name_empty"
+description = "unacceptable wallet name: empty"
+descriptor_template = "wsh(sortedmulti(2,@0/**,@1/**))"
+keys_info = [
+    "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+error = "INCORRECT_DATA"
+
+[[case]]
+name = "invalid_name_too_long_65"
+description = "unacceptable wallet name: too_long_65"
+descriptor_template = "wsh(sortedmulti(2,@0/**,@1/**))"
+keys_info = [
+    "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+wallet_name = "This wallet name is much too long since it requires 65 characters"
+error = "INCORRECT_DATA"
+
+[[case]]
+name = "invalid_name_leading_space"
+description = "unacceptable wallet name: leading_space"
+descriptor_template = "wsh(sortedmulti(2,@0/**,@1/**))"
+keys_info = [
+    "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+wallet_name = " Test"
+error = "INCORRECT_DATA"
+
+[[case]]
+name = "invalid_name_trailing_space"
+description = "unacceptable wallet name: trailing_space"
+descriptor_template = "wsh(sortedmulti(2,@0/**,@1/**))"
+keys_info = [
+    "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+wallet_name = "Test "
+error = "INCORRECT_DATA"
+
+[[case]]
+name = "invalid_name_out_of_range_char"
+description = "unacceptable wallet name: out_of_range_char"
+descriptor_template = "wsh(sortedmulti(2,@0/**,@1/**))"
+keys_info = [
+    "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+wallet_name = "Tæst"
+error = "INCORRECT_DATA"
+
+[[case]]
+name = "missing_key"
+description = "policy references @1 but only one key is provided"
+descriptor_template = "wsh(multi(2,@0/**,@1/**))"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+wallet_name = "Missing a key"
+error = "INCORRECT_DATA"
+
+[[case]]
+name = "unsupported_bare_pk"
+description = "bare pk() top-level descriptor is not supported"
+descriptor_template = "pk(@0/**)"
+keys_info = [
+    "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+]
+wallet_name = "Unsupported"
+error = "NOT_SUPPORTED"
+
+[[case]]
+name = "not_sane_duplicate_key"
+description = "the same key appears twice in the keys vector"
+descriptor_template = "wsh(c:andor(pk(@0/<0;1>/*),pk_k(@1/**),and_v(v:pk(@2/<2;3>/*),pk_k(@3/**))))"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+    "tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+    "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
+]
+wallet_name = "Unsupported policy"
+error = "NOT_SUPPORTED"
+
+[[case]]
+name = "not_sane_overlapping_derivations"
+description = "same key with overlapping derivations"
+descriptor_template = "wsh(thresh(3,pk(@0/**),s:pk(@1/**),s:pk(@0/**),sln:older(12960)))"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+    "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
+]
+wallet_name = "Unsupported policy"
+error = "NOT_SUPPORTED"
+
+[[case]]
+name = "not_sane_timelock_mixing"
+description = "miniscript mixing time- and height-based absolute timelocks"
+descriptor_template = "wsh(thresh(2,c:pk_k(@0/**),ac:pk_k(@1/**),altv:after(1000000000),altv:after(100)))"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+    "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
+]
+wallet_name = "Timelock mixing is bad"
+error = "NOT_SUPPORTED"
+
+[[case]]
+name = "not_sane_no_signature_required"
+description = "miniscript that does not always require a signature"
+descriptor_template = "wsh(or_d(multi(1,@0/**),or_b(multi(3,@1/**,@2/**,@3/**),su:after(500000))))"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+    "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
+    "tpubDF6JT5K4izwALMpFv7fQrpWr5bGUMEoWphkzTVJH8jTfgirNEgGZnxsWJDCCxhg2UnW5RcD9Tx8aVAdoM734X5bnRGmJUujz26uQ5gAC1nE",
+    "tpubDF4kujkh5dAhC1pFgBToZybXdvJFXXGX4BWdDxWqP7EUpG8gxkfMQeDjGPDnTr9e4NrkFmDM1ocav3Jz6x79CRZbxGr9dzFokJLuvDDnyRh",
+]
+wallet_name = "No need for sig"
+error = "NOT_SUPPORTED"
+
+[[case]]
+name = "not_sane_malleable"
+description = "malleable miniscript policy"
+descriptor_template = "wsh(c:andor(ripemd160(6ad07d21fd5dfc646f0b30577045ce201616b9ba),pk_h(@0/**),and_v(v:hash256(8a35d9ca92a48eaade6f53a64985e9e2afeb74dcf8acb4c3721e0dc7e4294b25),pk_h(@1/**))))"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+    "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
+]
+wallet_name = "Malleable"
+error = "NOT_SUPPORTED"
+
+[[case]]
+name = "too_many_derivation_steps"
+description = "key with 9 derivation steps exceeds the maximum (8)"
+descriptor_template = "wpkh(@0/**)"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/2'/0'/1'/2'/3'/4']tpubDR1MRwnrfYuCbZ5dvozygap7EkR1pRXfwKhfCEpMTHtzrtN78MnFeipS2Vq9Nr3WHSurdqmrPfm5yQH5ikxJhYUTK12VxmqfTKR8hUF8mty",
+]
+wallet_name = "Too many steps"
+error = "INCORRECT_DATA"
+
+[[case]]
+name = "too_many_keys"
+description = "16 key expressions exceed the maximum (15) supported in a wallet policy"
+descriptor_template = "wsh(multi(1,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,@8/**,@9/**,@10/**,@11/**,@12/**,@13/**,@14/**,@15/**))"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+    "tpubDD814oESVM3uG2yZZDnJDex6gLeeahu2cmK2AL26ozTtDouQCY4NA8xcTW5oiJLp1cydFtDPdWxWDpLPGyLo6sGbemykJm4ocjjvt5cwvtv",
+    "tpubDCz2AbmcM5cVir5UiGjdPgtY6Tugwg44VZYJjpPxyZAg9vMsztGVjcgW9wkQF3oDF4mK2vRxzeXY7d31KYStsRQtuhPNpLFJgz3A3Np9Vc8",
+    "tpubDCbN8YbwHgkEVHc3kYfJirFiHaQaR9brzgF6KNhnceLe58hWiHMDXrovq3SBbHBcHHhNiXNSY7wKWRUGb3pYDTeEnVJBqthwG3FhgeuUQjb",
+    "tpubDD3GzZF6koScghQdMUZ1VT6UnNyvvhVGwwEaReiHSPrKxFguBhp6K2kpbKUwudodaQy44EDbUz4rLgGGN5XJmqCTrydxwY9sRmErUGmK8XA",
+    "tpubDDi6fvvXrjwNvm9tRrAowv5MmxajeptXACMAoVTGSS7dCfabntWJk6eaxFYTy3SLnphoLDs8wzkuQF54x5fiT63dYQ8FBQZWxVSVgNqZUCb",
+    "tpubDDtawMw95R6dzwnW6ptNwAHJVHQRS8vYCyXBVrycd6hnqDfPjBpyMxBbgFgZCdp5oX5L34Z42tvetavdvzcRubV7Yc6mh639uDjRvHDFTrB",
+    "tpubDCDtoPWjoKyu8BurUA6erB4hDBtN18xybX2mFSY1AWXy5qem2j79MbzGiJiNUZsqzLXUuoxjDhwCvACr8NSTukFLWPpgLZSS7KGawZSkTKQ",
+    "tpubDCXuqAmWrb4Zv2wRsjW3iaCN4EddaxFwMDnrfBaonLKDKvnkAzR5yar6CpAU6XiQpXJtirSfjJ1UjTs4ZnUXFpCM3Jr6Y8WgbPGhRgo7vXW",
+    "tpubDDpVtgEAwc9QGnxi6froduQcPHUFQKfz8XDRvjnwqXPTYQYzjTmPkepYQkD5vymqQanH2sMZsu6GYvfpzrPgvBiUUmpuYuWnotukE1h1zBb",
+    "tpubDDCK19rtBJsMt8Jb5eoJZKwF8C46HDY6qGrfuDSmtzb3nXA3X7h8DgQrTRbdaRMPziwo9CfS9xK8s8mDqAztqC2MTp1ZuK51Jr2DKweqkKY",
+    "tpubDCFwnN6jcEGzVsxTe7yX72zModdxsdAXi8C6t3xEqGKwkZd2ke2cExXgTNSbTM25FdzUxZXj6EhzLGZdPYtDk1hQbUgkak7HLJppn3erid2",
+    "tpubDDCaqm7sT9mSE1tQFcDnxrGvS7wJkVZ2UyL2daVVUVuWSSkco3u8pKyJSH7uRJKu48gudpXzWa8XqGzSPmbZN2SwPpkKE3GbXvpQB9euuNS",
+    "tpubDDXidKmnHQnn7XNBfV6ngDqyporatWXdUGSayXBTm1WQwQGrtcPb38zaZGo3y3K6KnD37dAnU66JWcLEY53F8zRKeBT7J5Y27ER5TTcDhr6",
+    "tpubDCyakepujvAQzi2S6eVYrC6ky5mBfHe3xE4fxj3FaT4Nt7TvmGW7w22kJ5EF4XR33oLc2PAGveNymx8tubaSZ4wA6ja7cnE3t4maND5ehep",
+    "tpubDDExGXv7gGXC7aXxQoajPixpn6o5BPLPYL3DFouZd3GmNwSi8cKBLn51y6Deh2jHcCDB88e4R51oqn5iK9pvsyUKV6BPieMCbCn8Qzd6GPs",
+]
+wallet_name = "Too many keys"
+error = "NOT_SUPPORTED"
+
+[[case]]
+name = "no_internal_key"
+description = "policy with only a foreign key (fingerprint never matches ours)"
+descriptor_template = "wpkh(@0/**)"
+keys_info = [
+    "[76223a6e/48'/1'/0'/2']tpubDD814oESVM3uG2yZZDnJDex6gLeeahu2cmK2AL26ozTtDouQCY4NA8xcTW5oiJLp1cydFtDPdWxWDpLPGyLo6sGbemykJm4ocjjvt5cwvtv",
+]
+wallet_name = "No internal key"
+error = "INCORRECT_DATA"
+
+[[case]]
+name = "no_internal_key_fp_collision"
+description = "key has our fingerprint but a foreign xpub; the re-derivation mismatch must keep it external (no internal key)"
+descriptor_template = "wpkh(@0/**)"
+keys_info = [
+    "[f5acc2fd/44'/1'/3']tpubDD814oESVM3uG2yZZDnJDex6gLeeahu2cmK2AL26ozTtDouQCY4NA8xcTW5oiJLp1cydFtDPdWxWDpLPGyLo6sGbemykJm4ocjjvt5cwvtv",
+]
+wallet_name = "Fingerprint collision"
+error = "INCORRECT_DATA"
+
+[[case]]
+name = "internal_key_with_collision"
+description = "1-of-2 with a fingerprint-collision key (our fp, foreign xpub) plus a real internal key; the collision key must still be classified external"
+descriptor_template = "wsh(multi(1,@0/**,@1/**))"
+keys_info = [
+    "[f5acc2fd/44'/1'/3']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+]
+wallet_name = "Collision and internal"
+expected_wallet_id = "25bbdfdbc7d7f184ddbea79d52bd1235d95cce799d06b4e7aced22b253d4e266"
+expected_wallet_hmac = "f82f318bdd7d7db9f586b34c2f4985614ec9abf0d9c9ef48b3e57ba246ef0cf2"
+expected_key_types = ["external", "internal"]
+descriptor_hidden = true
+

@@ -11,7 +11,7 @@ from .embit.networks import NETWORKS
 from .command_builder import BitcoinCommandBuilder, BitcoinInsType
 from .common import Chain, read_uint, read_varint
 from .client_command import ClientCommandInterpreter, CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG, CCMD_YIELD_MUSIG_PUBNONCE_TAG
-from .client_base import Client, MusigPartialSignature, MusigPubNonce, SignPsbtYieldedObject, TransportClient, PartialSignature
+from .client_base import Client, MusigPartialSignature, MusigPubNonce, SignPsbtYieldedObject, UnknownSignPsbtYieldedObject, TransportClient, PartialSignature
 from .client_legacy import LegacyClient
 from .exception import DeviceException
 from .errors import UnknownDeviceError
@@ -145,6 +145,11 @@ def _decode_signpsbt_yielded_value(res: bytes) -> Tuple[int, SignPsbtYieldedObje
                 partial_signature=partial_signature
             )
         )
+    elif input_index_or_tag >= 0x80000000:
+        # this is certainly an unknown tag added by a future version of the app
+        # we expect the first element to be the input index, and the rest of the data is opaque
+        input_index = read_varint(res_buffer)
+        return input_index, UnknownSignPsbtYieldedObject(input_index_or_tag, res_buffer.read())
     else:
         # other values follow an encoding without an explicit tag, where the
         # first element is the input index. All the signature types are implemented
@@ -221,7 +226,7 @@ class NewClient(Client):
         first_addr_device = self.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
 
         if first_addr_device != self._derive_address_for_policy(wallet, False, 0):
-            raise RuntimeError("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin-new")
+            raise RuntimeError("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin")
 
         return wallet_id, wallet_hmac
 
@@ -262,7 +267,7 @@ class NewClient(Client):
         # sanity check: for miniscripts, derive the address independently
 
         if result != self._derive_address_for_policy(wallet, change, address_index):
-            raise RuntimeError("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin-new")
+            raise RuntimeError("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin")
 
         return result
 

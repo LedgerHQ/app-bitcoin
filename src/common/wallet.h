@@ -12,10 +12,8 @@
 #include "constants.h"
 #include "crypto.h"
 
-#ifndef SKIP_FOR_CMOCKA
 #include "os.h"
 #include "cx.h"
-#endif
 
 // The maximum number of keys supported for CHECKMULTISIG{VERIFY}
 // bitcoin-core supports up to 20, but we limit to 16 as bigger pushes require special handling.
@@ -58,6 +56,24 @@
 
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH \
     MAX(MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1, MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2)
+
+// As parse_script is recursive, we set a maximum reasonable recursion depth in order to avoid the
+// risk of stack exhaustion.
+// This depth is unlikely to be hit in practice.
+// Miniscript wrappers are counted as well: while they are not parsed recursively, they still
+// increase the depth of the parsed policy, which affects other recursive walkers.
+#define MAX_PARSE_SCRIPT_RECURSION_DEPTH 16
+
+// Maximum supported nesting of thresh operators
+#define MAX_THRESH_NESTING 4
+
+// Maximum supported value for n in a thresh miniscript operator (technical limitation).
+// It also bounds the stack used while analyzing a policy: the arrays of compute_thresh_ops() and
+// compute_thresh_stacksize() are proportional to it, and up to MAX_THRESH_NESTING of them are
+// alive at the same time due to recursion, therefore this ends up eating a substantial amount of
+// memory.
+// This limit is extremely unlikely to be hit in practice.
+#define MAX_N_IN_THRESH 24
 
 // at most 92 bytes
 // wallet type (1 byte)
@@ -400,7 +416,7 @@ typedef struct {
     uint16_t k;                 // threshold
     uint16_t n;                 // number of child scripts
     rptr_policy_node_scriptlist_t
-        scriptlist;  // pointer to array of exactly n pointers to child scripts
+        scriptlist;  // pointer to a linked list of exactly n child scripts
 } policy_node_thresh_t;
 
 typedef struct {
@@ -532,8 +548,6 @@ int traverse_policy_dfs(const policy_node_t *policy_node,
                         policy_node_callback_t callback,
                         void *callback_state);
 
-#ifndef SKIP_FOR_CMOCKA
-
 /**
  * Computes the id of the policy map wallet (commitment to header + policy map + keys_info), as per
  * specifications.
@@ -542,5 +556,3 @@ int traverse_policy_dfs(const policy_node_t *policy_node,
  * @param out a pointer to a 32-byte array for the output
  */
 void get_policy_wallet_id(policy_map_wallet_header_t *wallet_header, uint8_t out[static 32]);
-
-#endif

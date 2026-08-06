@@ -179,7 +179,9 @@ def sign_psbt_instruction_tap(model: Firmware) -> Instructions:
     return instructions
 
 
-def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True, *, has_spend_from_wallet: bool = False, to_on_next_page: bool = False, fees_on_next_page: bool = False, has_unverifiedwarning: bool = False, has_sighashwarning: bool = False, has_feewarning: bool = False, has_external_inputs: bool = False, go_back: bool = False) -> Instructions:
+def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True, *, has_spend_from_wallet: bool = False, to_on_next_page: bool = False, fees_on_next_page: bool = False, has_unverifiedwarning: bool = False, has_sighashwarning: bool = False, has_feewarning: bool = False, has_external_inputs: bool = False, amounts_unavailable: bool = False, go_back: bool = False) -> Instructions:
+    # amounts_unavailable: open-outputs sighash (NONE/SINGLE) -> the review shows no
+    # outputs/amounts, only the "Amounts & fees" notice.
     instructions = Instructions(model)
 
     funcdict = {
@@ -223,28 +225,34 @@ def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True,
             run_num = run_num + 1
 
     else:
+        # All the warnings below, plus the review that follows, are shown by the firmware
+        # within a single APDU exchange. They must therefore live in one request group
         if has_sighashwarning:
             # This transaction uses non-standard signing rules- actually clicking "Continue anyway"
-            instructions.choice_reject("Continue anyway")
+            funcdict[which_func]("Continue anyway", NavInsID.USE_CASE_REVIEW_TAP,
+                                 NavInsID.USE_CASE_CHOICE_REJECT, save_screenshot=save_screenshot)
             which_func = 'same_request'
 
         if has_external_inputs:
             # This transaction has external inputs- actually clicking "Continue anyway"
-            instructions.choice_reject("Continue anyway")
+            funcdict[which_func]("Continue anyway", NavInsID.USE_CASE_REVIEW_TAP,
+                                 NavInsID.USE_CASE_CHOICE_REJECT, save_screenshot=save_screenshot)
             which_func = 'same_request'
 
         if has_unverifiedwarning:
             # Non-default sighash - actually clicking "Continue anyway"
-            instructions.choice_reject("Continue anyway")
+            funcdict[which_func]("Continue anyway", NavInsID.USE_CASE_REVIEW_TAP,
+                                 NavInsID.USE_CASE_CHOICE_REJECT, save_screenshot=save_screenshot)
             which_func = 'same_request'
 
         funcdict[which_func]("Review", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
                                  save_screenshot=save_screenshot)
         which_func = 'same_request'
 
+        review_anchor = "Amounts & fees" if amounts_unavailable else "Amount"
         run_num = 1
         while True:
-            funcdict[which_func]("Amount", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+            funcdict[which_func](review_anchor, NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
                                       save_screenshot=save_screenshot)
             if to_on_next_page:
                 funcdict[which_func]("To", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,

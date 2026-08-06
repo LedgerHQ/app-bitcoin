@@ -10,7 +10,7 @@ import { PsbtV2 } from './psbtv2';
  * so it can't always store the full psbt in memory.
  *
  * The signing process is documented at
- * https://github.com/LedgerHQ/app-bitcoin-new/blob/master/doc/bitcoin.md#sign_psbt
+ * https://github.com/LedgerHQ/app-bitcoin/blob/master/doc/bitcoin.md#sign_psbt
  */
 export class MerkelizedPsbt extends PsbtV2 {
   public readonly globalMerkleMap: MerkleMap;

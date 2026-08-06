@@ -22,7 +22,6 @@ from io import BytesIO
 import re
 from re import Match
 
-from dataclasses import dataclass
 import secrets
 import struct
 from typing import Dict, Iterable, Iterator, List, Optional, Set, Tuple, Union
@@ -40,6 +39,12 @@ import base58
 from test_utils.taproot_sighash import SIGHASH_DEFAULT, TaprootSignatureHash
 from test_utils import bip0327, bip0340, hash160, sha256
 from test_utils import taproot
+from test_utils.wallet_policy import (
+    PlainKeyPlaceholder,
+    MuSig2KeyPlaceholder,
+    KeyPlaceholder,
+    extract_placeholders,
+)
 
 from bitcoin_client.ledger_bitcoin.embit.descriptor.miniscript import Miniscript
 from bitcoin_client.ledger_bitcoin.psbt import PSBT, PartiallySignedInput
@@ -59,55 +64,6 @@ def tapleaf_hash(script: Optional[bytes], leaf_version=b'\xC0') -> Optional[byte
     )
 
 
-@dataclass
-class PlainKeyPlaceholder:
-    key_index: int
-    num1: int
-    num2: int
-
-
-@dataclass
-class Musig2KeyPlaceholder:
-    key_indexes: List[int]
-    num1: int
-    num2: int
-
-
-KeyPlaceholder = Union[PlainKeyPlaceholder, Musig2KeyPlaceholder]
-
-
-def parse_placeholder(placeholder_str: str) -> KeyPlaceholder:
-    """Parses a placeholder string to create a KeyPlaceholder object."""
-    if placeholder_str.startswith('musig'):
-        key_indexes_str = placeholder_str[6:placeholder_str.index(
-            ')/<')].split(',')
-        key_indexes = [int(index.strip('@')) for index in key_indexes_str]
-
-        nums_part = placeholder_str[placeholder_str.index(')/<') + 3:-3]
-        num1, num2 = map(int, nums_part.split(';'))
-
-        return Musig2KeyPlaceholder(key_indexes, num1, num2)
-    elif placeholder_str.startswith('@'):
-        parts = placeholder_str.split('/')
-        key_index = int(parts[0].strip('@'))
-
-        # Remove '<' from the start and '>' from the end
-        nums_part = parts[1][1:-1]
-        num1, num2 = map(int, nums_part.split(';'))
-
-        return PlainKeyPlaceholder(key_index, num1, num2)
-    else:
-        raise ValueError("Invalid placeholder string")
-
-
-def extract_placeholders(desc_tmpl: str) -> List[KeyPlaceholder]:
-    """Extracts and parses all placeholders in a descriptor template, from left to right."""
-
-    pattern = r'musig\((?:@\d+,)*(?:@\d+)\)/<\d+;\d+>/\*|@\d+/<\d+;\d+>/\*'
-    matches = [(match.group(), match.start())
-               for match in re.finditer(pattern, desc_tmpl)]
-    sorted_matches = sorted(matches, key=lambda x: x[1])
-    return [parse_placeholder(match[0]) for match in sorted_matches]
 
 
 def unsorted_musig(pubkeys: Iterable[bytes], version_bytes: bytes) -> Tuple[str, bip0327.KeyAggContext]:
@@ -274,7 +230,7 @@ class Tree:
             assert self.left is not None and self.right is not None
             left_h = self.left.get_taptree_hash(
                 keys_info, is_change, address_index)
-            right_h = self.left.get_taptree_hash(
+            right_h = self.right.get_taptree_hash(
                 keys_info, is_change, address_index)
             if left_h <= right_h:
                 return taproot.tagged_hash("TapBranch", left_h + right_h)
@@ -336,7 +292,7 @@ class TrDescriptorTemplate:
                 self.consume(';')
                 num2 = self.parse_num()
                 self.consume('>/*')
-                return Musig2KeyPlaceholder(key_indexes, num1, num2)
+                return MuSig2KeyPlaceholder(key_indexes, num1, num2)
             else:
                 raise Exception("Syntax error in key placeholder")
 
@@ -403,10 +359,10 @@ class TrDescriptorTemplate:
             for placeholder, script in self.tree.placeholders():
                 yield (placeholder, script)
 
-    def get_taptree_hash(self, is_change: bool, address_index: int) -> bytes:
+    def get_taptree_hash(self, keys_info: List[str], is_change: bool, address_index: int) -> bytes:
         if self.tree is None:
             raise ValueError("There is no taptree")
-        return self.tree.get_taptree_hash(is_change, address_index)
+        return self.tree.get_taptree_hash(keys_info, is_change, address_index)
 
 
 class PsbtMusig2Cosigner(ABC):
@@ -434,7 +390,7 @@ class PsbtMusig2Cosigner(ABC):
         pass
 
 
-def find_change_and_addr_index_for_musig(input_psbt: PartiallySignedInput, placeholder: Musig2KeyPlaceholder, agg_xpub: ExtendedKey):
+def find_change_and_addr_index_for_musig(input_psbt: PartiallySignedInput, placeholder: MuSig2KeyPlaceholder, agg_xpub: ExtendedKey):
     num1, num2 = placeholder.num1, placeholder.num2
 
     agg_xpub_fingerprint = hash160(agg_xpub.pubkey)[0:4]
@@ -498,7 +454,7 @@ def get_bip32_tweaks(ext_key: ExtendedKey, steps: List[int]) -> List[bytes]:
 def process_placeholder(
     wallet_policy: WalletPolicy,
     psbt_input: PartiallySignedInput,
-    placeholder: Musig2KeyPlaceholder,
+    placeholder: MuSig2KeyPlaceholder,
     keyagg_ctx: bip0327.KeyAggContext,
     agg_xpub: ExtendedKey,
     tapleaf_desc: Optional[str],
@@ -550,7 +506,8 @@ def process_placeholder(
     if tapleaf_desc is None:
         t = der_key.pubkey[-32:]
         if desc_tmpl.tree is not None:
-            t += desc_tmpl.get_taptree_hash(is_change, address_index)
+            t += desc_tmpl.get_taptree_hash(
+                wallet_policy.keys_info, is_change, address_index)
         tweaks.append(taproot.tagged_hash("TapTweak", t))
         is_xonly_tweak.append(True)
 
@@ -600,7 +557,7 @@ class HotMusig2Cosigner(PsbtMusig2Cosigner):
         rand_seed = secrets.token_bytes(32)
 
         for placeholder_index, (placeholder, tapleaf_desc) in enumerate(desc_tmpl.placeholders()):
-            if not isinstance(placeholder, Musig2KeyPlaceholder):
+            if not isinstance(placeholder, MuSig2KeyPlaceholder):
                 continue
 
             agg_xpub_str, keyagg_ctx = aggregate_musig_pubkey(
@@ -658,7 +615,7 @@ class HotMusig2Cosigner(PsbtMusig2Cosigner):
                 "No musig signing session for this psbt")
 
         for placeholder_index, (placeholder, tapleaf_desc) in enumerate(desc_tmpl.placeholders()):
-            if not isinstance(placeholder, Musig2KeyPlaceholder):
+            if not isinstance(placeholder, MuSig2KeyPlaceholder):
                 continue
 
             agg_xpub_str, keyagg_ctx = aggregate_musig_pubkey(
@@ -790,7 +747,7 @@ def run_musig2_test(wallet_policy: WalletPolicy, psbt: PSBT, cosigners: List[Psb
         wallet_policy.descriptor_template)
 
     for placeholder, tapleaf_desc in desc_tmpl.placeholders():
-        if not isinstance(placeholder, Musig2KeyPlaceholder):
+        if not isinstance(placeholder, MuSig2KeyPlaceholder):
             continue
 
         agg_xpub_str, keyagg_ctx = aggregate_musig_pubkey(

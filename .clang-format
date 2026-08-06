@@ -1,10 +1,10 @@
 ---
 BasedOnStyle: Google
 IndentWidth: 4
----
 Language: Cpp
 ColumnLimit: 100
 PointerAlignment: Right
+DerivePointerAlignment: true
 AlignAfterOpenBracket: Align
 AlignConsecutiveMacros: true
 AllowAllParametersOfDeclarationOnNextLine: false

@@ -46,6 +46,7 @@ def test_get_extended_pubkey_standard_nodisplay(client: RaggerClient):
         "m/49'/1'/1'/1/3": "tpubDGnetmJDCL18TyaaoyRAYbkSE9wbHktSdTS4mfsR6inC8c2r6TjdBt3wkqEQhHYPtXpa46xpxDaCXU2PRNUGVvDzAHPG6hHRavYbwAGfnFr",
         "m/84'/1'/2'/0/10": "tpubDG9YpSUwScWJBBSrhnAT47NcT4NZGLcY18cpkaiWHnkUCi19EtCh8Heeox268NaFF6o56nVeSXuTyK6jpzTvV1h68Kr3edA8AZp27MiLUNt",
         "m/86'/1'/4'/1/12": "tpubDHTZ815MvTaRmo6Qg1rnU6TEU4ZkWyA56jA1UgpmMcBGomnSsyo34EZLoctzZY9MTJ6j7bhccceUeXZZLxZj5vgkVMYfcZ7DNPsyRdFpS3f",
+        "m/87'/1'/0'": "tpubDCfRoKFmEJ2uJdvBmrUngREKnaab4P6vC5NbMaeLhjdr3b5zEoruPKByWBJJag5qTdc5FptiSRpuY7AReZPcQAQqCVCUDj3R6DJuyzjMAmh",
         # support up to 8 steps
         "m/86'/1'/4'/1/2/3/4/5": "tpubDNcjumrTe1BBYEc1FmMaJZQw47mbvb4LfX4YwqC6GQ18PfMfuH3BEYREfdHm2gWXkSJ3JiXHF11iKnbJxzxp5qkgo8BBy2L48FRvrLhpTuh",
         # the following two paths test compatibility with Unchained Capital's multisig setup

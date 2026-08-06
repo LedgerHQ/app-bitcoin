@@ -178,7 +178,7 @@ static inline int crypto_hash_update_u32(cx_hash_t *hash_context, uint32_t data)
  *
  * @param[in] in
  *   Pointer to input data.
- * @param[in] in_len
+ * @param[in] inlen
  *   Length of input data.
  * @param[out] out
  *   Pointer to the 160-bit (20 bytes) output array.
@@ -190,12 +190,12 @@ void crypto_ripemd160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20])
  *
  * @param[in] in
  *   Pointer to input data.
- * @param[in] in_len
+ * @param[in] inlen
  *   Length of input data.
  * @param[out] out
  *   Pointer to the 160-bit (20 bytes) output array.
  */
-void crypto_hash160(const uint8_t *in, uint16_t in_len, uint8_t *out);
+void crypto_hash160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]);
 
 /**
  * Computes the 33-bytes compressed public key from the uncompressed 65-bytes public key.
@@ -381,6 +381,9 @@ void crypto_tr_tagged_hash_init(cx_sha256_t *hash_context, const uint8_t *tag, u
  *   Pointer to a 32-byte array.
  * @param[out]  out
  *   Pointer to an array that will received the output as an uncompressed 65-bytes pubkey.
+ *
+ * @return 0 on success, -1 if x is not the x-coordinate of a point on the curve. On failure, the
+ *   content of `out` is unspecified and must not be used.
  */
 int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]);
 

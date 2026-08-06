@@ -124,7 +124,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
     if (is_array_all_zeros(wallet_hmac, sizeof(wallet_hmac))) {
         // No hmac, verify that the policy is indeed a default one
 
-        if (!is_wallet_policy_standard(dc, &wallet_header, &wallet_policy_map.parsed)) {
+        if (!is_wallet_policy_standard(dc, &wallet_header, &wallet_policy_map.parsed, NULL, NULL)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
@@ -181,11 +181,11 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
         int script_len = get_wallet_script(
             dc,
             &wallet_policy_map.parsed,
-            &(wallet_derivation_info_t){.wallet_version = wallet_header.version,
-                                        .keys_merkle_root = wallet_header.keys_info_merkle_root,
-                                        .n_keys = wallet_header.n_keys,
-                                        .change = is_change,
-                                        .address_index = address_index},
+            &(wallet_derivation_info_t) {.wallet_version = wallet_header.version,
+                                         .keys_merkle_root = wallet_header.keys_info_merkle_root,
+                                         .n_keys = wallet_header.n_keys,
+                                         .change = is_change,
+                                         .address_index = address_index},
             script);
         if (script_len < 0) {
             PRINTF("Couldn't produce wallet script\n");

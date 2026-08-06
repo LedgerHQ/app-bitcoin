@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use bitcoin::{
     address,
     bip32::{DerivationPath, Fingerprint, Xpub},
-    consensus::encode::{deserialize_partial, VarInt},
+    consensus::encode::deserialize_partial,
     secp256k1::ecdsa::Signature,
     Psbt,
 };
@@ -19,6 +19,7 @@ use crate::{
     command,
     error::BitcoinClientError,
     interpreter::{get_merkleized_map_commitment, ClientCommandInterpreter},
+    protocol::*,
     psbt::*,
     wallet::WalletPolicy,
 };
@@ -81,6 +82,13 @@ impl<T: Transport> BitcoinClient<T> {
         let desc_str = wallet
             .get_descriptor(change)
             .map_err(|_| BitcoinClientError::ClientError("Failed to get descriptor".to_string()))?;
+
+        // Replace musig() expressions with their aggregate xpub, since rust-miniscript
+        // currently does not support musig().
+        let desc_str = crate::bip327::replace_musigs(&desc_str).map_err(|e| {
+            BitcoinClientError::ClientError(format!("Failed to process musig keys: {}", e))
+        })?;
+
         let descriptor = Descriptor::<DescriptorPublicKey>::from_str(&desc_str).map_err(|_| {
             BitcoinClientError::ClientError("Failed to parse descriptor".to_string())
         })?;
@@ -93,7 +101,7 @@ impl<T: Transport> BitcoinClient<T> {
             .script_pubkey()
             != expected_address.assume_checked_ref().script_pubkey()
         {
-            return Err(BitcoinClientError::InvalidResponse("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin-new".to_string()));
+            return Err(BitcoinClientError::InvalidResponse("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin".to_string()));
         }
 
         Ok(())
@@ -255,13 +263,17 @@ impl<T: Transport> BitcoinClient<T> {
 
     /// Signs a PSBT using a registered wallet (or a standard wallet that does not need registration).
     /// Signature requires explicit approval from the user.
+    ///
+    /// Each yielded payload is decoded into a [`SignPsbtYieldedObject`], which
+    /// covers regular partial signatures as well as MuSig2 round 1 / round 2
+    /// payloads.
     #[allow(clippy::type_complexity)]
     pub async fn sign_psbt(
         &self,
         psbt: &Psbt,
         wallet: &WalletPolicy,
         wallet_hmac: Option<&[u8; 32]>,
-    ) -> Result<Vec<(usize, PartialSignature)>, BitcoinClientError<T::Error>> {
+    ) -> Result<Vec<(usize, SignPsbtYieldedObject)>, BitcoinClientError<T::Error>> {
         let mut intpr = ClientCommandInterpreter::new();
         intpr.add_known_preimage(wallet.serialize());
         let keys: Vec<String> = wallet.keys.iter().map(|k| k.to_string()).collect();
@@ -331,26 +343,18 @@ impl<T: Transport> BitcoinClient<T> {
             });
         }
 
-        let mut signatures = Vec::new();
+        let mut yielded_objects = Vec::new();
         for result in results {
-            let (input_index, i): (VarInt, usize) =
-                deserialize_partial(&result).map_err(|_| BitcoinClientError::UnexpectedResult {
+            let (input_index, obj) = parse_sign_psbt_yielded(&result).map_err(|_| {
+                BitcoinClientError::UnexpectedResult {
                     command: cmd.ins,
                     data: result.clone(),
-                })?;
-
-            signatures.push((
-                input_index.0 as usize,
-                PartialSignature::from_slice(&result[i..]).map_err(|_| {
-                    BitcoinClientError::UnexpectedResult {
-                        command: cmd.ins,
-                        data: result.clone(),
-                    }
-                })?,
-            ));
+                }
+            })?;
+            yielded_objects.push((input_index, obj));
         }
 
-        Ok(signatures)
+        Ok(yielded_objects)
     }
 
     /// Sign a message with the key derived with the given derivation path.

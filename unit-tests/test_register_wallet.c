@@ -1,0 +1,617 @@
+/**
+ * Unit tests for handler_register_wallet (and, indirectly, its static helpers
+ * is_policy_acceptable / is_policy_name_acceptable).
+ *
+ * Most test cases are loaded from TEST_VECTORS_PATH (a TOML file) at runtime; see
+ * the file's header comment for the schema. For each vector we:
+ *   1. Register the descriptor template as a preimage and the keys-info list as
+ *      a Merkle tree with the mock dispatcher (this gives us the keys Merkle
+ *      root the device would have received from the client).
+ *   2. Serialize the register_wallet command data exactly as the Python
+ *      command_builder does: varint(len(wallet_bytes)) || wallet_bytes.
+ *   3. Drive handler_register_wallet against the mock dispatcher.
+ *   4. On success, assert the returned status word is OK and that the response
+ *      (wallet_id || hmac) matches the pinned expected_wallet_id and, when
+ *      present, expected_wallet_hmac.
+ *      On a deterministic rejection, assert the mapped status word.
+ *
+ * BIP32 derivation and the SLIP-0021 wallet HMAC are real (app crypto over the
+ * speculos bridge, which uses the standard test seed), so the pinned wallet
+ * HMACs reproduce without a device or emulator.
+ *
+ * A few final, hand-written cases follow (not from the vectors file) for things that
+ * the portable wallet-policy schema cannot express.
+ */
+#include <limits.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <setjmp.h>
+
+#include <cmocka.h>
+
+#include "cx.h"
+
+#include "mock_dispatcher.h"
+#include "tomlc17.h"
+#include "toml_helpers.h"
+
+#include "buffer.h"
+#include "varint.h"
+#include "common/wallet.h"
+#include "common/cleartext.h"  // cleartext_confusion_score, CLEARTEXT_MAX_CONFUSION_SCORE
+#include "constants.h"
+#include "handler/handlers.h"
+#include "sw.h"
+#include "ui/display.h"  // key_type_e, ui_display_register_wallet_policy
+
+#ifndef TEST_VECTORS_PATH
+#error "TEST_VECTORS_PATH must be defined to point at the vectors file"
+#endif
+
+#define MAX_KEYS_PER_CASE 16
+#define MAX_KEY_INFO_LEN  (MAX_POLICY_KEY_INFO_LEN + 1)
+#define MAX_TPL_LEN       (MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 + 1)
+/* One slot more than MAX_WALLET_NAME_LENGTH so the over-long-name reject vector
+ * still fits in the buffer (the handler is what rejects it, not the loader). */
+#define MAX_NAME_LEN  (MAX_WALLET_NAME_LENGTH + 2)
+#define MAX_ERROR_LEN 32
+#define HASH_HEX_LEN  64
+
+typedef struct {
+    char name[MAX_NAME_LEN];
+    char descriptor_template[MAX_TPL_LEN];
+    char keys_info[MAX_KEYS_PER_CASE][MAX_KEY_INFO_LEN];
+    size_t n_keys;
+    char wallet_name[MAX_NAME_LEN];
+    bool has_error;
+    char error[MAX_ERROR_LEN];
+    bool has_wallet_id;
+    uint8_t expected_wallet_id[32];
+    bool has_wallet_hmac;
+    uint8_t expected_wallet_hmac[32];
+    bool has_key_types;
+    key_type_e key_types[MAX_KEYS_PER_CASE];
+    size_t n_key_types;
+    /* When true, the handler is expected to hide the raw descriptor template and
+     * confirm via the cleartext block only (the case for multisig policies). */
+    bool descriptor_hidden;
+} testcase_t;
+
+static testcase_t *g_cases = NULL;
+static size_t g_n_cases = 0;
+
+/* Records the arguments the handler passes to the UI confirmation, so the test
+ * can verify the per-key classification (internal/external/unspendable) the
+ * handler computed — not just the aggregate status word. Reset before each case
+ * in case_setup. A file-scope global is the channel: the stub's signature is
+ * fixed by the UI prototype, and the shared mock dispatcher shouldn't carry
+ * test-specific fields. */
+static struct {
+    bool called;
+    size_t n_keys;
+    key_type_e keys_type[MAX_N_KEYS_IN_WALLET_POLICY];
+    /* The handler passes a NULL descriptor template when it chooses to hide the
+     * raw descriptor in favour of the cleartext block (multisig policies). */
+    bool descriptor_shown;
+    char descriptor_template[MAX_TPL_LEN];
+    size_t n_cleartext_lines;
+    char name[MAX_NAME_LEN];
+    uint8_t version;
+} g_ui_capture;
+
+/* The handler calls this once the policy is accepted, just before computing the
+ * HMAC. We capture its arguments and approve (return true); pure UI DENY flows
+ * are out of scope for these vectors (see register_wallet.toml). */
+bool ui_display_register_wallet_policy(
+    dispatcher_context_t *context,
+    const policy_map_wallet_header_t *wallet_header,
+    const char *descriptor_template,
+    const char (*cleartext_lines)[CT_MAX_LINES][CT_MAX_LINE_LEN + 1],
+    size_t n_cleartext_lines,
+    const char (*keys_info)[MAX_N_KEYS_IN_WALLET_POLICY][MAX_POLICY_KEY_INFO_LEN + 1],
+    const key_type_e (*keys_type)[MAX_N_KEYS_IN_WALLET_POLICY]) {
+    (void) keys_info;
+    (void) cleartext_lines;
+
+    g_ui_capture.called = true;
+    g_ui_capture.n_keys = wallet_header->n_keys;
+    g_ui_capture.version = wallet_header->version;
+    g_ui_capture.n_cleartext_lines = n_cleartext_lines;
+    for (size_t i = 0; i < wallet_header->n_keys && i < MAX_N_KEYS_IN_WALLET_POLICY; i++) {
+        g_ui_capture.keys_type[i] = (*keys_type)[i];
+    }
+    snprintf(g_ui_capture.name, sizeof(g_ui_capture.name), "%s", wallet_header->name);
+    /* A NULL template means the handler hid the raw descriptor (cleartext-only
+     * multisig screen); record that rather than capturing the "(null)" string. */
+    g_ui_capture.descriptor_shown = (descriptor_template != NULL);
+    if (g_ui_capture.descriptor_shown) {
+        snprintf(g_ui_capture.descriptor_template,
+                 sizeof(g_ui_capture.descriptor_template),
+                 "%s",
+                 descriptor_template);
+    } else {
+        g_ui_capture.descriptor_template[0] = '\0';
+    }
+
+    (void) context;
+    return true;
+}
+
+/* Map a key-type name from the vectors file to its key_type_e. */
+static key_type_e key_type_from_name(const char *name) {
+    if (strcmp(name, "internal") == 0) return PUBKEY_TYPE_INTERNAL;
+    if (strcmp(name, "external") == 0) return PUBKEY_TYPE_EXTERNAL;
+    if (strcmp(name, "unspendable") == 0) return PUBKEY_TYPE_UNSPENDABLE;
+    fprintf(stderr, "unknown key type: %s\n", name);
+    abort();
+}
+
+/* ===========================================================================
+ *  Helpers
+ * =========================================================================== */
+
+/* Decode exactly 64 lowercase/uppercase hex chars into 32 bytes. Aborts on a
+ * bad length or a non-hex character (runs before any test, so abort() is the
+ * right failure mode — there is no setjmp buffer to unwind to). */
+static void decode_hash_hex(const char *field, const char *hex, uint8_t out[32]) {
+    if (strlen(hex) != HASH_HEX_LEN) {
+        fprintf(stderr, "%s: expected %d hex chars, got %zu\n", field, HASH_HEX_LEN, strlen(hex));
+        abort();
+    }
+    for (size_t i = 0; i < 32; i++) {
+        unsigned int byte;
+        if (sscanf(hex + 2 * i, "%2x", &byte) != 1) {
+            fprintf(stderr, "%s: invalid hex\n", field);
+            abort();
+        }
+        out[i] = (uint8_t) byte;
+    }
+}
+
+/* Map an error name from the vectors file to its status word. */
+static uint16_t error_name_to_sw(const char *name) {
+    if (strcmp(name, "NOT_SUPPORTED") == 0) {
+        return SW_NOT_SUPPORTED;
+    }
+    if (strcmp(name, "INCORRECT_DATA") == 0) {
+        return SW_INCORRECT_DATA;
+    }
+    fprintf(stderr, "unknown error name: %s\n", name);
+    abort();
+}
+
+/* ===========================================================================
+ *  TOML loader. Copies the relevant fields out of the parsed document into
+ *  g_cases, so the document lifetime doesn't need to outlive parsing.
+ * =========================================================================== */
+static void parse_vectors(const char *path) {
+    toml_result_t r = toml_parse_file_ex(path);
+    if (!r.ok) {
+        fprintf(stderr, "failed to parse %s: %s\n", path, r.errmsg);
+        toml_free(r);
+        abort();
+    }
+
+    toml_datum_t cases = toml_get(r.toptab, "case");
+    if (cases.type != TOML_ARRAY) {
+        fprintf(stderr, "vectors file is missing the [[case]] array\n");
+        toml_free(r);
+        abort();
+    }
+
+    if (cases.u.arr.size <= 0) {
+        fprintf(stderr, "vectors file has no [[case]] entries\n");
+        abort();
+    }
+
+    g_n_cases = (size_t) cases.u.arr.size;
+    g_cases = calloc(g_n_cases, sizeof(testcase_t));
+    if (g_cases == NULL) {
+        fprintf(stderr, "out of memory allocating %zu test cases\n", g_n_cases);
+        abort();
+    }
+
+    for (size_t i = 0; i < g_n_cases; i++) {
+        toml_datum_t tc_node = cases.u.arr.elem[i];
+        if (tc_node.type != TOML_TABLE) {
+            fprintf(stderr, "case %zu: not a TOML table\n", i);
+            abort();
+        }
+
+        testcase_t *cur = &g_cases[i];
+
+        copy_required_string(tc_node, "name", cur->name, sizeof(cur->name));
+        copy_required_string(tc_node,
+                             "descriptor_template",
+                             cur->descriptor_template,
+                             sizeof(cur->descriptor_template));
+
+        /* wallet_name defaults to "" (empty). */
+        if (!copy_optional_string(tc_node,
+                                  "wallet_name",
+                                  cur->wallet_name,
+                                  sizeof(cur->wallet_name))) {
+            cur->wallet_name[0] = '\0';
+        }
+
+        char hex[HASH_HEX_LEN + 1];
+        cur->has_wallet_id = copy_optional_string(tc_node, "expected_wallet_id", hex, sizeof(hex));
+        if (cur->has_wallet_id) {
+            decode_hash_hex("expected_wallet_id", hex, cur->expected_wallet_id);
+        }
+        cur->has_wallet_hmac =
+            copy_optional_string(tc_node, "expected_wallet_hmac", hex, sizeof(hex));
+        if (cur->has_wallet_hmac) {
+            decode_hash_hex("expected_wallet_hmac", hex, cur->expected_wallet_hmac);
+        }
+
+        cur->has_error = copy_optional_string(tc_node, "error", cur->error, sizeof(cur->error));
+
+        if (cur->has_error == cur->has_wallet_id) {
+            fprintf(stderr,
+                    "%s: must have exactly one of `error` or `expected_wallet_id`\n",
+                    cur->name);
+            abort();
+        }
+
+        toml_datum_t keys = toml_get(tc_node, "keys_info");
+        if (keys.type != TOML_ARRAY) {
+            fprintf(stderr, "%s: keys_info must be an array\n", cur->name);
+            abort();
+        }
+        if (keys.u.arr.size <= 0 || (size_t) keys.u.arr.size > MAX_KEYS_PER_CASE) {
+            fprintf(stderr,
+                    "%s: keys_info has %d entries (must be 1..%d)\n",
+                    cur->name,
+                    keys.u.arr.size,
+                    MAX_KEYS_PER_CASE);
+            abort();
+        }
+        cur->n_keys = (size_t) keys.u.arr.size;
+
+        for (size_t k = 0; k < cur->n_keys; k++) {
+            toml_datum_t key_node = keys.u.arr.elem[k];
+            if (key_node.type != TOML_STRING) {
+                fprintf(stderr, "%s: keys_info[%zu] is not a string\n", cur->name, k);
+                abort();
+            }
+            if ((size_t) key_node.u.str.len >= MAX_KEY_INFO_LEN) {
+                fprintf(stderr,
+                        "%s: keys_info[%zu] too long (%d >= %d)\n",
+                        cur->name,
+                        k,
+                        key_node.u.str.len,
+                        MAX_KEY_INFO_LEN);
+                abort();
+            }
+            memcpy(cur->keys_info[k], key_node.u.str.ptr, (size_t) key_node.u.str.len);
+            cur->keys_info[k][key_node.u.str.len] = '\0';
+        }
+
+        /* Optional: whether the handler should hide the raw descriptor template
+         * in favour of the cleartext-only screen. Defaults to false. */
+        toml_datum_t dh = toml_get(tc_node, "descriptor_hidden");
+        if (dh.type == TOML_BOOLEAN) {
+            cur->descriptor_hidden = dh.u.boolean;
+        } else if (dh.type != TOML_UNKNOWN) {
+            fprintf(stderr, "%s: descriptor_hidden must be a boolean\n", cur->name);
+            abort();
+        } else {
+            cur->descriptor_hidden = false;
+        }
+
+        /* Optional per-key classification (one entry per key, @0,@1,... order). */
+        toml_datum_t kt = toml_get(tc_node, "expected_key_types");
+        cur->has_key_types = (kt.type != TOML_UNKNOWN);
+        if (cur->has_key_types) {
+            if (kt.type != TOML_ARRAY || (size_t) kt.u.arr.size != cur->n_keys) {
+                fprintf(stderr,
+                        "%s: expected_key_types must be an array of length n_keys (%zu)\n",
+                        cur->name,
+                        cur->n_keys);
+                abort();
+            }
+            cur->n_key_types = cur->n_keys;
+            for (size_t k = 0; k < cur->n_keys; k++) {
+                toml_datum_t e = kt.u.arr.elem[k];
+                if (e.type != TOML_STRING) {
+                    fprintf(stderr, "%s: expected_key_types[%zu] is not a string\n", cur->name, k);
+                    abort();
+                }
+                cur->key_types[k] = key_type_from_name(e.u.str.ptr);
+            }
+        }
+    }
+
+    toml_free(r);
+}
+
+/* ===========================================================================
+ *  Test driver
+ * =========================================================================== */
+
+/* Per-case cmocka state: pairs a heap-allocated mock dispatcher with the
+ * testcase. Mirrors test_get_wallet_address.c. `tc` is NULL for the
+ * hand-written cases, which drive the handler directly and never read it. */
+typedef struct {
+    void *mock_state;
+    const testcase_t *tc;
+} case_state_t;
+
+/* Setup for every test (vector-driven and hand-written alike): allocate the
+ * case state, stand up a fresh mock dispatcher, and reset the UI capture. The
+ * incoming *state is the testcase_t pointer for vector cases or NULL for the
+ * hand-written ones. Centralizing the g_ui_capture reset here keeps it out of
+ * the test bodies. */
+static int case_setup(void **state) {
+    const testcase_t *tc = (const testcase_t *) *state;
+    case_state_t *cs = calloc(1, sizeof(case_state_t));
+    if (cs == NULL) {
+        return -1;
+    }
+    if (mock_dispatcher_setup(&cs->mock_state) != 0) {
+        free(cs);
+        return -1;
+    }
+    cs->tc = tc;
+    *state = cs;
+    memset(&g_ui_capture, 0, sizeof(g_ui_capture));
+    return 0;
+}
+
+static int case_teardown(void **state) {
+    case_state_t *cs = *state;
+    if (cs != NULL) {
+        mock_dispatcher_teardown(&cs->mock_state);
+        free(cs);
+        *state = NULL;
+    }
+    return 0;
+}
+
+/* Serialize the register_wallet command data into `out`, returning its length.
+ * Layout matches command_builder.register_wallet:
+ *   varint(len(wallet_bytes)) || wallet_bytes
+ * with wallet_bytes =
+ *   version(1) || name_len(1) || name || varint(template_len) ||
+ *   sha256(template) || varint(n_keys) || keys_merkle_root(32). */
+static size_t serialize_request(const testcase_t *tc,
+                                const uint8_t keys_merkle_root[32],
+                                uint8_t *out,
+                                size_t out_size) {
+    uint8_t wb[1 + 1 + MAX_NAME_LEN + 5 + 32 + 5 + 32];
+    size_t wblen = 0;
+
+    size_t name_len = strlen(tc->wallet_name);
+    size_t template_len = strlen(tc->descriptor_template);
+
+    wb[wblen++] = WALLET_POLICY_VERSION_V2;
+    wb[wblen++] = (uint8_t) name_len;
+    memcpy(wb + wblen, tc->wallet_name, name_len);
+    wblen += name_len;
+
+    wblen += (size_t) varint_write(wb + wblen, 0, template_len);
+
+    cx_hash_sha256((const uint8_t *) tc->descriptor_template, template_len, wb + wblen, 32);
+    wblen += 32;
+
+    wblen += (size_t) varint_write(wb + wblen, 0, tc->n_keys);
+
+    memcpy(wb + wblen, keys_merkle_root, 32);
+    wblen += 32;
+
+    size_t clen = 0;
+    clen += (size_t) varint_write(out, 0, wblen);
+    assert_true(clen + wblen <= out_size);
+    memcpy(out + clen, wb, wblen);
+    clen += wblen;
+    return clen;
+}
+
+/* Register the descriptor-template preimage and the keys-info list with the mock
+ * dispatcher, serialize the register_wallet command, and drive the handler.
+ * Shared by the vector-driven case and the hand-written cases; results land in
+ * mock->last_sw / mock->request_buf and (via the UI stub) g_ui_capture. */
+static void drive_register_wallet(mock_dispatcher_t *mock, const testcase_t *tc) {
+    assert_true(tc->n_keys <= MAX_KEYS_PER_CASE);
+
+    /* The descriptor template is fetched by the device via call_get_preimage. */
+    mock_dispatcher_add_preimage(mock,
+                                 (const uint8_t *) tc->descriptor_template,
+                                 strlen(tc->descriptor_template));
+
+    /* Register the keys-info list; the last tree's root is the keys Merkle root
+     * the device would have received in the wallet header. */
+    const uint8_t *key_ptrs[MAX_KEYS_PER_CASE];
+    size_t key_lens[MAX_KEYS_PER_CASE];
+    for (size_t i = 0; i < tc->n_keys; i++) {
+        key_ptrs[i] = (const uint8_t *) tc->keys_info[i];
+        key_lens[i] = strlen(tc->keys_info[i]);
+    }
+    mock_dispatcher_add_list(mock, key_ptrs, key_lens, tc->n_keys);
+    uint8_t keys_merkle_root[32];
+    memcpy(keys_merkle_root, mock->trees[mock->n_trees - 1].root, 32);
+
+    uint8_t cdata[MAX_TPL_LEN + 128];
+    size_t cdata_len = serialize_request(tc, keys_merkle_root, cdata, sizeof(cdata));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+    dc->read_buffer = buffer_create(cdata, cdata_len);
+
+    handler_register_wallet(dc, 0);
+}
+
+static void test_one_case(void **state) {
+    case_state_t *cs = *state;
+    mock_dispatcher_t *mock = cs->mock_state;
+    const testcase_t *tc = cs->tc;
+
+    drive_register_wallet(mock, tc);
+
+    if (tc->has_error) {
+        assert_int_equal(mock->last_sw, error_name_to_sw(tc->error));
+        /* A deterministic rejection must return before the UI confirmation. */
+        assert_false(g_ui_capture.called);
+        return;
+    }
+
+    /* Success: response is wallet_id(32) || hmac(32), accumulated in request_buf. */
+    assert_int_equal(mock->last_sw, SW_OK);
+    assert_int_equal(mock->request_len, 64);
+    assert_memory_equal(mock->request_buf, tc->expected_wallet_id, 32);
+    if (tc->has_wallet_hmac) {
+        assert_memory_equal(mock->request_buf + 32, tc->expected_wallet_hmac, 32);
+    }
+
+    /* The UI confirmation must have been shown, with the parsed header intact. */
+    assert_true(g_ui_capture.called);
+    assert_int_equal(g_ui_capture.version, WALLET_POLICY_VERSION_V2);
+    assert_int_equal(g_ui_capture.n_keys, tc->n_keys);
+    if (tc->descriptor_hidden) {
+        /* The raw descriptor is hidden; the cleartext block must stand in for it. */
+        assert_false(g_ui_capture.descriptor_shown);
+        assert_true(g_ui_capture.n_cleartext_lines > 0);
+    } else {
+        assert_true(g_ui_capture.descriptor_shown);
+        assert_string_equal(g_ui_capture.descriptor_template, tc->descriptor_template);
+    }
+    assert_string_equal(g_ui_capture.name, tc->wallet_name);
+
+    /* When pinned, verify the per-key classification (NUMS / internal-key
+     * re-derivation / fingerprint-collision guard) the handler computed. */
+    if (tc->has_key_types) {
+        for (size_t i = 0; i < tc->n_key_types; i++) {
+            assert_int_equal(g_ui_capture.keys_type[i], tc->key_types[i]);
+        }
+    }
+}
+
+/* Hand-written framing case: an empty command buffer makes the leading
+ * buffer_read_varint fail, which the handler reports as SW_WRONG_DATA_LENGTH.
+ * This branch can't be expressed via the portable wallet-policy schema. */
+static void test_wrong_data_length(void **state) {
+    case_state_t *cs = *state;
+    mock_dispatcher_t *mock = cs->mock_state;
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+
+    dc->read_buffer = buffer_create((void *) "", 0);
+    handler_register_wallet(dc, 0);
+
+    assert_int_equal(mock->last_sw, SW_WRONG_DATA_LENGTH);
+}
+
+/* Hand-written case: a policy whose cleartext confusion score exceeds
+ * CLEARTEXT_MAX_CONFUSION_SCORE must not be shown in cleartext; the handler falls
+ * back to the raw descriptor template.
+ *
+ * The policy is a taproot key-path plus a balanced tree of eight single-sig
+ * pk() tapleaves. Its confusion score is the taptree-shape factor (2n-3)!! for
+ * n=8 leaves, i.e. 13!! = 1*3*5*7*9*11*13 = 135135.
+ */
+static void test_confusion_score_over_threshold_shows_raw(void **state) {
+    case_state_t *cs = *state;
+    mock_dispatcher_t *mock = cs->mock_state;
+
+    static const char *const keys[9] = {
+        "[f5acc2fd/48'/1'/0'/"
+        "2']"
+        "tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaq"
+        "Fo9VsybY1J5FuedLfm4dK",
+        "tpubDD814oESVM3uG2yZZDnJDex6gLeeahu2cmK2AL26ozTtDouQCY4NA8xcTW5oiJLp1cydFtDPdWxWDpLPGyLo6s"
+        "GbemykJm4ocjjvt5cwvtv",
+        "tpubDCz2AbmcM5cVir5UiGjdPgtY6Tugwg44VZYJjpPxyZAg9vMsztGVjcgW9wkQF3oDF4mK2vRxzeXY7d31KYStsR"
+        "QtuhPNpLFJgz3A3Np9Vc8",
+        "tpubDCbN8YbwHgkEVHc3kYfJirFiHaQaR9brzgF6KNhnceLe58hWiHMDXrovq3SBbHBcHHhNiXNSY7wKWRUGb3pYDT"
+        "eEnVJBqthwG3FhgeuUQjb",
+        "tpubDD3GzZF6koScghQdMUZ1VT6UnNyvvhVGwwEaReiHSPrKxFguBhp6K2kpbKUwudodaQy44EDbUz4rLgGGN5XJmq"
+        "CTrydxwY9sRmErUGmK8XA",
+        "tpubDDi6fvvXrjwNvm9tRrAowv5MmxajeptXACMAoVTGSS7dCfabntWJk6eaxFYTy3SLnphoLDs8wzkuQF54x5fiT6"
+        "3dYQ8FBQZWxVSVgNqZUCb",
+        "tpubDDtawMw95R6dzwnW6ptNwAHJVHQRS8vYCyXBVrycd6hnqDfPjBpyMxBbgFgZCdp5oX5L34Z42tvetavdvzcRub"
+        "V7Yc6mh639uDjRvHDFTrB",
+        "tpubDCDtoPWjoKyu8BurUA6erB4hDBtN18xybX2mFSY1AWXy5qem2j79MbzGiJiNUZsqzLXUuoxjDhwCvACr8NSTuk"
+        "FLWPpgLZSS7KGawZSkTKQ",
+        "tpubDCXuqAmWrb4Zv2wRsjW3iaCN4EddaxFwMDnrfBaonLKDKvnkAzR5yar6CpAU6XiQpXJtirSfjJ1UjTs4ZnUXFp"
+        "CM3Jr6Y8WgbPGhRgo7vXW",
+    };
+    const size_t n_keys = 9;
+    const char *tmpl =
+        "tr(@0/**,{{{pk(@1/**),pk(@2/**)},{pk(@3/**),pk(@4/**)}},"
+        "{{pk(@5/**),pk(@6/**)},{pk(@7/**),pk(@8/**)}}})";
+    const uint64_t EXPECTED_CONFUSION_SCORE = 135135ULL;
+
+    /* (a) The chosen template's confusion score is above the threshold. */
+    uint8_t policy_buf[MAX_WALLET_POLICY_BYTES];
+    buffer_t tb = buffer_create((void *) tmpl, strlen(tmpl));
+    int plen =
+        parse_descriptor_template(&tb, policy_buf, sizeof(policy_buf), WALLET_POLICY_VERSION_V2);
+    assert_true(plen > 0);
+    uint64_t score = cleartext_confusion_score((const policy_node_t *) policy_buf);
+    assert_int_equal(score, EXPECTED_CONFUSION_SCORE);
+    assert_true(score > CLEARTEXT_MAX_CONFUSION_SCORE);
+
+    /* (b) Drive the handler and check that it falls back to the raw template. */
+    testcase_t tc = {0};
+    snprintf(tc.wallet_name, sizeof(tc.wallet_name), "%s", "Confusing taproot tree");
+    snprintf(tc.descriptor_template, sizeof(tc.descriptor_template), "%s", tmpl);
+    tc.n_keys = n_keys;
+    for (size_t i = 0; i < n_keys; i++) {
+        snprintf(tc.keys_info[i], sizeof(tc.keys_info[i]), "%s", keys[i]);
+    }
+
+    drive_register_wallet(mock, &tc);
+
+    assert_int_equal(mock->last_sw, SW_OK);
+    assert_true(g_ui_capture.called);
+    /* Score too high: no cleartext, and the raw descriptor template stands in. */
+    assert_true(g_ui_capture.descriptor_shown);
+    assert_string_equal(g_ui_capture.descriptor_template, tmpl);
+    assert_int_equal(g_ui_capture.n_cleartext_lines, 0);
+}
+
+int main(void) {
+    parse_vectors(TEST_VECTORS_PATH);
+
+    const size_t N_HANDWRITTEN_CASES = 2;
+
+    /* VLA so that the cmocka_run_group_tests_name macro's sizeof-based count
+     * computes correctly; the +2 are the hand-written cases below. */
+    struct CMUnitTest tests[g_n_cases + N_HANDWRITTEN_CASES];
+    for (size_t i = 0; i < g_n_cases; i++) {
+        tests[i] = (struct CMUnitTest) {
+            .name = g_cases[i].name,
+            .test_func = test_one_case,
+            .setup_func = case_setup,
+            .teardown_func = case_teardown,
+            .initial_state = &g_cases[i],
+        };
+    }
+
+    size_t n_testcase = g_n_cases;
+    tests[n_testcase++] = (struct CMUnitTest) {
+        .name = "wrong_data_length",
+        .test_func = test_wrong_data_length,
+        .setup_func = case_setup,
+        .teardown_func = case_teardown,
+        .initial_state = NULL,
+    };
+    tests[n_testcase++] = (struct CMUnitTest) {
+        .name = "confusion_score_over_threshold_shows_raw",
+        .test_func = test_confusion_score_over_threshold_shows_raw,
+        .setup_func = case_setup,
+        .teardown_func = case_teardown,
+        .initial_state = NULL,
+    };
+
+    // sanity: make sure the N_HANDWRITTEN_CASES constant matches the declared number
+    assert(n_testcase == g_n_cases + N_HANDWRITTEN_CASES);
+
+    int rc = cmocka_run_group_tests_name("register_wallet", tests, NULL, NULL);
+    free(g_cases);
+    return rc;
+}

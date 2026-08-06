@@ -27,8 +27,8 @@ include $(BOLOS_SDK)/Makefile.target
 
 # Application version
 APPVERSION_M = 2
-APPVERSION_N = 4
-APPVERSION_P = 6
+APPVERSION_N = 5
+APPVERSION_P = 0
 APPVERSION_SUFFIX = # if not empty, appended at the end. Do not add a dash.
 
 ifeq ($(APPVERSION_SUFFIX),)
@@ -144,6 +144,11 @@ ENABLE_NBGL_QRCODE = 1
 ENABLE_SWAP = 1
 
 ########################################
+#        Stack protection features     #
+########################################
+ENABLE_STACK_PROTECTOR = 1
+
+########################################
 #          Features disablers          #
 ########################################
 # Don't use standard app file to avoid conflicts for now
@@ -187,7 +192,7 @@ endif
 
 ifeq ($(DEBUG),10)
     $(warning Using semihosted PRINTF. Only run with speculos!)
-    DEFINES   += HAVE_PRINTF HAVE_SEMIHOSTED_PRINTF PRINTF=semihosted_printf
+    DEFINES   += HAVE_SEMIHOSTED_PRINTF
 endif
 
 # Needed to be able to include the definition of G_cx

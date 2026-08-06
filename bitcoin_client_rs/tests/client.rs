@@ -6,7 +6,10 @@ use bitcoin::{
     hashes::{hex::FromHex, Hash},
     psbt::Psbt,
 };
-use ledger_bitcoin_client::{async_client, client, psbt::PartialSignature, wallet};
+use ledger_bitcoin_client::{
+    async_client, client, psbt::PartialSignature, wallet, MusigPartialSignature, MusigPubNonce,
+    SignPsbtYieldedObject,
+};
 
 fn test_cases(path: &str) -> Vec<serde_json::Value> {
     let data = std::fs::read_to_string(path).expect("Unable to read file");
@@ -303,7 +306,17 @@ async fn test_sign_psbt() {
         let sigs: Vec<serde_json::Value> = case
             .get("sigs")
             .map(|v| serde_json::from_value(v.clone()).unwrap())
-            .unwrap();
+            .unwrap_or_default();
+
+        let musig_pub_nonces: Vec<serde_json::Value> = case
+            .get("musig_pub_nonces")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap_or_default();
+
+        let musig_partial_signatures: Vec<serde_json::Value> = case
+            .get("musig_partial_signatures")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap_or_default();
 
         let psbt_str: String = case
             .get("psbt")
@@ -319,52 +332,157 @@ async fn test_sign_psbt() {
             .sign_psbt(&psbt, &wallet, hmac.as_ref())
             .unwrap();
 
-        let check_signatures = |sigs: &[serde_json::Value], res: Vec<(usize, PartialSignature)>| {
-            for (i, psbt_sig) in res {
-                for (j, res_sig) in sigs.iter().enumerate() {
-                    if i == j {
-                        match psbt_sig {
-                            PartialSignature::TapScriptSig(key, tapleaf_hash, sig) => {
-                                assert_eq!(
-                                    res_sig
-                                        .get("key")
-                                        .map(|v| serde_json::from_value::<String>(v.clone())
-                                            .unwrap())
-                                        .unwrap(),
-                                    key.to_string()
-                                );
-                                if let Some(tapleaf_hash_res) = res_sig
-                                    .get("tapleaf_hash")
-                                    .map(|v| serde_json::from_value::<String>(v.clone()).unwrap())
-                                {
-                                    assert_eq!(
-                                        tapleaf_hash_res,
-                                        hex::encode(tapleaf_hash.unwrap().to_byte_array())
-                                    );
-                                }
-                                assert_eq!(
-                                    res_sig
-                                        .get("sig")
-                                        .map(|v| serde_json::from_value::<String>(v.clone())
-                                            .unwrap())
-                                        .unwrap(),
-                                    hex::encode(sig.to_vec())
-                                );
-                            }
-                            _ => {}
-                        }
+        let get_str = |v: &serde_json::Value, key: &str| -> String {
+            serde_json::from_value::<String>(v.get(key).unwrap().clone()).unwrap()
+        };
+
+        let check_optional_tapleaf =
+            |expected: &serde_json::Value, actual: &Option<bitcoin::taproot::TapLeafHash>| {
+                if let Some(expected_hash) = expected.get("tapleaf_hash") {
+                    let expected_hash: String =
+                        serde_json::from_value(expected_hash.clone()).unwrap();
+                    assert_eq!(expected_hash, hex::encode(actual.unwrap().to_byte_array()));
+                } else {
+                    assert!(actual.is_none());
+                }
+            };
+
+        let check_results = |sigs: &[serde_json::Value],
+                             musig_pub_nonces: &[serde_json::Value],
+                             musig_partial_sigs: &[serde_json::Value],
+                             res: &[(usize, SignPsbtYieldedObject)]| {
+            let mut partial_results: Vec<&(usize, SignPsbtYieldedObject)> = Vec::new();
+            let mut nonce_results: Vec<&(usize, SignPsbtYieldedObject)> = Vec::new();
+            let mut partialsig_results: Vec<&(usize, SignPsbtYieldedObject)> = Vec::new();
+
+            for item in res {
+                match &item.1 {
+                    SignPsbtYieldedObject::Partial(_) => partial_results.push(item),
+                    SignPsbtYieldedObject::MusigPubNonce(_) => nonce_results.push(item),
+                    SignPsbtYieldedObject::MusigPartialSignature(_) => {
+                        partialsig_results.push(item)
                     }
+                    other => panic!("Unexpected variant: {:?}", other),
+                }
+            }
+
+            // Check partial signatures (Sig and TapScriptSig)
+            assert_eq!(
+                sigs.len(),
+                partial_results.len(),
+                "Expected {} partial sigs, got {}",
+                sigs.len(),
+                partial_results.len()
+            );
+            for (expected, (i, obj)) in sigs.iter().zip(partial_results.iter()) {
+                match obj {
+                    SignPsbtYieldedObject::Partial(PartialSignature::Sig(key, sig)) => {
+                        assert_eq!(get_str(expected, "key"), key.to_string(), "input {i}");
+                        assert_eq!(
+                            get_str(expected, "sig"),
+                            hex::encode(sig.to_vec()),
+                            "input {i}"
+                        );
+                    }
+                    SignPsbtYieldedObject::Partial(PartialSignature::TapScriptSig(
+                        key,
+                        tapleaf_hash,
+                        sig,
+                    )) => {
+                        assert_eq!(get_str(expected, "key"), key.to_string(), "input {i}");
+                        check_optional_tapleaf(expected, tapleaf_hash);
+                        assert_eq!(
+                            get_str(expected, "sig"),
+                            hex::encode(sig.to_vec()),
+                            "input {i}"
+                        );
+                    }
+                    _ => unreachable!(),
+                }
+            }
+
+            // Check musig pub nonces
+            assert_eq!(
+                musig_pub_nonces.len(),
+                nonce_results.len(),
+                "Expected {} musig pub nonces, got {}",
+                musig_pub_nonces.len(),
+                nonce_results.len()
+            );
+            for (expected, (i, obj)) in musig_pub_nonces.iter().zip(nonce_results.iter()) {
+                match obj {
+                    SignPsbtYieldedObject::MusigPubNonce(MusigPubNonce {
+                        participant_pubkey,
+                        aggregate_pubkey,
+                        tapleaf_hash,
+                        pubnonce,
+                    }) => {
+                        assert_eq!(
+                            get_str(expected, "participant_pubkey"),
+                            participant_pubkey.to_string(),
+                            "input {i}"
+                        );
+                        assert_eq!(
+                            get_str(expected, "aggregate_pubkey"),
+                            aggregate_pubkey.to_string(),
+                            "input {i}"
+                        );
+                        assert_eq!(
+                            get_str(expected, "pubnonce"),
+                            hex::encode(pubnonce),
+                            "input {i}"
+                        );
+                        check_optional_tapleaf(expected, tapleaf_hash);
+                    }
+                    _ => unreachable!(),
+                }
+            }
+
+            // Check musig partial signatures
+            assert_eq!(
+                musig_partial_sigs.len(),
+                partialsig_results.len(),
+                "Expected {} musig partial sigs, got {}",
+                musig_partial_sigs.len(),
+                partialsig_results.len()
+            );
+            for (expected, (i, obj)) in musig_partial_sigs.iter().zip(partialsig_results.iter()) {
+                match obj {
+                    SignPsbtYieldedObject::MusigPartialSignature(MusigPartialSignature {
+                        participant_pubkey,
+                        aggregate_pubkey,
+                        tapleaf_hash,
+                        partial_signature,
+                    }) => {
+                        assert_eq!(
+                            get_str(expected, "participant_pubkey"),
+                            participant_pubkey.to_string(),
+                            "input {i}"
+                        );
+                        assert_eq!(
+                            get_str(expected, "aggregate_pubkey"),
+                            aggregate_pubkey.to_string(),
+                            "input {i}"
+                        );
+                        assert_eq!(
+                            get_str(expected, "partial_signature"),
+                            hex::encode(partial_signature),
+                            "input {i}"
+                        );
+                        check_optional_tapleaf(expected, tapleaf_hash);
+                    }
+                    _ => unreachable!(),
                 }
             }
         };
 
-        check_signatures(&sigs, res);
+        check_results(&sigs, &musig_pub_nonces, &musig_partial_signatures, &res);
 
         let res = async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
             .sign_psbt(&psbt, &wallet, hmac.as_ref())
             .await
             .unwrap();
 
-        check_signatures(&sigs, res);
+        check_results(&sigs, &musig_pub_nonces, &musig_partial_signatures, &res);
     }
 }

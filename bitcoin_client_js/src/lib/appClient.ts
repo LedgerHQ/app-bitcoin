@@ -68,7 +68,7 @@ function makePartialSignature(pubkeyAugm: Buffer, signature: Buffer): PartialSig
 
 /**
  * This class encapsulates the APDU protocol documented at
- * https://github.com/LedgerHQ/app-bitcoin-new/blob/master/doc/bitcoin.md
+ * https://github.com/LedgerHQ/app-bitcoin/blob/master/doc/bitcoin.md
  */
 export class AppClient {
   readonly transport: Transport;
@@ -102,7 +102,7 @@ export class AppClient {
         CLA_FRAMEWORK,
         FrameworkIns.CONTINUE_INTERRUPTED,
         0,
-        0,
+        CURRENT_PROTOCOL_VERSION,
         commandResponse,
         [0x9000, 0xe000]
       );

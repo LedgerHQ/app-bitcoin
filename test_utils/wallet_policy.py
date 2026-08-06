@@ -36,13 +36,31 @@ class PlainKeyPlaceholder:
     num2: int
 
 
-# future extensions will have multiple subtypes (e.g.: MuSig2KeyPlaceholder)
-KeyPlaceholder = PlainKeyPlaceholder
+@dataclass
+class MuSig2KeyPlaceholder:
+    """A `musig(@i,@j,...)/<num1;num2>/*` placeholder. The key indexes refer
+    to entries in the wallet's keys_info; the participant pubkeys are
+    aggregated via BIP-327 to form a single synthetic key, after which the
+    `/<num1;num2>/*` derivation is applied."""
+    key_indexes: List[int]
+    num1: int
+    num2: int
+
+
+KeyPlaceholder = Union[PlainKeyPlaceholder, MuSig2KeyPlaceholder]
 
 
 def parse_placeholder(placeholder_str: str) -> KeyPlaceholder:
     """Parses a placeholder string to create a KeyPlaceholder object."""
-    if placeholder_str.startswith('@'):
+    if placeholder_str.startswith('musig('):
+        close = placeholder_str.index(')')
+        keys_part = placeholder_str[len('musig('):close]
+        key_indexes = [int(k.strip().lstrip('@')) for k in keys_part.split(',')]
+        m = re.match(r'/<(\d+);(\d+)>/\*', placeholder_str[close + 1:])
+        if m is None:
+            raise ValueError(f"Invalid musig placeholder string: {placeholder_str!r}")
+        return MuSig2KeyPlaceholder(key_indexes, int(m.group(1)), int(m.group(2)))
+    elif placeholder_str.startswith('@'):
         parts = placeholder_str.split('/')
         key_index = int(parts[0].strip('@'))
 
@@ -159,7 +177,7 @@ class Tree:
             assert self.left is not None and self.right is not None
             left_h = self.left.get_taptree_hash(
                 keys_info, is_change, address_index)
-            right_h = self.left.get_taptree_hash(
+            right_h = self.right.get_taptree_hash(
                 keys_info, is_change, address_index)
             if left_h <= right_h:
                 return tagged_hash("TapBranch", left_h + right_h)
@@ -187,6 +205,15 @@ class GenericParser(ABC):
             num2 = self.parse_num()
             self.consume('>/*')
             return PlainKeyPlaceholder(key_index, num1, num2)
+        elif self.input.startswith('musig(', self.index):
+            self.consume('musig(')
+            key_indexes = self.parse_key_indexes()
+            self.consume(')/<')
+            num1 = self.parse_num()
+            self.consume(';')
+            num2 = self.parse_num()
+            self.consume('>/*')
+            return MuSig2KeyPlaceholder(key_indexes, num1, num2)
         else:
             raise Exception("Syntax error in key placeholder")
 
@@ -266,6 +293,12 @@ class DescriptorTemplate(ABC):
             return WshDescriptorTemplate
         elif input_string.startswith('wpkh('):
             return WpkhDescriptorTemplate
+        elif input_string.startswith('sh(wpkh('):
+            return ShWpkhDescriptorTemplate
+        elif input_string.startswith('sh(wsh('):
+            return ShWshDescriptorTemplate
+        elif input_string.startswith('sh('):
+            return ShDescriptorTemplate
         elif input_string.startswith('pkh('):
             return PkhDescriptorTemplate
         else:
@@ -277,12 +310,12 @@ class DescriptorTemplate(ABC):
         return descriptor_type.from_string(input_string)
 
     def is_legacy(self) -> bool:
-        # TODO: incomplete, missing legacy sh(...) descriptors
-        return isinstance(self, PkhDescriptorTemplate)
+        return isinstance(self, (PkhDescriptorTemplate, ShDescriptorTemplate))
 
     def is_segwit(self) -> bool:
-        # TODO: incomplete, missing sh(wsh(...)) and sh(wpkh(...)) descriptors
-        return isinstance(self, (WshDescriptorTemplate, WpkhDescriptorTemplate, TrDescriptorTemplate))
+        return isinstance(self, (WshDescriptorTemplate, WpkhDescriptorTemplate,
+                                 ShWpkhDescriptorTemplate, ShWshDescriptorTemplate,
+                                 TrDescriptorTemplate))
 
     def is_taproot(self) -> bool:
         return isinstance(self, TrDescriptorTemplate)
@@ -417,3 +450,80 @@ class PkhDescriptorTemplate(DescriptorTemplate):
 
     def placeholders(self) -> Iterator[Tuple[KeyPlaceholder, Optional[str]]]:
         yield (self.key, None)
+
+
+class ShWpkhDescriptorTemplate(DescriptorTemplate):
+    """
+    Represents a sh(wpkh(KEY)) descriptor template — BIP-49 wrapped segwit.
+    """
+
+    def __init__(self, key: KeyPlaceholder):
+        self.key = key
+
+    @classmethod
+    def from_string(cls, input_string):
+        parser = cls.Parser(input_string.replace("/**", "/<0;1>/*"))
+        return parser.parse()
+
+    class Parser(GenericParser):
+        def parse(self) -> 'ShWpkhDescriptorTemplate':
+            self.consume('sh(wpkh(')
+            key = self.parse_keyplaceholder()
+            self.consume('))')
+            return ShWpkhDescriptorTemplate(key)
+
+    def placeholders(self) -> Iterator[Tuple[KeyPlaceholder, Optional[str]]]:
+        yield (self.key, None)
+
+
+class ShWshDescriptorTemplate(DescriptorTemplate):
+    """
+    Represents a sh(wsh(SCRIPT)) descriptor template.
+    """
+
+    def __init__(self, inner_script: str):
+        self.inner_script = inner_script
+
+    @classmethod
+    def from_string(cls, input_string):
+        parser = cls.Parser(input_string.replace("/**", "/<0;1>/*"))
+        return parser.parse()
+
+    class Parser(GenericParser):
+        def parse(self) -> 'ShWshDescriptorTemplate':
+            self.consume('sh(wsh(')
+            inner_script = self.parse_script()
+            self.consume('))')
+            return ShWshDescriptorTemplate(inner_script)
+
+    def placeholders(self) -> Iterator[Tuple[KeyPlaceholder, Optional[str]]]:
+        for placeholder in extract_placeholders(self.inner_script):
+            yield (placeholder, None)
+
+
+class ShDescriptorTemplate(DescriptorTemplate):
+    """
+    Represents a legacy sh(SCRIPT) descriptor template — bare P2SH, where
+    SCRIPT is neither wpkh(...) nor wsh(...) (those have their own
+    classes). Used for `sh(multi(...))`, `sh(sortedmulti(...))`,
+    `sh(pkh(...))`, etc.
+    """
+
+    def __init__(self, inner_script: str):
+        self.inner_script = inner_script
+
+    @classmethod
+    def from_string(cls, input_string):
+        parser = cls.Parser(input_string.replace("/**", "/<0;1>/*"))
+        return parser.parse()
+
+    class Parser(GenericParser):
+        def parse(self) -> 'ShDescriptorTemplate':
+            self.consume('sh(')
+            inner_script = self.parse_script()
+            self.consume(')')
+            return ShDescriptorTemplate(inner_script)
+
+    def placeholders(self) -> Iterator[Tuple[KeyPlaceholder, Optional[str]]]:
+        for placeholder in extract_placeholders(self.inner_script):
+            yield (placeholder, None)

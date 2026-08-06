@@ -74,7 +74,7 @@ bool get_address_from_compressed_public_key(unsigned char format,
 
                 uint8_t parity;
                 crypto_tr_tweak_pubkey(compressed_pub_key + 1,
-                                       (uint8_t[]){},
+                                       (uint8_t[]) {},
                                        0,
                                        &parity,
                                        tweaked_key);

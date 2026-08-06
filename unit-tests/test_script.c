@@ -8,14 +8,6 @@
 
 #include <cmocka.h>
 
-// missing definitions to make it compile without the SDK
-unsigned int pic(unsigned int linked_address) {
-    return linked_address;
-}
-
-#define PRINTF(...) printf
-#define PIC(x)      (x)
-
 #include "common/script.h"
 
 static void test_get_push_script_size(void **state) {
