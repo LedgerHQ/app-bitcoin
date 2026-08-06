@@ -282,13 +282,18 @@ static int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitnes
         return -1;
     }
 
+    // SIZE_MAX is reserved by call_psbt_parse_rawtx to mean "no output is queried"
+    if (prevout_n >= SIZE_MAX) {
+        return -1;
+    }
+
     txid_parser_outputs_t parser_outputs;
     // request non-witness utxo, and get the prevout's value and scriptpubkey
     int res = call_psbt_parse_rawtx(dc,
                                     input_map,
                                     (uint8_t[]){PSBT_IN_NON_WITNESS_UTXO},
                                     1,
-                                    prevout_n,
+                                    (size_t) prevout_n,
                                     &parser_outputs);
     if (res < 0) {
         PRINTF("Parsing rawtx failed\n");
@@ -304,6 +309,11 @@ static int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitnes
     }
 
     *amount = parser_outputs.vout_value;
+
+    if (parser_outputs.vout_scriptpubkey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
+        return -1;
+    }
+
     *scriptPubKey_len = parser_outputs.vout_scriptpubkey_len;
     memcpy(scriptPubKey, parser_outputs.vout_scriptpubkey, parser_outputs.vout_scriptpubkey_len);
 
@@ -345,6 +355,10 @@ get_amount_scriptpubkey_from_psbt_witness(dispatcher_context_t *dc,
 
     uint8_t *wit_utxo_scriptPubkey = raw_witnessUtxo + 9;
     uint64_t wit_utxo_prevout_amount = read_u64_le(&raw_witnessUtxo[0], 0);
+
+    if (wit_utxo_scriptPubkey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
+        return -1;
+    }
 
     *amount = wit_utxo_prevout_amount;
     *scriptPubKey_len = wit_utxo_scriptPubkey_len;
@@ -2160,6 +2174,12 @@ compute_segwit_hashes(dispatcher_context_t *dc, sign_psbt_state_t *st, segwit_ha
                 return false;
             }
 
+            if (in_scriptPubKey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
+                // this should never happen
+                SEND_SW(dc, SW_INCORRECT_DATA);
+                return false;
+            }
+
             uint8_t in_amount_le[8];
             write_u64_le(in_amount_le, 0, in_amount);
             crypto_hash_update(&sha_amounts_context.header, in_amount_le, 8);
@@ -2214,6 +2234,12 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                                              input->in_out.scriptPubKey,
                                                              &input->in_out.scriptPubKey_len,
                                                              NULL)) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+
+        if (input->in_out.scriptPubKey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
+            // this should never happen
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }

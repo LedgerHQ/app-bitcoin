@@ -59,6 +59,21 @@
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH \
     MAX(MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1, MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2)
 
+// As parse_script is recursive, we set a maximum reasonable recursion depth in order to avoid the
+// risk of stack exhaustion.
+// This depth is unlikely to be hit in practice.
+// Miniscript wrappers are counted as well: while they are not parsed recursively, they still
+// increase the depth of the parsed policy, which affects other recursive walkers.
+#ifdef TARGET_NANOS
+// We use a more conservative limit on Nano S, since the stack is smaller
+// and this directly affect the recursion depth.
+// MAX_POLICY_DEPTH is also set to 10, making sure that policies that can be
+// parsed and registered can also be used at signing time.
+#define MAX_PARSE_SCRIPT_RECURSION_DEPTH 10
+#else
+#define MAX_PARSE_SCRIPT_RECURSION_DEPTH 16
+#endif
+
 // at most 92 bytes
 // wallet type (1 byte)
 // name length (1 byte)
@@ -380,7 +395,7 @@ typedef struct {
     int16_t k;                  // threshold
     int16_t n;                  // number of child scripts
     rptr_policy_node_scriptlist_t
-        scriptlist;  // pointer to array of exactly n pointers to child scripts
+        scriptlist;  // pointer to a linked list of exactly n child scripts
 } policy_node_thresh_t;
 
 typedef struct {

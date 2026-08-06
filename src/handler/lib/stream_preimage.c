@@ -1,4 +1,5 @@
 #include <string.h>
+#include <limits.h>
 
 #include "../../boilerplate/sw.h"
 #include "stream_preimage.h"
@@ -33,6 +34,11 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
         !buffer_can_read(&dispatcher_context->read_buffer, partial_data_len)) {
         return -2;
     }
+
+    if (preimage_len_u64 > UINT32_MAX) {
+        return -10;
+    }
+
     uint32_t preimage_len = (uint32_t) preimage_len_u64;
 
     if (preimage_len < 1 || partial_data_len == 0) {
@@ -44,12 +50,19 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
         return -4;
     }
 
+    uint8_t *data_ptr =
+        dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
+
+    // Merkle tree leaves are hashes of 0x00 || element
+    // Checked before any callback, so that nothing is streamed out for an invalid preimage.
+    if (data_ptr[0] != 0x00) {
+        PRINTF("Not a Merkle tree leaf preimage\n");
+        return -11;
+    }
+
     if (len_callback != NULL) {
         len_callback(preimage_len - 1, callback_state);
     }
-
-    uint8_t *data_ptr =
-        dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
 
     cx_sha256_t hash_context;
     cx_sha256_init(&hash_context);
