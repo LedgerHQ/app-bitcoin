@@ -2023,8 +2023,13 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
             if (memcmp(pubkey_i.compressed_pubkey,
                        pubkey_j.compressed_pubkey,
                        sizeof(pubkey_i.compressed_pubkey)) == 0) {
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
                 // duplicated pubkey
                 return WITH_ERROR(-1, "Repeated pubkey in wallet policy");
+#else
+                // Fuzz mode: the crypto mock returns a constant pubkey for every
+                // derivation, so allow the collision to keep multi-key policies reachable.
+#endif
             }
         }
     }

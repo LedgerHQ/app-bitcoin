@@ -55,7 +55,12 @@ int merkle_get_ith_direction(size_t size, size_t index, size_t i) {
     if (size <= 1 || index >= size) {
         return -1;
     }
-
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    // Bound fuzz-only sizes to avoid catastrophic iteration counts.
+    if (size > ((size_t) 1U << MAX_MERKLE_TREE_DEPTH)) {
+        return -1;
+    }
+#endif
     uint8_t n_directions = 0;
     while (size > 1) {
         uint8_t depth = ceil_lg(size);

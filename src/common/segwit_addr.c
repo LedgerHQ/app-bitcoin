@@ -44,7 +44,9 @@ static uint32_t bech32_final_constant(bech32_encoding enc) {
     return 0; // suppress compiler warning on missing return value
 }
 
-static const char* charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+// `const` array (not a string-literal pointer) so the alphabet lands in
+// .rodata, keeping it out of the Absolution prefix.
+static const char charset[] = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
 static const int8_t charset_rev[128] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
