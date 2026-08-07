@@ -127,16 +127,24 @@ static void generate_merkle_proof(const uint8_t hashes[][32],
  * =========================================================================== */
 
 static void mock_add_to_response(const void *rdata, size_t rdata_len) {
-    assert(g_active_mock != NULL);
+    /* No assert(): NDEBUG is defined in the fuzzing build, so an assert here is a
+     * no-op and an over-long request would corrupt memory silently. Drop instead. */
+    if (g_active_mock == NULL) {
+        return;
+    }
     mock_dispatcher_t *m = g_active_mock;
 
-    assert(m->request_len + rdata_len <= sizeof(m->request_buf));
+    if (m->request_len + rdata_len > sizeof(m->request_buf)) {
+        return;
+    }
     memcpy(m->request_buf + m->request_len, rdata, rdata_len);
     m->request_len += rdata_len;
 }
 
 static void mock_finalize_response(uint16_t sw) {
-    assert(g_active_mock != NULL);
+    if (g_active_mock == NULL) {
+        return;
+    }
     g_active_mock->last_sw = sw;
 }
 
@@ -151,6 +159,15 @@ static void mock_set_ui_dirty(void) {
 /* ---- Client command handlers ---- */
 
 static int handle_get_preimage(mock_dispatcher_t *m) {
+    /* The element queue belongs to the command immediately before this one. Only
+     * GET_MORE_ELEMENTS may inherit it; every other command starts a fresh reply, so
+     * clear it here rather than relying on the next overflow to overwrite it. Without
+     * this, a GET_MORE_ELEMENTS arriving after a command that fitted in one response
+     * is served leftovers from an earlier round. */
+    m->queue.count = 0;
+    m->queue.head = 0;
+    m->queue.element_size = 0;
+
     /* Request format: <CCMD_GET_PREIMAGE:1> <hash_type:1> <hash:32> */
     if (m->request_len < 1 + 1 + 32) {
         return -1;
@@ -232,10 +249,14 @@ static int handle_get_more_elements(mock_dispatcher_t *m) {
 
 static int handle_yield(mock_dispatcher_t *m) {
     /* Store everything after the command byte as a yielded value */
-    assert(m->n_yielded < MOCK_MAX_YIELDED);
+    if (m->n_yielded >= MOCK_MAX_YIELDED) {
+        return -1;
+    }
 
     size_t data_len = m->request_len > 0 ? m->request_len - 1 : 0;
-    assert(data_len <= MOCK_MAX_YIELDED_LEN);
+    if (data_len > MOCK_MAX_YIELDED_LEN) {
+        return -1;
+    }
 
     m->yielded[m->n_yielded].len = data_len;
     if (data_len > 0) {
@@ -249,6 +270,15 @@ static int handle_yield(mock_dispatcher_t *m) {
 }
 
 static int handle_get_merkle_leaf_proof(mock_dispatcher_t *m) {
+    /* The element queue belongs to the command immediately before this one. Only
+     * GET_MORE_ELEMENTS may inherit it; every other command starts a fresh reply, so
+     * clear it here rather than relying on the next overflow to overwrite it. Without
+     * this, a GET_MORE_ELEMENTS arriving after a command that fitted in one response
+     * is served leftovers from an earlier round. */
+    m->queue.count = 0;
+    m->queue.head = 0;
+    m->queue.element_size = 0;
+
     /* Request: <cmd:1> <merkle_root:32> <tree_size:varint> <leaf_index:varint> */
     buffer_t req = buffer_create(m->request_buf + 1, m->request_len - 1);
 
@@ -314,6 +344,15 @@ static int handle_get_merkle_leaf_proof(mock_dispatcher_t *m) {
 }
 
 static int handle_get_merkle_leaf_index(mock_dispatcher_t *m) {
+    /* The element queue belongs to the command immediately before this one. Only
+     * GET_MORE_ELEMENTS may inherit it; every other command starts a fresh reply, so
+     * clear it here rather than relying on the next overflow to overwrite it. Without
+     * this, a GET_MORE_ELEMENTS arriving after a command that fitted in one response
+     * is served leftovers from an earlier round. */
+    m->queue.count = 0;
+    m->queue.head = 0;
+    m->queue.element_size = 0;
+
     /* Request: <cmd:1> <merkle_root:32> <leaf_hash:32> */
     if (m->request_len < 1 + 32 + 32) return -1;
 
@@ -355,11 +394,9 @@ static int handle_get_merkle_leaf_index(mock_dispatcher_t *m) {
 
 /* ---- Main interruption handler ---- */
 
-static int mock_process_interruption(dispatcher_context_t *dc) {
-    mock_dispatcher_t *m = g_active_mock;
-    assert(m != NULL);
-    assert(dc == &m->dc);
-
+/* Run the accumulated request through its handler and apply the tamper hook.
+ * Shared by mock_process_interruption() and mock_dispatcher_handle_ccmd(). */
+static int run_client_command(mock_dispatcher_t *m) {
     if (m->request_len == 0) {
         return -1;
     }
@@ -409,6 +446,19 @@ static int mock_process_interruption(dispatcher_context_t *dc) {
         }
     }
 
+    return 0;
+}
+
+static int mock_process_interruption(dispatcher_context_t *dc) {
+    mock_dispatcher_t *m = g_active_mock;
+    if (m == NULL || dc != &m->dc) {
+        return -1;
+    }
+
+    if (run_client_command(m) < 0) {
+        return -1;
+    }
+
     /* Set read_buffer to point at the response */
     dc->read_buffer = buffer_create(m->response_buf, m->response_len);
     return 0;
@@ -454,22 +504,33 @@ int mock_dispatcher_teardown(void **state) {
     return 0;
 }
 
-void mock_dispatcher_add_preimage(mock_dispatcher_t *mock, const uint8_t *data, size_t len) {
-    assert(mock->n_preimages < MOCK_MAX_PREIMAGES);
-    assert(len <= MOCK_BUF_SIZE);
+int mock_dispatcher_add_preimage(mock_dispatcher_t *mock, const uint8_t *data, size_t len) {
+    if (mock->n_preimages >= MOCK_MAX_PREIMAGES || len > MOCK_BUF_SIZE) {
+        return -1;
+    }
 
     size_t idx = mock->n_preimages++;
     mock_sha256(data, len, mock->preimages[idx].hash);
     memcpy(mock->preimages[idx].data, data, len);
     mock->preimages[idx].len = len;
+    return 0;
 }
 
-void mock_dispatcher_add_list(mock_dispatcher_t *mock,
-                              const uint8_t *const *elements,
-                              const size_t *element_lens,
-                              size_t n) {
-    assert(mock->n_trees < MOCK_MAX_TREES);
-    assert(n <= MOCK_MAX_TREE_ELEMS);
+int mock_dispatcher_add_list(mock_dispatcher_t *mock,
+                             const uint8_t *const *elements,
+                             const size_t *element_lens,
+                             size_t n) {
+    /* Validated up front: a mid-loop bail would leave a tree whose root does not
+     * match the leaves it serves, which the app would report as its own error. */
+    if (mock->n_trees >= MOCK_MAX_TREES || n > MOCK_MAX_TREE_ELEMS ||
+        mock->n_preimages + n > MOCK_MAX_PREIMAGES) {
+        return -1;
+    }
+    for (size_t i = 0; i < n; i++) {
+        if (element_lens[i] > 256) {
+            return -1;
+        }
+    }
 
     mock_merkle_tree_t *tree = &mock->trees[mock->n_trees++];
     memset(tree, 0, sizeof(mock_merkle_tree_t));
@@ -481,8 +542,6 @@ void mock_dispatcher_add_list(mock_dispatcher_t *mock,
      *  3. Register the preimage (0x00 || element) so GET_PREIMAGE can retrieve it
      */
     for (size_t i = 0; i < n; i++) {
-        assert(element_lens[i] <= 256);
-
         memcpy(tree->raw_elements[i], elements[i], element_lens[i]);
         tree->raw_element_lens[i] = element_lens[i];
 
@@ -498,18 +557,21 @@ void mock_dispatcher_add_list(mock_dispatcher_t *mock,
 
     /* Compute Merkle root */
     build_merkle_root((const uint8_t(*)[32]) tree->element_hashes, 0, n, tree->root);
+    return 0;
 }
 
-void mock_dispatcher_add_map(mock_dispatcher_t *mock,
+int mock_dispatcher_add_map(mock_dispatcher_t *mock,
                              const uint8_t *const *keys,
                              const size_t *key_lens,
                              const uint8_t *const *values,
                              const size_t *value_lens,
-                             size_t n,
-                             merkleized_map_commitment_t *out_commitment) {
+                            size_t n,
+                            merkleized_map_commitment_t *out_commitment) {
     /* Sort items by key (simple insertion sort, matching Python's sorted()) */
     size_t sorted_indices[MOCK_MAX_TREE_ELEMS];
-    assert(n <= MOCK_MAX_TREE_ELEMS);
+    if (n > MOCK_MAX_TREE_ELEMS) {
+        return -1;
+    }
     for (size_t i = 0; i < n; i++) {
         sorted_indices[i] = i;
     }
@@ -544,10 +606,14 @@ void mock_dispatcher_add_map(mock_dispatcher_t *mock,
 
     /* Register both keys and values as Merkle trees (mirrors add_known_mapping) */
     size_t keys_tree_idx = mock->n_trees;
-    mock_dispatcher_add_list(mock, sorted_keys, sorted_key_lens, n);
+    if (mock_dispatcher_add_list(mock, sorted_keys, sorted_key_lens, n) < 0) {
+        return -1;
+    }
 
     size_t values_tree_idx = mock->n_trees;
-    mock_dispatcher_add_list(mock, sorted_values, sorted_value_lens, n);
+    if (mock_dispatcher_add_list(mock, sorted_values, sorted_value_lens, n) < 0) {
+        return -1;
+    }
 
     /* Fill in the commitment */
     out_commitment->size = (uint64_t) n;
@@ -556,6 +622,7 @@ void mock_dispatcher_add_map(mock_dispatcher_t *mock,
     /* The mock builds the keys tree already sorted, so the commitment satisfies the invariant that
      * the by-key value readers assert on (matching what call_get_merkleized_map guarantees). */
     out_commitment->_keys_are_sorted = true;
+    return 0;
 }
 
 /* ---- Helper: register a psbt_map_t with the mock ---- */
@@ -642,4 +709,109 @@ int mock_dispatcher_add_psbt(mock_dispatcher_t *mock,
     }
 
     return 0;
+}
+
+void mock_dispatcher_reset(mock_dispatcher_t *mock) {
+    mock->request_len = 0;
+    mock->response_len = 0;
+    mock->last_sw = 0;
+    mock->n_preimages = 0;
+    mock->n_trees = 0;
+    mock->n_yielded = 0;
+    mock->queue.count = 0;
+    mock->queue.head = 0;
+    mock->queue.element_size = 0;
+    mock->tamper_call_count = 0;
+
+    /* Callbacks in mock->dc are untouched, but the file-scope pointer they use to
+     * find their owner must name this instance. */
+    g_active_mock = mock;
+}
+
+int mock_dispatcher_handle_ccmd(mock_dispatcher_t *mock,
+                                const uint8_t *request,
+                                size_t request_len,
+                                uint8_t *response,
+                                size_t response_cap,
+                                size_t *response_len) {
+    if (request_len == 0 || request_len > sizeof(mock->request_buf)) {
+        return -1;
+    }
+
+    memcpy(mock->request_buf, request, request_len);
+    mock->request_len = request_len;
+
+    if (run_client_command(mock) < 0) {
+        return -1;
+    }
+    if (mock->response_len > response_cap) {
+        return -1;
+    }
+
+    memcpy(response, mock->response_buf, mock->response_len);
+    *response_len = mock->response_len;
+    return 0;
+}
+
+int mock_dispatcher_tree_begin(mock_dispatcher_t *mock) {
+    if (mock->n_trees >= MOCK_MAX_TREES) {
+        return -1;
+    }
+    int idx = (int) mock->n_trees++;
+    mock_merkle_tree_t *tree = &mock->trees[idx];
+    tree->n_elements = 0;
+    memset(tree->root, 0, sizeof(tree->root));
+    return idx;
+}
+
+int mock_dispatcher_tree_add_leaf(mock_dispatcher_t *mock, int tree,
+                                  const uint8_t *data, size_t len) {
+    if (tree < 0 || (size_t) tree >= mock->n_trees) {
+        return -1;
+    }
+    mock_merkle_tree_t *t = &mock->trees[tree];
+    if (t->n_elements >= MOCK_MAX_TREE_ELEMS || len > sizeof(t->raw_elements[0])) {
+        return -1;
+    }
+    if (mock->n_preimages >= MOCK_MAX_PREIMAGES || 1 + len > MOCK_BUF_SIZE) {
+        return -1;
+    }
+
+    size_t i = t->n_elements++;
+    memcpy(t->raw_elements[i], data, len);
+    t->raw_element_lens[i] = len;
+    merkle_compute_element_hash(data, len, t->element_hashes[i]);
+
+    /* GET_PREIMAGE serves leaves as (0x00 || element), as add_list() does. */
+    uint8_t prefixed[1 + sizeof(t->raw_elements[0])];
+    prefixed[0] = 0x00;
+    memcpy(prefixed + 1, data, len);
+    mock_dispatcher_add_preimage(mock, prefixed, 1 + len);
+    return 0;
+}
+
+int mock_dispatcher_tree_add_leaf_hash(mock_dispatcher_t *mock, int tree,
+                                       const uint8_t hash[32]) {
+    if (tree < 0 || (size_t) tree >= mock->n_trees) {
+        return -1;
+    }
+    mock_merkle_tree_t *t = &mock->trees[tree];
+    if (t->n_elements >= MOCK_MAX_TREE_ELEMS) {
+        return -1;
+    }
+    size_t i = t->n_elements++;
+    memcpy(t->element_hashes[i], hash, 32);
+    t->raw_element_lens[i] = 0;
+    return 0;
+}
+
+void mock_dispatcher_tree_end(mock_dispatcher_t *mock, int tree, uint8_t out_root[32]) {
+    if (tree < 0 || (size_t) tree >= mock->n_trees) {
+        return;
+    }
+    mock_merkle_tree_t *t = &mock->trees[tree];
+    build_merkle_root((const uint8_t(*)[32]) t->element_hashes, 0, t->n_elements, t->root);
+    if (out_root != NULL) {
+        memcpy(out_root, t->root, 32);
+    }
 }

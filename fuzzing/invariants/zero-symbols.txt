@@ -1,0 +1,86 @@
+# Bitcoin-specific symbols to zero out of the Absolution prefix (in addition
+# to the framework SDK list). Zeroing removes a symbol from the prefix
+# entirely (fixed 0), reclaiming bytes from globals that do not gate parsing.
+
+# App runtime state — overwritten during dispatch, not branch-gating.
+G_output_len
+G_dispatcher_state
+G_dispatcher_context
+g_ui_state
+G_sign_psbt_cache
+pairs
+
+# Pointers overwritten by the harness every iteration (random bytes crash).
+G_processing_screen_text
+G_swap_sign_return_value_address@handle_swap_sign_transaction.c
+
+# SDK swap return-value pointer: only dereferenced under #ifdef HAVE_SWAP in
+# io.c, which is not compiled in this build. Zero it to a defined NULL state.
+G_swap_signing_return_value_address@lib_standard_app
+
+# Timeout bookkeeping (io_ext.c): set by the SDK ticker, gates no parser
+# branch (bounded by G_is_timeout_active, which starts false).
+G_ticks@io_ext.c
+G_interruption_timeout_start_tick@io_ext.c
+G_processing_timeout_start_tick@io_ext.c
+G_is_timeout_active@io_ext.c
+
+# Stack canary (constant, never mutated).
+
+# Crypto context (internal to the mock, no app branches).
+G_cx
+
+# UI display state — set by display functions, no pre-condition branches.
+confirmed_status@display_nbgl.c
+rejected_status@display_nbgl.c
+n_pairs@display_nbgl.c
+pairList@display_nbgl.c
+g_current_streaming_index@display.c
+nbTicks@ux.c
+pos@ux.c
+
+# Linker/OS symbols (meaningless to mutate).
+_bss
+_ebss
+
+# Mock/harness state — programmatically controlled or reset each iteration.
+# g_btc_host is defined in harness/fuzz_dispatcher.c, which is not in
+# absolution_targets.txt -- absolution never models it, so no pin is needed.
+# (Left documented rather than as a dead selector: the ~18 MB mock_dispatcher
+# struct it holds would dominate the prefix if that TU were ever added.)
+g_active_mock
+fuzz_continuation_host
+fuzz_continuation_idx
+
+# Mangled aliases of file-static booleans overridden via their canonical
+# names (g_ux_flow_ended, g_ux_flow_response in display.c).
+___src_ui_display_c_g_ux_flow_ended
+___src_ui_display_c_g_ux_flow_response
+
+# PSBT model mock state.
+g_derived_xpub
+g_pm_desc_idx
+pm_force_sign_mode
+
+# G_swap_state is NOT zeroed — Absolution drives it directly (field-level
+# domains in domain-overrides.txt).
+
+# NBGL settings page state. menu_nbgl.c writes settingsSwitches[] and
+# initSettingPage before any read, so the 19 prefix bytes Absolution spends
+# sampling them cannot change behaviour -- and .text/.subText are `const char *`
+# fields, i.e. wild pointers if ever dereferenced.
+settingsSwitches
+initSettingPage
+
+# psbt_entropy and the fault knobs are re-read from the input by
+# fuzz_dispatcher.c (memcpy at the top of fuzz_entry, btc_read_fault_knobs)
+# *after* sample_invariant() runs, so the 20 prefix bytes spent sampling them
+# are discarded before the app sees them. The input still drives both.
+psbt_entropy
+btc_fault_kind
+btc_fault_target
+btc_fault_param
+
+# pm_derive_mock_xpub()'s cache flag. Its only reader has no call site, and a
+# sampled value can claim a derivation happened when g_derived_xpub is unset.
+g_xpub_derived
