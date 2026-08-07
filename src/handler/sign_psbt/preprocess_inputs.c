@@ -168,12 +168,12 @@ bool __attribute__((noinline)) preprocess_inputs(
 
             // check if the prevout_hash of the transaction matches the computed one from the
             // non-witness utxo
-            if (0 > call_get_merkleized_map_value(dc,
-                                                  &input.in_out.map,
-                                                  (uint8_t[]) {PSBT_IN_PREVIOUS_TXID},
-                                                  1,
-                                                  prevout_hash,
-                                                  sizeof(prevout_hash))) {
+            if (32 != call_get_merkleized_map_value(dc,
+                                                    &input.in_out.map,
+                                                    (uint8_t[]) {PSBT_IN_PREVIOUS_TXID},
+                                                    1,
+                                                    prevout_hash,
+                                                    sizeof(prevout_hash))) {
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return false;
             }
