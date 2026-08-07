@@ -66,8 +66,8 @@ int merkle_get_ith_direction(size_t size, size_t index, size_t i) {
         uint8_t depth = ceil_lg(size);
 
         // bitmask of the direction from the current node, where 0 = left, 1 = right;
-        // also the number of leaves of the left subtree
-        uint32_t mask = 1 << (depth - 1);
+        // also the number of leaves of the left subtree. Unsigned: depth can reach 32.
+        uint32_t mask = 1U << (depth - 1);
 
         uint8_t is_right_child = (index & mask) != 0 ? 1 : 0;
 

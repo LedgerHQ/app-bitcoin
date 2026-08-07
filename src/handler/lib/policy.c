@@ -1964,7 +1964,7 @@ static int check_older_node_cb(const policy_node_t *node, void *callback_state) 
     (void) callback_state;
     if (node->type == TOKEN_OLDER) {
         const policy_node_with_uint32_t *older = (const policy_node_with_uint32_t *) node;
-        uint32_t n = older->n & ~SEQUENCE_LOCKTIME_TYPE_FLAG;
+        uint32_t n = older->n & ~(uint32_t) SEQUENCE_LOCKTIME_TYPE_FLAG;
         if (n < 1 || n > 65535) {
             return -1;
         }
