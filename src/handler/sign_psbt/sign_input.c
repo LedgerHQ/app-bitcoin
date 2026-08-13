@@ -34,12 +34,12 @@
 #include "dispatcher.h"
 #include "error_codes.h"
 #include "get_merkleized_map.h"
-#include "get_merkleized_map_value.h"
 #include "init_global_state.h"
 #include "musig_signing.h"
 #include "policy.h"
 #include "preprocess_inputs.h"
 #include "psbt.h"
+#include "psbt_fields.h"
 #include "sign_psbt_cache.h"
 #include "sw.h"
 #include "txhashes.h"
@@ -231,11 +231,8 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
     // changes depending on the type of spend; therefore, we set it later.
     if (input->has_sighash_type) {
         // Get sighash type
-        if (4 != call_get_merkleized_map_value_u32_le(dc,
-                                                      &input->in_out.map,
-                                                      (uint8_t[]) {PSBT_IN_SIGHASH_TYPE},
-                                                      1,
-                                                      &input->sighash_type)) {
+        if (PSBT_FIELD_PRESENT !=
+            psbt_get_input_sighash_type(dc, &input->in_out.map, &input->sighash_type)) {
             PRINTF("Malformed PSBT_IN_SIGHASH_TYPE for input %d\n", cur_input_index);
 
             SEND_SW(dc, SW_INCORRECT_DATA);
@@ -324,14 +321,12 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 // wrapped segwit transactions that we support
                 uint8_t redeemScript[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
 
-                int redeemScript_length =
-                    call_get_merkleized_map_value(dc,
-                                                  &input->in_out.map,
-                                                  (uint8_t[]) {PSBT_IN_REDEEM_SCRIPT},
-                                                  1,
-                                                  redeemScript,
-                                                  sizeof(redeemScript));
-                if (redeemScript_length < 0) {
+                size_t redeemScript_length;
+                if (PSBT_FIELD_PRESENT != psbt_get_input_redeem_script(dc,
+                                                                       &input->in_out.map,
+                                                                       redeemScript,
+                                                                       sizeof(redeemScript),
+                                                                       &redeemScript_length)) {
                     PRINTF("Error fetching redeem script\n");
                     SEND_SW(dc, SW_INCORRECT_DATA);
                     return false;

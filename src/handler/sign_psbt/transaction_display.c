@@ -29,9 +29,9 @@
 #include "dispatcher.h"
 #include "display.h"
 #include "get_merkleized_map.h"
-#include "get_merkleized_map_value.h"
 #include "menu.h"
 #include "psbt.h"
+#include "psbt_fields.h"
 #include "script.h"
 #include "sighash.h"
 #include "sw.h"
@@ -91,37 +91,21 @@ static bool get_output_script_and_amount(
         return false;
     }
 
-    // Read output amount
-    uint8_t raw_result[8];
-
     // Read the output's amount
-    int result_len = call_get_merkleized_map_value(dc,
-                                                   &map,
-                                                   (uint8_t[]) {PSBT_OUT_AMOUNT},
-                                                   1,
-                                                   raw_result,
-                                                   sizeof(raw_result));
-    if (result_len != 8) {
+    if (PSBT_FIELD_PRESENT != psbt_get_output_amount(dc, &map, out_amount)) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }
-    uint64_t value = read_u64_le(raw_result, 0);
-    *out_amount = value;
 
     // Read the output's scriptPubKey
-    result_len = call_get_merkleized_map_value(dc,
-                                               &map,
-                                               (uint8_t[]) {PSBT_OUT_SCRIPT},
-                                               1,
-                                               out_scriptPubKey,
-                                               MAX_OUTPUT_SCRIPTPUBKEY_LEN);
-
-    if (result_len < 0 || result_len > MAX_OUTPUT_SCRIPTPUBKEY_LEN) {
+    if (PSBT_FIELD_PRESENT != psbt_get_output_script(dc,
+                                                     &map,
+                                                     out_scriptPubKey,
+                                                     MAX_OUTPUT_SCRIPTPUBKEY_LEN,
+                                                     out_scriptPubKey_len)) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }
-
-    *out_scriptPubKey_len = result_len;
 
     return true;
 }

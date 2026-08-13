@@ -1,8 +1,5 @@
 #pragma once
 
-/* SDK headers */
-#include "read.h"
-
 /* Local headers */
 #include "dispatcher.h"
 #include "map_value_status.h"
@@ -35,24 +32,3 @@ int call_get_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                   size_t key_len,
                                   uint8_t *out,
                                   size_t out_len);
-
-/**
- * Convenience shortcut to read a little-endian unsigned 32-bit int.
- * TODO: more docs
- */
-static inline int call_get_merkleized_map_value_u32_le(dispatcher_context_t *dispatcher_context,
-                                                       const merkleized_map_commitment_t *map,
-                                                       const uint8_t *key,
-                                                       size_t key_len,
-                                                       uint32_t *out) {
-    uint8_t result_raw[4];
-
-    int res = call_get_merkleized_map_value(dispatcher_context, map, key, key_len, result_raw, 4);
-    if (res != 4) {
-        return -1;
-    }
-
-    *out = read_u32_le(result_raw, 0);
-
-    return 4;
-}

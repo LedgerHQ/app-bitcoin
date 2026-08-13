@@ -17,12 +17,15 @@
 
 #include "txhashes.h"
 
+/* SDK headers */
+#include "write.h"
+
 /* Local headers */
 #include "amount_from_psbt.h"
 #include "error_codes.h"
 #include "get_merkleized_map.h"
-#include "get_merkleized_map_value.h"
 #include "psbt.h"
+#include "psbt_fields.h"
 #include "stream_merkleized_map_value.h"
 
 /* BIP0341 tags for computing the tagged hashes when computing he sighash */
@@ -94,28 +97,21 @@ static int hash_output_n(dispatcher_context_t *dc,
     }
 
     // get output's amount
-    uint8_t amount_raw[8];
-    if (8 != call_get_merkleized_map_value(dc,
-                                           &ith_map,
-                                           (uint8_t[]) {PSBT_OUT_AMOUNT},
-                                           1,
-                                           amount_raw,
-                                           8)) {
+    uint64_t amount;
+    if (PSBT_FIELD_PRESENT != psbt_get_output_amount(dc, &ith_map, &amount)) {
         return -1;
     }
 
+    uint8_t amount_raw[8];
+    write_u64_le(amount_raw, 0, amount);
     crypto_hash_update(hash_context, amount_raw, 8);
 
     // get output's scriptPubKey
 
     uint8_t out_script[MAX_OUTPUT_SCRIPTPUBKEY_LEN];
-    int out_script_len = call_get_merkleized_map_value(dc,
-                                                       &ith_map,
-                                                       (uint8_t[]) {PSBT_OUT_SCRIPT},
-                                                       1,
-                                                       out_script,
-                                                       sizeof(out_script));
-    if (out_script_len < 0) {
+    size_t out_script_len;
+    if (PSBT_FIELD_PRESENT !=
+        psbt_get_output_script(dc, &ith_map, out_script, sizeof(out_script), &out_script_len)) {
         return -1;
     }
 
@@ -160,42 +156,31 @@ bool __attribute__((noinline)) compute_tx_hashes(dispatcher_context_t *dc,
 
             // get prevout hash and output index for the i-th input
             uint8_t ith_prevout_hash[32];
-            if (32 != call_get_merkleized_map_value(dc,
-                                                    &ith_map,
-                                                    (uint8_t[]) {PSBT_IN_PREVIOUS_TXID},
-                                                    1,
-                                                    ith_prevout_hash,
-                                                    32)) {
+            if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_txid(dc, &ith_map, ith_prevout_hash)) {
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return false;
             }
 
             crypto_hash_update(&sha_prevouts_context.header, ith_prevout_hash, 32);
 
-            uint8_t ith_prevout_n_raw[4];
-            if (4 != call_get_merkleized_map_value(dc,
-                                                   &ith_map,
-                                                   (uint8_t[]) {PSBT_IN_OUTPUT_INDEX},
-                                                   1,
-                                                   ith_prevout_n_raw,
-                                                   4)) {
+            uint32_t ith_prevout_n;
+            if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_index(dc, &ith_map, &ith_prevout_n)) {
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return false;
             }
 
+            uint8_t ith_prevout_n_raw[4];
+            write_u32_le(ith_prevout_n_raw, 0, ith_prevout_n);
             crypto_hash_update(&sha_prevouts_context.header, ith_prevout_n_raw, 4);
 
-            uint8_t ith_nSequence_raw[4];
-            if (4 != call_get_merkleized_map_value(dc,
-                                                   &ith_map,
-                                                   (uint8_t[]) {PSBT_IN_SEQUENCE},
-                                                   1,
-                                                   ith_nSequence_raw,
-                                                   4)) {
+            uint32_t ith_nSequence;
+            if (PSBT_FIELD_PRESENT != psbt_get_input_sequence(dc, &ith_map, &ith_nSequence)) {
                 // if no PSBT_IN_SEQUENCE is present, we must assume nSequence 0xFFFFFFFF
-                memset(ith_nSequence_raw, 0xFF, 4);
+                ith_nSequence = 0xFFFFFFFF;
             }
 
+            uint8_t ith_nSequence_raw[4];
+            write_u32_le(ith_nSequence_raw, 0, ith_nSequence);
             crypto_hash_update(&sha_sequences_context.header, ith_nSequence_raw, 4);
         }
 
@@ -309,29 +294,21 @@ bool __attribute__((noinline)) compute_sighash_legacy(dispatcher_context_t *dc,
 
         // get prevout hash and output index for the i-th input
         uint8_t ith_prevout_hash[32];
-        if (32 != call_get_merkleized_map_value(dc,
-                                                &ith_map,
-                                                (uint8_t[]) {PSBT_IN_PREVIOUS_TXID},
-                                                1,
-                                                ith_prevout_hash,
-                                                32)) {
+        if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_txid(dc, &ith_map, ith_prevout_hash)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
 
         crypto_hash_update(&sighash_context.header, ith_prevout_hash, 32);
 
-        uint8_t ith_prevout_n_raw[4];
-        if (4 != call_get_merkleized_map_value(dc,
-                                               &ith_map,
-                                               (uint8_t[]) {PSBT_IN_OUTPUT_INDEX},
-                                               1,
-                                               ith_prevout_n_raw,
-                                               4)) {
+        uint32_t ith_prevout_n;
+        if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_index(dc, &ith_map, &ith_prevout_n)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
 
+        uint8_t ith_prevout_n_raw[4];
+        write_u32_le(ith_prevout_n_raw, 0, ith_prevout_n);
         crypto_hash_update(&sighash_context.header, ith_prevout_n_raw, 4);
 
         if (i != input_index) {
@@ -368,17 +345,14 @@ bool __attribute__((noinline)) compute_sighash_legacy(dispatcher_context_t *dc,
             }
         }
 
-        uint8_t ith_nSequence_raw[4];
-        if (4 != call_get_merkleized_map_value(dc,
-                                               &ith_map,
-                                               (uint8_t[]) {PSBT_IN_SEQUENCE},
-                                               1,
-                                               ith_nSequence_raw,
-                                               4)) {
+        uint32_t ith_nSequence;
+        if (PSBT_FIELD_PRESENT != psbt_get_input_sequence(dc, &ith_map, &ith_nSequence)) {
             // if no PSBT_IN_SEQUENCE is present, we must assume nSequence 0xFFFFFFFF
-            memset(ith_nSequence_raw, 0xFF, 4);
+            ith_nSequence = 0xFFFFFFFF;
         }
 
+        uint8_t ith_nSequence_raw[4];
+        write_u32_le(ith_nSequence_raw, 0, ith_nSequence);
         crypto_hash_update(&sighash_context.header, ith_nSequence_raw, 4);
     }
 
@@ -450,29 +424,21 @@ bool __attribute__((noinline)) compute_sighash_segwitv0(
 
         // get prevout hash and output index for the current input
         uint8_t prevout_hash[32];
-        if (32 != call_get_merkleized_map_value(dc,
-                                                input_map,
-                                                (uint8_t[]) {PSBT_IN_PREVIOUS_TXID},
-                                                1,
-                                                prevout_hash,
-                                                32)) {
+        if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_txid(dc, input_map, prevout_hash)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
 
         crypto_hash_update(&sighash_context.header, prevout_hash, 32);
 
-        uint8_t prevout_n_raw[4];
-        if (4 != call_get_merkleized_map_value(dc,
-                                               input_map,
-                                               (uint8_t[]) {PSBT_IN_OUTPUT_INDEX},
-                                               1,
-                                               prevout_n_raw,
-                                               4)) {
+        uint32_t prevout_n;
+        if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_index(dc, input_map, &prevout_n)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
 
+        uint8_t prevout_n_raw[4];
+        write_u32_le(prevout_n_raw, 0, prevout_n);
         crypto_hash_update(&sighash_context.header, prevout_n_raw, 4);
     }
 
@@ -521,37 +487,28 @@ bool __attribute__((noinline)) compute_sighash_segwitv0(
     }
 
     {
-        // input value, taken from the WITNESS_UTXO field
-        uint8_t witness_utxo[8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN];
-
-        int witness_utxo_len = call_get_merkleized_map_value(dc,
-                                                             input_map,
-                                                             (uint8_t[]) {PSBT_IN_WITNESS_UTXO},
-                                                             1,
-                                                             witness_utxo,
-                                                             sizeof(witness_utxo));
-        if (witness_utxo_len < 8) {
+        // input value (8-byte amount), taken from the WITNESS_UTXO field
+        uint64_t amount;
+        if (PSBT_FIELD_PRESENT != psbt_get_input_witness_utxo_amount(dc, input_map, &amount)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
 
-        crypto_hash_update(&sighash_context.header,
-                           witness_utxo,
-                           8);  // only the first 8 bytes (amount)
+        uint8_t amount_raw[8];
+        write_u64_le(amount_raw, 0, amount);
+        crypto_hash_update(&sighash_context.header, amount_raw, 8);
     }
 
     // nSequence
     {
-        uint8_t nSequence_raw[4];
-        if (4 != call_get_merkleized_map_value(dc,
-                                               input_map,
-                                               (uint8_t[]) {PSBT_IN_SEQUENCE},
-                                               1,
-                                               nSequence_raw,
-                                               4)) {
+        uint32_t nSequence;
+        if (PSBT_FIELD_PRESENT != psbt_get_input_sequence(dc, input_map, &nSequence)) {
             // if no PSBT_IN_SEQUENCE is present, we must assume nSequence 0xFFFFFFFF
-            memset(nSequence_raw, 0xFF, 4);
+            nSequence = 0xFFFFFFFF;
         }
+
+        uint8_t nSequence_raw[4];
+        write_u32_le(nSequence_raw, 0, nSequence);
         crypto_hash_update(&sighash_context.header, nSequence_raw, 4);
     }
 
@@ -643,40 +600,29 @@ bool __attribute__((noinline)) compute_sighash_segwitv1(
 
     if ((sighash_byte & 0x80) == SIGHASH_ANYONECANPAY) {
         // outpoint (hash)
-        if (32 != call_get_merkleized_map_value(dc,
-                                                input_map,
-                                                (uint8_t[]) {PSBT_IN_PREVIOUS_TXID},
-                                                1,
-                                                tmp,
-                                                32)) {
+        if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_txid(dc, input_map, tmp)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
         crypto_hash_update(&sighash_context.header, tmp, 32);
 
         // outpoint (output index)
-        if (4 != call_get_merkleized_map_value(dc,
-                                               input_map,
-                                               (uint8_t[]) {PSBT_IN_OUTPUT_INDEX},
-                                               1,
-                                               tmp,
-                                               4)) {
+        uint32_t prevout_n;
+        if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_index(dc, input_map, &prevout_n)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
+        write_u32_le(tmp, 0, prevout_n);
         crypto_hash_update(&sighash_context.header, tmp, 4);
 
-        if (8 > call_get_merkleized_map_value(dc,
-                                              input_map,
-                                              (uint8_t[]) {PSBT_IN_WITNESS_UTXO},
-                                              1,
-                                              tmp,
-                                              8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN)) {
+        uint64_t amount;
+        if (PSBT_FIELD_PRESENT != psbt_get_input_witness_utxo_amount(dc, input_map, &amount)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
 
         // amount
+        write_u64_le(tmp, 0, amount);
         crypto_hash_update(&sighash_context.header, tmp, 8);
 
         // scriptPubKey
@@ -684,15 +630,12 @@ bool __attribute__((noinline)) compute_sighash_segwitv1(
         crypto_hash_update(&sighash_context.header, scriptPubKey, scriptPubKey_len);
 
         // nSequence
-        if (4 != call_get_merkleized_map_value(dc,
-                                               input_map,
-                                               (uint8_t[]) {PSBT_IN_SEQUENCE},
-                                               1,
-                                               tmp,
-                                               4)) {
+        uint32_t nSequence;
+        if (PSBT_FIELD_PRESENT != psbt_get_input_sequence(dc, input_map, &nSequence)) {
             // if no PSBT_IN_SEQUENCE is present, we must assume nSequence 0xFFFFFFFF
-            memset(tmp, 0xFF, 4);
+            nSequence = 0xFFFFFFFF;
         }
+        write_u32_le(tmp, 0, nSequence);
         crypto_hash_update(&sighash_context.header, tmp, 4);
     } else {
         // input_index

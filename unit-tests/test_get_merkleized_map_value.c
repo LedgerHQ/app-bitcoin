@@ -1,7 +1,5 @@
 /**
- * Unit tests for call_get_merkleized_map_value (and the
- * call_get_merkleized_map_value_u32_le convenience wrapper) using the
- * mock dispatcher.
+ * Unit tests for call_get_merkleized_map_value using the mock dispatcher.
  *
  * call_get_merkleized_map_value looks up a key in a merkleized key-value
  * map (by finding its index via Merkle leaf index), then fetches the
@@ -125,8 +123,8 @@ static void test_map_value_unsorted_input(void **state) {
 }
 
 /**
- * Error: the key is not present in the map. call_get_merkle_leaf_index
- * returns a negative value, which must be propagated as -1.
+ * The key is not present in the map, which must be reported as MAP_VALUE_ABSENT rather than as a
+ * generic failure.
  */
 static void test_map_value_key_not_found(void **state) {
     mock_dispatcher_t *mock = *state;
@@ -152,13 +150,14 @@ static void test_map_value_key_not_found(void **state) {
                                                sizeof(missing_key),
                                                out,
                                                sizeof(out));
-    assert_int_equal(result, -1);
+    /* A genuinely missing key must be reported as absent, distinctly from a failed lookup, so
+     * that callers may safely apply a default for an optional field. */
+    assert_int_equal(result, MAP_VALUE_ABSENT);
 }
 
 /**
- * Error: output buffer too small to hold the value. The underlying
- * call_get_merkle_leaf_element returns a negative value when the
- * preimage does not fit, which must be propagated.
+ * Error: output buffer too small to hold the value. The underlying flow reports that the preimage
+ * does not fit, which must reach the caller as MAP_VALUE_ERROR.
  */
 static void test_map_value_out_buffer_too_small(void **state) {
     mock_dispatcher_t *mock = *state;
@@ -178,7 +177,10 @@ static void test_map_value_out_buffer_too_small(void **state) {
     uint8_t out[2];
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkleized_map_value(dc, &commitment, key, sizeof(key), out, sizeof(out));
-    assert_true(result < 0);
+    /* Present but too long for the buffer is an ERROR, NOT ABSENT. Before the statuses were
+     * separated both surfaced as -1, so a caller substituting a default for an optional field
+     * would have signed over a value the client never committed to. */
+    assert_int_equal(result, MAP_VALUE_ERROR);
 }
 
 /**
@@ -205,93 +207,6 @@ static void test_map_value_empty_value(void **state) {
     assert_int_equal(result, 0);
     /* Buffer must be left untouched. */
     assert_int_equal(out[0], 0xCD);
-}
-
-/**
- * Happy path for call_get_merkleized_map_value_u32_le: a 4-byte
- * little-endian value is decoded into a uint32_t.
- */
-static void test_map_value_u32_le(void **state) {
-    mock_dispatcher_t *mock = *state;
-
-    const uint8_t key[] = {0x10};
-    /* 0xDEADBEEF in little-endian */
-    const uint8_t value[] = {0xEF, 0xBE, 0xAD, 0xDE};
-
-    const uint8_t *keys[] = {key};
-    const size_t key_lens[] = {sizeof(key)};
-    const uint8_t *values[] = {value};
-    const size_t value_lens[] = {sizeof(value)};
-
-    merkleized_map_commitment_t commitment;
-    mock_dispatcher_add_map(mock, keys, key_lens, values, value_lens, 1, &commitment);
-
-    uint32_t got = 0;
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
-    int result = call_get_merkleized_map_value_u32_le(dc, &commitment, key, sizeof(key), &got);
-
-    assert_int_equal(result, 4);
-    assert_int_equal(got, 0xDEADBEEFu);
-}
-
-/**
- * Error path for call_get_merkleized_map_value_u32_le: the value at the
- * key has a length different from 4. The wrapper must return -1 without
- * writing to the output.
- */
-static void test_map_value_u32_le_wrong_length(void **state) {
-    mock_dispatcher_t *mock = *state;
-
-    const uint8_t key[] = {0x10};
-    /* Only 3 bytes — not a valid 32-bit value. */
-    const uint8_t value[] = {0x01, 0x02, 0x03};
-
-    const uint8_t *keys[] = {key};
-    const size_t key_lens[] = {sizeof(key)};
-    const uint8_t *values[] = {value};
-    const size_t value_lens[] = {sizeof(value)};
-
-    merkleized_map_commitment_t commitment;
-    mock_dispatcher_add_map(mock, keys, key_lens, values, value_lens, 1, &commitment);
-
-    uint32_t got = 0xCAFEBABEu;
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
-    int result = call_get_merkleized_map_value_u32_le(dc, &commitment, key, sizeof(key), &got);
-
-    assert_int_equal(result, -1);
-    /* The wrapper bails out before assigning to *out. */
-    assert_int_equal(got, 0xCAFEBABEu);
-}
-
-/**
- * Error path for call_get_merkleized_map_value_u32_le: the key is not
- * present in the map.
- */
-static void test_map_value_u32_le_key_not_found(void **state) {
-    mock_dispatcher_t *mock = *state;
-
-    const uint8_t key[] = {0x10};
-    const uint8_t value[] = {0x01, 0x02, 0x03, 0x04};
-
-    const uint8_t *keys[] = {key};
-    const size_t key_lens[] = {sizeof(key)};
-    const uint8_t *values[] = {value};
-    const size_t value_lens[] = {sizeof(value)};
-
-    merkleized_map_commitment_t commitment;
-    mock_dispatcher_add_map(mock, keys, key_lens, values, value_lens, 1, &commitment);
-
-    const uint8_t missing_key[] = {0xFF};
-
-    uint32_t got = 0;
-    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
-    int result = call_get_merkleized_map_value_u32_le(dc,
-                                                      &commitment,
-                                                      missing_key,
-                                                      sizeof(missing_key),
-                                                      &got);
-
-    assert_int_equal(result, -1);
 }
 
 /**
@@ -354,9 +269,6 @@ int main(void) {
         T(test_map_value_key_not_found),
         T(test_map_value_out_buffer_too_small),
         T(test_map_value_empty_value),
-        T(test_map_value_u32_le),
-        T(test_map_value_u32_le_wrong_length),
-        T(test_map_value_u32_le_key_not_found),
         T(test_map_value_corrupted_value_proof),
     };
 #undef T

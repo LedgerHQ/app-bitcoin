@@ -33,11 +33,11 @@
 #include "dispatcher.h"
 #include "error_codes.h"
 #include "get_merkleized_map.h"
-#include "get_merkleized_map_value.h"
 #include "init_global_state.h"
 #include "policy.h"
 #include "process_in_outs.h"
 #include "psbt.h"
+#include "psbt_fields.h"
 #include "sighash.h"
 #include "sign_psbt_cache.h"
 #include "sw.h"
@@ -168,12 +168,8 @@ bool __attribute__((noinline)) preprocess_inputs(
 
             // check if the prevout_hash of the transaction matches the computed one from the
             // non-witness utxo
-            if (32 != call_get_merkleized_map_value(dc,
-                                                    &input.in_out.map,
-                                                    (uint8_t[]) {PSBT_IN_PREVIOUS_TXID},
-                                                    1,
-                                                    prevout_hash,
-                                                    sizeof(prevout_hash))) {
+            if (PSBT_FIELD_PRESENT !=
+                psbt_get_input_prevout_txid(dc, &input.in_out.map, prevout_hash)) {
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return false;
             }
@@ -301,11 +297,8 @@ bool __attribute__((noinline)) preprocess_inputs(
         }
 
         // get the sighash_type
-        if (4 != call_get_merkleized_map_value_u32_le(dc,
-                                                      &input.in_out.map,
-                                                      (uint8_t[]) {PSBT_IN_SIGHASH_TYPE},
-                                                      1,
-                                                      &input.sighash_type)) {
+        if (PSBT_FIELD_PRESENT !=
+            psbt_get_input_sighash_type(dc, &input.in_out.map, &input.sighash_type)) {
             PRINTF("Malformed PSBT_IN_SIGHASH_TYPE for input %d\n", cur_input_index);
 
             SEND_SW(dc, SW_INCORRECT_DATA);

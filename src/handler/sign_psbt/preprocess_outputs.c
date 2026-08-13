@@ -30,9 +30,9 @@
 #include "dispatcher.h"
 #include "error_codes.h"
 #include "get_merkleized_map.h"
-#include "get_merkleized_map_value.h"
 #include "process_in_outs.h"
 #include "psbt.h"
+#include "psbt_fields.h"
 #include "sign_psbt_cache.h"
 #include "sw.h"
 
@@ -131,21 +131,12 @@ bool __attribute__((noinline)) preprocess_outputs(
             return false;
         }
 
-        // Read output amount
-        uint8_t raw_result[8];
-
         // Read the output's amount
-        int result_len = call_get_merkleized_map_value(dc,
-                                                       &output.in_out.map,
-                                                       (uint8_t[]) {PSBT_OUT_AMOUNT},
-                                                       1,
-                                                       raw_result,
-                                                       sizeof(raw_result));
-        if (result_len != 8) {
+        uint64_t value;
+        if (PSBT_FIELD_PRESENT != psbt_get_output_amount(dc, &output.in_out.map, &value)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
-        uint64_t value = read_u64_le(raw_result, 0);
 
         if (value > BITCOIN_TOTAL_SUPPLY) {
             // sanity check to avoid overflows in amounts
@@ -158,19 +149,14 @@ bool __attribute__((noinline)) preprocess_outputs(
         st->outputs.total_amount += value;
 
         // Read the output's scriptPubKey
-        result_len = call_get_merkleized_map_value(dc,
-                                                   &output.in_out.map,
-                                                   (uint8_t[]) {PSBT_OUT_SCRIPT},
-                                                   1,
-                                                   output.in_out.scriptPubKey,
-                                                   sizeof(output.in_out.scriptPubKey));
-
-        if (result_len < 0 || result_len > (int) sizeof(output.in_out.scriptPubKey)) {
+        if (PSBT_FIELD_PRESENT != psbt_get_output_script(dc,
+                                                         &output.in_out.map,
+                                                         output.in_out.scriptPubKey,
+                                                         sizeof(output.in_out.scriptPubKey),
+                                                         &output.in_out.scriptPubKey_len)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
-
-        output.in_out.scriptPubKey_len = result_len;
 
         int is_internal = is_in_out_internal(dc, st, sign_psbt_cache, &output.in_out, false);
 
