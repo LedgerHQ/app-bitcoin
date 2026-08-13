@@ -13,8 +13,8 @@
  * Returns a negative number if the key is not found, or any of the proofs failed. Returns 0 on
  * success.
  *
- * NOTE: this does _not_ check that the keys are lexicographically sorted; the sanity check needs to
- * be done before.
+ * PRECONDITION: the map's keys must have already been verified to be lexicographically sorted;
+ * this function asserts it (LEDGER_ASSERT on `map->_keys_are_sorted`).
  */
 int call_get_merkleized_map_value_hash(dispatcher_context_t *dispatcher_context,
                                        const merkleized_map_commitment_t *map,

@@ -123,9 +123,9 @@ static bool __attribute__((noinline)) parse_sign_psbt_apdu(dispatcher_context_t 
  */
 static bool __attribute__((noinline)) process_global_map(dispatcher_context_t *dc,
                                                          sign_psbt_state_t *st) {
-    // Check integrity of the global map
-    if (call_check_merkle_tree_sorted(dc, st->global_map.keys_root, (size_t) st->global_map.size) <
-        0) {
+    // Check integrity of the global map (this also marks it as validated, so that its values may
+    // be read by key below).
+    if (call_check_merkleized_map_sorted(dc, &st->global_map) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }

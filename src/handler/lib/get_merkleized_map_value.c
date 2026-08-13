@@ -2,6 +2,9 @@
 
 #include "get_merkleized_map_value.h"
 
+/* SDK headers */
+#include "ledger_assert.h"
+
 /* Local headers */
 #include "get_merkle_leaf_element.h"
 #include "get_merkle_leaf_index.h"
@@ -13,6 +16,10 @@ int call_get_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                   uint8_t *out,
                                   size_t out_len) {
     // LOG_PROCESSOR(__FILE__, __LINE__, __func__);
+
+    // Reading a value by key is only sound once the map's keys have been verified sorted (hence
+    // unique); otherwise a malicious client could equivocate. This must hold by construction.
+    LEDGER_ASSERT(map->_keys_are_sorted, "map keys not validated as sorted");
 
     uint8_t key_merkle_hash[32];
     merkle_compute_element_hash(key, key_len, key_merkle_hash);

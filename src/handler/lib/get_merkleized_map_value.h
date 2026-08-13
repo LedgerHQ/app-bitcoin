@@ -16,8 +16,15 @@
  * Returns a negative number if the response is too long to fit into the output buffer, or if the
  * key is not found, or if any of the proofs failed. Returns the length of the preimage on success.
  *
- * NOTE: this does _not_ check that the keys are lexicographically sorted; the sanity check needs to
- * be done before.
+ * PRECONDITION: the map's keys must have already been verified to be lexicographically sorted (and
+ * therefore unique); this is what makes a by-key lookup unambiguous. A map is validated either by
+ * `call_get_merkleized_map[_with_callback]` (which validates before returning) or by
+ * `call_check_merkleized_map_sorted`. This function asserts that precondition (LEDGER_ASSERT on
+ * `map->_keys_are_sorted`); it does NOT re-check the ordering itself.
+ *
+ * NOTE for callbacks fired during validation (via call_get_merkleized_map_with_callback): at that
+ * point the map is not yet validated, so values must be read by index (on `values_root`) and never
+ * by key through this function or its siblings.
  */
 int call_get_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                   const merkleized_map_commitment_t *map,

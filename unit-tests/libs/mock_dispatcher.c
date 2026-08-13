@@ -553,6 +553,9 @@ void mock_dispatcher_add_map(mock_dispatcher_t *mock,
     out_commitment->size = (uint64_t) n;
     memcpy(out_commitment->keys_root, mock->trees[keys_tree_idx].root, 32);
     memcpy(out_commitment->values_root, mock->trees[values_tree_idx].root, 32);
+    /* The mock builds the keys tree already sorted, so the commitment satisfies the invariant that
+     * the by-key value readers assert on (matching what call_get_merkleized_map guarantees). */
+    out_commitment->_keys_are_sorted = true;
 }
 
 /* ---- Helper: register a psbt_map_t with the mock ---- */
