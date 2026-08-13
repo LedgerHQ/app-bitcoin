@@ -15,7 +15,7 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
     do {
         if (root == NULL || root->type != TOKEN_PKH) break;
         const policy_node_with_key_t *ct_n1 = (const policy_node_with_key_t *) root;
-        const policy_node_keyexpr_t *ct_k2 = r_policy_node_keyexpr(&ct_n1->key);
+        const policy_node_keyexpr_t *ct_k2 = ct_n1->key;
         if (ct_k2->type != KEY_EXPRESSION_NORMAL) break;
         set_binding_key(&out->bindings, 0, ct_k2);
         out->bindings.n = 1;
@@ -27,7 +27,7 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
     do {
         if (root == NULL || root->type != TOKEN_WPKH) break;
         const policy_node_with_key_t *ct_n1 = (const policy_node_with_key_t *) root;
-        const policy_node_keyexpr_t *ct_k2 = r_policy_node_keyexpr(&ct_n1->key);
+        const policy_node_keyexpr_t *ct_k2 = ct_n1->key;
         if (ct_k2->type != KEY_EXPRESSION_NORMAL) break;
         set_binding_key(&out->bindings, 0, ct_k2);
         out->bindings.n = 1;
@@ -38,10 +38,10 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
     do {
         if (root == NULL || root->type != TOKEN_SH) break;
         const policy_node_with_script_t *ct_n1 = (const policy_node_with_script_t *) root;
-        const policy_node_t *ct_c2 = r_policy_node(&ct_n1->script);
+        const policy_node_t *ct_c2 = ct_n1->script;
         if (ct_c2 == NULL || ct_c2->type != TOKEN_WPKH) break;
         const policy_node_with_key_t *ct_n3 = (const policy_node_with_key_t *) ct_c2;
-        const policy_node_keyexpr_t *ct_k4 = r_policy_node_keyexpr(&ct_n3->key);
+        const policy_node_keyexpr_t *ct_k4 = ct_n3->key;
         if (ct_k4->type != KEY_EXPRESSION_NORMAL) break;
         set_binding_key(&out->bindings, 0, ct_k4);
         out->bindings.n = 1;
@@ -53,10 +53,10 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
     do {
         if (root == NULL || root->type != TOKEN_SH) break;
         const policy_node_with_script_t *ct_n1 = (const policy_node_with_script_t *) root;
-        const policy_node_t *ct_c2 = r_policy_node(&ct_n1->script);
+        const policy_node_t *ct_c2 = ct_n1->script;
         if (ct_c2 == NULL || ct_c2->type != TOKEN_MULTI) break;
         const policy_node_multisig_t *ct_n3 = (const policy_node_multisig_t *) ct_c2;
-        const policy_node_keyexpr_t *ct_ka4 = r_policy_node_keyexpr(&ct_n3->keys);
+        const policy_node_keyexpr_t *ct_ka4 = ct_n3->keys;
         set_binding_number(&out->bindings, 0, ct_n3->k);
         set_binding_keys(&out->bindings, 1, ct_ka4, ct_n3->n);
         out->bindings.n = 2;
@@ -67,10 +67,10 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
     do {
         if (root == NULL || root->type != TOKEN_SH) break;
         const policy_node_with_script_t *ct_n1 = (const policy_node_with_script_t *) root;
-        const policy_node_t *ct_c2 = r_policy_node(&ct_n1->script);
+        const policy_node_t *ct_c2 = ct_n1->script;
         if (ct_c2 == NULL || ct_c2->type != TOKEN_SORTEDMULTI) break;
         const policy_node_multisig_t *ct_n3 = (const policy_node_multisig_t *) ct_c2;
-        const policy_node_keyexpr_t *ct_ka4 = r_policy_node_keyexpr(&ct_n3->keys);
+        const policy_node_keyexpr_t *ct_ka4 = ct_n3->keys;
         set_binding_number(&out->bindings, 0, ct_n3->k);
         set_binding_keys(&out->bindings, 1, ct_ka4, ct_n3->n);
         out->bindings.n = 2;
@@ -81,10 +81,10 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
     do {
         if (root == NULL || root->type != TOKEN_WSH) break;
         const policy_node_with_script_t *ct_n1 = (const policy_node_with_script_t *) root;
-        const policy_node_t *ct_c2 = r_policy_node(&ct_n1->script);
+        const policy_node_t *ct_c2 = ct_n1->script;
         if (ct_c2 == NULL || ct_c2->type != TOKEN_MULTI) break;
         const policy_node_multisig_t *ct_n3 = (const policy_node_multisig_t *) ct_c2;
-        const policy_node_keyexpr_t *ct_ka4 = r_policy_node_keyexpr(&ct_n3->keys);
+        const policy_node_keyexpr_t *ct_ka4 = ct_n3->keys;
         set_binding_number(&out->bindings, 0, ct_n3->k);
         set_binding_keys(&out->bindings, 1, ct_ka4, ct_n3->n);
         out->bindings.n = 2;
@@ -95,10 +95,10 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
     do {
         if (root == NULL || root->type != TOKEN_WSH) break;
         const policy_node_with_script_t *ct_n1 = (const policy_node_with_script_t *) root;
-        const policy_node_t *ct_c2 = r_policy_node(&ct_n1->script);
+        const policy_node_t *ct_c2 = ct_n1->script;
         if (ct_c2 == NULL || ct_c2->type != TOKEN_SORTEDMULTI) break;
         const policy_node_multisig_t *ct_n3 = (const policy_node_multisig_t *) ct_c2;
-        const policy_node_keyexpr_t *ct_ka4 = r_policy_node_keyexpr(&ct_n3->keys);
+        const policy_node_keyexpr_t *ct_ka4 = ct_n3->keys;
         set_binding_number(&out->bindings, 0, ct_n3->k);
         set_binding_keys(&out->bindings, 1, ct_ka4, ct_n3->n);
         out->bindings.n = 2;
@@ -109,13 +109,13 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
     do {
         if (root == NULL || root->type != TOKEN_SH) break;
         const policy_node_with_script_t *ct_n1 = (const policy_node_with_script_t *) root;
-        const policy_node_t *ct_c2 = r_policy_node(&ct_n1->script);
+        const policy_node_t *ct_c2 = ct_n1->script;
         if (ct_c2 == NULL || ct_c2->type != TOKEN_WSH) break;
         const policy_node_with_script_t *ct_n3 = (const policy_node_with_script_t *) ct_c2;
-        const policy_node_t *ct_c4 = r_policy_node(&ct_n3->script);
+        const policy_node_t *ct_c4 = ct_n3->script;
         if (ct_c4 == NULL || ct_c4->type != TOKEN_MULTI) break;
         const policy_node_multisig_t *ct_n5 = (const policy_node_multisig_t *) ct_c4;
-        const policy_node_keyexpr_t *ct_ka6 = r_policy_node_keyexpr(&ct_n5->keys);
+        const policy_node_keyexpr_t *ct_ka6 = ct_n5->keys;
         set_binding_number(&out->bindings, 0, ct_n5->k);
         set_binding_keys(&out->bindings, 1, ct_ka6, ct_n5->n);
         out->bindings.n = 2;
@@ -126,13 +126,13 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
     do {
         if (root == NULL || root->type != TOKEN_SH) break;
         const policy_node_with_script_t *ct_n1 = (const policy_node_with_script_t *) root;
-        const policy_node_t *ct_c2 = r_policy_node(&ct_n1->script);
+        const policy_node_t *ct_c2 = ct_n1->script;
         if (ct_c2 == NULL || ct_c2->type != TOKEN_WSH) break;
         const policy_node_with_script_t *ct_n3 = (const policy_node_with_script_t *) ct_c2;
-        const policy_node_t *ct_c4 = r_policy_node(&ct_n3->script);
+        const policy_node_t *ct_c4 = ct_n3->script;
         if (ct_c4 == NULL || ct_c4->type != TOKEN_SORTEDMULTI) break;
         const policy_node_multisig_t *ct_n5 = (const policy_node_multisig_t *) ct_c4;
-        const policy_node_keyexpr_t *ct_ka6 = r_policy_node_keyexpr(&ct_n5->keys);
+        const policy_node_keyexpr_t *ct_ka6 = ct_n5->keys;
         set_binding_number(&out->bindings, 0, ct_n5->k);
         set_binding_keys(&out->bindings, 1, ct_ka6, ct_n5->n);
         out->bindings.n = 2;
@@ -143,10 +143,10 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
     do {
         if (root == NULL || root->type != TOKEN_TR) break;
         const policy_node_tr_t *ct_n1 = (const policy_node_tr_t *) root;
-        const policy_node_keyexpr_t *ct_k2 = r_policy_node_keyexpr(&ct_n1->key);
+        const policy_node_keyexpr_t *ct_k2 = ct_n1->key;
         if (ct_k2->type != KEY_EXPRESSION_MUSIG) break;
-        const musig_aggr_key_info_t *ct_mi3 = r_musig_aggr_key_info(&ct_k2->m.musig_info);
-        if (!isnull_policy_node_tree(&ct_n1->tree)) break;
+        const musig_aggr_key_info_t *ct_mi3 = ct_k2->m.musig_info;
+        if (ct_n1->tree != NULL) break;
         set_binding_number(&out->bindings, 0, ct_mi3->n);
         set_binding_keys(&out->bindings, 1, ct_k2, 1);
         out->bindings.n = 2;
@@ -158,9 +158,9 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
     do {
         if (root == NULL || root->type != TOKEN_TR) break;
         const policy_node_tr_t *ct_n1 = (const policy_node_tr_t *) root;
-        const policy_node_keyexpr_t *ct_k2 = r_policy_node_keyexpr(&ct_n1->key);
+        const policy_node_keyexpr_t *ct_k2 = ct_n1->key;
         if (ct_k2->type != KEY_EXPRESSION_NORMAL) break;
-        if (!isnull_policy_node_tree(&ct_n1->tree)) break;
+        if (ct_n1->tree != NULL) break;
         set_binding_key(&out->bindings, 0, ct_k2);
         out->bindings.n = 1;
         out->cls = DC_TAPROOT_KEY_ONLY;
@@ -171,11 +171,11 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
     do {
         if (root == NULL || root->type != TOKEN_TR) break;
         const policy_node_tr_t *ct_n1 = (const policy_node_tr_t *) root;
-        const policy_node_keyexpr_t *ct_k2 = r_policy_node_keyexpr(&ct_n1->key);
+        const policy_node_keyexpr_t *ct_k2 = ct_n1->key;
         if (ct_k2->type != KEY_EXPRESSION_NORMAL) break;
-        if (isnull_policy_node_tree(&ct_n1->tree)) break;
+        if (ct_n1->tree == NULL) break;
         set_binding_key(&out->bindings, 0, ct_k2);
-        out->taptree = r_policy_node_tree(&ct_n1->tree);
+        out->taptree = ct_n1->tree;
         out->bindings.n = 1;
         out->cls = DC_TAPROOT;
         return true;
@@ -185,13 +185,13 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
     do {
         if (root == NULL || root->type != TOKEN_TR) break;
         const policy_node_tr_t *ct_n1 = (const policy_node_tr_t *) root;
-        const policy_node_keyexpr_t *ct_k2 = r_policy_node_keyexpr(&ct_n1->key);
+        const policy_node_keyexpr_t *ct_k2 = ct_n1->key;
         if (ct_k2->type != KEY_EXPRESSION_MUSIG) break;
-        const musig_aggr_key_info_t *ct_mi3 = r_musig_aggr_key_info(&ct_k2->m.musig_info);
-        if (isnull_policy_node_tree(&ct_n1->tree)) break;
+        const musig_aggr_key_info_t *ct_mi3 = ct_k2->m.musig_info;
+        if (ct_n1->tree == NULL) break;
         set_binding_number(&out->bindings, 0, ct_mi3->n);
         set_binding_keys(&out->bindings, 1, ct_k2, 1);
-        out->taptree = r_policy_node_tree(&ct_n1->tree);
+        out->taptree = ct_n1->tree;
         out->bindings.n = 2;
         out->cls = DC_TAPROOT_MUSIG;
         return true;
@@ -212,7 +212,7 @@ bool match_tapleaf(const policy_node_t *leaf_script, ct_leaf_match_t *out) {
     do {
         if (leaf_script == NULL || leaf_script->type != TOKEN_PK) break;
         const policy_node_with_key_t *ct_n1 = (const policy_node_with_key_t *) leaf_script;
-        const policy_node_keyexpr_t *ct_k2 = r_policy_node_keyexpr(&ct_n1->key);
+        const policy_node_keyexpr_t *ct_k2 = ct_n1->key;
         if (ct_k2->type != KEY_EXPRESSION_NORMAL) break;
         set_binding_key(&out->bindings, 0, ct_k2);
         out->bindings.n = 1;
@@ -224,18 +224,18 @@ bool match_tapleaf(const policy_node_t *leaf_script, ct_leaf_match_t *out) {
     do {
         if (leaf_script == NULL || leaf_script->type != TOKEN_AND_V) break;
         const policy_node_with_script2_t *ct_n1 = (const policy_node_with_script2_t *) leaf_script;
-        const policy_node_t *ct_c2 = r_policy_node(&ct_n1->scripts[0]);
+        const policy_node_t *ct_c2 = ct_n1->scripts[0];
         if (ct_c2 == NULL || ct_c2->type != TOKEN_V) break;
         const policy_node_with_script_t *ct_w3 = (const policy_node_with_script_t *) ct_c2;
-        const policy_node_t *ct_c4 = r_policy_node(&ct_w3->script);
+        const policy_node_t *ct_c4 = ct_w3->script;
         if (ct_c4 == NULL || ct_c4->type != TOKEN_PK) break;
         const policy_node_with_key_t *ct_n5 = (const policy_node_with_key_t *) ct_c4;
-        const policy_node_keyexpr_t *ct_k6 = r_policy_node_keyexpr(&ct_n5->key);
+        const policy_node_keyexpr_t *ct_k6 = ct_n5->key;
         if (ct_k6->type != KEY_EXPRESSION_NORMAL) break;
-        const policy_node_t *ct_c7 = r_policy_node(&ct_n1->scripts[1]);
+        const policy_node_t *ct_c7 = ct_n1->scripts[1];
         if (ct_c7 == NULL || ct_c7->type != TOKEN_PK) break;
         const policy_node_with_key_t *ct_n8 = (const policy_node_with_key_t *) ct_c7;
-        const policy_node_keyexpr_t *ct_k9 = r_policy_node_keyexpr(&ct_n8->key);
+        const policy_node_keyexpr_t *ct_k9 = ct_n8->key;
         if (ct_k9->type != KEY_EXPRESSION_NORMAL) break;
         set_binding_key(&out->bindings, 0, ct_k6);
         set_binding_key(&out->bindings, 1, ct_k9);
@@ -248,7 +248,7 @@ bool match_tapleaf(const policy_node_t *leaf_script, ct_leaf_match_t *out) {
     do {
         if (leaf_script == NULL || leaf_script->type != TOKEN_SORTEDMULTI_A) break;
         const policy_node_multisig_t *ct_n1 = (const policy_node_multisig_t *) leaf_script;
-        const policy_node_keyexpr_t *ct_ka2 = r_policy_node_keyexpr(&ct_n1->keys);
+        const policy_node_keyexpr_t *ct_ka2 = ct_n1->keys;
         set_binding_number(&out->bindings, 0, ct_n1->k);
         set_binding_keys(&out->bindings, 1, ct_ka2, ct_n1->n);
         out->bindings.n = 2;
@@ -260,7 +260,7 @@ bool match_tapleaf(const policy_node_t *leaf_script, ct_leaf_match_t *out) {
     do {
         if (leaf_script == NULL || leaf_script->type != TOKEN_MULTI_A) break;
         const policy_node_multisig_t *ct_n1 = (const policy_node_multisig_t *) leaf_script;
-        const policy_node_keyexpr_t *ct_ka2 = r_policy_node_keyexpr(&ct_n1->keys);
+        const policy_node_keyexpr_t *ct_ka2 = ct_n1->keys;
         set_binding_number(&out->bindings, 0, ct_n1->k);
         set_binding_keys(&out->bindings, 1, ct_ka2, ct_n1->n);
         out->bindings.n = 2;
@@ -271,9 +271,9 @@ bool match_tapleaf(const policy_node_t *leaf_script, ct_leaf_match_t *out) {
     do {
         if (leaf_script == NULL || leaf_script->type != TOKEN_PK) break;
         const policy_node_with_key_t *ct_n1 = (const policy_node_with_key_t *) leaf_script;
-        const policy_node_keyexpr_t *ct_k2 = r_policy_node_keyexpr(&ct_n1->key);
+        const policy_node_keyexpr_t *ct_k2 = ct_n1->key;
         if (ct_k2->type != KEY_EXPRESSION_MUSIG) break;
-        const musig_aggr_key_info_t *ct_mi3 = r_musig_aggr_key_info(&ct_k2->m.musig_info);
+        const musig_aggr_key_info_t *ct_mi3 = ct_k2->m.musig_info;
         set_binding_number(&out->bindings, 0, ct_mi3->n);
         set_binding_keys(&out->bindings, 1, ct_k2, 1);
         out->bindings.n = 2;
@@ -285,14 +285,14 @@ bool match_tapleaf(const policy_node_t *leaf_script, ct_leaf_match_t *out) {
     do {
         if (leaf_script == NULL || leaf_script->type != TOKEN_AND_V) break;
         const policy_node_with_script2_t *ct_n1 = (const policy_node_with_script2_t *) leaf_script;
-        const policy_node_t *ct_c2 = r_policy_node(&ct_n1->scripts[0]);
+        const policy_node_t *ct_c2 = ct_n1->scripts[0];
         if (ct_c2 == NULL || ct_c2->type != TOKEN_V) break;
         const policy_node_with_script_t *ct_w3 = (const policy_node_with_script_t *) ct_c2;
-        const policy_node_t *ct_c4 = r_policy_node(&ct_w3->script);
+        const policy_node_t *ct_c4 = ct_w3->script;
         ct_leaf_match_t ct_sub5;
         if (!match_tapleaf(ct_c4, &ct_sub5)) break;
         if (ct_sub5.cls == TC_OTHER || ct_sub5.cls == TC_TIMELOCKED || ct_sub5.cls == TC_AND_V) break;
-        const policy_node_t *ct_c6 = r_policy_node(&ct_n1->scripts[1]);
+        const policy_node_t *ct_c6 = ct_n1->scripts[1];
         ct_timelock_t ct_tl7;
         if (!match_lock_value(ct_c6, &ct_tl7)) break;
         set_binding_sub(&out->bindings, 0, ct_c4);
@@ -306,14 +306,14 @@ bool match_tapleaf(const policy_node_t *leaf_script, ct_leaf_match_t *out) {
     do {
         if (leaf_script == NULL || leaf_script->type != TOKEN_AND_V) break;
         const policy_node_with_script2_t *ct_n1 = (const policy_node_with_script2_t *) leaf_script;
-        const policy_node_t *ct_c2 = r_policy_node(&ct_n1->scripts[0]);
+        const policy_node_t *ct_c2 = ct_n1->scripts[0];
         if (ct_c2 == NULL || ct_c2->type != TOKEN_V) break;
         const policy_node_with_script_t *ct_w3 = (const policy_node_with_script_t *) ct_c2;
-        const policy_node_t *ct_c4 = r_policy_node(&ct_w3->script);
+        const policy_node_t *ct_c4 = ct_w3->script;
         ct_leaf_match_t ct_sub5;
         if (!match_tapleaf(ct_c4, &ct_sub5)) break;
         if (ct_sub5.cls == TC_OTHER || ct_sub5.cls == TC_TIMELOCKED || ct_sub5.cls == TC_AND_V) break;
-        const policy_node_t *ct_c6 = r_policy_node(&ct_n1->scripts[1]);
+        const policy_node_t *ct_c6 = ct_n1->scripts[1];
         ct_leaf_match_t ct_sub7;
         if (!match_tapleaf(ct_c6, &ct_sub7)) break;
         if (ct_sub7.cls == TC_OTHER || ct_sub7.cls == TC_TIMELOCKED || ct_sub7.cls == TC_AND_V) break;

@@ -330,9 +330,8 @@ bool fill_keyexpr_info_if_internal(dispatcher_context_t *dc,
         return result;
     } else if (keyexpr_info->key_expression_ptr->type == KEY_EXPRESSION_MUSIG) {
         // iterate through the keys of the musig() placeholder to find if a key is internal
-        const musig_aggr_key_info_t *musig_info =
-            r_musig_aggr_key_info(&keyexpr_info->key_expression_ptr->m.musig_info);
-        const uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
+        const musig_aggr_key_info_t *musig_info = keyexpr_info->key_expression_ptr->m.musig_info;
+        const uint16_t *key_indexes = musig_info->key_indexes;
 
         bool has_internal_key = false;
 

@@ -235,8 +235,8 @@ static uint64_t key_orderings_count(const policy_node_t *root, bool *out_canonic
             members[0] = k->k.key_index;
             n_members = 1;
         } else {
-            const musig_aggr_key_info_t *ai = r_musig_aggr_key_info(&k->m.musig_info);
-            const uint16_t *ak = r_uint16(&ai->key_indexes);
+            const musig_aggr_key_info_t *ai = k->m.musig_info;
+            const uint16_t *ak = ai->key_indexes;
             n_members = ai->n;
             for (uint16_t j = 0; j < n_members; j++) members[j] = ak[j];
         }
@@ -273,7 +273,7 @@ static uint64_t key_orderings_count(const policy_node_t *root, bool *out_canonic
 static uint16_t keys_member_count(const ct_value_t *v) {
     if (v->u.keys.n == 1 && v->u.keys.array != NULL &&
         v->u.keys.array[0].type == KEY_EXPRESSION_MUSIG) {
-        return r_musig_aggr_key_info(&v->u.keys.array[0].m.musig_info)->n;
+        return v->u.keys.array[0].m.musig_info->n;
     }
     return v->u.keys.n;
 }
@@ -282,8 +282,8 @@ static uint16_t keys_member_count(const ct_value_t *v) {
 static uint32_t keys_member_index(const ct_value_t *v, uint16_t j) {
     if (v->u.keys.n == 1 && v->u.keys.array != NULL &&
         v->u.keys.array[0].type == KEY_EXPRESSION_MUSIG) {
-        const musig_aggr_key_info_t *mi = r_musig_aggr_key_info(&v->u.keys.array[0].m.musig_info);
-        return r_uint16(&mi->key_indexes)[j];
+        const musig_aggr_key_info_t *mi = v->u.keys.array[0].m.musig_info;
+        return mi->key_indexes[j];
     }
     return v->u.keys.array[j].k.key_index;
 }
@@ -300,13 +300,13 @@ static int compare_uint32(uint32_t left, uint32_t right) {
 
 static int compare_musig_keyexprs(const policy_node_keyexpr_t *left,
                                   const policy_node_keyexpr_t *right) {
-    const musig_aggr_key_info_t *left_info = r_musig_aggr_key_info(&left->m.musig_info);
-    const musig_aggr_key_info_t *right_info = r_musig_aggr_key_info(&right->m.musig_info);
+    const musig_aggr_key_info_t *left_info = left->m.musig_info;
+    const musig_aggr_key_info_t *right_info = right->m.musig_info;
     int order = compare_uint16(left_info->n, right_info->n);
     if (order != 0) return order;
 
-    const uint16_t *left_indexes = r_uint16(&left_info->key_indexes);
-    const uint16_t *right_indexes = r_uint16(&right_info->key_indexes);
+    const uint16_t *left_indexes = left_info->key_indexes;
+    const uint16_t *right_indexes = right_info->key_indexes;
     for (uint16_t i = 0; i < left_info->n; i++) {
         order = compare_uint16(left_indexes[i], right_indexes[i]);
         if (order != 0) return order;
@@ -451,8 +451,8 @@ static int append_keyexpr(char *out, size_t cap, size_t *off, const policy_node_
         return append_str(out, cap, off, buf);
     }
     // KEY_EXPRESSION_MUSIG: "musig(@a,@b,@c)"
-    const musig_aggr_key_info_t *mi = r_musig_aggr_key_info(&key->m.musig_info);
-    const uint16_t *idx = r_uint16(&mi->key_indexes);
+    const musig_aggr_key_info_t *mi = key->m.musig_info;
+    const uint16_t *idx = mi->key_indexes;
     if (append_str(out, cap, off, "musig(") < 0) return -1;
     for (uint16_t i = 0; i < mi->n; i++) {
         char buf[8];
@@ -475,8 +475,8 @@ static int append_keys_list(char *out,
     // tr(musig(...)) forms). In that case render the inner keys as a flat
     // Oxford-comma list (without "musig(...)" wrapping).
     if (n == 1 && keys->type == KEY_EXPRESSION_MUSIG) {
-        const musig_aggr_key_info_t *mi = r_musig_aggr_key_info(&keys->m.musig_info);
-        const uint16_t *idx = r_uint16(&mi->key_indexes);
+        const musig_aggr_key_info_t *mi = keys->m.musig_info;
+        const uint16_t *idx = mi->key_indexes;
         uint16_t m = mi->n;
         for (uint16_t i = 0; i < m; i++) {
             if (i > 0) {
@@ -710,11 +710,11 @@ static int collect_leaves(const policy_node_tree_t *tree,
     if (tree == NULL) return 0;
     if (tree->is_leaf) {
         if (*n >= max) return -1;
-        out[(*n)++] = r_policy_node(&tree->script);
+        out[(*n)++] = tree->script;
         return 0;
     }
-    if (collect_leaves(r_policy_node_tree(&tree->left_tree), out, n, max) < 0) return -1;
-    return collect_leaves(r_policy_node_tree(&tree->right_tree), out, n, max);
+    if (collect_leaves(tree->left_tree, out, n, max) < 0) return -1;
+    return collect_leaves(tree->right_tree, out, n, max);
 }
 
 // ---------------------------------------------------------------------------
