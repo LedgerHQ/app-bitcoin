@@ -147,7 +147,7 @@ static void test_ct_to_cleartext(void **state) {
 
 // A generous buffer: some cases below build large taptrees whose parsed form
 // does not fit in POLICY_BUF_SIZE.
-#define BIG_POLICY_BUF_SIZE 4096
+#define BIG_POLICY_BUF_SIZE 8192
 
 static const policy_node_t *parse_or_fail(const char *tmpl, uint8_t *buf, size_t bufsize) {
     int r = parse_template(tmpl, buf, bufsize);

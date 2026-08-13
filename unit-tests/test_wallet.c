@@ -22,10 +22,6 @@ static int parse_policy(const char *descriptor_template, uint8_t *out, size_t ou
                                      WALLET_POLICY_VERSION_V2);
 }
 
-// in unit tests, size_t integers are currently 8 compiled as 8 bytes; therefore, in the app
-// about half of the memory would be needed
-#define MAX_WALLET_POLICY_MEMORY_SIZE 512
-
 // convenience function to compactly check common assertions on a pointer to a key expression with a
 // single key
 static void check_key_expr_plain(const policy_node_keyexpr_t *ptr,
@@ -58,7 +54,7 @@ static void check_key_expr_musig(const policy_node_keyexpr_t *ptr,
 static void test_parse_policy_map_singlesig_1(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
 
     int res = parse_policy("pkh(@0/**)", out, sizeof(out));
 
@@ -72,7 +68,7 @@ static void test_parse_policy_map_singlesig_1(void **state) {
 static void test_parse_policy_map_singlesig_2(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
 
     int res = parse_policy("sh(wpkh(@0/**))", out, sizeof(out));
 
@@ -90,7 +86,7 @@ static void test_parse_policy_map_singlesig_2(void **state) {
 static void test_parse_policy_map_singlesig_3(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
 
     int res = parse_policy("sh(wsh(pkh(@0/**)))", out, sizeof(out));
 
@@ -112,7 +108,7 @@ static void test_parse_policy_map_singlesig_3(void **state) {
 static void test_parse_policy_map_multisig_1(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
 
     int res = parse_policy("sortedmulti(2,@0/**,@1/**,@2/**)", out, sizeof(out));
 
@@ -130,7 +126,7 @@ static void test_parse_policy_map_multisig_1(void **state) {
 static void test_parse_policy_map_multisig_2(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
 
     int res = parse_policy("wsh(multi(3,@0/**,@1/**,@2/**,@3/**,@4/**))", out, sizeof(out));
 
@@ -152,7 +148,7 @@ static void test_parse_policy_map_multisig_2(void **state) {
 static void test_parse_policy_map_multisig_3(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
 
     int res =
         parse_policy("sh(wsh(sortedmulti(3,@0/**,@1/**,@2/**,@3/**,@4/**)))", out, sizeof(out));
@@ -178,7 +174,7 @@ static void test_parse_policy_map_multisig_3(void **state) {
 static void test_parse_policy_tr(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     int res;
 
     // Simple tr without a tree
@@ -240,7 +236,7 @@ static void test_parse_policy_tr(void **state) {
 static void test_parse_policy_tr_multisig(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     int res;
 
     // tr with a tree with two scripts: a multi_a and a sortedmulti_a:
@@ -289,7 +285,7 @@ static void test_parse_policy_tr_multisig(void **state) {
 static void test_parse_policy_tr_musig_keypath(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     int res;
 
     res = parse_policy("tr(musig(@2,@0,@1)/<3;13>/*)", out, sizeof(out));
@@ -306,7 +302,7 @@ static void test_parse_policy_tr_musig_keypath(void **state) {
 static void test_parse_policy_tr_musig_scriptpath(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     int res;
 
     // tr with a musig in the script path
@@ -330,7 +326,7 @@ static void test_parse_policy_tr_musig_scriptpath(void **state) {
 static void test_get_policy_segwit_version(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     policy_node_t *policy = (policy_node_t *) out;
 
     // legacy policies (returning -1)
@@ -364,7 +360,7 @@ static void test_get_policy_segwit_version(void **state) {
 static void test_parse_unsigned_decimal_overflow(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     assert_true(0 > parse_policy("wsh(older(5368709120))", out, sizeof(out)));
 }
 
@@ -374,13 +370,13 @@ static void test_parse_unsigned_decimal_overflow(void **state) {
 static void test_parse_keyexpr_multipath_hardened_boundary(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
 
     // 0x7fffffff (2147483647) is the largest valid unhardened index: still accepted.
     int res = parse_policy("pkh(@0/<2147483647;0>/*)", out, sizeof(out));
     assert_true(res >= 0);
     policy_node_with_key_t *node_1 = (policy_node_with_key_t *) out;
-    check_key_expr_plain(r_policy_node_keyexpr(&node_1->key), 0, 2147483647, 0);
+    check_key_expr_plain(node_1->key, 0, 2147483647, 0);
 
     // 0x80000000 (2147483648) is the first hardened index: must be rejected for both M and N.
     assert_true(0 > parse_policy("pkh(@0/<2147483648;0>/*)", out, sizeof(out)));
@@ -390,7 +386,7 @@ static void test_parse_keyexpr_multipath_hardened_boundary(void **state) {
 static void test_failures(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
 
     // excess byte not allowed
     assert_true(0 > parse_policy("pkh(@0/**) ", out, sizeof(out)));
@@ -500,8 +496,8 @@ static void Test(const char *ms, const char *hexscript, int mode, int opslimit, 
     strcpy(descriptor_tr, "tr(@0/<100;101>/*,");
     strcat(descriptor_tr, ms);
     strcat(descriptor_tr, ")");
-    uint8_t out_wsh[MAX_WALLET_POLICY_MEMORY_SIZE];
-    uint8_t out_tr[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out_wsh[MAX_WALLET_POLICY_BYTES];
+    uint8_t out_tr[MAX_WALLET_POLICY_BYTES];
 
     uint8_t *out;
 
@@ -742,7 +738,7 @@ static int traverse_collect_cb(const policy_node_t *node, void *state_) {
 static void test_traverse_single_leaf(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     assert_true(parse_policy("pkh(@0/**)", out, sizeof(out)) >= 0);
 
     traverse_collect_t s = {.count = 0, .max_visits = -1};
@@ -755,7 +751,7 @@ static void test_traverse_single_leaf(void **state) {
 static void test_traverse_wsh_multi(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     assert_true(parse_policy("wsh(multi(2,@0/**,@1/**))", out, sizeof(out)) >= 0);
 
     traverse_collect_t s = {.count = 0, .max_visits = -1};
@@ -770,7 +766,7 @@ static void test_traverse_wsh_multi(void **state) {
 static void test_traverse_or_i(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     assert_true(parse_policy("wsh(or_i(pk(@0/**),pk(@1/**)))", out, sizeof(out)) >= 0);
 
     traverse_collect_t s = {.count = 0, .max_visits = -1};
@@ -786,7 +782,7 @@ static void test_traverse_or_i(void **state) {
 static void test_traverse_andor(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     assert_true(parse_policy("wsh(c:andor(0,pk_k(@0/**),pk_k(@1/**)))", out, sizeof(out)) >= 0);
 
     traverse_collect_t s = {.count = 0, .max_visits = -1};
@@ -804,7 +800,7 @@ static void test_traverse_andor(void **state) {
 static void test_traverse_thresh(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     assert_true(parse_policy("wsh(thresh(2,c:pk_k(@0/**),ac:pk_k(@1/**),ac:pk_k(@2/**)))",
                              out,
                              sizeof(out)) >= 0);
@@ -834,7 +830,7 @@ static void test_traverse_thresh(void **state) {
 static void test_traverse_tr_no_script(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     assert_true(parse_policy("tr(@0/**)", out, sizeof(out)) >= 0);
 
     traverse_collect_t s = {.count = 0, .max_visits = -1};
@@ -848,7 +844,7 @@ static void test_traverse_tr_no_script(void **state) {
 static void test_traverse_tr_one_leaf(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     assert_true(parse_policy("tr(@0/**,pk(@1/**))", out, sizeof(out)) >= 0);
 
     traverse_collect_t s = {.count = 0, .max_visits = -1};
@@ -864,7 +860,7 @@ static void test_traverse_tr_one_leaf(void **state) {
 static void test_traverse_tr_two_leaves(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     assert_true(parse_policy("tr(@0/**,{pk(@1/**),pk(@2/**)})", out, sizeof(out)) >= 0);
 
     traverse_collect_t s = {.count = 0, .max_visits = -1};
@@ -884,7 +880,7 @@ static void test_traverse_tr_two_leaves(void **state) {
 static void test_traverse_tr_nested_tree(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     // tr(@0/**,{pk(@1/**),{pk(@2/**),pk(@3/**)}})  — nested taptree
     assert_true(parse_policy("tr(@0/**,{pk(@1/**),{pk(@2/**),pk(@3/**)}})", out, sizeof(out)) >= 0);
 
@@ -905,7 +901,7 @@ static void test_traverse_tr_nested_tree(void **state) {
 static void test_traverse_callback_abort(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
     assert_true(parse_policy("wsh(or_i(pk(@0/**),pk(@1/**)))", out, sizeof(out)) >= 0);
 
     // The DFS order is: TOKEN_WSH, TOKEN_OR_I, TOKEN_PK, TOKEN_PK.
@@ -943,7 +939,7 @@ static void test_parse_policy_max_depth_wrappers(void **state) {
     (void) state;
 
     // deep policies need more memory than the simple ones of the other tests
-    uint8_t out[4 * MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[4 * MAX_WALLET_POLICY_BYTES];
     char policy[MAX_DESCRIPTOR_TEMPLATE_LENGTH + 1];
 
     // the script inside wsh() is at depth 1, therefore one wrapper less than the limit fits
@@ -986,7 +982,7 @@ static void make_thresh_chain(char *out, size_t out_size, int n_levels) {
 static void test_parse_policy_max_thresh_nesting(void **state) {
     (void) state;
 
-    uint8_t out[4 * MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[4 * MAX_WALLET_POLICY_BYTES];
     char policy[MAX_DESCRIPTOR_TEMPLATE_LENGTH + 1];
 
     make_thresh_chain(policy, sizeof(policy), MAX_THRESH_NESTING);
@@ -1025,7 +1021,7 @@ static void make_wide_thresh(char *out, size_t out_size, int n_branches) {
 static void test_max_n_in_thresh(void **state) {
     (void) state;
 
-    uint8_t out[4 * MAX_WALLET_POLICY_MEMORY_SIZE];
+    uint8_t out[4 * MAX_WALLET_POLICY_BYTES];
     char policy[MAX_DESCRIPTOR_TEMPLATE_LENGTH + 1];
     policy_node_ext_info_t ext_info;
 

@@ -52,7 +52,16 @@
 // We do not expect these limits to be reached in practice any time soon, but they can
 // be further increased if necessary.
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 512
-#define MAX_WALLET_POLICY_BYTES           896
+// Memory reserved for the abstract syntax tree of a parsed wallet policy.
+// We declare the size based on the size of pointers (which is 4 on the real device),
+// so that it doesn't need to be changed when compiling for unit tests.
+#ifdef TARGET_NANOX
+// The Nano X has considerably less RAM than the other devices, therefore we keep the budget
+// smaller - which might reject some very large policies.
+#define MAX_WALLET_POLICY_BYTES 1024
+#else
+#define MAX_WALLET_POLICY_BYTES (384 * sizeof(void *))  // 1536 on the real devices
+#endif
 
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH \
     MAX(MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1, MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2)
