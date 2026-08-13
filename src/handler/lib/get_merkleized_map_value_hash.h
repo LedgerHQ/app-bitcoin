@@ -2,6 +2,7 @@
 
 /* Local headers */
 #include "dispatcher.h"
+#include "map_value_status.h"
 #include "merkle.h"
 
 /**
@@ -10,8 +11,9 @@
  * pointer. As the value is a Merkle tree preimage, it is always the hash of a string starting with
  * a 0x00 byte.
  *
- * Returns a negative number if the key is not found, or any of the proofs failed. Returns 0 on
- * success.
+ * Returns 0 on success, MAP_VALUE_ABSENT if the key is not in the map, or MAP_VALUE_ERROR if any
+ * of the proofs failed. See map_value_status.h; in particular, callers must branch on
+ * MAP_VALUE_ABSENT explicitly rather than on `res < 0` when a missing key is not an error.
  *
  * PRECONDITION: the map's keys must have already been verified to be lexicographically sorted;
  * this function asserts it (LEDGER_ASSERT on `map->_keys_are_sorted`).

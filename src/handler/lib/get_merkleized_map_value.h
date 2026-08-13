@@ -5,6 +5,7 @@
 
 /* Local headers */
 #include "dispatcher.h"
+#include "map_value_status.h"
 #include "merkle.h"
 
 /**
@@ -13,8 +14,10 @@
  * Merkle proof matches. The value is then stored in the `out` pointer, which must be large enough
  * to contain the preimage.
  *
- * Returns a negative number if the response is too long to fit into the output buffer, or if the
- * key is not found, or if any of the proofs failed. Returns the length of the preimage on success.
+ * Returns the length of the preimage on success, MAP_VALUE_ABSENT if the key is not in the map, or
+ * MAP_VALUE_ERROR if any of the proofs failed, the response was malformed, or the value is too
+ * long to fit into the output buffer. See map_value_status.h; in particular, callers must branch
+ * on MAP_VALUE_ABSENT explicitly rather than on `res < 0` when a missing key is not an error.
  *
  * PRECONDITION: the map's keys must have already been verified to be lexicographically sorted (and
  * therefore unique); this is what makes a by-key lookup unambiguous. A map is validated either by

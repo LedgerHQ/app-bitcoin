@@ -1,6 +1,8 @@
 #include <string.h>
 #include <limits.h>
 
+#include "get_merkle_leaf_index.h"
+
 /* Local headers */
 #include "client_commands.h"
 #include "get_merkle_leaf_hash.h"
@@ -21,7 +23,8 @@ int call_get_merkle_leaf_index(dispatcher_context_t *dispatcher_context,
         SET_RESPONSE(dispatcher_context, request, sizeof(request), SW_INTERRUPTED_EXECUTION);
     }
     if (dispatcher_context->process_interruption(dispatcher_context) < 0) {
-        return -3;
+        PRINTF("Interrupted execution failed.\n");
+        return MERKLE_LEAF_ERROR;
     }
 
     uint8_t found;
@@ -30,15 +33,18 @@ int call_get_merkle_leaf_index(dispatcher_context_t *dispatcher_context,
     if (!buffer_read_u8(&dispatcher_context->read_buffer, &found) ||
         !buffer_read_varint(&dispatcher_context->read_buffer, &index) || index > INT_MAX ||
         index >= (uint64_t) size) {
-        return -1;
+        PRINTF("Malformed response, or index out of range.\n");
+        return MERKLE_LEAF_ERROR;
     }
 
     if (found != 0 && found != 1) {
-        return -2;
+        PRINTF("Invalid value for the 'found' flag.\n");
+        return MERKLE_LEAF_ERROR;
     }
 
     if (!found) {
-        return -3;
+        // The client claims the leaf is not in the tree; this is not verified.
+        return MERKLE_LEAF_NOT_FOUND;
     }
 
     // Ask the host for the leaf hash with that index
@@ -46,11 +52,13 @@ int call_get_merkle_leaf_index(dispatcher_context_t *dispatcher_context,
     int res =
         call_get_merkle_leaf_hash(dispatcher_context, root, size, index, returned_merkle_leaf_hash);
     if (res < 0) {
-        return -4;
+        PRINTF("Failed to retrieve the leaf hash at the returned index.\n");
+        return MERKLE_LEAF_ERROR;
     }
 
     if (memcmp(leaf_hash, returned_merkle_leaf_hash, 32) != 0) {
-        return -5;
+        PRINTF("Leaf hash at the returned index does not match.\n");
+        return MERKLE_LEAF_ERROR;
     }
 
     return index;
