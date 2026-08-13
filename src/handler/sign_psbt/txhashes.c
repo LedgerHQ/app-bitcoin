@@ -78,6 +78,32 @@ static int update_hashes_with_map_value(dispatcher_context_t *dispatcher_context
                                             &cb_state);
 }
 
+/**
+ * Reads an input's nSequence, substituting the BIP-0370 default of 0xFFFFFFFF when the field is
+ * genuinely absent from the map.
+ *
+ * The default is applied only on PSBT_FIELD_ABSENT: a field that is present but unreadable (wrong
+ * length, or a failed Merkle proof) is an error, because silently defaulting there would hash an
+ * nSequence the client never committed to.
+ *
+ * Returns false after sending an error status word.
+ */
+static bool get_nsequence_or_default(dispatcher_context_t *dc,
+                                     const merkleized_map_commitment_t *map,
+                                     uint32_t *out) {
+    switch (psbt_get_input_sequence(dc, map, out)) {
+        case PSBT_FIELD_PRESENT:
+            return true;
+        case PSBT_FIELD_ABSENT:
+            *out = 0xFFFFFFFF;
+            return true;
+        default:
+            PRINTF("Malformed PSBT_IN_SEQUENCE\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+    }
+}
+
 // Updates the hash_context with the output of given index
 // returns -1 on error. 0 on success.
 static int hash_output_n(dispatcher_context_t *dc,
@@ -174,9 +200,8 @@ bool __attribute__((noinline)) compute_tx_hashes(dispatcher_context_t *dc,
             crypto_hash_update(&sha_prevouts_context.header, ith_prevout_n_raw, 4);
 
             uint32_t ith_nSequence;
-            if (PSBT_FIELD_PRESENT != psbt_get_input_sequence(dc, &ith_map, &ith_nSequence)) {
-                // if no PSBT_IN_SEQUENCE is present, we must assume nSequence 0xFFFFFFFF
-                ith_nSequence = 0xFFFFFFFF;
+            if (!get_nsequence_or_default(dc, &ith_map, &ith_nSequence)) {
+                return false;
             }
 
             uint8_t ith_nSequence_raw[4];
@@ -346,9 +371,8 @@ bool __attribute__((noinline)) compute_sighash_legacy(dispatcher_context_t *dc,
         }
 
         uint32_t ith_nSequence;
-        if (PSBT_FIELD_PRESENT != psbt_get_input_sequence(dc, &ith_map, &ith_nSequence)) {
-            // if no PSBT_IN_SEQUENCE is present, we must assume nSequence 0xFFFFFFFF
-            ith_nSequence = 0xFFFFFFFF;
+        if (!get_nsequence_or_default(dc, &ith_map, &ith_nSequence)) {
+            return false;
         }
 
         uint8_t ith_nSequence_raw[4];
@@ -502,9 +526,8 @@ bool __attribute__((noinline)) compute_sighash_segwitv0(
     // nSequence
     {
         uint32_t nSequence;
-        if (PSBT_FIELD_PRESENT != psbt_get_input_sequence(dc, input_map, &nSequence)) {
-            // if no PSBT_IN_SEQUENCE is present, we must assume nSequence 0xFFFFFFFF
-            nSequence = 0xFFFFFFFF;
+        if (!get_nsequence_or_default(dc, input_map, &nSequence)) {
+            return false;
         }
 
         uint8_t nSequence_raw[4];
@@ -631,9 +654,8 @@ bool __attribute__((noinline)) compute_sighash_segwitv1(
 
         // nSequence
         uint32_t nSequence;
-        if (PSBT_FIELD_PRESENT != psbt_get_input_sequence(dc, input_map, &nSequence)) {
-            // if no PSBT_IN_SEQUENCE is present, we must assume nSequence 0xFFFFFFFF
-            nSequence = 0xFFFFFFFF;
+        if (!get_nsequence_or_default(dc, input_map, &nSequence)) {
+            return false;
         }
         write_u32_le(tmp, 0, nSequence);
         crypto_hash_update(&sighash_context.header, tmp, 4);

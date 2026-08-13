@@ -65,9 +65,6 @@ psbt_field_status_t psbt_get_global_tx_version(dispatcher_context_t *dc,
 /**
  * PSBT_GLOBAL_FALLBACK_LOCKTIME: optional 4-byte little-endian locktime.
  * On ABSENT the caller must use locktime 0 (BIP-0370); ERROR must abort.
- *
- * NOTE: ABSENT currently also absorbs read failures (a value too long for the buffer, or a failed
- * proof), which preserves the behaviour that predates this refactor. Tightened in a later commit.
  */
 psbt_field_status_t psbt_get_global_fallback_locktime(dispatcher_context_t *dc,
                                                       const merkleized_map_commitment_t *global_map,
@@ -89,10 +86,9 @@ psbt_field_status_t psbt_get_input_prevout_index(dispatcher_context_t *dc,
 
 /**
  * PSBT_IN_SEQUENCE: optional 4-byte little-endian nSequence.
- * On ABSENT the caller must use the 0xFFFFFFFF default (BIP-0370).
- *
- * NOTE: the callers in txhashes.c currently also fall back to that default on ERROR, which
- * preserves the behaviour that predates this refactor. Tightened in a later commit.
+ * On ABSENT the caller must use the 0xFFFFFFFF default (BIP-0370); ERROR must abort. Note this is
+ * deliberately not folded into the accessor: a default returned from an error path would be signed
+ * over without the client ever having committed to it.
  */
 psbt_field_status_t psbt_get_input_sequence(dispatcher_context_t *dc,
                                             const merkleized_map_commitment_t *input_map,

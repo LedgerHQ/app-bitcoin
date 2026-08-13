@@ -167,6 +167,29 @@ static void test_fallback_locktime_wrong_length_is_error(void **state) {
     assert_int_equal(got, 0xCAFEBABEu);
 }
 
+/**
+ * Regression: the accessor used to read into a 9-byte buffer and map every negative result to
+ * PSBT_FIELD_ABSENT. A value longer than that buffer therefore came back as "absent", and the
+ * caller substituted locktime 0 for a field the client had actually committed to. It must be an
+ * error.
+ */
+static void test_fallback_locktime_over_buffer_is_error_not_absent(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    uint8_t very_long[12];
+    memset(very_long, 0x77, sizeof(very_long));
+
+    merkleized_map_commitment_t map;
+    map_with_one_field(mock, PSBT_GLOBAL_FALLBACK_LOCKTIME, very_long, sizeof(very_long), &map);
+
+    uint32_t got = 0xCAFEBABEu;
+    psbt_field_status_t status =
+        psbt_get_global_fallback_locktime(mock_dispatcher_get_dc(mock), &map, &got);
+
+    assert_int_equal(status, PSBT_FIELD_ERROR);
+    assert_int_equal(got, 0xCAFEBABEu);
+}
+
 /* ---------- Mandatory fields ---------- */
 
 static void test_prevout_txid_present(void **state) {
@@ -459,6 +482,7 @@ int main(void) {
         T(test_fallback_locktime_present),
         T(test_fallback_locktime_absent),
         T(test_fallback_locktime_wrong_length_is_error),
+        T(test_fallback_locktime_over_buffer_is_error_not_absent),
         T(test_prevout_txid_present),
         T(test_prevout_txid_absent),
         T(test_prevout_txid_short_is_error),

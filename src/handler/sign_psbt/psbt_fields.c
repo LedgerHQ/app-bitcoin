@@ -116,20 +116,7 @@ psbt_field_status_t psbt_get_global_tx_version(dispatcher_context_t *dc,
 psbt_field_status_t psbt_get_global_fallback_locktime(dispatcher_context_t *dc,
                                                       const merkleized_map_commitment_t *global_map,
                                                       uint32_t *out) {
-    // Sized as a varint (9 bytes) so that a present-but-wrong-length value is classified as ERROR
-    // rather than being rejected as "too long" (which would be indistinguishable from ABSENT).
-    uint8_t raw[9];
-    size_t len;
-    psbt_field_status_t status =
-        read_var(dc, global_map, PSBT_GLOBAL_FALLBACK_LOCKTIME, raw, sizeof(raw), &len);
-    if (status != PSBT_FIELD_PRESENT) {
-        return PSBT_FIELD_ABSENT;
-    }
-    if (len != 4) {
-        return PSBT_FIELD_ERROR;
-    }
-    *out = read_u32_le(raw, 0);
-    return PSBT_FIELD_PRESENT;
+    return read_u32_le_field(dc, global_map, PSBT_GLOBAL_FALLBACK_LOCKTIME, out);
 }
 
 /* -------------------------------------------------------------------------- */
