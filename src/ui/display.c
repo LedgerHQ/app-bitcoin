@@ -19,7 +19,6 @@ extern bool G_was_processing_screen_shown;
 
 static bool g_ux_flow_ended;
 static bool g_ux_flow_response;
-static int g_current_streaming_index;
 
 extern dispatcher_context_t G_dispatcher_context;
 
@@ -39,27 +38,6 @@ void send_deny_sw(dispatcher_context_t *dc) {
 void set_ux_flow_response(bool approved) {
     g_ux_flow_ended = true;
     g_ux_flow_response = approved;
-}
-
-uint8_t get_streaming_index(void) {
-    return g_current_streaming_index;
-}
-
-void reset_streaming_index(void) {
-    PRINTF("Reset streaming index\n");
-    g_current_streaming_index = 0;
-}
-
-void increase_streaming_index(void) {
-    PRINTF("Increase streaming index\n");
-    g_current_streaming_index += 1;
-}
-
-void decrease_streaming_index(void) {
-    PRINTF("Decrease streaming index\n");
-    if (g_current_streaming_index > 0) {
-        g_current_streaming_index -= 1;
-    }
 }
 
 // Process UI events until the current flow terminates; does not handle any APDU exchange
