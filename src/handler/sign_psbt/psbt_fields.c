@@ -15,6 +15,8 @@
  *  limitations under the License.
  *****************************************************************************/
 
+#include <string.h>
+
 #include "psbt_fields.h"
 
 /* SDK headers */
@@ -42,6 +44,8 @@
 /**
  * Reads a value of variable length (up to `out_cap` bytes) into `out`, writing its length to
  * `*out_len`. A value longer than `out_cap` is reported as PSBT_FIELD_ERROR.
+ *
+ * On any non-PRESENT outcome `out` is left zeroed and `*out_len` is 0.
  */
 static psbt_field_status_t read_var(dispatcher_context_t *dc,
                                     const merkleized_map_commitment_t *map,
@@ -50,11 +54,12 @@ static psbt_field_status_t read_var(dispatcher_context_t *dc,
                                     size_t out_cap,
                                     size_t *out_len) {
     int res = call_get_merkleized_map_value(dc, map, &key_type, 1, out, out_cap);
-    if (res == MAP_VALUE_ABSENT) {
-        return PSBT_FIELD_ABSENT;
-    }
     if (res < 0) {
-        return PSBT_FIELD_ERROR;
+        // on absent or error, zero out the output buffer and length,
+        // preventing the caller from possibly using uninitialized data
+        explicit_bzero(out, out_cap);
+        *out_len = 0;
+        return res == MAP_VALUE_ABSENT ? PSBT_FIELD_ABSENT : PSBT_FIELD_ERROR;
     }
     *out_len = (size_t) res;
     return PSBT_FIELD_PRESENT;
@@ -63,6 +68,8 @@ static psbt_field_status_t read_var(dispatcher_context_t *dc,
 /**
  * Reads a value that must be exactly `len` bytes into `out`. A present value of any other length
  * is malformed, hence PSBT_FIELD_ERROR.
+ *
+ * On any non-PRESENT outcome `out` is left zeroed.
  */
 static psbt_field_status_t read_fixed(dispatcher_context_t *dc,
                                       const merkleized_map_commitment_t *map,
@@ -74,7 +81,13 @@ static psbt_field_status_t read_fixed(dispatcher_context_t *dc,
     if (status != PSBT_FIELD_PRESENT) {
         return status;
     }
-    return read_len == len ? PSBT_FIELD_PRESENT : PSBT_FIELD_ERROR;
+    if (read_len != len) {
+        // on error, zero out the output buffer, preventing the caller from
+        // possibly using uninitialized data
+        explicit_bzero(out, len);
+        return PSBT_FIELD_ERROR;
+    }
+    return PSBT_FIELD_PRESENT;
 }
 
 /** Reads a value that must be exactly 4 bytes, decoded as a little-endian unsigned 32-bit int. */

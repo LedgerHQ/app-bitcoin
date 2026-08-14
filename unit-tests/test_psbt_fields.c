@@ -27,6 +27,13 @@
 
 /* ---------- Helpers ---------- */
 
+/** Asserts that a rejected read left nothing of the caller's sentinel, nor of the client's data. */
+static void assert_cleared(const uint8_t *buf, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        assert_int_equal(buf[i], 0);
+    }
+}
+
 /**
  * Registers a map holding a single (key_type, value) pair and returns its commitment.
  */
@@ -225,7 +232,9 @@ static void test_prevout_txid_absent(void **state) {
 }
 
 /**
- * A short txid must be rejected rather than accepted with an uninitialized tail.
+ * A short txid must be rejected rather than accepted with an uninitialized tail. The 31 bytes the
+ * client did send are proved, so read_var reports success and only read_fixed can clear them: they
+ * must not be left in the caller's buffer alongside an uninitialized 32nd byte.
  */
 static void test_prevout_txid_short_is_error(void **state) {
     mock_dispatcher_t *mock = *state;
@@ -237,10 +246,12 @@ static void test_prevout_txid_short_is_error(void **state) {
     map_with_one_field(mock, PSBT_IN_PREVIOUS_TXID, txid, sizeof(txid), &map);
 
     uint8_t got[32];
+    memset(got, 0xEE, sizeof(got));
     psbt_field_status_t status =
         psbt_get_input_prevout_txid(mock_dispatcher_get_dc(mock), &map, got);
 
     assert_int_equal(status, PSBT_FIELD_ERROR);
+    assert_cleared(got, sizeof(got));
 }
 
 static void test_output_amount_present(void **state) {
@@ -371,7 +382,8 @@ static void test_output_script_absent(void **state) {
 }
 
 /**
- * A script longer than the caller's buffer is an error, not an absent field.
+ * A script longer than the caller's buffer is an error, not an absent field. Neither the buffer nor
+ * the length may be left holding anything a caller could mistake for a value.
  */
 static void test_output_script_too_long_is_error(void **state) {
     mock_dispatcher_t *mock = *state;
@@ -383,11 +395,14 @@ static void test_output_script_too_long_is_error(void **state) {
     map_with_one_field(mock, PSBT_OUT_SCRIPT, script, sizeof(script), &map);
 
     uint8_t got[16];
-    size_t got_len = 0;
+    memset(got, 0xEE, sizeof(got));
+    size_t got_len = 123;
     psbt_field_status_t status =
         psbt_get_output_script(mock_dispatcher_get_dc(mock), &map, got, sizeof(got), &got_len);
 
     assert_int_equal(status, PSBT_FIELD_ERROR);
+    assert_int_equal(got_len, 0);
+    assert_cleared(got, sizeof(got));
 }
 
 static void test_redeem_script_present(void **state) {
