@@ -91,6 +91,11 @@ static nbgl_layoutTagValueList_t pairList;
 static void reset_flow_state(void) {
     memset(pairs, 0, sizeof(pairs));
     n_pairs = 0;
+    // Only the two flows using `status_operation_callback` set these; clearing them means a flow
+    // that forgets fails the assertions at the read sites instead of showing the previous
+    // command's status text.
+    confirmed_status = NULL;
+    rejected_status = NULL;
 }
 
 // Account row label: direction (From/To/unknown) + type. "default" = a standard derivation,
@@ -219,6 +224,7 @@ static void ux_flow_response_true(void) {
 // Statuses
 static void status_operation_cancel(void) {
     ux_flow_response_false();
+    LEDGER_ASSERT(rejected_status != NULL, "Rejection status not set by the flow");
     nbgl_useCaseStatus(rejected_status, false, ui_menu_main);
 }
 
@@ -240,6 +246,7 @@ static void status_address_cancel(void) {
 static void status_operation_callback(bool confirm) {
     if (confirm) {
         ux_flow_response_true();
+        LEDGER_ASSERT(confirmed_status != NULL, "Confirmation status not set by the flow");
         nbgl_useCaseStatus(confirmed_status, true, ui_menu_main);
     } else {
         status_operation_cancel();
