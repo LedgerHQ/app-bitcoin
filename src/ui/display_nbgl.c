@@ -385,14 +385,12 @@ void ui_display_transaction_streaming_prompt(void) {
 void ui_display_transaction_streaming_output_address_amount(void) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    pairs[0].item = "Transaction output";
-    pairs[0].value = state->output_index_str[0];
-
-    pairs[1].item = "Amount";
-    pairs[1].value = state->amount[0];
-
-    pairs[2].item = "To";
-    pairs[2].value = state->address_or_description[0];
+    // Whole-struct assignments: the pool is shared with the other flows, and a partial write
+    // would inherit `centeredInfo`/`forcePageStart`/`valueIcon` from whoever used the index last.
+    pairs[0] =
+        (nbgl_layoutTagValue_t) {.item = "Transaction output", .value = state->output_index_str[0]};
+    pairs[1] = (nbgl_layoutTagValue_t) {.item = "Amount", .value = state->amount[0]};
+    pairs[2] = (nbgl_layoutTagValue_t) {.item = "To", .value = state->address_or_description[0]};
 
     nbgl_useCaseReviewStreamingContinue(make_pair_list(3, false), start_transaction_callback);
 }
@@ -410,8 +408,7 @@ void ui_display_transaction_streaming_flow(bool is_self_transfer) {
     }
 
     if (is_self_transfer) {
-        pairs[l_n_pairs].item = "Amount";
-        pairs[l_n_pairs++].value = "Self-transfer";
+        pairs[l_n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Amount", .value = "Self-transfer"};
     }
 
     if (state->display_mode == TX_DISPLAY_NET_ONLY) {
@@ -426,8 +423,7 @@ void ui_display_transaction_streaming_flow(bool is_self_transfer) {
             // "External inputs amount" + net "You spend/receive", then the trustworthy fee.
             l_n_pairs = append_external_inputs_pairs(state, l_n_pairs, /* force_page */ false);
         }
-        pairs[l_n_pairs].item = "Fees";
-        pairs[l_n_pairs++].value = state->fee;
+        pairs[l_n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Fees", .value = state->fee};
     }
 
     nbgl_useCaseReviewStreamingContinue(make_pair_list(l_n_pairs, false), finish_transaction_flow);
@@ -447,11 +443,10 @@ void ui_display_pubkey_flow(void) {
     confirmed_status = "Public key\napproved";
     rejected_status = "Public key rejected";
 
-    pairs[0].item = "Path";
-    pairs[0].value = g_ui_state.path_and_pubkey.bip32_path_str;
-
-    pairs[1].item = "Public key";
-    pairs[1].value = g_ui_state.path_and_pubkey.pubkey;
+    pairs[0] = (nbgl_layoutTagValue_t) {.item = "Path",
+                                        .value = g_ui_state.path_and_pubkey.bip32_path_str};
+    pairs[1] =
+        (nbgl_layoutTagValue_t) {.item = "Public key", .value = g_ui_state.path_and_pubkey.pubkey};
 
     nbgl_useCaseReviewLight(TYPE_OPERATION,
                             make_pair_list(2, false),
@@ -464,8 +459,8 @@ void ui_display_pubkey_flow(void) {
 
 void ui_display_receive_in_wallet_flow(void) {
     // Setup list
-    pairs[0].item = "Account name";
-    pairs[0].value = g_ui_state.wallet.wallet_name;
+    pairs[0] =
+        (nbgl_layoutTagValue_t) {.item = "Account name", .value = g_ui_state.wallet.wallet_name};
 
     nbgl_useCaseAddressReview(g_ui_state.wallet.address,
                               make_pair_list(1, false),
@@ -546,20 +541,21 @@ void ui_display_register_wallet_policy_flow(void) {
 }
 
 void ui_sign_message_and_confirm_flow(bool is_hash) {
-    pairs[0].item = "Path";
-    pairs[0].value = g_ui_state.path_and_message.bip32_path_str;
-
+    const char *message_label;
     if (!is_hash) {
 #ifdef SCREEN_SIZE_WALLET
-        pairs[1].item = "Message content";
+        message_label = "Message content";
 #else
-        pairs[1].item = "Message";
+        message_label = "Message";
 #endif
     } else {
-        pairs[1].item = "Message hash";
+        message_label = "Message hash";
     }
 
-    pairs[1].value = g_ui_state.path_and_message.message;
+    pairs[0] = (nbgl_layoutTagValue_t) {.item = "Path",
+                                        .value = g_ui_state.path_and_message.bip32_path_str};
+    pairs[1] = (nbgl_layoutTagValue_t) {.item = message_label,
+                                        .value = g_ui_state.path_and_message.message};
 
     nbgl_useCaseReview(TYPE_MESSAGE,
                        make_pair_list(2, true),
