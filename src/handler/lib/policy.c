@@ -2057,15 +2057,14 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
             // musig placeholders are disjoint, as long as they are not exactly the same set of
             // keys. Similarly, a key used in a normal placeholder could also be part of the set of
             // keys in a musig placeholder.
+            // are_key_placeholders_identical() already compares the keys themselves (the key index
+            // for plain placeholders, the whole set of key indexes for musig ones), so there is
+            // nothing left to compare but the derivations.
             if (are_key_placeholders_identical(kp_i, kp_j)) {
-                if (kp_i->k.key_index == kp_j->k.key_index) {
-                    if (kp_i->num_first == kp_j->num_first || kp_i->num_first == kp_j->num_second ||
-                        kp_i->num_second == kp_j->num_first ||
-                        kp_i->num_second == kp_j->num_second) {
-                        return WITH_ERROR(
-                            -1,
-                            "Key expressions with repeated derivations in miniscript");
-                    }
+                if (kp_i->num_first == kp_j->num_first || kp_i->num_first == kp_j->num_second ||
+                    kp_i->num_second == kp_j->num_first || kp_i->num_second == kp_j->num_second) {
+                    return WITH_ERROR(-1,
+                                      "Key expressions with repeated derivations in miniscript");
                 }
             }
         }
