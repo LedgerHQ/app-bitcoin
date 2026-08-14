@@ -21,6 +21,9 @@ int call_get_merkleized_map_with_callback(dispatcher_context_t *dispatcher_conte
     uint8_t raw_output[9 + 2 * 32];  // maximum size of serialized result (9 bytes for the varint,
                                      // and the 2 Merkle roots)
 
+    // The map is not yet validated; explicitly mark it as such
+    out_ptr->_keys_are_sorted = false;
+
     int el_len = call_get_merkle_leaf_element(dispatcher_context,
                                               root,
                                               size,
@@ -38,10 +41,15 @@ int call_get_merkleized_map_with_callback(dispatcher_context_t *dispatcher_conte
         return -1;
     }
 
-    return call_check_merkle_tree_sorted_with_callback(dispatcher_context,
-                                                       callback_state,
-                                                       out_ptr->keys_root,
-                                                       out_ptr->size,
-                                                       callback,
-                                                       out_ptr);
+    int ret = call_check_merkle_tree_sorted_with_callback(dispatcher_context,
+                                                          callback_state,
+                                                          out_ptr->keys_root,
+                                                          out_ptr->size,
+                                                          callback,
+                                                          out_ptr);
+    if (ret >= 0) {
+        // keys were verified to be lexicographically sorted: the map is now safe for by-key reads
+        out_ptr->_keys_are_sorted = true;
+    }
+    return ret;
 }

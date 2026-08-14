@@ -37,11 +37,11 @@
 #include "error_codes.h"
 #include "get_merkle_leaf_element.h"
 #include "get_merkleized_map.h"
-#include "get_merkleized_map_value.h"
 #include "get_preimage.h"
 #include "musig.h"
 #include "policy.h"
 #include "psbt.h"
+#include "psbt_fields.h"
 #include "sign_psbt_cache.h"
 #include "sw.h"
 #include "wallet.h"
@@ -123,46 +123,32 @@ static bool __attribute__((noinline)) parse_sign_psbt_apdu(dispatcher_context_t 
  */
 static bool __attribute__((noinline)) process_global_map(dispatcher_context_t *dc,
                                                          sign_psbt_state_t *st) {
-    // Check integrity of the global map
-    if (call_check_merkle_tree_sorted(dc, st->global_map.keys_root, (size_t) st->global_map.size) <
-        0) {
+    // Check integrity of the global map (this also marks it as validated, so that its values may
+    // be read by key below).
+    if (call_check_merkleized_map_sorted(dc, &st->global_map) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }
-
-    uint8_t raw_result[9];  // max size for a varint
-    int result_len;
 
     // Read tx version
-    result_len = call_get_merkleized_map_value(dc,
-                                               &st->global_map,
-                                               (uint8_t[]) {PSBT_GLOBAL_TX_VERSION},
-                                               1,
-                                               raw_result,
-                                               sizeof(raw_result));
-    if (result_len != 4) {
+    if (PSBT_FIELD_PRESENT != psbt_get_global_tx_version(dc, &st->global_map, &st->tx_version)) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }
-    st->tx_version = read_u32_le(raw_result, 0);
 
     // Read fallback locktime.
     // Unlike BIP-0370 recommendation, we use the fallback locktime as-is, ignoring each input's
     // preferred height/block locktime. If that's relevant, the client must set the fallback
     // locktime to the appropriate value before calling sign_psbt.
-    result_len = call_get_merkleized_map_value(dc,
-                                               &st->global_map,
-                                               (uint8_t[]) {PSBT_GLOBAL_FALLBACK_LOCKTIME},
-                                               1,
-                                               raw_result,
-                                               sizeof(raw_result));
-    if (result_len < 0) {
-        st->locktime = 0;
-    } else if (result_len != 4) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return false;
-    } else {
-        st->locktime = read_u32_le(raw_result, 0);
+    switch (psbt_get_global_fallback_locktime(dc, &st->global_map, &st->locktime)) {
+        case PSBT_FIELD_ABSENT:
+            st->locktime = 0;
+            break;
+        case PSBT_FIELD_PRESENT:
+            break;
+        default:  // PSBT_FIELD_ERROR: present but malformed
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
     }
 
     return true;

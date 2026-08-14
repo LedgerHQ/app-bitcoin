@@ -178,7 +178,9 @@ static void test_get_leaf_index_unknown_hash(void **state) {
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_index(dc, 1, root, fake_hash);
 
-    assert_true(result < 0);
+    /* A key that is genuinely not in the tree must be reported as such, and must be
+     * distinguishable from a failed lookup. */
+    assert_int_equal(result, MERKLE_LEAF_NOT_FOUND);
 }
 
 /**
@@ -394,7 +396,8 @@ static void test_get_leaf_index_initial_comm_failure(void **state) {
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_index(dc, 1, root, leaf_hash);
 
-    assert_int_equal(result, -3);
+    /* A communication failure must NOT be reported as a missing key. */
+    assert_int_equal(result, MERKLE_LEAF_ERROR);
 }
 
 /**
@@ -434,7 +437,8 @@ static void test_get_leaf_index_invalid_found(void **state) {
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_index(dc, 1, root, leaf_hash);
 
-    assert_int_equal(result, -2);
+    /* An out-of-range 'found' flag is a protocol violation, not a missing key. */
+    assert_int_equal(result, MERKLE_LEAF_ERROR);
 }
 
 /**
@@ -476,7 +480,8 @@ static void test_get_leaf_index_verify_comm_failure(void **state) {
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_index(dc, 1, root, leaf_hash);
 
-    assert_int_equal(result, -4);
+    /* A failure while verifying the returned index must NOT be reported as a missing key. */
+    assert_int_equal(result, MERKLE_LEAF_ERROR);
 }
 
 /* ---------- Main ---------- */

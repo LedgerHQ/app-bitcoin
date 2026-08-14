@@ -1,5 +1,7 @@
 #ifdef HAVE_SWAP
 
+#include <string.h>
+
 /* SDK headers */
 #include "read.h"
 #include "swap_lib_calls.h"
