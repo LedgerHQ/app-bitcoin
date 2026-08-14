@@ -202,6 +202,10 @@ extern bool G_was_processing_screen_shown;
 static void finish_transaction_flow(bool choice);
 
 static nbgl_layoutTagValueList_t *make_pair_list(unsigned int nbPairs, bool wrapping) {
+    // Guards both an overflow of the pool and the silent truncation of `nbPairs` into the
+    // `uint8_t` field of nbgl_layoutTagValueList_t.
+    LEDGER_ASSERT(nbPairs <= N_UX_PAIRS, "Too many tag/value pairs");
+
     pairList = (nbgl_layoutTagValueList_t) {
         .pairs = pairs,
         .nbPairs = nbPairs,
