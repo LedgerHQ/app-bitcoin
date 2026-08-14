@@ -1,6 +1,6 @@
 /*****************************************************************************
  *   Ledger App Bitcoin.
- *   (c) 2025, 2026 Ledger SAS.
+ *   (c) 2026 Ledger SAS.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -115,8 +115,9 @@ psbt_field_status_t psbt_get_input_redeem_script(dispatcher_context_t *dc,
 
 /**
  * PSBT_IN_WITNESS_UTXO amount: reads the witness UTXO and returns its 8-byte little-endian amount.
- * Only requires the value to be at least 8 bytes; the full structural validation of the witness
- * UTXO is done elsewhere (see get_amount_scriptpubkey_from_psbt_witness).
+ * Only requires the value to be at least 8 bytes and at most 8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN;
+ * the full structural validation of the witness UTXO is done elsewhere (see
+ * get_amount_scriptpubkey_from_psbt_witness).
  */
 psbt_field_status_t psbt_get_input_witness_utxo_amount(dispatcher_context_t *dc,
                                                        const merkleized_map_commitment_t *input_map,

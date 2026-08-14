@@ -590,7 +590,8 @@ bool __attribute__((noinline)) compute_sighash_segwitv1(
     // the first 0x00 byte is not part of SigMsg
     crypto_hash_update_u8(&sighash_context.header, 0x00);
 
-    uint8_t tmp[MAX(32, 8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN)];
+    // re-used multiple times below; the largest size we need is a 32-byte hash
+    uint8_t tmp[32];
 
     // hash type
     crypto_hash_update_u8(&sighash_context.header, sighash_byte);

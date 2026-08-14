@@ -58,6 +58,9 @@ static inline int call_check_merkle_tree_sorted(dispatcher_context_t *dispatcher
  */
 static inline int call_check_merkleized_map_sorted(dispatcher_context_t *dispatcher_context,
                                                    merkleized_map_commitment_t *map) {
+    // The map is not yet validated; explicitly mark it as such
+    map->_keys_are_sorted = false;
+
     int ret = call_check_merkle_tree_sorted(dispatcher_context, map->keys_root, (size_t) map->size);
     if (ret >= 0) {
         map->_keys_are_sorted = true;
