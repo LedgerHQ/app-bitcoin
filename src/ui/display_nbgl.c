@@ -77,9 +77,16 @@ const char GA_UNVERIFIED_INPUTS_TITLE[] = "External inputs amount";
 const char GA_UNVERIFIED_INPUTS_TITLE[] = "External amounts";
 #endif
 
-// Size of the tag/value pool for a transaction review; see the breakdown in the static assert
-// below (account row, per-output rows, external-inputs rows, fees, high-fee, "Signing rule").
-#define N_UX_PAIRS 54
+// Size of the tag/value pool, the larger of what the two greediest flows need. Derived rather
+// than hardcoded so it tracks MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER, which is smaller on Nano X, and so
+// the _Static_asserts in the two flows below hold by construction.
+//   transaction review: 1 account row + 3 per external output + 2 external-inputs rows + 1 fees
+//                       + 1 high-fee notice + 1 "Signing rule"
+//   register wallet:    1 account name + 1 descriptor template + 1 co-signer separator
+//                       + 1 per key + 1 per cleartext line
+#define N_UX_PAIRS                                                \
+    MAX(1 + 3 * MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER + 2 + 1 + 1 + 1, \
+        3 + MAX_N_KEYS_IN_WALLET_POLICY + CT_MAX_LINES)
 
 static nbgl_layoutTagValue_t pairs[N_UX_PAIRS];
 static unsigned int n_pairs;
