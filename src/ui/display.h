@@ -217,8 +217,6 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
                                const char *wallet_name,
                                const char *address);
 
-bool ui_display_unusual_path(dispatcher_context_t *context, const char *bip32_path_str);
-
 void ui_prepare_authorize_wallet_spend(const char *wallet_name,
                                        account_role_t account_role,
                                        bool account_is_default,
@@ -232,8 +230,6 @@ bool ui_warn_nondefault_sighash(dispatcher_context_t *context);
 
 // Shows a terminal status explaining that a non-standard sighash was rejected
 void ui_warn_nondefault_sighash_disabled(dispatcher_context_t *context);
-
-bool ui_warn_high_fee(dispatcher_context_t *context);
 
 /* These 3 functions have to be called in following order:
  * 1. init - initialize the flow; the summary is applied here so the account row, the
@@ -274,8 +270,6 @@ void ui_display_receive_in_wallet_flow(void);
 
 void ui_display_default_wallet_address_flow(void);
 
-void ui_display_spend_from_wallet_flow(void);
-
 void ui_display_warning_external_inputs_flow(void);
 
 void ui_display_unverified_segwit_inputs_flows(void);
@@ -283,8 +277,6 @@ void ui_display_unverified_segwit_inputs_flows(void);
 void ui_display_nondefault_sighash_flow(void);
 
 void ui_display_nondefault_sighash_disabled_flow(void);
-
-void ui_warn_high_fee_flow(void);
 
 void ui_display_register_wallet_policy_flow(void);
 
@@ -296,15 +288,12 @@ void ui_display_transaction_streaming_prompt(void);
 void ui_display_transaction_streaming_output_address_amount(void);
 void ui_display_transaction_streaming_flow(bool is_self_transfer);
 
-bool ui_post_processing_confirm_wallet_spend(dispatcher_context_t *context, bool success);
-
 bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool success);
 
 bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool success);
 
 void ui_display_post_processing_confirm_message(bool success);
 void ui_display_post_processing_confirm_transaction(bool success);
-void ui_set_display_prompt(void);
 
 /**
  * Functions to get and set the text to be shown when processing.
