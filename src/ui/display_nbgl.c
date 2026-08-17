@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdint.h>
+#include <string.h>
 
 /* SDK headers */
 #include "nbgl_use_case.h"
@@ -83,6 +84,14 @@ const char GA_UNVERIFIED_INPUTS_TITLE[] = "External amounts";
 static nbgl_layoutTagValue_t pairs[N_UX_PAIRS];
 static unsigned int n_pairs;
 static nbgl_layoutTagValueList_t pairList;
+
+// Clears the row pool at the start of a review.
+// Only call this from the functions that *start* a review, never from the `_add`/`_show` steps or
+// the streaming continuations: those run mid-review, while the previous page is still displayed.
+static void reset_flow_state(void) {
+    memset(pairs, 0, sizeof(pairs));
+    n_pairs = 0;
+}
 
 // Account row label: direction (From/To/unknown) + type. "default" = a standard derivation,
 // "registered" = a registered policy. On Nano there's no room for the type, so we keep only
@@ -285,7 +294,7 @@ void ui_display_transaction_simplified_flow_init(void) {
      * + 1 Signing rule */
     _Static_assert(N_UX_PAIRS >= (1 + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER * 3 + 2 + 1 + 1 + 1),
                    "Insufficient pairs for this flow");
-    n_pairs = 0;
+    reset_flow_state();
 
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
@@ -367,6 +376,8 @@ void ui_display_transaction_simplified_flow_show(void) {
 }
 
 void ui_display_transaction_streaming_prompt(void) {
+    reset_flow_state();
+
     nbgl_useCaseReviewStreamingStart(TYPE_TRANSACTION,
                                      &ICON_APP_ACTION,
                                      GA_REVIEW_TRANSACTION,
@@ -440,6 +451,8 @@ static void finish_transaction_flow(bool choice) {
 
 // Continue light notify callback
 void ui_display_pubkey_flow(void) {
+    reset_flow_state();
+
     confirmed_status = "Public key\napproved";
     rejected_status = "Public key rejected";
 
@@ -458,6 +471,8 @@ void ui_display_pubkey_flow(void) {
 }
 
 void ui_display_receive_in_wallet_flow(void) {
+    reset_flow_state();
+
     // Setup list
     pairs[0] =
         (nbgl_layoutTagValue_t) {.item = "Account name", .value = g_ui_state.wallet.wallet_name};
@@ -474,10 +489,10 @@ void ui_display_register_wallet_policy_flow(void) {
     _Static_assert(N_UX_PAIRS >= 3 + MAX_N_KEYS_IN_WALLET_POLICY + CT_MAX_LINES,
                    "Insufficient pairs for this flow");
 
+    reset_flow_state();
+
     confirmed_status = "Account registered";
     rejected_status = "Account rejected";
-
-    n_pairs = 0;
 
     pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
         .item = "Account name",
@@ -541,6 +556,8 @@ void ui_display_register_wallet_policy_flow(void) {
 }
 
 void ui_sign_message_and_confirm_flow(bool is_hash) {
+    reset_flow_state();
+
     const char *message_label;
     if (!is_hash) {
 #ifdef SCREEN_SIZE_WALLET
@@ -568,6 +585,8 @@ void ui_sign_message_and_confirm_flow(bool is_hash) {
 
 // Address flow
 void ui_display_default_wallet_address_flow(void) {
+    reset_flow_state();
+
     nbgl_useCaseAddressReview(g_ui_state.wallet.address,
                               NULL,
                               &ICON_APP_ACTION,
