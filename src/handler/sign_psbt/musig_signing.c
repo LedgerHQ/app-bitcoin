@@ -165,6 +165,44 @@ bool compute_musig_per_input_info(dispatcher_context_t *dc,
     return true;
 }
 
+/**
+ * Derives the (secnonce, pubnonce) pair for the given (input index, key expression) pair, out of
+ * the synthetic randomness of the psbt-level MuSig2 session.
+ *
+ * Every place that needs a nonce must go through this function: round 1 publishes the pubnonce,
+ * while round 2 recomputes the corresponding secnonce. Should the two derivations ever diverge, the
+ * partial signatures produced in round 2 would not match the pubnonces published in round 1, and
+ * the aggregate signature would be invalid.
+ *
+ * On failure, the secnonce is zeroed out before returning.
+ */
+static bool __attribute__((noinline)) musig_derive_nonce(const musig_psbt_session_t *psbt_session,
+                                                         const keyexpr_info_t *keyexpr_info,
+                                                         const uint8_t aggpk[static 32],
+                                                         unsigned int input_index,
+                                                         musig_secnonce_t *secnonce,
+                                                         musig_pubnonce_t *pubnonce) {
+    uint8_t rand_i_j[32];
+    compute_rand_i_j(psbt_session, input_index, keyexpr_info->index, rand_i_j);
+
+    int res = musig_nonce_gen(rand_i_j,
+                              sizeof(rand_i_j),
+                              keyexpr_info->internal_pubkey.compressed_pubkey,
+                              aggpk,
+                              secnonce,
+                              pubnonce);
+
+    explicit_bzero(rand_i_j, sizeof(rand_i_j));
+
+    if (0 > res) {
+        PRINTF("MuSig2 nonce generation failed\n");
+        explicit_bzero(secnonce, sizeof(*secnonce));
+        return false;
+    }
+
+    return true;
+}
+
 static bool __attribute__((noinline)) yield_musig_data(dispatcher_context_t *dc,
                                                        sign_psbt_state_t *st,
                                                        unsigned int cur_input_index,
@@ -288,22 +326,21 @@ bool produce_and_yield_pubnonce(dispatcher_context_t *dc,
         return false;
     }
 
-    bool ret = false;
-    uint8_t rand_i_j[32];
-    compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->index, rand_i_j);
-
     musig_secnonce_t secnonce;
     musig_pubnonce_t pubnonce;
-    int res = musig_nonce_gen(rand_i_j,
-                              sizeof(rand_i_j),
-                              keyexpr_info->internal_pubkey.compressed_pubkey,
-                              musig_per_input_info.agg_key_tweaked.compressed_pubkey + 1,
-                              &secnonce,
-                              &pubnonce);
+    bool nonce_ok = musig_derive_nonce(psbt_session,
+                                       keyexpr_info,
+                                       musig_per_input_info.agg_key_tweaked.compressed_pubkey + 1,
+                                       cur_input_index,
+                                       &secnonce,
+                                       &pubnonce);
+
+    // round 1 only publishes the pubnonce; the secnonce is recomputed in round 2
     explicit_bzero(&secnonce, sizeof(secnonce));
-    if (0 > res) {
-        PRINTF("MuSig2 nonce generation failed\n");
-        goto cleanup;
+
+    if (!nonce_ok) {
+        SEND_SW(dc, SW_BAD_STATE);  // should never happen
+        return false;
     }
 
     if (!yield_musig_pubnonce(dc,
@@ -314,14 +351,6 @@ bool produce_and_yield_pubnonce(dispatcher_context_t *dc,
                               musig_per_input_info.agg_key_tweaked.compressed_pubkey,
                               keyexpr_info->is_tapscript ? keyexpr_info->tapleaf_hash : NULL)) {
         PRINTF("Failed yielding MuSig2 pubnonce\n");
-        goto cleanup;
-    }
-
-    ret = true;
-
-cleanup:
-    explicit_bzero(rand_i_j, sizeof(rand_i_j));
-    if (!ret) {
         SEND_SW(dc, SW_BAD_STATE);  // should never happen
         return false;
     }
@@ -432,21 +461,15 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
     }
 
     // recompute secnonce from psbt_session randomness
-    uint8_t rand_i_j[32];
-    compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->index, rand_i_j);
-
     musig_secnonce_t secnonce;
     musig_pubnonce_t pubnonce;
 
-    if (0 > musig_nonce_gen(rand_i_j,
-                            sizeof(rand_i_j),
-                            keyexpr_info->internal_pubkey.compressed_pubkey,
+    if (!musig_derive_nonce(psbt_session,
+                            keyexpr_info,
                             musig_per_input_info.agg_key_tweaked.compressed_pubkey + 1,
+                            cur_input_index,
                             &secnonce,
                             &pubnonce)) {
-        PRINTF("MuSig2 nonce generation failed\n");
-        explicit_bzero(rand_i_j, sizeof(rand_i_j));
-        explicit_bzero(&secnonce, sizeof(secnonce));
         SEND_SW(dc, SW_BAD_STATE);  // should never happen
         return false;
     }
@@ -498,7 +521,6 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
     } while (false);
 
     explicit_bzero(&private_key, sizeof(private_key));
-    explicit_bzero(rand_i_j, sizeof(rand_i_j));
     explicit_bzero(&secnonce, sizeof(secnonce));
 
     if (err) {
