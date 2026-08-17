@@ -134,6 +134,52 @@ def test_sign_psbt_highfee(navigator: Navigator, firmware: Firmware, client: Rag
     assert len(result) == 1
 
 
+def test_sign_psbt_then_sign_message_no_stale_review_state(navigator: Navigator, firmware: Firmware,
+                                                           client: RaggerClient, test_name: str):
+    # Regression test: the review rows live in a static pool that is reused by every flow, so a
+    # row must never inherit display flags from a previous command.
+    #
+    # A past version of the app would display the sign_message UX incorrectly due to some NBGL
+    # fields not being cleared after the sign_psbt flow.
+    wallet = WalletPolicy(
+        "",
+        "wpkh(@0/**)",
+        [
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
+        ],
+    )
+
+    # The self-transfer PSBT from test_sign_psbt_singlesig_wpkh_selftransfer: both outputs are
+    # change, so no external output is shown and a "self-transfer" row takes index 0.
+    psbt = PSBT()
+    psbt.deserialize("cHNidP8BAHECAAAAAfcDVJxLN1tzz5vaIy2onFL/ht/OqwKm2jEWGwMNDE/cAQAAAAD9////As0qAAAAAAAAFgAUJfcXOL7SoYGoDC1n6egGa0OTD9/mtgEAAAAAABYAFDXG4N1tPISxa6iF3Kc6yGPQtZPsTTQlAAABAPYCAAAAAAEBCOcYS1aMP1uQcUKTMJbvlsZXsV4yNnVxynyMfxSX//UAAAAAFxYAFGEWho6AN6qeux0gU3BSWnK+Dw4D/f///wKfJwEAAAAAABepFG1IUtrzpUCfdyFtu46j1ZIxLX7ph0DiAQAAAAAAFgAU4e5IJz0XxNe96ANYDugMQ34E0/cCRzBEAiB1b84pX0QaOUrvCdDxKeB+idM6wYKTLGmqnUU/tL8/lQIgbSinpq4jBlo+SIGyh8XNVrWAeMlKBNmoLenKOBugKzcBIQKXsd8NwO+9naIfeI3nkgYjg6g3QZarGTRDs7SNVZfGPJBJJAABAR9A4gEAAAAAABYAFOHuSCc9F8TXvegDWA7oDEN+BNP3IgYCgffBheEUZI8iAFFfv7b+HNM7j4jolv6lj5/n3j68h3kY9azC/VQAAIABAACAAAAAgAAAAAAHAAAAACICAzQZjNnkwXFEhm1F6oC2nk1ADqH6t/RHBAOblLA4tV5BGPWswv1UAACAAQAAgAAAAIABAAAAEgAAAAAiAgJxtbd5rYcIOFh3l7z28MeuxavnanCdck9I0uJs+HTwoBj1rML9VAAAgAEAAIAAAACAAQAAAAAAAAAA")
+
+    # Push the fee over 10% of the input amount, so the high-fee notice is shown.
+    for out in psbt.tx.vout:
+        out.nValue = int(out.nValue * 0.5)
+
+    # the warning is only raised when the total amount is at least 100000 sats
+    assert sum(input.witness_utxo.nValue for input in psbt.inputs) >= 100000
+
+    client.sign_psbt(psbt, wallet, None, navigator,
+                     instructions=sign_psbt_instruction_approve(firmware, has_feewarning=True),
+                     testname=f"{test_name}_psbt")
+
+    # A distinct testname is required: snapshot dirs are f"{testname}_{index}_{sub_index}" with
+    # index restarting at 0 for each top-level client call, so reusing test_name would collide.
+    message = "The root problem with conventional currency is all the trust that's required to make it work. The central bank must be trusted not to debase the currency, but the history of fiat currencies is full of breaches of that trust. Banks must be trusted to hold our money and transfer it electronically, but they lend it out in waves of credit bubbles with barely a fraction in reserve. We have to trust them with our privacy, trust them not to let identity thieves drain our accounts. Their massive overhead costs make micropayments impossible."
+
+    res = client.sign_message(
+        message,
+        "m/84'/1'/0'/0/8",
+        navigator,
+        instructions=message_instruction_approve_long(firmware),
+        testname=f"{test_name}_msg"
+    )
+
+    assert res == 'H4frM6TYm5ty1MAf9o/Zz9Qiy3VEldAYFY91SJ/5nYMAZY1UUB97fiRjKW8mJit2+V4OCa1YCqjDqyFnD9Fw75k='
+
+
 def test_sign_psbt_singlesig_wpkh_1to2(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
     # PSBT for a segwit 1-input 2-output spend (1 change address)
