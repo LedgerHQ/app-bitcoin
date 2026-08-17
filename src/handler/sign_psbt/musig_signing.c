@@ -478,6 +478,19 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
         return false;
     }
 
+    // Check that the pubnonce we just recomputed is indeed the one that the client put in the psbt.
+    // A mismatch means that the psbt was not built with the pubnonces of this session; for example,
+    // because a more recent round 1 for the same wallet policy replaced the session in storage.
+    // Signing anyway would produce a partial signature that does not match the aggregate nonce, and
+    // therefore an invalid aggregate signature; the other cosigners would then legitimately blame
+    // this signer for being disruptive. Fail cleanly instead.
+    if (memcmp(&pubnonce, &my_pubnonce, sizeof(pubnonce)) != 0) {
+        PRINTF("The pubnonce in the PSBT does not match the MuSig2 session\n");
+        explicit_bzero(&secnonce, sizeof(secnonce));
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return false;
+    }
+
     // generate and yield partial signature
 
     cx_ecfp_private_key_t private_key = {0};
