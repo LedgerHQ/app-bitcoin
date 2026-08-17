@@ -169,11 +169,22 @@ bool compute_musig_per_input_info(dispatcher_context_t *dc,
  * Derives the (secnonce, pubnonce) pair for the given (input index, key expression) pair, out of
  * the synthetic randomness of the psbt-level MuSig2 session.
  *
+ * The nonce deliberately depends only on the session randomness, the two indices and the wallet
+ * policy; it does _not_ depend on the transaction, nor on the input's (change, address_index).
+ * Therefore, the `aggpk` argument of NonceGen is the aggregate key of the musig() key expression
+ * _before_ any of the tweaks, rather than the tweaked key that is actually being signed for.
+ * In BIP-0327, `aggpk` (like `msg`, which this app already omits) is an optional argument whose
+ * only purpose is to add further entropy to the derivation, as a defense in depth; it is not
+ * needed for the uniqueness of the nonce, which here is guaranteed by `rand_root` coming from
+ * the hardware RNG and by the (input_index, keyexpr_index) domain separation in compute_rand_i_j.
+ *
+ * Making the nonce independent of the transaction is what allows a client to run round 1 of MuSig2
+ * before knowing the transaction that will be signed. See doc/musig.md.
+ *
  * On failure, the secnonce is zeroed out before returning.
  */
 static bool __attribute__((noinline)) musig_derive_nonce(const musig_psbt_session_t *psbt_session,
                                                          const keyexpr_info_t *keyexpr_info,
-                                                         const uint8_t aggpk[static 32],
                                                          unsigned int input_index,
                                                          musig_secnonce_t *secnonce,
                                                          musig_pubnonce_t *pubnonce) {
@@ -183,7 +194,8 @@ static bool __attribute__((noinline)) musig_derive_nonce(const musig_psbt_sessio
     int res = musig_nonce_gen(rand_i_j,
                               sizeof(rand_i_j),
                               keyexpr_info->internal_pubkey.compressed_pubkey,
-                              aggpk,
+                              // untweaked aggregate key of the musig() key expression
+                              keyexpr_info->pubkey.compressed_pubkey + 1,
                               secnonce,
                               pubnonce);
 
@@ -323,12 +335,8 @@ bool produce_and_yield_pubnonce(dispatcher_context_t *dc,
 
     musig_secnonce_t secnonce;
     musig_pubnonce_t pubnonce;
-    bool nonce_ok = musig_derive_nonce(psbt_session,
-                                       keyexpr_info,
-                                       musig_per_input_info.agg_key_tweaked.compressed_pubkey + 1,
-                                       cur_input_index,
-                                       &secnonce,
-                                       &pubnonce);
+    bool nonce_ok =
+        musig_derive_nonce(psbt_session, keyexpr_info, cur_input_index, &secnonce, &pubnonce);
 
     // round 1 only publishes the pubnonce; the secnonce is recomputed in round 2
     explicit_bzero(&secnonce, sizeof(secnonce));
@@ -459,12 +467,7 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
     musig_secnonce_t secnonce;
     musig_pubnonce_t pubnonce;
 
-    if (!musig_derive_nonce(psbt_session,
-                            keyexpr_info,
-                            musig_per_input_info.agg_key_tweaked.compressed_pubkey + 1,
-                            cur_input_index,
-                            &secnonce,
-                            &pubnonce)) {
+    if (!musig_derive_nonce(psbt_session, keyexpr_info, cur_input_index, &secnonce, &pubnonce)) {
         SEND_SW(dc, SW_BAD_STATE);  // should never happen
         return false;
     }
