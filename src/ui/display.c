@@ -207,6 +207,11 @@ void ui_prepare_authorize_wallet_spend(const char *wallet_name,
                                        bool account_is_default,
                                        const tx_summary_t *summary) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
+
+    // Make sure that the state is cleared before starting a streaming UI flow, preventing
+    // any possible bug caused by stale state.
+    memset(state, 0, sizeof(ui_validate_transaction_state_t));
+
     state->account_role = account_role;
     state->account_is_default = account_is_default;
     if (wallet_name == NULL) {
