@@ -29,7 +29,6 @@
 typedef struct {
     plain_pk_t keys[MAX_PUBKEYS_PER_MUSIG];
     serialized_extended_pubkey_t agg_key_tweaked;
-    uint8_t psbt_session_id[32];
     uint8_t tweaks[3][32];  // 2 or three tweaks
     size_t n_tweaks;        // always 2 or 3 for supported BIP-388 wallet policies
     bool is_xonly[3];       // 2 or 3 elements
@@ -46,7 +45,6 @@ typedef struct {
  */
 bool compute_musig_per_input_info(dispatcher_context_t *dc,
                                   sign_psbt_state_t *st,
-                                  signing_state_t *signing_state,
                                   const input_info_t *input,
                                   const keyexpr_info_t *keyexpr_info,
                                   musig_per_input_info_t *out);
