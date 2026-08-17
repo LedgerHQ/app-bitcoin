@@ -188,6 +188,8 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
     return true;
 #endif
 
+    memset(state, 0, sizeof(ui_wallet_state_t));
+
     strncpy(state->address, address, sizeof(state->address));
 
     if (wallet_name == NULL) {
@@ -361,8 +363,6 @@ void ui_transaction_simplified_init(const char *wallet_policy_name,
     if (wallet_policy_name != NULL) {
         strncpy(state->wallet_policy_name, wallet_policy_name, sizeof(state->wallet_policy_name));
         state->has_wallet_policy = true;
-    } else {
-        memset(state->wallet_policy_name, 0, sizeof(state->wallet_policy_name));
     }
     state->n_outputs = outputs_num;
     state->warnings = warnings;
