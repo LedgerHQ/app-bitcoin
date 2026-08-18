@@ -1,0 +1,23 @@
+# Bitcoin-specific UBSan carve-outs, composed onto the SDK's list via
+# -DLEDGER_FUZZ_APP_UBSAN_IGNORELIST (see ledger-secure-sdk/fuzzing/CMakeLists.txt).
+#
+# Scoped to the files owning the generic-callback idiom, rather than a blanket
+# -fno-sanitize=function, which would remove the indirect-call-type oracle app-wide.
+
+[function]
+# parsing_step_t and merkle_tree_elements_callback_t are generic function-pointer
+# typedefs that the dispatcher casts typed callbacks through deliberately. The
+# idiom trips -fsanitize=function without being a defect. Scoped to the files that
+# own the idiom rather than the whole app.
+src:*/src/handler/lib/stream_merkleized_map_value.c
+src:*/src/handler/lib/parser.c
+src:*/common/parser_ext.c
+src:*/src/handler/sign_psbt/preprocess_inputs.c
+src:*/src/handler/sign_psbt/preprocess_outputs.c
+src:*/src/handler/sign_psbt/sign_input.c
+
+# send_response() carries an empty parameter list, so its type is not void(void)
+# and reaching it through dispatcher_context_t's `void (*send_response)(void)` is
+# a call through an incompatible type. Scoped to the function so the dispatcher
+# keeps the oracle everywhere else.
+fun:send_response

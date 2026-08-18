@@ -1964,7 +1964,7 @@ static int check_older_node_cb(const policy_node_t *node, void *callback_state) 
     (void) callback_state;
     if (node->type == TOKEN_OLDER) {
         const policy_node_with_uint32_t *older = (const policy_node_with_uint32_t *) node;
-        uint32_t n = older->n & ~SEQUENCE_LOCKTIME_TYPE_FLAG;
+        uint32_t n = older->n & ~(uint32_t) SEQUENCE_LOCKTIME_TYPE_FLAG;
         if (n < 1 || n > 65535) {
             return -1;
         }
@@ -2023,8 +2023,13 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
             if (memcmp(pubkey_i.compressed_pubkey,
                        pubkey_j.compressed_pubkey,
                        sizeof(pubkey_i.compressed_pubkey)) == 0) {
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
                 // duplicated pubkey
                 return WITH_ERROR(-1, "Repeated pubkey in wallet policy");
+#else
+                // Fuzz mode: the crypto mock returns a constant pubkey for every
+                // derivation, so allow the collision to keep multi-key policies reachable.
+#endif
             }
         }
     }

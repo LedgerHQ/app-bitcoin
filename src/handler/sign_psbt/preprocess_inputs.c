@@ -186,6 +186,12 @@ bool __attribute__((noinline)) preprocess_inputs(
                 return false;
             }
 
+            // sanity check before accumulating, to avoid overflowing the total
+            if (input.prevout_amount > BITCOIN_TOTAL_SUPPLY) {
+                PRINTF("Input amount exceeds Bitcoin total supply!\n");
+                SEND_SW(dc, SW_INCORRECT_DATA);
+                return false;
+            }
             st->inputs_total_amount += input.prevout_amount;
         }
 
@@ -220,19 +226,18 @@ bool __attribute__((noinline)) preprocess_inputs(
                 }
             } else {
                 // we extract the scriptPubKey and prevout amount from the witness utxo
+                // sanity check before accumulating, to avoid overflowing the total
+                if (wit_utxo_prevout_amount > BITCOIN_TOTAL_SUPPLY) {
+                    PRINTF("Input amount exceeds Bitcoin total supply!\n");
+                    SEND_SW(dc, SW_INCORRECT_DATA);
+                    return false;
+                }
                 st->inputs_total_amount += wit_utxo_prevout_amount;
 
                 input.prevout_amount = wit_utxo_prevout_amount;
                 input.in_out.scriptPubKey_len = wit_utxo_scriptPubkey_len;
                 memcpy(input.in_out.scriptPubKey, wit_utxo_scriptPubkey, wit_utxo_scriptPubkey_len);
             }
-        }
-
-        if (input.prevout_amount > BITCOIN_TOTAL_SUPPLY) {
-            // sanity check to avoid overflows in amounts
-            PRINTF("Input amount exceed Bitcoin total supply!\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
         }
 
         // check if the input is internal; if not, continue

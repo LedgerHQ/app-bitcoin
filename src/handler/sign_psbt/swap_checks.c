@@ -41,9 +41,14 @@ bool __attribute__((noinline)) execute_swap_checks(dispatcher_context_t *dc,
 
     // Swap feature: check that wallet policy is a default one
     if (!st->account.is_default) {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+        // Fuzzing repair: force the default-wallet branch so swap validation runs.
+        st->account.is_default = true;
+#else
         PRINTF("Must be a default wallet policy for swap feature\n");
         SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_NONDEFAULT_POLICY);
         finalize_exchange_sign_transaction(false);
+#endif
     }
 
     // No external inputs allowed
@@ -54,11 +59,17 @@ bool __attribute__((noinline)) execute_swap_checks(dispatcher_context_t *dc,
     }
 
     if (st->warnings.missing_nonwitnessutxo || st->warnings.non_default_sighash) {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+        // Fuzzing repair: clear warnings so the swap-validation tail runs.
+        st->warnings.missing_nonwitnessutxo = false;
+        st->warnings.non_default_sighash = false;
+#else
         // Do not allow transactions with missing non-witness utxos or non-default sighash flags
         PRINTF(
             "Missing non-witness utxo or non-default sighash flags are not allowed during swaps\n");
         SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_MISSING_NONWITNESSUTXO);
         finalize_exchange_sign_transaction(false);
+#endif
     }
 
     uint64_t fee = st->inputs_total_amount - st->outputs.total_amount;
@@ -82,9 +93,23 @@ bool __attribute__((noinline)) execute_swap_checks(dispatcher_context_t *dc,
         swap_dest_idx = 1;
 
         if (st->n_external_outputs != 2) {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+            // Fuzzing repair: the exact "2 external outputs" count depends on
+            // mocked change-classification and is rarely hit by mutation. Relax to
+            // >=1 so the OP_RETURN parser below still runs; swap_dest_idx=0 keeps the
+            // later output_scripts[] access in-bounds. Downstream address/hash/fee
+            // checks fail naturally, so findings past here need production-reachability
+            // triage.
+            if (st->n_external_outputs < 1) {
+                SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_WRONG_N_OF_OUTPUTS);
+                finalize_exchange_sign_transaction(false);
+            }
+            swap_dest_idx = 0;
+#else
             PRINTF("Cross-chain swap transaction must have exactly 2 external outputs\n");
             SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_WRONG_N_OF_OUTPUTS);
             finalize_exchange_sign_transaction(false);
+#endif
         }
 
         uint8_t *opreturn_script = st->outputs.output_scripts[0];

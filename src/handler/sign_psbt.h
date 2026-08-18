@@ -34,7 +34,7 @@ typedef struct {
                                 // matched with the current key expression in the signing flow
 
     bool is_change;
-    int address_index;
+    uint32_t address_index;
 
     // For an output, its scriptPubKey
     // for an input, the prevout's scriptPubKey (either from the non-witness-utxo, or from the

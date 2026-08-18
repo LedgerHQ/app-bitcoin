@@ -368,12 +368,14 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
         memcpy(musig_my_psbt_id + 33 + 33, keyexpr_info->tapleaf_hash, 32);
     }
     musig_pubnonce_t my_pubnonce;
-    if (sizeof(musig_pubnonce_t) != call_get_merkleized_map_value(dc,
-                                                                  &input->in_out.map,
-                                                                  musig_my_psbt_id_key,
-                                                                  1 + psbt_id_len,
-                                                                  my_pubnonce.raw,
-                                                                  sizeof(musig_pubnonce_t))) {
+    // call_get_merkleized_map_value returns int (negative on error); cast the
+    // unsigned sizeof so the comparison doesn't trip UBSan's sign-change check.
+    if ((int) sizeof(musig_pubnonce_t) != call_get_merkleized_map_value(dc,
+                                                                        &input->in_out.map,
+                                                                        musig_my_psbt_id_key,
+                                                                        1 + psbt_id_len,
+                                                                        my_pubnonce.raw,
+                                                                        sizeof(musig_pubnonce_t))) {
         PRINTF("Missing or erroneous pubnonce in PSBT\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;

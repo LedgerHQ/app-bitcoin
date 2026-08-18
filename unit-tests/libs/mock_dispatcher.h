@@ -38,7 +38,12 @@
 
 /* ---- Configuration ---- */
 #define MOCK_MAX_PREIMAGES   1024
-#define MOCK_MAX_TREES       16
+/* A PSBT scenario spends 1 (key-info) + 2 (global) + 1 (inputs list) + 2 per input
+ * map + 1 (outputs list) + 2 per output map, i.e. 5 + 2*(n_in + n_out). At 16 that
+ * caps n_in + n_out at 5 against declared maxima of 8 and 8, so 54 of 64 uniform
+ * (n_in, n_out) pairs made the builder refuse and the iteration dispatch nothing --
+ * 84.4% of SIGN_PSBT inputs. 40 lifts the cap to 17. */
+#define MOCK_MAX_TREES       40
 #define MOCK_MAX_TREE_ELEMS  1024
 #define MOCK_MAX_YIELDED     1024
 #define MOCK_MAX_QUEUE_ELEMS 2048
@@ -141,6 +146,54 @@ typedef struct {
 void mock_dispatcher_init(mock_dispatcher_t *mock);
 
 /**
+ * Clear per-scenario state without re-zeroing the whole struct.
+ *
+ * mock_dispatcher_init() memsets several megabytes (the preimage store and the
+ * Merkle trees dominate), which is fine once per test but not once per fuzzing
+ * iteration. Only the counters gate what is readable, so resetting them is
+ * enough; the dc callbacks and any tamper hook are left in place.
+ */
+void mock_dispatcher_reset(mock_dispatcher_t *mock);
+
+/**
+ * Answer one client command without going through dispatcher_context_t.
+ *
+ * Same handlers, same tamper hook as mock_process_interruption(); this entry
+ * point exists for callers that already own the transport (a fuzzing harness
+ * intercepting os_io_rx_evt(), for instance) and just need request bytes turned
+ * into response bytes.
+ *
+ * @return 0 on success, -1 on a malformed request, an unknown command, an
+ *         oversized response, or a tamper hook simulating a comms failure.
+ */
+int mock_dispatcher_handle_ccmd(mock_dispatcher_t *mock,
+                                const uint8_t *request,
+                                size_t request_len,
+                                uint8_t *response,
+                                size_t response_cap,
+                                size_t *response_len);
+
+/**
+ * @name Incremental Merkle tree construction
+ *
+ * mock_dispatcher_add_list() needs every element up front. These build a tree
+ * leaf by leaf, which is what a caller assembling elements in a loop wants.
+ * Each leaf is registered as a preimage exactly as add_list() does.
+ * @{
+ */
+/** @return tree index, or -1 if no tree slot is free. */
+int mock_dispatcher_tree_begin(mock_dispatcher_t *mock);
+/** @return 0, or -1 if the tree is full or the element too large. */
+int mock_dispatcher_tree_add_leaf(mock_dispatcher_t *mock, int tree,
+                                  const uint8_t *data, size_t len);
+/** Add a leaf by its hash, for elements whose preimage is registered elsewhere. */
+int mock_dispatcher_tree_add_leaf_hash(mock_dispatcher_t *mock, int tree,
+                                       const uint8_t hash[32]);
+/** Compute the root; @p out_root may be NULL. */
+void mock_dispatcher_tree_end(mock_dispatcher_t *mock, int tree, uint8_t out_root[32]);
+/** @} */
+
+/**
  * cmocka setup fixture: allocates a mock_dispatcher_t on the heap, initializes
  * it, and stores the pointer in *state.
  */
@@ -156,7 +209,7 @@ int mock_dispatcher_teardown(void **state);
  * Register a known preimage. Computes sha256(data) and stores the mapping.
  * The mock will respond to CCMD_GET_PREIMAGE requests matching this hash.
  */
-void mock_dispatcher_add_preimage(mock_dispatcher_t *mock, const uint8_t *data, size_t len);
+int mock_dispatcher_add_preimage(mock_dispatcher_t *mock, const uint8_t *data, size_t len);
 
 /**
  * Set a tamper hook to simulate malicious client behavior.
@@ -178,11 +231,13 @@ static inline void mock_dispatcher_set_tamper_hook(mock_dispatcher_t *mock,
  * @param elements     Array of pointers to element data.
  * @param element_lens Array of element lengths.
  * @param n            Number of elements.
+ * @return 0, or -1 if a capacity or per-element limit would be exceeded. Nothing is
+ *         registered on failure, so a tree's root always matches the leaves it serves.
  */
-void mock_dispatcher_add_list(mock_dispatcher_t *mock,
-                              const uint8_t *const *elements,
-                              const size_t *element_lens,
-                              size_t n);
+int mock_dispatcher_add_list(mock_dispatcher_t *mock,
+                             const uint8_t *const *elements,
+                             const size_t *element_lens,
+                             size_t n);
 
 /**
  * Register a key-value mapping (like a PSBT map) and its Merkle trees.
@@ -198,7 +253,7 @@ void mock_dispatcher_add_list(mock_dispatcher_t *mock,
  * @param n             Number of key-value pairs.
  * @param out_commitment  Filled with the merkleized map commitment (size, keys_root, values_root).
  */
-void mock_dispatcher_add_map(mock_dispatcher_t *mock,
+int mock_dispatcher_add_map(mock_dispatcher_t *mock,
                              const uint8_t *const *keys,
                              const size_t *key_lens,
                              const uint8_t *const *values,
