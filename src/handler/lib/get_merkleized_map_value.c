@@ -27,10 +27,13 @@ int call_get_merkleized_map_value(dispatcher_context_t *dispatcher_context,
     int index =
         call_get_merkle_leaf_index(dispatcher_context, map->size, map->keys_root, key_merkle_hash);
 
-    if (index == MERKLE_LEAF_NOT_FOUND) {
-        return MAP_VALUE_ABSENT;
-    }
     if (index < 0) {
+        // Nothing was written to `out` here, but clear it anyway to keep the postcondition
+        // uniform, MAP_VALUE_ABSENT included: no caller pre-seeds a default into the buffer.
+        explicit_bzero(out, out_len);
+        if (index == MERKLE_LEAF_NOT_FOUND) {
+            return MAP_VALUE_ABSENT;
+        }
         PRINTF("Failed to look up the key.\n");
         return MAP_VALUE_ERROR;
     }

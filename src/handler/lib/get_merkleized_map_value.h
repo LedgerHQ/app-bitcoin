@@ -16,6 +16,9 @@
  * long to fit into the output buffer. See map_value_status.h; in particular, callers must branch
  * on MAP_VALUE_ABSENT explicitly rather than on `res < 0` when a missing key is not an error.
  *
+ * On any non-success return - MAP_VALUE_ABSENT included - `out` is fully zeroed; see
+ * call_get_preimage.
+ *
  * PRECONDITION: the map's keys must have already been verified to be lexicographically sorted (and
  * therefore unique); this is what makes a by-key lookup unambiguous. A map is validated either by
  * `call_get_merkleized_map[_with_callback]` (which validates before returning) or by

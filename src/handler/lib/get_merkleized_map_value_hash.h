@@ -15,6 +15,9 @@
  * of the proofs failed. See map_value_status.h; in particular, callers must branch on
  * MAP_VALUE_ABSENT explicitly rather than on `res < 0` when a missing key is not an error.
  *
+ * On any non-success return - MAP_VALUE_ABSENT included - `out` is fully zeroed; see
+ * call_get_preimage.
+ *
  * PRECONDITION: the map's keys must have already been verified to be lexicographically sorted;
  * this function asserts it (LEDGER_ASSERT on `map->_keys_are_sorted`).
  */
