@@ -17,6 +17,7 @@
 #include <cmocka.h>
 
 #include "mock_dispatcher.h"
+#include "test_assertions.h"
 
 #include "client_commands.h"
 #include "handler/lib/get_merkle_preimage.h"
@@ -111,12 +112,14 @@ static void test_get_merkle_preimage_unknown_hash(void **state) {
     /* Don't register any preimage; just call with a random hash */
     uint8_t hash[32] = {0xDE, 0xAD, 0xBE, 0xEF};
     uint8_t out[256];
+    memset(out, 0xEE, sizeof(out));
 
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     /* process_interruption returns -1 → call_get_merkle_preimage returns -1 */
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -135,11 +138,13 @@ static void test_get_merkle_preimage_buffer_too_small(void **state) {
     add_merkle_preimage(mock, element, sizeof(element), hash);
 
     uint8_t out[50]; /* Too small for 100-byte element */
+    memset(out, 0xEE, sizeof(out));
 
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -4);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -282,11 +287,13 @@ static void test_get_merkle_preimage_corrupted_data(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_data, NULL);
 
     uint8_t out[256];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     /* Must detect hash mismatch */
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -321,11 +328,13 @@ static void test_get_merkle_preimage_corrupted_continuation(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_continuation, NULL);
 
     uint8_t out[512];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     /* Must detect the corruption (hash mismatch or protocol error) */
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -360,10 +369,12 @@ static void test_get_merkle_preimage_truncated(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_truncate, NULL);
 
     uint8_t out[64];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -2);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -395,10 +406,12 @@ static void test_get_merkle_preimage_zero_len(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_zero_len, NULL);
 
     uint8_t out[64];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -3);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -432,10 +445,12 @@ static void test_get_merkle_preimage_partial_len_over(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_partial_len_over, NULL);
 
     uint8_t out[64];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -5);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -472,10 +487,12 @@ static void test_get_merkle_preimage_comm_failure(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_fail_second, NULL);
 
     uint8_t out[512];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -6);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -510,10 +527,12 @@ static void test_get_merkle_preimage_truncated_more(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_truncate_more, NULL);
 
     uint8_t out[512];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -7);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -548,10 +567,12 @@ static void test_get_merkle_preimage_bad_element_size(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_more_bad_size, NULL);
 
     uint8_t out[512];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -8);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -590,10 +611,12 @@ static void test_get_merkle_preimage_more_bytes(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_more_bytes, NULL);
 
     uint8_t out[512];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -9);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -627,17 +650,17 @@ static void test_get_merkle_preimage_internal_node_preimage(void **state) {
     assert_memory_equal(hash, mock->trees[0].root, 32);
 
     uint8_t out[256];
-    memset(out, 0xAA, sizeof(out));
+    memset(out, 0xEE, sizeof(out));
 
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -12);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
- * Adversarial: same rejection for an arbitrary non-zero prefix byte, and nothing is written to
- * the output buffer.
+ * Adversarial: same rejection for an arbitrary non-zero prefix byte.
  */
 static void test_get_merkle_preimage_bad_prefix(void **state) {
     mock_dispatcher_t *mock = *state;
@@ -654,15 +677,13 @@ static void test_get_merkle_preimage_bad_prefix(void **state) {
     compute_sha256(preimage, sizeof(preimage), hash);
 
     uint8_t out[64];
-    memset(out, 0xAA, sizeof(out));
+    memset(out, 0xEE, sizeof(out));
 
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -12);
-    for (size_t i = 0; i < sizeof(out); i++) {
-        assert_int_equal(out[i], 0xAA);
-    }
+    assert_cleared(out, sizeof(out));
 }
 
 /* ---------- Main ---------- */

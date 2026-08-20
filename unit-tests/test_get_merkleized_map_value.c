@@ -17,6 +17,7 @@
 #include <cmocka.h>
 
 #include "mock_dispatcher.h"
+#include "test_assertions.h"
 
 #include "client_commands.h"
 #include "common/merkle.h"
@@ -143,6 +144,7 @@ static void test_map_value_key_not_found(void **state) {
     const uint8_t missing_key[] = {0xFF};
 
     uint8_t out[64];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkleized_map_value(dc,
                                                &commitment,
@@ -153,6 +155,7 @@ static void test_map_value_key_not_found(void **state) {
     /* A genuinely missing key must be reported as absent, distinctly from a failed lookup, so
      * that callers may safely apply a default for an optional field. */
     assert_int_equal(result, MAP_VALUE_ABSENT);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -175,12 +178,14 @@ static void test_map_value_out_buffer_too_small(void **state) {
 
     /* Provide an output buffer smaller than the value length. */
     uint8_t out[2];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkleized_map_value(dc, &commitment, key, sizeof(key), out, sizeof(out));
     /* Present but too long for the buffer is an ERROR, NOT ABSENT. Before the statuses were
      * separated both surfaced as -1, so a caller substituting a default for an optional field
      * would have signed over a value the client never committed to. */
     assert_int_equal(result, MAP_VALUE_ERROR);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -252,10 +257,57 @@ static void test_map_value_corrupted_value_proof(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_value_proof, &proof_call);
 
     uint8_t out[64];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkleized_map_value(dc, &commitment, key, sizeof(key), out, sizeof(out));
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
+}
+
+/**
+ * Adversarial: the proofs all check out, but the client corrupts the value preimage itself, so it
+ * lands in `out` before it is found not to hash to the committed leaf.
+ */
+static int tamper_corrupt_value_data(uint8_t *response_buf,
+                                     size_t *response_len,
+                                     uint8_t cmd,
+                                     int call_count,
+                                     void *user_data) {
+    (void) call_count;
+    (void) user_data;
+
+    /* Byte 0 is the 0x00 leaf prefix, rejected before any write; corrupt the value instead. */
+    if (cmd == CCMD_GET_PREIMAGE && *response_len > 3) {
+        response_buf[3] ^= 0xFF;
+    }
+    return 0;
+}
+
+static void test_map_value_corrupted_value_data(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    const uint8_t key[] = {0x01};
+    uint8_t value[40];
+    memset(value, 0x5A, sizeof(value));
+
+    const uint8_t *keys[] = {key};
+    const size_t key_lens[] = {sizeof(key)};
+    const uint8_t *values[] = {value};
+    const size_t value_lens[] = {sizeof(value)};
+
+    merkleized_map_commitment_t commitment;
+    mock_dispatcher_add_map(mock, keys, key_lens, values, value_lens, 1, &commitment);
+
+    mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_value_data, NULL);
+
+    uint8_t out[64];
+    memset(out, 0xEE, sizeof(out));
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+    int result = call_get_merkleized_map_value(dc, &commitment, key, sizeof(key), out, sizeof(out));
+
+    assert_int_equal(result, MAP_VALUE_ERROR);
+    assert_cleared(out, sizeof(out));
 }
 
 /* ---------- Main ---------- */
@@ -270,6 +322,7 @@ int main(void) {
         T(test_map_value_out_buffer_too_small),
         T(test_map_value_empty_value),
         T(test_map_value_corrupted_value_proof),
+        T(test_map_value_corrupted_value_data),
     };
 #undef T
 

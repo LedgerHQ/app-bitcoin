@@ -7,10 +7,11 @@
 #include "stream_preimage.h"
 #include "sw.h"
 
-int call_get_preimage(dispatcher_context_t *dispatcher_context,
-                      const uint8_t hash[static 32],
-                      uint8_t *out,
-                      size_t out_len) {
+// Body of call_get_preimage; the wrapper below clears `out` on failure.
+static int get_preimage(dispatcher_context_t *dispatcher_context,
+                        const uint8_t hash[static 32],
+                        uint8_t *out,
+                        size_t out_len) {
     // LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     uint8_t cmd = CCMD_GET_PREIMAGE;
@@ -122,4 +123,17 @@ int call_get_preimage(dispatcher_context_t *dispatcher_context,
     }
 
     return (int) preimage_len;
+}
+
+int call_get_preimage(dispatcher_context_t *dispatcher_context,
+                      const uint8_t hash[static 32],
+                      uint8_t *out,
+                      size_t out_len) {
+    int res = get_preimage(dispatcher_context, hash, out, out_len);
+    if (res < 0) {
+        // The preimage is streamed into `out` before its hash can be checked, so a failed read
+        // would otherwise leave bytes there that the client chose and the device rejected.
+        explicit_bzero(out, out_len);
+    }
+    return res;
 }

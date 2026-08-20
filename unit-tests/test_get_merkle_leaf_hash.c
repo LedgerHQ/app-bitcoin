@@ -16,6 +16,7 @@
 #include <cmocka.h>
 
 #include "mock_dispatcher.h"
+#include "test_assertions.h"
 
 #include "client_commands.h"
 #include "handler/lib/get_merkle_leaf_hash.h"
@@ -266,10 +267,12 @@ static void test_get_leaf_hash_wrong_root(void **state) {
     memset(bad_root, 0xFF, 32);
 
     uint8_t out[32];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_hash(dc, bad_root, 1, 0, out);
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -343,10 +346,12 @@ static void test_get_leaf_hash_corrupted_proof(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_proof_hash, NULL);
 
     uint8_t out[32];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_hash(dc, root, 4, 0, out);
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -382,10 +387,12 @@ static void test_get_leaf_hash_corrupted_leaf(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_leaf_hash, NULL);
 
     uint8_t out[32];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_hash(dc, root, 2, 0, out);
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -421,10 +428,12 @@ static void test_get_leaf_hash_proof_elements_overflow(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_proof_elements_overflow, NULL);
 
     uint8_t out[32];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_hash(dc, root, 2, 0, out);
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -463,10 +472,12 @@ static void test_get_leaf_hash_zero_proof_size(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_zero_proof_size, NULL);
 
     uint8_t out[32];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_hash(dc, root, 3, 0, out);
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -509,10 +520,12 @@ static void test_get_leaf_hash_bad_proof_element_size(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_bad_proof_element_size, NULL);
 
     uint8_t out[32];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_hash(dc, root, 128, 0, out);
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -552,10 +565,12 @@ static void test_get_leaf_hash_truncated_proof_elements(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_truncate_proof_elements, NULL);
 
     uint8_t out[32];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_hash(dc, root, 4, 0, out);
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -599,10 +614,12 @@ static void test_get_leaf_hash_more_comm_failure(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_fail_more, NULL);
 
     uint8_t out[32];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_hash(dc, root, 128, 0, out);
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -644,10 +661,12 @@ static void test_get_leaf_hash_truncated_more(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_truncate_more, NULL);
 
     uint8_t out[32];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_hash(dc, root, 128, 0, out);
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -694,10 +713,12 @@ static void test_get_leaf_hash_more_proof_overflow(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_more_proof_overflow, NULL);
 
     uint8_t out[32];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_hash(dc, root, 128, 0, out);
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -762,10 +783,12 @@ static void test_get_leaf_hash_internal_node_as_leaf(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_internal_node_as_leaf, forged);
 
     uint8_t out[32];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_hash(dc, root, 4, 0, out);
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -870,10 +893,12 @@ static void test_get_leaf_hash_overlong_proof(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_overlong_proof, NULL);
 
     uint8_t out[32];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_hash(dc, root, 5, 4, out);
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**

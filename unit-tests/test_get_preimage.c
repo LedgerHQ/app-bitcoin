@@ -17,6 +17,7 @@
 #include <cmocka.h>
 
 #include "mock_dispatcher.h"
+#include "test_assertions.h"
 
 #include "client_commands.h"
 #include "handler/lib/get_preimage.h"
@@ -94,12 +95,14 @@ static void test_get_preimage_unknown_hash(void **state) {
     /* Don't register any preimage; just call with a random hash */
     uint8_t hash[32] = {0xDE, 0xAD, 0xBE, 0xEF};
     uint8_t out[256];
+    memset(out, 0xEE, sizeof(out));
 
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     /* process_interruption returns -1 → call_get_preimage returns -1 */
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -120,11 +123,13 @@ static void test_get_preimage_buffer_too_small(void **state) {
     compute_sha256(preimage, sizeof(preimage), hash);
 
     uint8_t out[50]; /* Too small! */
+    memset(out, 0xEE, sizeof(out));
 
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -10);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -251,11 +256,13 @@ static void test_get_preimage_corrupted_data(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_preimage_data, NULL);
 
     uint8_t out[256];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     /* Must detect the hash mismatch */
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -294,11 +301,13 @@ static void test_get_preimage_partial_len_overflow(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_partial_len_overflow, NULL);
 
     uint8_t out[256];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     /* Detected via buffer_can_read or partial_data_len > preimage_len */
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -333,10 +342,12 @@ static void test_get_preimage_zero_len(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_zero_preimage_len, NULL);
 
     uint8_t out[256];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -372,11 +383,13 @@ static void test_get_preimage_bad_element_size(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_more_elements_bad_size, NULL);
 
     uint8_t out[512];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     /* Detected via buffer_can_read or elements_len != 1 */
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -413,11 +426,13 @@ static void test_get_preimage_more_bytes_than_remaining(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_more_bytes_than_remaining, NULL);
 
     uint8_t out[512];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     /* n_bytes > bytes_remaining → -8, or buffer_can_read fails → -6 */
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -454,10 +469,12 @@ static void test_get_preimage_corrupted_continuation(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_continuation, NULL);
 
     uint8_t out[512];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -502,11 +519,13 @@ static void test_get_preimage_overflow_len(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_preimage_len_too_big, NULL);
 
     uint8_t out[256];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     /* preimage_len_u64 > UINT32_MAX → return -11 */
     assert_int_equal(result, -11);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -545,10 +564,12 @@ static void test_get_preimage_partial_len_strictly_over(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_partial_len_strictly_over, NULL);
 
     uint8_t out[256];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -4);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -587,10 +608,12 @@ static void test_get_preimage_bad_element_size_strict(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_more_elements_bad_size_strict, NULL);
 
     uint8_t out[512];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -7);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -632,10 +655,12 @@ static void test_get_preimage_more_bytes_strict(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_more_bytes_with_padding, NULL);
 
     uint8_t out[512];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_int_equal(result, -8);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -674,10 +699,12 @@ static void test_get_preimage_communication_failure(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_fail_second_call, NULL);
 
     uint8_t out[512];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_preimage(dc, hash, out, sizeof(out));
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /* ---------- Main ---------- */

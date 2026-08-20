@@ -14,6 +14,8 @@
  *
  * Returns the length of the preimage without the prefix on success, or a negative number in case
  * of failure.
+ *
+ * On any negative return `out_ptr` is fully zeroed; see call_get_preimage.
  */
 int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
                              const uint8_t hash[static 32],
