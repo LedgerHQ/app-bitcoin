@@ -254,12 +254,36 @@ static void test_ct_too_many_leaves(void **state) {
     expect_encode(big, 1, false, NULL, 0);
 }
 
+// A musig() among the keys of a multi_a is not classified: the `$keys` binding of the multisig
+// patterns only accepts plain key expressions, since a single-element list holding a musig is how
+// pk(musig(...)) is bound. Such a leaf therefore renders as the "(unknown)" marker, and the app
+// falls back to showing the raw descriptor template.
+// This behaviour is not in the shared vectors of specs/bip388/test_vectors.toml yet, as the
+// reference implementation has to grow the same guard first.
+static void test_ct_musig_in_multi_a_is_not_classified(void **state) {
+    (void) state;
+    static const char *const want[] = {"Main path: spendable by @0", "(unknown)"};
+    expect_encode("tr(@0/**,multi_a(2,musig(@1,@2)/**,@3/**))", 1, false, want, 2);
+
+    // The 1-key case is the sharp one: a single-element key list holding a musig is precisely the
+    // sentinel for pk(musig(...)), whose keys are rendered flattened. Without the guard, this leaf
+    // would therefore read "any 1 of @1 and @2 must sign", while a musig aggregate key requires
+    // *both* of them to sign.
+    expect_encode("tr(@0/**,multi_a(1,musig(@1,@2)/**))", 1, false, want, 2);
+
+    // for comparison: the same leaf with plain key expressions does classify
+    static const char *const want_plain[] = {"Main path: spendable by @0",
+                                             "Any 2 of @1, @2 and @3 must sign"};
+    expect_encode("tr(@0/**,multi_a(2,@1/**,@2/**,@3/**))", 1, true, want_plain, 2);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_ct_confusion_score),
         cmocka_unit_test(test_ct_to_cleartext),
         cmocka_unit_test(test_ct_line_overflow),
         cmocka_unit_test(test_ct_too_many_leaves),
+        cmocka_unit_test(test_ct_musig_in_multi_a_is_not_classified),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

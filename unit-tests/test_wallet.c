@@ -314,6 +314,66 @@ static void test_parse_policy_tr_musig_scriptpath(void **state) {
     check_key_expr_musig(script_pk->key, 3, (uint16_t[]) {2, 0, 3}, 0, 1);
 }
 
+static void test_parse_policy_tr_multi_a_musig(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
+    int res;
+
+    // tr with a musig among the keys of a multi_a in the script path
+    res = parse_policy("tr(@0/**,multi_a(2,musig(@1,@2)/**,@3/**))", out, sizeof(out));
+
+    assert_true(res >= 0);
+
+    policy_node_tr_t *root = (policy_node_tr_t *) out;
+    assert_int_equal(root->base.type, TOKEN_TR);
+    check_key_expr_plain(root->key, 0, 0, 1);
+
+    assert_false(root->tree == NULL);
+    policy_node_tree_t *tree = root->tree;
+    assert_true(tree->is_leaf);
+
+    policy_node_multisig_t *multi_a = (policy_node_multisig_t *) tree->script;
+    assert_int_equal(multi_a->base.type, TOKEN_MULTI_A);
+    assert_int_equal(multi_a->k, 2);
+    assert_int_equal(multi_a->n, 2);
+
+    check_key_expr_musig(&multi_a->keys[0], 2, (uint16_t[]) {1, 2}, 0, 1);
+    check_key_expr_plain(&multi_a->keys[1], 3, 0, 1);
+}
+
+static void test_parse_policy_tr_multi_a_two_musigs(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_BYTES];
+    int res;
+
+    // a multi_a with a plain key expression followed by two musig ones; each musig allocates its
+    // own structures while being parsed, so this checks that the key expressions are still laid
+    // out correctly in memory
+    res = parse_policy("tr(@0/**,multi_a(2,@1/**,musig(@2,@3)/<2;3>/*,musig(@4,@5,@6)/**))",
+                       out,
+                       sizeof(out));
+
+    assert_true(res >= 0);
+
+    policy_node_tr_t *root = (policy_node_tr_t *) out;
+    assert_int_equal(root->base.type, TOKEN_TR);
+
+    assert_false(root->tree == NULL);
+    policy_node_tree_t *tree = root->tree;
+    assert_true(tree->is_leaf);
+
+    policy_node_multisig_t *multi_a = (policy_node_multisig_t *) tree->script;
+    assert_int_equal(multi_a->base.type, TOKEN_MULTI_A);
+    assert_int_equal(multi_a->k, 2);
+    assert_int_equal(multi_a->n, 3);
+
+    check_key_expr_plain(&multi_a->keys[0], 1, 0, 1);
+    check_key_expr_musig(&multi_a->keys[1], 2, (uint16_t[]) {2, 3}, 2, 3);
+    check_key_expr_musig(&multi_a->keys[2], 3, (uint16_t[]) {4, 5, 6}, 0, 1);
+}
+
 static void test_get_policy_segwit_version(void **state) {
     (void) state;
 
@@ -445,11 +505,24 @@ static void test_failures(void **state) {
     assert_true(
         0 > parse_policy("tr(musig(@0,musig(@1,@2))/**)", out, sizeof(out)));  // can't nest musig
 
-    // musig is currently disabled in multi_a/sortedmulti_a, until the parsing
-    // of such expressions is properly fixed in parse_policy
-    assert_true(0 > parse_policy("tr(@0/**,multi_a(1,musig(@1,@2)/**))", out, sizeof(out)));
+    assert_true(0 > parse_policy("wsh(multi(2,musig(@0,@1)/**,@2/**))",
+                                 out,
+                                 sizeof(out)));  // not taproot
+    assert_true(0 > parse_policy("tr(@0/**,multi_a(2,musig(@1,musig(@2,@3))/**,@4/**))",
+                                 out,
+                                 sizeof(out)));  // can't nest musig
+
+    // musig is only supported in multi_a, and deliberately rejected in sortedmulti_a: sorting the
+    // keys would require recomputing each aggregate key once per position
     assert_true(0 >
                 parse_policy("tr(@0/**,sortedmulti_a(2,musig(@1,@2)/**,@3/**))", out, sizeof(out)));
+
+    // at most MAX_PUBKEYS_PER_MULTISIG (16) key expressions; this one has 17
+    assert_true(0 > parse_policy("tr(@0/**,multi_a(2,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,"
+                                 "@8/**,@9/**,@10/**,@11/**,@12/**,@13/**,@14/**,@15/**,@16/**,"
+                                 "@17/**))",
+                                 out,
+                                 sizeof(out)));
 }
 
 enum TestMode {
@@ -1040,6 +1113,8 @@ int main() {
         cmocka_unit_test(test_parse_policy_tr_multisig),
         cmocka_unit_test(test_parse_policy_tr_musig_scriptpath),
         cmocka_unit_test(test_parse_policy_tr_musig_keypath),
+        cmocka_unit_test(test_parse_policy_tr_multi_a_musig),
+        cmocka_unit_test(test_parse_policy_tr_multi_a_two_musigs),
         cmocka_unit_test(test_get_policy_segwit_version),
         cmocka_unit_test(test_parse_unsigned_decimal_overflow),
         cmocka_unit_test(test_parse_keyexpr_multipath_hardened_boundary),
