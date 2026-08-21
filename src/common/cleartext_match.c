@@ -57,6 +57,7 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
         if (ct_c2 == NULL || ct_c2->type != TOKEN_MULTI) break;
         const policy_node_multisig_t *ct_n3 = (const policy_node_multisig_t *) ct_c2;
         const policy_node_keyexpr_t *ct_ka4 = ct_n3->keys;
+        if (!all_keyexprs_plain(ct_ka4, ct_n3->n)) break;
         set_binding_number(&out->bindings, 0, ct_n3->k);
         set_binding_keys(&out->bindings, 1, ct_ka4, ct_n3->n);
         out->bindings.n = 2;
@@ -71,6 +72,7 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
         if (ct_c2 == NULL || ct_c2->type != TOKEN_SORTEDMULTI) break;
         const policy_node_multisig_t *ct_n3 = (const policy_node_multisig_t *) ct_c2;
         const policy_node_keyexpr_t *ct_ka4 = ct_n3->keys;
+        if (!all_keyexprs_plain(ct_ka4, ct_n3->n)) break;
         set_binding_number(&out->bindings, 0, ct_n3->k);
         set_binding_keys(&out->bindings, 1, ct_ka4, ct_n3->n);
         out->bindings.n = 2;
@@ -85,6 +87,7 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
         if (ct_c2 == NULL || ct_c2->type != TOKEN_MULTI) break;
         const policy_node_multisig_t *ct_n3 = (const policy_node_multisig_t *) ct_c2;
         const policy_node_keyexpr_t *ct_ka4 = ct_n3->keys;
+        if (!all_keyexprs_plain(ct_ka4, ct_n3->n)) break;
         set_binding_number(&out->bindings, 0, ct_n3->k);
         set_binding_keys(&out->bindings, 1, ct_ka4, ct_n3->n);
         out->bindings.n = 2;
@@ -99,6 +102,7 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
         if (ct_c2 == NULL || ct_c2->type != TOKEN_SORTEDMULTI) break;
         const policy_node_multisig_t *ct_n3 = (const policy_node_multisig_t *) ct_c2;
         const policy_node_keyexpr_t *ct_ka4 = ct_n3->keys;
+        if (!all_keyexprs_plain(ct_ka4, ct_n3->n)) break;
         set_binding_number(&out->bindings, 0, ct_n3->k);
         set_binding_keys(&out->bindings, 1, ct_ka4, ct_n3->n);
         out->bindings.n = 2;
@@ -116,6 +120,7 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
         if (ct_c4 == NULL || ct_c4->type != TOKEN_MULTI) break;
         const policy_node_multisig_t *ct_n5 = (const policy_node_multisig_t *) ct_c4;
         const policy_node_keyexpr_t *ct_ka6 = ct_n5->keys;
+        if (!all_keyexprs_plain(ct_ka6, ct_n5->n)) break;
         set_binding_number(&out->bindings, 0, ct_n5->k);
         set_binding_keys(&out->bindings, 1, ct_ka6, ct_n5->n);
         out->bindings.n = 2;
@@ -133,6 +138,7 @@ bool match_top_level(const policy_node_t *root, ct_top_match_t *out) {
         if (ct_c4 == NULL || ct_c4->type != TOKEN_SORTEDMULTI) break;
         const policy_node_multisig_t *ct_n5 = (const policy_node_multisig_t *) ct_c4;
         const policy_node_keyexpr_t *ct_ka6 = ct_n5->keys;
+        if (!all_keyexprs_plain(ct_ka6, ct_n5->n)) break;
         set_binding_number(&out->bindings, 0, ct_n5->k);
         set_binding_keys(&out->bindings, 1, ct_ka6, ct_n5->n);
         out->bindings.n = 2;
@@ -249,6 +255,7 @@ bool match_tapleaf(const policy_node_t *leaf_script, ct_leaf_match_t *out) {
         if (leaf_script == NULL || leaf_script->type != TOKEN_SORTEDMULTI_A) break;
         const policy_node_multisig_t *ct_n1 = (const policy_node_multisig_t *) leaf_script;
         const policy_node_keyexpr_t *ct_ka2 = ct_n1->keys;
+        if (!all_keyexprs_plain(ct_ka2, ct_n1->n)) break;
         set_binding_number(&out->bindings, 0, ct_n1->k);
         set_binding_keys(&out->bindings, 1, ct_ka2, ct_n1->n);
         out->bindings.n = 2;
@@ -261,6 +268,7 @@ bool match_tapleaf(const policy_node_t *leaf_script, ct_leaf_match_t *out) {
         if (leaf_script == NULL || leaf_script->type != TOKEN_MULTI_A) break;
         const policy_node_multisig_t *ct_n1 = (const policy_node_multisig_t *) leaf_script;
         const policy_node_keyexpr_t *ct_ka2 = ct_n1->keys;
+        if (!all_keyexprs_plain(ct_ka2, ct_n1->n)) break;
         set_binding_number(&out->bindings, 0, ct_n1->k);
         set_binding_keys(&out->bindings, 1, ct_ka2, ct_n1->n);
         out->bindings.n = 2;

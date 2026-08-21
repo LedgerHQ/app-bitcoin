@@ -487,6 +487,8 @@ def _handle_arg(ctx: _Ctx, arg: Any, ak: str, struct: str, t: str, i: int) -> No
             raise ValueError(f"unexpected arg {arg!r} in KeyList position")
         ka = ctx.fresh("ka")
         ctx.body.append(f"const policy_node_keyexpr_t *{ka} = {t}->keys;")
+        # musig() is not supported in the key list in clear text; leave unclassified.
+        ctx.body.append(f"if (!all_keyexprs_plain({ka}, {t}->n)) break;")
         slot = ctx.bidx[arg[1]]
         ctx.binds.append(f"set_binding_keys(&out->bindings, {slot}, {ka}, {t}->n);")
     elif ak == "SUB":

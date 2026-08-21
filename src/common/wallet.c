@@ -18,12 +18,6 @@
 
 #include "../crypto.h"
 
-// The key expressions of multi() and friends are allocated one by one, but then accessed as an
-// array through policy_node_multisig_t::keys; that only works if buffer_alloc() lays them out
-// back-to-back, that is, if their size is a multiple of the alignment it pads to.
-_Static_assert(sizeof(policy_node_keyexpr_t) % 4 == 0,
-               "policy_node_keyexpr_t must be a multiple of the buffer_alloc() alignment");
-
 typedef struct {
     PolicyNodeType type;
     const char *name;
@@ -470,7 +464,7 @@ static int parse_keyexpr(buffer_t *in_buf,
         }
 
         if (!allow_musig) {
-            return WITH_ERROR(-1, "musig is only allowed in taproot");
+            return WITH_ERROR(-1, "musig is not allowed in this key expression");
         }
 
         out->type = KEY_EXPRESSION_MUSIG;
@@ -597,6 +591,62 @@ static int parse_keyexpr(buffer_t *in_buf,
 
     out->keyexpr_index = *keyexpr_index;
     ++(*keyexpr_index);
+    return 0;
+}
+
+/**
+ * Parses the comma-separated key expressions of a multi() family fragment, up to (but not
+ * consuming) the ')' that closes it, filling in `node->keys` and `node->n`.
+ *
+ * The key expressions are parsed into a temporary array, then copied into a single allocation:
+ * `node->keys` is used as an array, but a musig() key expression allocates its own satellite
+ * structures from `out_buf` while it is being parsed, so allocating the key expressions one at a
+ * time would interleave them with those and break the layout.
+ *
+ * The `noinline` is required: inlined in parse_script(), the temporary array would live in that
+ * function's frame, which would increase the stack usage as it is recursive.
+ */
+__attribute__((noinline)) static int parse_multisig_keys(buffer_t *in_buf,
+                                                         int version,
+                                                         policy_node_multisig_t *node,
+                                                         bool allow_musig,
+                                                         buffer_t *out_buf,
+                                                         uint16_t *keyexpr_index) {
+    policy_node_keyexpr_t keys[MAX_PUBKEYS_PER_MULTISIG];
+    uint16_t n = 0;
+
+    while (true) {
+        uint8_t c;
+        // If the next character is a ')', we exit and leave it in the buffer
+        if (buffer_peek(in_buf, &c) && c == ')') {
+            break;
+        }
+
+        // otherwise, there must be a comma
+        if (!consume_character(in_buf, ',')) {
+            return WITH_ERROR(-1, "Expected ','");
+        }
+
+        if (n >= MAX_PUBKEYS_PER_MULTISIG) {
+            return WITH_ERROR(-1, "Too many key expressions");
+        }
+
+        if (0 > parse_keyexpr(in_buf, version, &keys[n], allow_musig, out_buf, keyexpr_index)) {
+            return WITH_ERROR(-1, "Error parsing key expression");
+        }
+
+        ++n;
+    }
+
+    node->keys = (policy_node_keyexpr_t *) buffer_alloc(out_buf,
+                                                        (size_t) n * sizeof(policy_node_keyexpr_t),
+                                                        true);
+    if (node->keys == NULL) {
+        return WITH_ERROR(-1, "Out of memory");
+    }
+    memcpy(node->keys, keys, (size_t) n * sizeof(policy_node_keyexpr_t));
+    node->n = n;
+
     return 0;
 }
 
@@ -1729,47 +1779,16 @@ static int parse_script(buffer_t *in_buf,
             }
             node->k = (int16_t) k;
 
-            // We allocate the array of key indices at the current position in the output buffer
-            // (on success).
-            // Note: this is incompatible with musig keys, therefore we don't currently support
-            // musig nested inside multi_a or sortedmulti_a.
-            buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-            node->keys = (policy_node_keyexpr_t *) buffer_get_cur(out_buf);
-
-            node->n = 0;
-            while (true) {
-                uint8_t c;
-                // If the next character is a ')', we exit and leave it in the buffer
-                if (buffer_peek(in_buf, &c) && c == ')') {
-                    break;
-                }
-
-                // otherwise, there must be a comma
-                if (!consume_character(in_buf, ',')) {
-                    return WITH_ERROR(-1, "Expected ','");
-                }
-
-                policy_node_keyexpr_t *key_expr = (policy_node_keyexpr_t *) buffer_alloc(
-                    out_buf,
-                    sizeof(policy_node_keyexpr_t),
-                    true);  // we align this pointer, as there's padding in an array of
-                            // structures
-                if (key_expr == NULL) {
-                    return WITH_ERROR(-1, "Out of memory");
-                }
-
-                if (0 >
-                    parse_keyexpr(
+            if (0 > parse_multisig_keys(
                         in_buf,
                         version,
-                        key_expr,
-                        false,  // musig is not currently supported in keys of multisig fragments
+                        node,
+                        // musig is only supported in multi_a; we do not support it in
+                        // sortedmulti_a, where sorting the keys would become  complicated
+                        token == TOKEN_MULTI_A,
                         out_buf,
                         &key_expression_count)) {
-                    return WITH_ERROR(-1, "Error parsing key expression");
-                }
-
-                ++node->n;
+                return -1;
             }
 
             // check integrity of k and n

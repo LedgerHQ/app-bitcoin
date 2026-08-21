@@ -70,8 +70,16 @@ typedef struct {
 } ct_leaf_match_t;
 
 // ---------------------------------------------------------------------------
-// Binding setters used by the generated classifier.
+// Guards and binding setters used by the generated classifier.
 // ---------------------------------------------------------------------------
+
+// Returns true iff all the `n` key expressions in `keys` are plain (non-musig) ones.
+static inline bool all_keyexprs_plain(const policy_node_keyexpr_t *keys, uint16_t n) {
+    for (uint16_t i = 0; i < n; i++) {
+        if (keys[i].type != KEY_EXPRESSION_NORMAL) return false;
+    }
+    return true;
+}
 
 static inline void set_binding_key(ct_bindings_t *b, int i, const policy_node_keyexpr_t *k) {
     b->v[i].kind = CT_BV_KEY;
