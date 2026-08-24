@@ -149,6 +149,11 @@ ENABLE_SWAP = 1
 ENABLE_STACK_PROTECTOR = 1
 
 ########################################
+#                 LTO                  #
+########################################
+ENABLE_LINK_TIME_OPTIMIZATION = 1
+
+########################################
 #          Features disablers          #
 ########################################
 # Don't use standard app file to avoid conflicts for now
