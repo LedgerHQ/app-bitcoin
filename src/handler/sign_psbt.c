@@ -41,13 +41,6 @@
 #include "sw.h"
 #include "txhashes.h"
 
-// We declare this in the global space in order to use less stack space, since BOLOS enforces on
-// some devices an 8kb stack limit.
-// Once this is resolved in BOLOS, we should move this to the function scope to avoid unnecessarily
-// reserving RAM that can only be used for the signing flow (which, at time of writing, is the most
-// RAM-intensive operation command of the app).
-sign_psbt_cache_t G_sign_psbt_cache;
-
 void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -62,8 +55,8 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     // read APDU inputs, initialize global state and read global PSBT map
     if (!init_global_state(dc, &st)) return;
 
-    sign_psbt_cache_t *cache = &G_sign_psbt_cache;
-    init_sign_psbt_cache(cache);
+    sign_psbt_cache_t cache;
+    init_sign_psbt_cache(&cache);
 
     // bitmap to keep track of which inputs are internal
     uint8_t internal_inputs[BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)];
@@ -81,14 +74,14 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
      *  - detect internal inputs that should be signed, and if there are external inputs or unusual
      * sighashes
      */
-    if (!preprocess_inputs(dc, &st, cache, internal_inputs)) return;
+    if (!preprocess_inputs(dc, &st, &cache, internal_inputs)) return;
 
     /** OUTPUTS VERIFICATION FLOW
      *
      *  For each output, check if it's a change address.
      *  Check if it's an acceptable output.
      */
-    if (!preprocess_outputs(dc, &st, cache, internal_outputs)) return;
+    if (!preprocess_outputs(dc, &st, &cache, internal_outputs)) return;
 
     // check if we're only executing the MuSig2 Round 1
     bool only_signing_for_musig = true;
@@ -117,7 +110,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
         // pubnonces; this does not involve the private keys, therefore we can do it without user
         // confirmation
 
-        if (!produce_musig2_pubnonces(dc, &st, &signing_state, cache, internal_inputs)) {
+        if (!produce_musig2_pubnonces(dc, &st, &signing_state, &cache, internal_inputs)) {
             return;
         }
     }
@@ -152,7 +145,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
          * For each internal key expression, and for each internal input, sign using the
          * appropriate algorithm.
          */
-        int sign_result = sign_transaction(dc, &st, cache, &signing_state, internal_inputs);
+        int sign_result = sign_transaction(dc, &st, &cache, &signing_state, internal_inputs);
 
 #ifdef HAVE_SWAP
         if (!G_called_from_swap)
