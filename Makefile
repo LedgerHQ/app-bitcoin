@@ -200,9 +200,6 @@ ifeq ($(DEBUG),10)
     DEFINES   += HAVE_SEMIHOSTED_PRINTF
 endif
 
-# Needed to be able to include the definition of G_cx
-INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
-
 ########################################
 #          Features enablers           #
 ########################################
