@@ -23,6 +23,12 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
 
     PRINT_STACK_POINTER();
 
+    // make sure that tree size and leaf index are consistent
+    if (tree_size == 0 || leaf_index >= tree_size) {
+        PRINTF("Leaf index out of range.\n");
+        return -1;
+    }
+
     {  // make sure memory is deallocated as soon as possible
         uint8_t tmp[9];
         tmp[0] = CCMD_GET_MERKLE_LEAF_PROOF;
@@ -55,6 +61,9 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
         }
 
         // The proof length must be exactly the depth of the leaf in the tree
+        // Since the tree_size and leaf_index are validated, the first call to
+        // merkle_get_ith_direction returns -1 precisely if proof_size is not smaller than the
+        // correct proof size.
         if (merkle_get_ith_direction(tree_size, leaf_index, proof_size) != -1 ||
             (proof_size > 0 &&
              merkle_get_ith_direction(tree_size, leaf_index, (size_t) proof_size - 1) < 0)) {
