@@ -375,10 +375,9 @@ def test_e2e_miniscript_policy_with_a(navigator: Navigator, firmware: Firmware, 
     # versions 2.1.0 and 2.1.1 of the app incorrectly compiled the 'a:' wrapper, producing incorrect addresses
 
     _, core_xpub_orig1 = create_new_wallet()
-    _, core_xpub_orig2 = create_new_wallet()
-    core_wallet_name3, core_xpub_orig3 = create_new_wallet()
+    core_wallet_name2, core_xpub_orig2 = create_new_wallet()
+    _, core_xpub_orig3 = create_new_wallet()
     _, core_xpub_orig4 = create_new_wallet()
-    _, core_xpub_orig5 = create_new_wallet()
 
     path = "48'/1'/0'/2'"
     internal_xpub = get_internal_xpub(speculos_globals.seed, path)
@@ -386,17 +385,16 @@ def test_e2e_miniscript_policy_with_a(navigator: Navigator, firmware: Firmware, 
 
     wallet_policy = WalletPolicy(
         name="Policy with a:",
-        descriptor_template="wsh(or_i(and_v(v:pkh(@0/**),older(65535)),or_d(multi(2,@1/**,@3/**),and_v(v:thresh(1,pkh(@4/**),a:pkh(@5/**)),older(64231)))))",
+        descriptor_template="wsh(or_i(and_v(v:pkh(@0/**),older(65535)),or_d(multi(2,@1/**,@2/**),and_v(v:thresh(1,pkh(@3/**),a:pkh(@4/**)),older(64231)))))",
         keys_info=[
             f"{core_xpub_orig1}",
             internal_xpub_orig,
             f"{core_xpub_orig2}",
             f"{core_xpub_orig3}",
             f"{core_xpub_orig4}",
-            f"{core_xpub_orig5}",
         ])
 
-    run_test_e2e(navigator, client, wallet_policy, [core_wallet_name3], rpc, rpc_test_wallet, speculos_globals,
+    run_test_e2e(navigator, client, wallet_policy, [core_wallet_name2], rpc, rpc_test_wallet, speculos_globals,
                  e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
 
 
