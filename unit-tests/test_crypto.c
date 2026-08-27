@@ -261,6 +261,98 @@ static void test_crypto_get_compressed_pubkey_invalid(void **state) {
 }
 
 /* ---------------------------------------------------------------- */
+/* crypto_get_uncompressed_pubkey                                   */
+/*                                                                  */
+/* Reuses the key pairs defined for crypto_get_compressed_pubkey.   */
+/* ---------------------------------------------------------------- */
+
+static void test_crypto_get_uncompressed_pubkey_02(void **state) {
+    (void) state;
+
+    uint8_t key_in[33], key_out[65];
+    memcpy(key_in, compressed_key_02, 33);
+    int ret = crypto_get_uncompressed_pubkey(key_in, key_out);
+
+    assert_int_equal(ret, 0);
+
+    assert_memory_equal(key_out, uncompressed_key_02, 65);
+    assert_memory_equal(key_in, compressed_key_02, 33);
+}
+
+static void test_crypto_get_uncompressed_pubkey_03(void **state) {
+    (void) state;
+
+    uint8_t key_in[33], key_out[65];
+    memcpy(key_in, compressed_key_03, 33);
+    int ret = crypto_get_uncompressed_pubkey(key_in, key_out);
+
+    assert_int_equal(ret, 0);
+
+    assert_memory_equal(key_out, uncompressed_key_03, 65);
+    assert_memory_equal(key_in, compressed_key_03, 33);
+}
+
+// Test that it also works if out == compressed_key
+static void test_crypto_get_uncompressed_pubkey_in_place(void **state) {
+    (void) state;
+
+    uint8_t key_in_out[65];
+    memcpy(key_in_out, compressed_key_02, 33);
+    int ret = crypto_get_uncompressed_pubkey(key_in_out, key_in_out);
+
+    assert_int_equal(ret, 0);
+
+    assert_memory_equal(key_in_out, uncompressed_key_02, 65);
+}
+
+static void test_crypto_get_uncompressed_pubkey_invalid_prefix(void **state) {
+    (void) state;
+
+    uint8_t key_in[33], key_out[65];
+    memcpy(key_in, compressed_key_02, 33);
+    key_in[0] = 0x04;  // only 0x02 and 0x03 are valid prefixes
+
+    assert_int_equal(crypto_get_uncompressed_pubkey(key_in, key_out), -1);
+}
+
+static void test_crypto_get_uncompressed_pubkey_not_on_curve(void **state) {
+    (void) state;
+
+    /* x = 5: with secp256k1's b=7, y^2 = 5^3 + 7 = 132 is not a quadratic
+     * residue mod p, so no point with this x exists. */
+    uint8_t key_in[33] = {0};
+    uint8_t key_out[65];
+    key_in[0] = 0x02;
+    key_in[32] = 5;
+
+    assert_int_equal(crypto_get_uncompressed_pubkey(key_in, key_out), -1);
+
+    /* Same x, with the other prefix. */
+    key_in[0] = 0x03;
+    assert_int_equal(crypto_get_uncompressed_pubkey(key_in, key_out), -1);
+}
+
+static void test_crypto_get_uncompressed_pubkey_x_not_in_field(void **state) {
+    (void) state;
+
+    /* x must be strictly smaller than the field order p. */
+    static const uint8_t p[32] = {
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xfc, 0x2f,
+    };
+
+    uint8_t key_in[33], key_out[65];
+    key_in[0] = 0x02;
+
+    memcpy(key_in + 1, p, 32);  // x == p
+    assert_int_equal(crypto_get_uncompressed_pubkey(key_in, key_out), -1);
+
+    memset(key_in + 1, 0xff, 32);  // x > p
+    assert_int_equal(crypto_get_uncompressed_pubkey(key_in, key_out), -1);
+}
+
+/* ---------------------------------------------------------------- */
 /* crypto_get_checksum                                              */
 /* ---------------------------------------------------------------- */
 
@@ -862,6 +954,12 @@ int main(void) {
         cmocka_unit_test(test_crypto_get_compressed_pubkey_03),
         cmocka_unit_test(test_crypto_get_compressed_pubkey_in_place),
         cmocka_unit_test(test_crypto_get_compressed_pubkey_invalid),
+        cmocka_unit_test(test_crypto_get_uncompressed_pubkey_02),
+        cmocka_unit_test(test_crypto_get_uncompressed_pubkey_03),
+        cmocka_unit_test(test_crypto_get_uncompressed_pubkey_in_place),
+        cmocka_unit_test(test_crypto_get_uncompressed_pubkey_invalid_prefix),
+        cmocka_unit_test(test_crypto_get_uncompressed_pubkey_not_on_curve),
+        cmocka_unit_test(test_crypto_get_uncompressed_pubkey_x_not_in_field),
         cmocka_unit_test(test_crypto_get_checksum_empty),
         cmocka_unit_test(test_crypto_get_checksum_hello),
         cmocka_unit_test(test_crypto_get_compressed_pubkey_at_path_master),
