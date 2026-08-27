@@ -272,7 +272,8 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         return;
     }
 
-    if (count_distinct_keys_info(&policy_map.parsed) != (int) wallet_header.n_keys) {
+    if (count_distinct_keys_info(&policy_map.parsed, wallet_header.n_keys) !=
+        (int) wallet_header.n_keys) {
         PRINTF("The number of keys in descriptor template doesn't match the provided keys\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
