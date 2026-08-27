@@ -135,7 +135,7 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
         if (0 > secp256k1_point_unsafe(I_L, P)) return -1;
 
         uint8_t K_par[65];
-        crypto_get_uncompressed_pubkey(parent->compressed_pubkey, K_par);
+        if (0 > crypto_get_uncompressed_pubkey(parent->compressed_pubkey, K_par)) return -1;
 
         // add K_par
         if (CX_OK !=
