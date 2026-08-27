@@ -86,6 +86,9 @@ void compute_rand_i_j(const musig_psbt_session_t *psbt_session,
     crypto_hash_update_u32(&hash_context.header, (uint32_t) i);
     crypto_hash_update_u32(&hash_context.header, (uint32_t) j);
     crypto_hash_digest(&hash_context.header, out, 32);
+
+    // avoid leaving sensitive randomness traces in memory
+    explicit_bzero(&hash_context, sizeof(hash_context));
 }
 
 void musigsession_initialize_signing_state(musig_signing_state_t *musig_signing_state) {
