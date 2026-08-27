@@ -96,6 +96,27 @@ typedef int (*mock_tamper_hook_t)(uint8_t *response_buf,
                                   int call_count,
                                   void *user_data);
 
+/**
+ * Forge hook signature.
+ * Called with the accumulated request *before* it reaches its handler, so a test can answer a
+ * request that an honest client would refuse (an out-of-range leaf index, say). The tamper hook
+ * cannot: it only ever sees a response that a handler already agreed to produce.
+ *
+ * Write the reply into response_buf/response_len and return 1 to deliver it; return 0 to leave the
+ * request to the honest handler; return -1 to simulate a communication failure.
+ *
+ * @param request_buf    The request bytes, starting with the command byte.
+ * @param request_len    Length of the request.
+ * @param response_buf   The response buffer (writable, MOCK_BUF_SIZE bytes).
+ * @param response_len   Out param for the response length; zeroed before the call.
+ * @param user_data      Opaque pointer set by the test.
+ */
+typedef int (*mock_forge_hook_t)(const uint8_t *request_buf,
+                                 size_t request_len,
+                                 uint8_t *response_buf,
+                                 size_t *response_len,
+                                 void *user_data);
+
 /* ---- Main mock state ---- */
 typedef struct {
     dispatcher_context_t dc; /* MUST be first member (container_of pattern) */
@@ -135,6 +156,10 @@ typedef struct {
     mock_tamper_hook_t tamper_hook;
     void *tamper_user_data;
     int tamper_call_count;
+
+    /* Forge hook (NULL = every request goes to its honest handler) */
+    mock_forge_hook_t forge_hook;
+    void *forge_user_data;
 } mock_dispatcher_t;
 
 /* ---- Public API ---- */
@@ -222,6 +247,18 @@ static inline void mock_dispatcher_set_tamper_hook(mock_dispatcher_t *mock,
     mock->tamper_hook = hook;
     mock->tamper_user_data = user_data;
     mock->tamper_call_count = 0;
+}
+
+/**
+ * Set a forge hook, to answer requests that no honest handler would.
+ * The hook is called with each request before it is dispatched.
+ * Pass NULL to disable forging.
+ */
+static inline void mock_dispatcher_set_forge_hook(mock_dispatcher_t *mock,
+                                                  mock_forge_hook_t hook,
+                                                  void *user_data) {
+    mock->forge_hook = hook;
+    mock->forge_user_data = user_data;
 }
 
 /**

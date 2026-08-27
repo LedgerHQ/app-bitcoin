@@ -876,6 +876,61 @@ static void test_get_leaf_hash_overlong_proof(void **state) {
     assert_true(result < 0);
 }
 
+/**
+ * Adversarial: the client claims a 0-length proof for a leaf index outside the tree.
+ *
+ * merkle_get_ith_direction returns -1 both for "past the leaf depth" and for "index out of range",
+ * so an out-of-range index makes every direction query fail; the proof length check then has no
+ * lower bound to enforce, and the upper bound is skipped for a claimed length of 0. Echoing the
+ * root back as the leaf hash makes the root comparison succeed vacuously, so without an explicit
+ * range check the client gets the root accepted as the hash of a leaf that does not exist.
+ */
+static int forge_empty_proof(const uint8_t *request_buf,
+                             size_t request_len,
+                             uint8_t *response_buf,
+                             size_t *response_len,
+                             void *user_data) {
+    (void) request_len;
+    (void) user_data;
+
+    if (request_buf[0] != CCMD_GET_MERKLE_LEAF_PROOF) {
+        return 0; /* anything else is answered honestly */
+    }
+
+    /* <leaf_hash:32> <proof_size:1> <n_proof_elements:1>, echoing back the requested root */
+    memcpy(response_buf, request_buf + 1, 32);
+    response_buf[32] = 0;
+    response_buf[33] = 0;
+    *response_len = 34;
+    return 1;
+}
+
+static void test_get_leaf_hash_out_of_range_index(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    const uint8_t *elems[] = {(const uint8_t *) "alpha",
+                              (const uint8_t *) "beta",
+                              (const uint8_t *) "gamma"};
+    size_t lens[] = {5, 4, 5};
+
+    uint8_t root[32];
+    build_tree(mock, elems, lens, 3, root);
+
+    mock_dispatcher_set_forge_hook(mock, forge_empty_proof, NULL);
+
+    uint8_t out[32];
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+
+    /* one past the last leaf */
+    assert_true(call_get_merkle_leaf_hash(dc, root, 3, 3, out) < 0);
+
+    /* well past the last leaf */
+    assert_true(call_get_merkle_leaf_hash(dc, root, 3, 100, out) < 0);
+
+    /* an empty tree has no leaves at all */
+    assert_true(call_get_merkle_leaf_hash(dc, root, 0, 0, out) < 0);
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -901,6 +956,7 @@ int main(void) {
         T(test_get_leaf_hash_internal_node_as_leaf),
         T(test_get_leaf_hash_proof_size_equals_depth),
         T(test_get_leaf_hash_overlong_proof),
+        T(test_get_leaf_hash_out_of_range_index),
     };
 #undef T
 

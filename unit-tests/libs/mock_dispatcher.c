@@ -404,6 +404,22 @@ static int run_client_command(mock_dispatcher_t *m) {
     uint8_t cmd = m->request_buf[0];
     int rc;
 
+    /* A forge hook answers before the handlers, so a test can reply to a request that no handler
+     * would accept. The tamper hook is not called on a forged response: the hook already had full
+     * control over its bytes. */
+    if (m->forge_hook != NULL) {
+        m->response_len = 0;
+        int forge_rc = m->forge_hook(m->request_buf,
+                                     m->request_len,
+                                     m->response_buf,
+                                     &m->response_len,
+                                     m->forge_user_data);
+        if (forge_rc != 0) {
+            m->request_len = 0;
+            return forge_rc < 0 ? -1 : 0;
+        }
+    }
+
     switch (cmd) {
         case CCMD_GET_PREIMAGE:
             rc = handle_get_preimage(m);
