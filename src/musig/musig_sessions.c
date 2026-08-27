@@ -37,10 +37,15 @@ static bool musigsession_pop(const uint8_t psbt_session_id[static 32], musig_psb
     return false;
 }
 
-static void musigsession_init_randomness(musig_psbt_session_t *session) {
+__attribute__((warn_unused_result)) static bool musigsession_init_randomness(
+    musig_psbt_session_t *session) {
     // it is extremely important that the randomness is initialized with a cryptographically strong
     // random number generator
-    cx_get_random_bytes(session->_rand_root, 32);
+    if (cx_get_random_bytes(session->_rand_root, sizeof(session->_rand_root)) != CX_OK) {
+        explicit_bzero(session->_rand_root, sizeof(session->_rand_root));
+        return false;
+    }
+    return true;
 }
 
 static void musigsession_store(const uint8_t psbt_session_id[static 32],
@@ -101,8 +106,12 @@ const musig_psbt_session_t *musigsession_round1_initialize(
 
     if (memcmp(musig_signing_state->_round1._id, psbt_session_id, 32) != 0) {
         // first input/placeholder pair using this session: initialize the session
+        if (!musigsession_init_randomness(&musig_signing_state->_round1)) {
+            PRINTF("Failed to initialize randomness for MuSig2 session\n");
+            return NULL;
+        }
+        // only copy the id if there was no failure
         memcpy(musig_signing_state->_round1._id, psbt_session_id, 32);
-        musigsession_init_randomness(&musig_signing_state->_round1);
     }
 
     return &musig_signing_state->_round1;
