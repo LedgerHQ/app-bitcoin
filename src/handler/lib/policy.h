@@ -239,16 +239,24 @@ bool are_key_placeholders_identical(const policy_node_keyexpr_t *kp1,
                                     const policy_node_keyexpr_t *kp2);
 
 /**
- * Determines the expected number of unique keys in the provided policy's key information.
- * The function calculates this by finding the maximum key index from key expressions and increments
- * it by 1. For instance, if the maximum key index found in the key expressions is `n`, then the
- * result would be `n + 1`.
+ * Counts the number of distinct key indices in the range [0, n_keys) that are referenced by some
+ * key expression in the provided policy (including every member of any musig() aggregation).
+ * Key indices greater than or equal to n_keys are rejected as an error, as they do not correspond
+ * to any key info actually supplied by the caller.
+ *
+ * Comparing the result with n_keys tells the caller whether every supplied key info is referenced
+ * at least once by the descriptor, with no gaps and no out-of-range references.
  *
  * @param[in] policy
  *   Pointer to the root node of the policy
- * @return the expected number of items in the keys information vector; -1 in case of error.
+ * @param[in] n_keys
+ *   The number of keys info supplied for this policy; also the exclusive upper bound for valid key
+ *   indices.
+ * @return the number of distinct key indices in [0, n_keys) referenced by the policy; -1 in case of
+ *   error, including if a key expression references an index outside of that range.
  */
-__attribute__((warn_unused_result)) int count_distinct_keys_info(const policy_node_t *policy);
+__attribute__((warn_unused_result)) int count_distinct_keys_info(const policy_node_t *policy,
+                                                                 size_t n_keys);
 
 /**
  * Checks if a wallet policy is sane, verifying that pubkeys are never repeated and (if miniscript)

@@ -1738,8 +1738,15 @@ int get_keyexpr_by_index(const policy_node_t *policy,
     return -1;
 }
 
-int count_distinct_keys_info(const policy_node_t *policy) {
-    int ret = -1;
+int count_distinct_keys_info(const policy_node_t *policy, size_t n_keys) {
+    if (n_keys > MAX_N_KEYS_IN_WALLET_POLICY) {
+        return -1;
+    }
+
+    // bitvector of key indices referenced anywhere in the policy
+    uint8_t used[BITVECTOR_REAL_SIZE(MAX_N_KEYS_IN_WALLET_POLICY)];
+    memset(used, 0, sizeof(used));
+
     policy_node_keyexpr_t *key_expression_ptr;
     int n_key_expressions = get_keyexpr_by_index(policy, 0, NULL, NULL);
     if (n_key_expressions < 0) {
@@ -1751,18 +1758,31 @@ int count_distinct_keys_info(const policy_node_t *policy) {
             return -1;
         }
         if (key_expression_ptr->type == KEY_EXPRESSION_NORMAL) {
-            ret = MAX(ret, key_expression_ptr->k.key_index + 1);
+            if (key_expression_ptr->k.key_index >= n_keys) {
+                return -1;
+            }
+            bitvector_set(used, key_expression_ptr->k.key_index, true);
         } else if (key_expression_ptr->type == KEY_EXPRESSION_MUSIG) {
             const musig_aggr_key_info_t *musig_info = key_expression_ptr->m.musig_info;
             const uint16_t *key_indexes = musig_info->key_indexes;
             for (int i = 0; i < musig_info->n; i++) {
-                ret = MAX(ret, key_indexes[i] + 1);
+                if (key_indexes[i] >= n_keys) {
+                    return -1;
+                }
+                bitvector_set(used, key_indexes[i], true);
             }
         } else {
             LEDGER_ASSERT(false, "Unknown key expression type");
         }
     }
-    return ret;
+
+    int n_distinct = 0;
+    for (size_t i = 0; i < n_keys; i++) {
+        if (bitvector_get(used, i)) {
+            ++n_distinct;
+        }
+    }
+    return n_distinct;
 }
 
 // Utility function to extract and decode the i-th xpub from the keys information vector
