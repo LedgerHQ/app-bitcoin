@@ -195,21 +195,32 @@ int crypto_get_uncompressed_pubkey(const uint8_t compressed_key[static 33],
         return -1;
     }
 
+    // the x-coordinate must be an element of the base field
+    if (memcmp(compressed_key + 1, secp256k1_p, 32) >= 0) {
+        return -1;
+    }
+
     uint8_t *x = &out[1], *y = &out[1 + 32];
 
     memmove(x, compressed_key + 1, 32);  // copy x
 
-    // we use y for intermediate results, in order to save memory
+    uint8_t c[32];  // c is the expected value of y^2, that is, x^3 + 7 (mod p)
 
     uint8_t e = 3;
-    if (CX_OK != cx_math_powm_no_throw(y, x, &e, 1, secp256k1_p, 32))
-        return -1;  // tmp = x^3 (mod p)
+    if (CX_OK != cx_math_powm_no_throw(c, x, &e, 1, secp256k1_p, 32)) return -1;  // c = x^3 (mod p)
     uint8_t scalar[32] = {0};
     scalar[31] = 7;
-    if (CX_OK != cx_math_addm_no_throw(y, y, scalar, secp256k1_p, 32))
-        return -1;  // tmp = x^3 + 7 (mod p)
-    if (CX_OK != cx_math_powm_no_throw(y, y, secp256k1_sqr_exponent, 32, secp256k1_p, 32))
-        return -1;  // tmp = sqrt(x^3 + 7) (mod p)
+    if (CX_OK != cx_math_addm_no_throw(c, c, scalar, secp256k1_p, 32))
+        return -1;  // c = x^3 + 7 (mod p)
+    if (CX_OK != cx_math_powm_no_throw(y, c, secp256k1_sqr_exponent, 32, secp256k1_p, 32))
+        return -1;  // y = sqrt(x^3 + 7) (mod p), if it exists
+
+    // Fail unless y * y % p == x^3 + 7 (guaranteed unless c is not a quadratic residue)
+    uint8_t y_2[32];
+    if (CX_OK != cx_math_multm_no_throw(y_2, y, y, secp256k1_p, 32)) return -1;  // y^2 (mod p)
+    if (memcmp(y_2, c, 32) != 0) {
+        return -1;  // the point is not on the curve
+    }
 
     // if the prefix and y don't have the same parity, take the opposite root (mod p)
     if (((prefix ^ y[31]) & 1) != 0) {
