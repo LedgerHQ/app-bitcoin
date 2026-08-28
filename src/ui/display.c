@@ -31,6 +31,20 @@ ui_state_t g_ui_state;
  */
 char const *G_processing_screen_text;
 
+/**
+ * Drop-in replacement for `strncpy(dst, src, dst_size)` for the strings displayed by this module.
+ *
+ * Copies the 0-terminated string `src` into the `dst_size`-byte buffer `dst`, terminator included.
+ * Unlike `strncpy`, the result is always 0-terminated, and the copy is never truncated: if `src`
+ * does not fit (or has no terminator within the first `dst_size` bytes), that is a programming
+ * error and the app is halted, rather than continuing with a possibly misrepresented UI flow.
+ */
+static void copy_ui_string(char *dst, const char *src, size_t dst_size) {
+    size_t len = strnlen(src, dst_size);
+    LEDGER_ASSERT(len < dst_size, "String does not fit in the UI buffer");
+    memcpy(dst, src, len + 1);
+}
+
 void send_deny_sw(dispatcher_context_t *dc) {
     SEND_SW(dc, SW_DENY);
 }
@@ -74,8 +88,8 @@ bool ui_display_pubkey(dispatcher_context_t *context,
 
     ui_path_and_pubkey_state_t *state = (ui_path_and_pubkey_state_t *) &g_ui_state;
 
-    strncpy(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
-    strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
+    copy_ui_string(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
+    copy_ui_string(state->pubkey, pubkey, sizeof(state->pubkey));
 
     ui_display_pubkey_flow();
 
@@ -91,8 +105,8 @@ bool ui_display_message_and_confirm(dispatcher_context_t *context,
 #endif
 
     ui_path_and_message_state_t *state = (ui_path_and_message_state_t *) &g_ui_state;
-    strncpy(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
-    strncpy(state->message, message, sizeof(state->message));
+    copy_ui_string(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
+    copy_ui_string(state->message, message, sizeof(state->message));
 
     ui_sign_message_and_confirm_flow(is_hash);
 
@@ -168,12 +182,12 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
 
     memset(state, 0, sizeof(ui_wallet_state_t));
 
-    strncpy(state->address, address, sizeof(state->address));
+    copy_ui_string(state->address, address, sizeof(state->address));
 
     if (wallet_name == NULL) {
         ui_display_default_wallet_address_flow();
     } else {
-        strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
+        copy_ui_string(state->wallet_name, wallet_name, sizeof(state->wallet_name));
         ui_display_receive_in_wallet_flow();
     }
 
@@ -197,7 +211,7 @@ void ui_prepare_authorize_wallet_spend(const char *wallet_name,
     if (wallet_name == NULL) {
         state->has_wallet_policy = false;
     } else {
-        strncpy(state->wallet_policy_name, wallet_name, sizeof(state->wallet_policy_name));
+        copy_ui_string(state->wallet_policy_name, wallet_name, sizeof(state->wallet_policy_name));
         state->has_wallet_policy = true;
     }
     prepare_tx_summary(state, summary);
@@ -262,9 +276,9 @@ bool ui_transaction_streaming_validate_output(dispatcher_context_t *context,
 
     format_output_index(index, total_count, state->output_index_str[0]);
 
-    strncpy(state->address_or_description[0],
-            address_or_description,
-            sizeof(state->address_or_description[0]));
+    copy_ui_string(state->address_or_description[0],
+                   address_or_description,
+                   sizeof(state->address_or_description[0]));
     format_sats_amount(COIN_COINID_SHORT, amount, state->amount[0]);
 
     ui_display_transaction_streaming_output_address_amount();
@@ -339,7 +353,9 @@ void ui_transaction_simplified_init(const char *wallet_policy_name,
     memset(state, 0, sizeof(ui_validate_transaction_state_t));
 
     if (wallet_policy_name != NULL) {
-        strncpy(state->wallet_policy_name, wallet_policy_name, sizeof(state->wallet_policy_name));
+        copy_ui_string(state->wallet_policy_name,
+                       wallet_policy_name,
+                       sizeof(state->wallet_policy_name));
         state->has_wallet_policy = true;
     }
     state->n_outputs = outputs_num;
@@ -360,9 +376,9 @@ void ui_transaction_simplified_add(uint64_t amount, const char *address_or_descr
     if (address_or_description == NULL) {
         state->is_self_transfer = true;
     } else {
-        strncpy(state->address_or_description[state->output_index],
-                address_or_description,
-                sizeof(state->address_or_description[state->output_index]));
+        copy_ui_string(state->address_or_description[state->output_index],
+                       address_or_description,
+                       sizeof(state->address_or_description[state->output_index]));
     }
     format_output_index(state->output_index + 1,
                         state->n_outputs,
