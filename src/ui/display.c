@@ -352,6 +352,9 @@ void ui_transaction_simplified_init(const char *wallet_policy_name,
 
     memset(state, 0, sizeof(ui_validate_transaction_state_t));
 
+    LEDGER_ASSERT(outputs_num <= MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER,
+                  "Too many outputs for the simplified review");
+
     if (wallet_policy_name != NULL) {
         copy_ui_string(state->wallet_policy_name,
                        wallet_policy_name,
@@ -371,6 +374,10 @@ void ui_transaction_simplified_init(const char *wallet_policy_name,
 
 void ui_transaction_simplified_add(uint64_t amount, const char *address_or_description) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
+
+    LEDGER_ASSERT(state->output_index < state->n_outputs &&
+                      state->output_index < MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER,
+                  "Too many outputs added to the simplified review");
 
     format_sats_amount(COIN_COINID_SHORT, amount, state->amount[state->output_index]);
     if (address_or_description == NULL) {
