@@ -29,7 +29,7 @@ from embit.descriptor import Descriptor
 from embit.networks import NETWORKS
 from embit.script import Script
 
-from bitcoin_client.ledger_bitcoin.embit.descriptor.miniscript import Miniscript
+from bitcoin_client.ledger_bitcoin._embit.descriptor.miniscript import Miniscript
 from test_utils import bip0340, sha256, hash160
 from test_utils.bip0327 import cbytes, key_agg
 from test_utils.wallet_policy import DescriptorTemplate, KeyPlaceholder, MuSig2KeyPlaceholder, PlainKeyPlaceholder, ShDescriptorTemplate, ShWpkhDescriptorTemplate, ShWshDescriptorTemplate, TrDescriptorTemplate, WshDescriptorTemplate, WpkhDescriptorTemplate, PkhDescriptorTemplate, derive_plain_descriptor, tapleaf_hash
