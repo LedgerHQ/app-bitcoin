@@ -88,6 +88,9 @@ const char GA_UNVERIFIED_INPUTS_TITLE[] = "External amounts";
     MAX(1 + 3 * MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER + 2 + 1 + 1 + 1, \
         3 + MAX_N_KEYS_IN_WALLET_POLICY + CT_MAX_LINES)
 
+//`nbPairs` is `uint8_t` in `nbgl_layoutTagValueList_t`
+_Static_assert(N_UX_PAIRS <= UINT8_MAX, "N_UX_PAIRS must fit in a uint8_t");
+
 static nbgl_layoutTagValue_t pairs[N_UX_PAIRS];
 static unsigned int n_pairs;
 static nbgl_layoutTagValueList_t pairList;
