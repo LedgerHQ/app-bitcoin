@@ -323,6 +323,8 @@ void ui_display_transaction_simplified_flow_init(void) {
 void ui_display_transaction_simplified_flow_add(void) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
+    LEDGER_ASSERT(n_pairs + 3 <= N_UX_PAIRS, "Too many tag/value pairs");
+
     unsigned int output_index = state->output_index;
     if (!state->is_self_transfer) {
         if (state->n_outputs > 1) {

@@ -234,7 +234,9 @@ void ui_warn_nondefault_sighash_disabled(dispatcher_context_t *context);
 /* These 3 functions have to be called in following order:
  * 1. init - initialize the flow; the summary is applied here so the account row, the
  *           "Signing rule" line and the per-output page breaks are all available up front.
- * 2. add  - to add information for an output.
+ *           `outputs_num` must not exceed MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER, the capacity of the
+ *           per-output arrays.
+ * 2. add  - to add information for an output; must be called at most `outputs_num` times.
  * 3. show - to actually start showing the transaction screens.
  * These functions call respectively init, add and show functions from display_nbgl module.
  */
