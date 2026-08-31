@@ -178,7 +178,7 @@ bool __attribute__((noinline)) execute_swap_checks(dispatcher_context_t *dc,
         finalize_exchange_sign_transaction(false);
     }
 
-    LEDGER_ASSERT(0 <= swap_dest_idx && swap_dest_idx < N_CACHED_EXTERNAL_OUTPUTS,
+    LEDGER_ASSERT(0 <= swap_dest_idx && (unsigned int) swap_dest_idx < N_CACHED_EXTERNAL_OUTPUTS,
                   "External output index out of range for swap\n");
 
     // Check that total amount and fees are as expected

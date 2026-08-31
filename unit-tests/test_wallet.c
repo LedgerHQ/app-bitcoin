@@ -368,6 +368,25 @@ static void test_parse_unsigned_decimal_overflow(void **state) {
     assert_true(0 > parse_policy("wsh(older(5368709120))", out, sizeof(out)));
 }
 
+// Regression test: in a /<M;N>/* key expression, M and N must be unhardened.
+// An older version incorrectly accepted 0x80000000 itself (the first hardened index) as a valid
+// unhardened value.
+static void test_parse_keyexpr_multipath_hardened_boundary(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+
+    // 0x7fffffff (2147483647) is the largest valid unhardened index: still accepted.
+    int res = parse_policy("pkh(@0/<2147483647;0>/*)", out, sizeof(out));
+    assert_true(res >= 0);
+    policy_node_with_key_t *node_1 = (policy_node_with_key_t *) out;
+    check_key_expr_plain(r_policy_node_keyexpr(&node_1->key), 0, 2147483647, 0);
+
+    // 0x80000000 (2147483648) is the first hardened index: must be rejected for both M and N.
+    assert_true(0 > parse_policy("pkh(@0/<2147483648;0>/*)", out, sizeof(out)));
+    assert_true(0 > parse_policy("pkh(@0/<0;2147483648>/*)", out, sizeof(out)));
+}
+
 static void test_failures(void **state) {
     (void) state;
 
@@ -1036,6 +1055,7 @@ int main() {
         cmocka_unit_test(test_parse_policy_tr_musig_keypath),
         cmocka_unit_test(test_get_policy_segwit_version),
         cmocka_unit_test(test_parse_unsigned_decimal_overflow),
+        cmocka_unit_test(test_parse_keyexpr_multipath_hardened_boundary),
         cmocka_unit_test(test_failures),
         cmocka_unit_test(test_miniscript_types),
         cmocka_unit_test(test_traverse_single_leaf),

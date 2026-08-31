@@ -122,7 +122,7 @@ static bool __attribute__((noinline)) display_external_outputs(
 
     // the counter used when showing outputs to the user, which ignores change outputs
     // (0-indexed here, although the UX starts with 1)
-    int external_outputs_count = 0;
+    unsigned int external_outputs_count = 0;
 
     for (unsigned int cur_output_index = 0; cur_output_index < st->n_outputs; cur_output_index++) {
         if (!bitvector_get(internal_outputs, cur_output_index)) {

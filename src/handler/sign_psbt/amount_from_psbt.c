@@ -114,9 +114,9 @@ int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_witness(
     if (wit_utxo_len < 8 + 1) {
         return -1;
     }
-    int wit_utxo_scriptPubkey_len = raw_witnessUtxo[8];
+    size_t wit_utxo_scriptPubkey_len = raw_witnessUtxo[8];
 
-    if (wit_utxo_len != 8 + 1 + wit_utxo_scriptPubkey_len) {
+    if ((size_t) wit_utxo_len != 8 + 1 + wit_utxo_scriptPubkey_len) {
         PRINTF("Length mismatch for witness utxo's scriptPubKey\n");
         return -1;
     }
