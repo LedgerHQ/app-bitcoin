@@ -560,7 +560,7 @@ static int parse_keyexpr(buffer_t *in_buf,
         } else if (next_character == '<') {
             buffer_seek_cur(in_buf, 1);  // skip "<"
             if (parse_unsigned_decimal(in_buf, &out->num_first) == -1 ||
-                out->num_first > 0x80000000u) {
+                out->num_first >= BIP32_FIRST_HARDENED_CHILD) {
                 return WITH_ERROR(
                     -1,
                     "Expected /** or /<M;N>/* in key expression, with unhardened M and N");
@@ -571,7 +571,7 @@ static int parse_keyexpr(buffer_t *in_buf,
             }
 
             if (parse_unsigned_decimal(in_buf, &out->num_second) == -1 ||
-                out->num_second > 0x80000000u) {
+                out->num_second >= BIP32_FIRST_HARDENED_CHILD) {
                 return WITH_ERROR(
                     -1,
                     "Expected /** or /<M;N>/* in key expression, with unhardened M and N");
