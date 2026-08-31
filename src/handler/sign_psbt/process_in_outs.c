@@ -65,7 +65,7 @@ int read_change_and_index_from_psbt_bip32_derivation(
         return -1;
     }
 
-    if (der_len < 2 || der_len > MAX_BIP32_PATH_STEPS) {
+    if (der_len < 2 || (unsigned int) der_len > MAX_BIP32_PATH_STEPS) {
         PRINTF("BIP32_DERIVATION path too long\n");
         return 0;
     }
