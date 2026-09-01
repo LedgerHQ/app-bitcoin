@@ -57,13 +57,12 @@
 
 /**
  * Maximum number of external outputs handled simultaneously.
- * On the Nano X, the stack size is limited to 8K at the OS level,
- * so the stack consumption has to be limited as well.
  */
 #ifndef TARGET_ID
 #error "bolos_target.h must be included (TARGET_* constants unavailable)"
 #endif
 #ifdef TARGET_NANOX
+// Nano X has smaller RAM size, so we keep this smaller.
 #define MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER 8U
 #else
 #define MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER 16U

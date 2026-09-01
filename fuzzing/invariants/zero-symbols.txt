@@ -7,7 +7,6 @@ G_output_len
 G_dispatcher_state
 G_dispatcher_context
 g_ui_state
-G_sign_psbt_cache
 pairs
 
 # Pointers overwritten by the harness every iteration (random bytes crash).
