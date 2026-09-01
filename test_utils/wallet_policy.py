@@ -15,7 +15,7 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from bitcoin_client.ledger_bitcoin.embit.descriptor.miniscript import Miniscript
+from bitcoin_client.ledger_bitcoin._embit.descriptor.miniscript import Miniscript
 from bitcoin_client.ledger_bitcoin.key import ExtendedKey
 from test_utils.taproot import ser_script, tagged_hash
 
