@@ -2,6 +2,6 @@
 # See dev-tools/playground/README.md for full setup instructions.
 
 bip32>=3.4,<4.0        # external-cosigner xpub derivation
-mnemonic==0.20         # BIP-39 mnemonic -> seed
+mnemonic>=0.20,<0.21   # BIP-39 mnemonic -> seed
 embit>=0.7.0,<0.8.0    # used by test_utils.txmaker (fake-PSBT generator)
 textual>=0.50          # TUI front-end (dev-tools/playground/gui.py)
