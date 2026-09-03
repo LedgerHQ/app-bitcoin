@@ -425,8 +425,8 @@ class _Ctx:
 
 def _sub_child_expr(struct: str, t: str, i: int) -> str:
     if struct == "policy_node_with_script_t":
-        return f"r_policy_node(&{t}->script)"
-    return f"r_policy_node(&{t}->scripts[{i}])"  # script2 / script3
+        return f"{t}->script"
+    return f"{t}->scripts[{i}]"  # script2 / script3
 
 
 def _classify_sub(ctx: _Ctx, node_var: str, name: str) -> None:
@@ -446,13 +446,13 @@ def _peel_wrappers(ctx: _Ctx, node_var: str, wrappers: list[str]) -> str:
         w = ctx.fresh("w")
         ctx.body.append(f"const policy_node_with_script_t *{w} = (const policy_node_with_script_t *) {node_var};")
         c2 = ctx.fresh("c")
-        ctx.body.append(f"const policy_node_t *{c2} = r_policy_node(&{w}->script);")
+        ctx.body.append(f"const policy_node_t *{c2} = {w}->script;")
         node_var = c2
     return node_var
 
 
 def _handle_key_arg(ctx: _Ctx, arg: Any, t: str) -> None:
-    key_expr = f"r_policy_node_keyexpr(&{t}->key)"
+    key_expr = f"{t}->key"
     if arg[0] == "binding" and arg[2] == "KEY":
         k = ctx.fresh("k")
         ctx.body.append(f"const policy_node_keyexpr_t *{k} = {key_expr};")
@@ -464,7 +464,7 @@ def _handle_key_arg(ctx: _Ctx, arg: Any, t: str) -> None:
         ctx.body.append(f"const policy_node_keyexpr_t *{k} = {key_expr};")
         ctx.body.append(f"if ({k}->type != KEY_EXPRESSION_MUSIG) break;")
         mi = ctx.fresh("mi")
-        ctx.body.append(f"const musig_aggr_key_info_t *{mi} = r_musig_aggr_key_info(&{k}->m.musig_info);")
+        ctx.body.append(f"const musig_aggr_key_info_t *{mi} = {k}->m.musig_info;")
         ts, ks = ctx.bidx[arg[1]], ctx.bidx[arg[2]]
         ctx.binds.append(f"set_binding_number(&out->bindings, {ts}, {mi}->n);")
         ctx.binds.append(f"set_binding_keys(&out->bindings, {ks}, {k}, 1);")
@@ -486,7 +486,7 @@ def _handle_arg(ctx: _Ctx, arg: Any, ak: str, struct: str, t: str, i: int) -> No
         if not (arg[0] == "binding" and arg[2] == "KEYS"):
             raise ValueError(f"unexpected arg {arg!r} in KeyList position")
         ka = ctx.fresh("ka")
-        ctx.body.append(f"const policy_node_keyexpr_t *{ka} = r_policy_node_keyexpr(&{t}->keys);")
+        ctx.body.append(f"const policy_node_keyexpr_t *{ka} = {t}->keys;")
         slot = ctx.bidx[arg[1]]
         ctx.binds.append(f"set_binding_keys(&out->bindings, {slot}, {ka}, {t}->n);")
     elif ak == "SUB":
@@ -524,10 +524,10 @@ def _lower(ctx: _Ctx, pat: Pattern, node_expr: str) -> None:
         # the $leaves taptree. A 1-arg tr matches only a leaf-less taproot.
         _handle_key_arg(ctx, pat.args[0], t)
         if len(pat.args) == 1:
-            ctx.body.append(f"if (!isnull_policy_node_tree(&{t}->tree)) break;")
+            ctx.body.append(f"if ({t}->tree != NULL) break;")
         else:
-            ctx.body.append(f"if (isnull_policy_node_tree(&{t}->tree)) break;")
-            ctx.binds.append(f"out->taptree = r_policy_node_tree(&{t}->tree);")
+            ctx.body.append(f"if ({t}->tree == NULL) break;")
+            ctx.binds.append(f"out->taptree = {t}->tree;")
         return
 
     for i, arg in enumerate(pat.args):

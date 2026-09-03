@@ -400,7 +400,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 return false;
 
             policy_node_tr_t *policy = (policy_node_tr_t *) st->account.policy_map;
-            if (!keyexpr_info->is_tapscript && !isnull_policy_node_tree(&policy->tree)) {
+            if (!keyexpr_info->is_tapscript && policy->tree != NULL) {
                 // keypath spend, we compute the taptree hash
                 if (0 > compute_taptree_hash(
                             dc,
@@ -411,7 +411,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                 .n_keys = st->account.wallet_header.n_keys,
                                 .wallet_version = st->account.wallet_header.version,
                                 .sign_psbt_cache = sign_psbt_cache},
-                            r_policy_node_tree(&policy->tree),
+                            policy->tree,
                             input->taptree_hash)) {
                     PRINTF("Error while computing taptree hash\n");
                     SEND_SW(dc, SW_BAD_STATE);
@@ -424,7 +424,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
             const uint8_t *tapleaf_hash = NULL;
             if (!keyexpr_info->is_tapscript) {
                 // keypath spend
-                if (isnull_policy_node_tree(&policy->tree)) {
+                if (policy->tree == NULL) {
                     // tweak as specified in BIP-86 and BIP-386
                     tweak_data = (uint8_t[]) {};
                     tweak_data_len = 0;
@@ -600,7 +600,7 @@ bool __attribute__((noinline)) produce_musig2_pubnonces(
                 // an internal key), and might not be needed at all otherwise. Therefore, it is
                 // actually more efficient to compute it here.
                 policy_node_tr_t *policy = (policy_node_tr_t *) st->account.policy_map;
-                bool has_taptree = !isnull_policy_node_tree(&policy->tree);
+                bool has_taptree = policy->tree != NULL;
                 if (has_taptree) {
                     if (0 >
                         compute_taptree_hash(
@@ -612,7 +612,7 @@ bool __attribute__((noinline)) produce_musig2_pubnonces(
                                 .n_keys = st->account.wallet_header.n_keys,
                                 .wallet_version = st->account.wallet_header.version,
                                 .sign_psbt_cache = sign_psbt_cache},
-                            r_policy_node_tree(&policy->tree),
+                            policy->tree,
                             input.taptree_hash)) {
                         PRINTF("Error while computing taptree hash\n");
                         SEND_SW(dc, SW_BAD_STATE);
