@@ -6,7 +6,6 @@
 /* SDK headers */
 #include "bip32.h"
 #include "buffer.h"
-#include "ledger_assert.h"
 
 /* Local headers */
 #include "constants.h"
@@ -30,14 +29,14 @@
 #define WALLET_POLICY_VERSION_V2 2  // the current full version
 
 // The string describing a pubkey can contain:
-// - (optional) the key origin info, which we limit to 46 bytes (2 + 8 + 3*12 = 46 bytes)
+// - (optional) the key origin info, which we limit to 46 bytes (2 + 8 + 8*12 = 106 bytes)
 // - the xpub itself (up to 113 characters)
 // - optional, the "/**" suffix.
 // Therefore, the total length of the key info string is at most 162 bytes.
-#define MAX_POLICY_KEY_INFO_LEN_V1 (46 + MAX_SERIALIZED_PUBKEY_LENGTH + 3)
+#define MAX_POLICY_KEY_INFO_LEN_V1 (106 + MAX_SERIALIZED_PUBKEY_LENGTH + 3)
 
 // In V1, there is no "/**" suffix, as that is no longer part of the key
-#define MAX_POLICY_KEY_INFO_LEN_V2 (46 + MAX_SERIALIZED_PUBKEY_LENGTH)
+#define MAX_POLICY_KEY_INFO_LEN_V2 (106 + MAX_SERIALIZED_PUBKEY_LENGTH)
 
 #define MAX_POLICY_KEY_INFO_LEN MAX(MAX_POLICY_KEY_INFO_LEN_V1, MAX_POLICY_KEY_INFO_LEN_V2)
 
@@ -85,7 +84,7 @@
 // This limit is extremely unlikely to be hit in practice.
 #define MAX_N_IN_THRESH 24
 
-// at most 92 bytes
+// at most 140 bytes
 // wallet type (1 byte)
 // name length (1 byte)
 // name (max MAX_WALLET_NAME_LENGTH bytes)
@@ -96,7 +95,7 @@
 #define MAX_WALLET_POLICY_SERIALIZED_LENGTH_V1 \
     (1 + 1 + MAX_WALLET_NAME_LENGTH + 1 + MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1 + 1 + 32)
 
-// at most 100 bytes
+// at most 148 bytes
 // wallet type (1 byte)
 // name length (1 byte)
 // name (max MAX_WALLET_NAME_LENGTH bytes)
