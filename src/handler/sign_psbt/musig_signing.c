@@ -30,9 +30,39 @@
 #include "psbt.h"
 #include "sw.h"
 
+/**
+ * Computes the id of the psbt-level MuSig2 signing session.
+ *
+ * The id identifies the session during both rounds of the protocol; it is the same for all the
+ * musig key expressions of the policy (if more than one), and for all the inputs of the psbt.
+ *
+ * It deliberately depends only on the wallet policy, and _not_ on the transaction being signed.
+ * That, together with the transaction-independent nonce derivation of musig_derive_nonce(), is what
+ * allows a client to execute round 1 before knowing the transaction, and to then use the resulting
+ * pubnonces for whichever transaction it ends up building. The cost is that at most one round-1
+ * batch can be pending per wallet policy: starting a new round 1 deletes the previous session, and
+ * round 2 for the older batch then fails cleanly, thanks to the pubnonce check in
+ * sign_sighash_musig_and_yield().
+ *
+ * Note that only the keys of the policy are committed to, and not the descriptor template; two
+ * registered policies with the same ordered list of keys therefore share the same session.
+ */
+static void musig_compute_session_id(const sign_psbt_state_t *st, uint8_t out[static 32]) {
+    // The tag is versioned: a session stored by a version of the app that derived the id
+    // differently must never be matched by an id computed here.
+    crypto_tr_tagged_hash(
+        (uint8_t[]) {'P', 's', 'b', 't', 'S', 'e', 's', 's', 'i', 'o', 'n', 'I', 'd', '2'},
+        14,
+        // TODO: wallet policy id would be more precise
+        st->account.wallet_header.keys_info_merkle_root,
+        32,
+        NULL,
+        0,
+        out);
+}
+
 bool compute_musig_per_input_info(dispatcher_context_t *dc,
                                   sign_psbt_state_t *st,
-                                  signing_state_t *signing_state,
                                   const input_info_t *input,
                                   const keyexpr_info_t *keyexpr_info,
                                   musig_per_input_info_t *out) {
@@ -49,7 +79,6 @@ bool compute_musig_per_input_info(dispatcher_context_t *dc,
     // 1) compute aggregate pubkey
     // 2) compute musig2 tweaks
     // 3) compute taproot tweak (if keypath spend)
-    // 4) compute the psbt_session_id that identifies the psbt-level signing session
 
     wallet_derivation_info_t wdi = {
         .n_keys = st->account.wallet_header.n_keys,
@@ -144,23 +173,56 @@ bool compute_musig_per_input_info(dispatcher_context_t *dc,
            sizeof(out->agg_key_tweaked.parent_fingerprint));
     memset(out->agg_key_tweaked.version, 0, sizeof(out->agg_key_tweaked.version));
 
-    // The psbt_session_id identifies the musig signing session for the entire (psbt, wallet_policy)
-    // pair, in both rounds 1 and 2 of the protocol; it is the same for all the musig placeholders
-    // in the policy (if more than one), and it is the same for all the inputs in the psbt. By
-    // making the hash depend on both the wallet policy and the transaction hashes, we make sure
-    // that an accidental collision is impossible, allowing for independent, parallel MuSig2 signing
-    // sessions for different transactions or wallet policies.
-    // Malicious collisions are not a concern, as they would only result in a signing failure (since
-    // the nonces would be incorrectly regenerated during round 2 of MuSig2).
-    crypto_tr_tagged_hash(
-        (uint8_t[]) {'P', 's', 'b', 't', 'S', 'e', 's', 's', 'i', 'o', 'n', 'I', 'd'},
-        13,
-        st->account.wallet_header
-            .keys_info_merkle_root,  // TODO: wallet policy id would be more precise
-        32,
-        (uint8_t *) &signing_state->tx_hashes,
-        sizeof(tx_hashes_t),
-        out->psbt_session_id);
+    return true;
+}
+
+/**
+ * Derives the (secnonce, pubnonce) pair for the given (input index, key expression) pair, out of
+ * the synthetic randomness of the psbt-level MuSig2 session.
+ *
+ * Every place that needs a nonce must go through this function: round 1 publishes the pubnonce,
+ * while round 2 recomputes the corresponding secnonce. Should the two derivations ever diverge, the
+ * partial signatures produced in round 2 would not match the pubnonces published in round 1, and
+ * the aggregate signature would be invalid.
+ *
+ * The nonce deliberately depends only on the session randomness, the two indices and the wallet
+ * policy; it does _not_ depend on the transaction, nor on the input's (change, address_index).
+ * Therefore, the `aggpk` argument of NonceGen is the aggregate key of the musig() key expression
+ * _before_ any of the tweaks, rather than the tweaked key that is actually being signed for.
+ * In BIP-0327, `aggpk` (like `msg`, which this app already omits) is an optional argument whose
+ * only purpose is to add entropy to the derivation, as a defense in depth against a faulty source
+ * of randomness; it is not needed for the uniqueness of the nonce, which here is guaranteed by
+ * `rand_root` coming from the hardware RNG and by the (input_index, keyexpr_index) domain
+ * separation in compute_rand_i_j.
+ *
+ * Making the nonce independent of the transaction is what allows a client to run round 1 of MuSig2
+ * before knowing the transaction that will be signed. See doc/musig.md.
+ *
+ * On failure, the secnonce is zeroed out before returning.
+ */
+static bool __attribute__((noinline)) musig_derive_nonce(const musig_psbt_session_t *psbt_session,
+                                                         const keyexpr_info_t *keyexpr_info,
+                                                         unsigned int input_index,
+                                                         musig_secnonce_t *secnonce,
+                                                         musig_pubnonce_t *pubnonce) {
+    uint8_t rand_i_j[32];
+    compute_rand_i_j(psbt_session, input_index, keyexpr_info->index, rand_i_j);
+
+    int res = musig_nonce_gen(rand_i_j,
+                              sizeof(rand_i_j),
+                              keyexpr_info->internal_pubkey.compressed_pubkey,
+                              // untweaked aggregate key of the musig() key expression
+                              keyexpr_info->pubkey.compressed_pubkey + 1,
+                              secnonce,
+                              pubnonce);
+
+    explicit_bzero(rand_i_j, sizeof(rand_i_j));
+
+    if (0 > res) {
+        PRINTF("MuSig2 nonce generation failed\n");
+        explicit_bzero(secnonce, sizeof(*secnonce));
+        return false;
+    }
 
     return true;
 }
@@ -266,12 +328,7 @@ bool produce_and_yield_pubnonce(dispatcher_context_t *dc,
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     musig_per_input_info_t musig_per_input_info;
-    if (!compute_musig_per_input_info(dc,
-                                      st,
-                                      signing_state,
-                                      input,
-                                      keyexpr_info,
-                                      &musig_per_input_info)) {
+    if (!compute_musig_per_input_info(dc, st, input, keyexpr_info, &musig_per_input_info)) {
         return false;
     }
 
@@ -279,8 +336,11 @@ bool produce_and_yield_pubnonce(dispatcher_context_t *dc,
      * Round 1 of the MuSig2 protocol: generate and yield pubnonce
      **/
 
+    uint8_t psbt_session_id[32];
+    musig_compute_session_id(st, psbt_session_id);
+
     const musig_psbt_session_t *psbt_session =
-        musigsession_round1_initialize(musig_per_input_info.psbt_session_id, &signing_state->musig);
+        musigsession_round1_initialize(psbt_session_id, &signing_state->musig);
     if (psbt_session == NULL) {
         // This should never happen
         PRINTF("Unexpected: failed to initialize MuSig2 round 1\n");
@@ -288,22 +348,17 @@ bool produce_and_yield_pubnonce(dispatcher_context_t *dc,
         return false;
     }
 
-    bool ret = false;
-    uint8_t rand_i_j[32];
-    compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->index, rand_i_j);
-
     musig_secnonce_t secnonce;
     musig_pubnonce_t pubnonce;
-    int res = musig_nonce_gen(rand_i_j,
-                              sizeof(rand_i_j),
-                              keyexpr_info->internal_pubkey.compressed_pubkey,
-                              musig_per_input_info.agg_key_tweaked.compressed_pubkey + 1,
-                              &secnonce,
-                              &pubnonce);
+    bool nonce_ok =
+        musig_derive_nonce(psbt_session, keyexpr_info, cur_input_index, &secnonce, &pubnonce);
+
+    // round 1 only publishes the pubnonce; the secnonce is recomputed in round 2
     explicit_bzero(&secnonce, sizeof(secnonce));
-    if (0 > res) {
-        PRINTF("MuSig2 nonce generation failed\n");
-        goto cleanup;
+
+    if (!nonce_ok) {
+        SEND_SW(dc, SW_BAD_STATE);  // should never happen
+        return false;
     }
 
     if (!yield_musig_pubnonce(dc,
@@ -314,14 +369,6 @@ bool produce_and_yield_pubnonce(dispatcher_context_t *dc,
                               musig_per_input_info.agg_key_tweaked.compressed_pubkey,
                               keyexpr_info->is_tapscript ? keyexpr_info->tapleaf_hash : NULL)) {
         PRINTF("Failed yielding MuSig2 pubnonce\n");
-        goto cleanup;
-    }
-
-    ret = true;
-
-cleanup:
-    explicit_bzero(rand_i_j, sizeof(rand_i_j));
-    if (!ret) {
         SEND_SW(dc, SW_BAD_STATE);  // should never happen
         return false;
     }
@@ -339,12 +386,7 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     musig_per_input_info_t musig_per_input_info;
-    if (!compute_musig_per_input_info(dc,
-                                      st,
-                                      signing_state,
-                                      input,
-                                      keyexpr_info,
-                                      &musig_per_input_info)) {
+    if (!compute_musig_per_input_info(dc, st, input, keyexpr_info, &musig_per_input_info)) {
         return false;
     }
 
@@ -384,8 +426,11 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
      * Round 2 of the MuSig2 protocol
      **/
 
+    uint8_t psbt_session_id[32];
+    musig_compute_session_id(st, psbt_session_id);
+
     const musig_psbt_session_t *psbt_session =
-        musigsession_round2_initialize(musig_per_input_info.psbt_session_id, &signing_state->musig);
+        musigsession_round2_initialize(psbt_session_id, &signing_state->musig);
 
     if (psbt_session == NULL) {
         // The PSBT contains a partial nonce, but we do not have the corresponding psbt
@@ -432,22 +477,24 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
     }
 
     // recompute secnonce from psbt_session randomness
-    uint8_t rand_i_j[32];
-    compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->index, rand_i_j);
-
     musig_secnonce_t secnonce;
     musig_pubnonce_t pubnonce;
 
-    if (0 > musig_nonce_gen(rand_i_j,
-                            sizeof(rand_i_j),
-                            keyexpr_info->internal_pubkey.compressed_pubkey,
-                            musig_per_input_info.agg_key_tweaked.compressed_pubkey + 1,
-                            &secnonce,
-                            &pubnonce)) {
-        PRINTF("MuSig2 nonce generation failed\n");
-        explicit_bzero(rand_i_j, sizeof(rand_i_j));
-        explicit_bzero(&secnonce, sizeof(secnonce));
+    if (!musig_derive_nonce(psbt_session, keyexpr_info, cur_input_index, &secnonce, &pubnonce)) {
         SEND_SW(dc, SW_BAD_STATE);  // should never happen
+        return false;
+    }
+
+    // Check that the pubnonce we just recomputed is indeed the one that the client put in the psbt.
+    // A mismatch means that the psbt was not built with the pubnonces of this session; for example,
+    // because a more recent round 1 for the same wallet policy replaced the session in storage.
+    // Signing anyway would produce a partial signature that does not match the aggregate nonce, and
+    // therefore an invalid aggregate signature; the other cosigners would then legitimately blame
+    // this signer for being disruptive. Fail cleanly instead.
+    if (memcmp(&pubnonce, &my_pubnonce, sizeof(pubnonce)) != 0) {
+        PRINTF("The pubnonce in the PSBT does not match the MuSig2 session\n");
+        explicit_bzero(&secnonce, sizeof(secnonce));
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }
 
@@ -498,7 +545,6 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
     } while (false);
 
     explicit_bzero(&private_key, sizeof(private_key));
-    explicit_bzero(rand_i_j, sizeof(rand_i_j));
     explicit_bzero(&secnonce, sizeof(secnonce));
 
     if (err) {
