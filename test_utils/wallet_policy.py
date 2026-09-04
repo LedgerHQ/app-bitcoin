@@ -15,9 +15,40 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
+import base58
+
 from bitcoin_client.ledger_bitcoin._embit.descriptor.miniscript import Miniscript
 from bitcoin_client.ledger_bitcoin.key import ExtendedKey
 from test_utils.taproot import ser_script, tagged_hash
+from test_utils.bip0327 import get_xonly_pk, key_agg
+
+# BIP-328 chaincode used to derive a synthetic xpub from an aggregated musig2 public key.
+_BIP328_CHAINCODE = bytes.fromhex(
+    "868087ca02a6f974c4598924c36b57762d32cb45717167e300622c7167e38965")
+
+
+def aggregate_musig_pubkey(keys_info: List[str]) -> str:
+    """Returns the BIP-328 synthetic extended public key (as a string) aggregating the
+    participant keys of a musig() key expression, sorted as required by descriptors."""
+    pubkeys: List[bytes] = []
+    versions = set()
+    for ki in keys_info:
+        xpub = ki[ki.find(']') + 1:]
+        xpub_bytes = base58.b58decode_check(xpub)
+        versions.add(xpub_bytes[:4])
+        pubkeys.append(xpub_bytes[-33:])
+
+    if len(versions) > 1:
+        raise ValueError(
+            "All the extended public keys should be from the same network")
+    version_bytes = versions.pop()
+
+    keyagg_ctx = key_agg(sorted(pubkeys))
+    Q = keyagg_ctx.Q
+    compressed_pubkey = (b'\x02' if Q[1] % 2 == 0 else b'\x03') + get_xonly_pk(keyagg_ctx)
+    ext_pubkey = (version_bytes + b'\x00' + b'\x00\x00\x00\x00' + b'\x00\x00\x00\x00' +
+                  _BIP328_CHAINCODE + compressed_pubkey)
+    return base58.b58encode_check(ext_pubkey).decode()
 
 
 def tapleaf_hash(script: Optional[bytes], leaf_version=b'\xC0') -> Optional[bytes]:
@@ -106,6 +137,16 @@ def derive_plain_descriptor(desc_tmpl: str, keys_info: List[str], is_change: boo
         return m if not is_change else n
 
     desc_tmpl = re.sub(r'<([^;]+);([^>]+)>', replace_m_n, desc_tmpl)
+
+    # Replace each musig(...) expression with the derived aggregate xpub
+    def replace_musig(match: re.Match[str]):
+        key_indexes = [int(i.strip('@')) for i in match.group(1).split(',')]
+        steps = [int(x) for x in match.group(2).split("/")]
+        assert len(steps) == 2
+        agg_xpub = aggregate_musig_pubkey([keys_info[i] for i in key_indexes])
+        return derive_from_key_info(agg_xpub, steps)
+
+    desc_tmpl = re.sub(r'musig\(([^)]+)\)/(\d+/\d+)', replace_musig, desc_tmpl)
 
     # Replace @i/a/b with the i-th element in keys_info, deriving the key appropriately
     # to get a plain xpub

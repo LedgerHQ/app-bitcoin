@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include "init_global_state.h"
+#include "bip322.h"
 
 /* SDK headers */
 #include "crypto_helpers.h"
@@ -244,6 +245,9 @@ bool __attribute__((noinline)) init_global_state(dispatcher_context_t *dc, sign_
     if (!parse_sign_psbt_apdu(dc, st, wallet_id, wallet_hmac)) return false;
 
     if (!process_global_map(dc, st)) return false;
+
+    // detect a BIP-322 message signing request (PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE)
+    if (!bip322_detect(dc, st)) return false;
 
     if (!load_wallet_account(dc, st, wallet_id, wallet_hmac)) return false;
 
