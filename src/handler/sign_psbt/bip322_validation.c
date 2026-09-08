@@ -30,6 +30,9 @@
 #include "script.h"
 #include "sw.h"
 
+// BIP-68: a sequence with this flag set has no relative timelock semantics.
+#define BIP68_SEQUENCE_LOCKTIME_DISABLE_FLAG (1u << 31)
+
 bool __attribute__((noinline)) validate_bip322_request(dispatcher_context_t *dc,
                                                        sign_psbt_state_t *st) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
@@ -91,15 +94,38 @@ bool __attribute__((noinline)) validate_bip322_request(dispatcher_context_t *dc,
             return false;
         }
 
-        // Every input must have sequence 0. A missing PSBT_IN_SEQUENCE defaults to the final
-        // sequence number (0xFFFFFFFF) per BIP-370, so it must be present. (Non-zero sequences
-        // only appear in the timelocked variants, which are not supported yet.)
+        // Sequence rules. BIP-322 gives a timelock meaning only to the sequence of the first
+        // input (the "age" of the signature, together with nLockTime); the proof-of-funds
+        // inputs are ordinary spends of real coins.
+        // A missing PSBT_IN_SEQUENCE means the final sequence number (0xFFFFFFFF) per BIP-370.
         uint32_t sequence;
-        if (PSBT_FIELD_PRESENT != psbt_get_input_sequence(dc, &input_map, &sequence) ||
-            sequence != 0) {
-            PRINTF("BIP-322: non-zero (or missing) sequence is not supported\n");
-            SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_SIGN_PSBT_BIP322_UNSUPPORTED);
+        psbt_field_status_t sequence_status = psbt_get_input_sequence(dc, &input_map, &sequence);
+        if (sequence_status == PSBT_FIELD_ERROR) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
+        }
+        if (cur_input_index == 0) {
+            // The first input must have an explicit sequence of 0: any other value makes this
+            // a timelocked variant, which is not supported yet.
+            if (sequence_status != PSBT_FIELD_PRESENT || sequence != 0) {
+                PRINTF("BIP-322: timelocked variants are not supported (first input's sequence)\n");
+                SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_SIGN_PSBT_BIP322_UNSUPPORTED);
+                return false;
+            }
+        } else {
+            // A proof-of-funds input may have sequence 0 (the value BIP-322 expects) or any
+            // sequence with the BIP-68 relative-timelock disable flag set, which includes the
+            // final sequence number (explicit, or implied by a missing PSBT_IN_SEQUENCE). With
+            // version 2, any other value would impose a relative timelock on to_sign, which is
+            // again a timelocked variant; with version 0, it is meaningless, so rejected too.
+            if (sequence_status == PSBT_FIELD_ABSENT) {
+                sequence = 0xFFFFFFFF;
+            }
+            if (sequence != 0 && (sequence & BIP68_SEQUENCE_LOCKTIME_DISABLE_FLAG) == 0) {
+                PRINTF("BIP-322: relative timelocks on proof-of-funds inputs are not supported\n");
+                SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_SIGN_PSBT_BIP322_UNSUPPORTED);
+                return false;
+            }
         }
 
         if (cur_input_index != 0) {

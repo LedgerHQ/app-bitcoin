@@ -563,6 +563,68 @@ def test_sign_bip322_pof_missing_challenge(navigator: Navigator, firmware: Firmw
                            IncorrectDataError, EC_SIGN_PSBT_BIP322_TOSPEND_MISMATCH)
 
 
+def test_sign_bip322_pof_final_sequences(navigator: Navigator, firmware: Firmware,
+                                         client: RaggerClient, test_name: str):
+    # BIP-322 gives a timelock meaning only to the first input's sequence: the proof-of-funds
+    # inputs may use the final sequence (explicit, or implied by an omitted PSBT_IN_SEQUENCE,
+    # which is its PSBTv2 default) or any sequence with the BIP-68 disable flag set.
+    # The review is identical to test_sign_bip322_proof_of_funds, so no screenshots are taken.
+    message = b"I control these coins"
+    for sequences in ([0xFFFFFFFF, 0xFFFFFFFE], [None, 0]):
+        psbt = build_bip322_pof_psbt(wallet_wpkh, message, [100_000, 200_000])
+        tx = psbt.tx
+        psbt.convert_to_v2()  # so that the client sends the input maps exactly as set below
+        for input_index, sequence in enumerate(sequences, start=1):
+            tx.vin[input_index].nSequence = 0xFFFFFFFF if sequence is None else sequence
+            psbt.inputs[input_index].sequence = sequence  # None: PSBT_IN_SEQUENCE is omitted
+
+        result = client.sign_psbt(psbt, wallet_wpkh, None, navigator,
+                                  instructions=bip322_instruction_approve(firmware,
+                                                                          save_screenshot=False),
+                                  testname=test_name)
+
+        assert len(result) == 3
+        for input_index, partial_sig in result:
+            challenge_script = bytes(psbt.inputs[input_index].witness_utxo.scriptPubKey)
+            amount = psbt.inputs[input_index].witness_utxo.nValue
+            sighash = bip322_pof_segwitv0_sighash_all(tx, input_index,
+                                                      p2wpkh_script_code(challenge_script),
+                                                      amount)
+            assert ecdsa_verify(partial_sig.pubkey, sighash, partial_sig.signature[:-1])
+
+
+@pytest.mark.parametrize("tx_version", [2, 0])
+def test_sign_bip322_pof_relative_timelock_unsupported(navigator: Navigator,
+                                                       firmware: Firmware,
+                                                       client: RaggerClient, test_name: str,
+                                                       tx_version: int):
+    # a proof-of-funds input whose sequence is neither 0 nor has the BIP-68 disable flag set:
+    # with version 2 it would impose a relative timelock on to_sign (a timelocked variant, not
+    # supported); with version 0 it is meaningless, and rejected too
+    psbt = build_bip322_pof_psbt(wallet_wpkh, b"I control these coins", [100_000])
+    psbt.tx.nVersion = tx_version
+    psbt.tx.vin[1].nSequence = 10
+
+    expect_sign_psbt_error(client, navigator, firmware, test_name, psbt,
+                           NotSupportedError, EC_SIGN_PSBT_BIP322_UNSUPPORTED)
+
+
+def test_sign_bip322_challenge_sequence_unsupported(navigator: Navigator, firmware: Firmware,
+                                                    client: RaggerClient, test_name: str):
+    # the first input's sequence is the "age" of a timelocked signature: only an explicit 0 is
+    # supported, whether the final sequence is given explicitly or implied by an omitted field
+    psbt = build_bip322_psbt(wallet_wpkh, b"Hello World")
+    psbt.tx.vin[0].nSequence = 0xFFFFFFFF
+    expect_sign_psbt_error(client, navigator, firmware, test_name, psbt,
+                           NotSupportedError, EC_SIGN_PSBT_BIP322_UNSUPPORTED)
+
+    psbt = build_bip322_psbt(wallet_wpkh, b"Hello World")
+    psbt.convert_to_v2()
+    psbt.inputs[0].sequence = None  # PSBT_IN_SEQUENCE omitted
+    expect_sign_psbt_error(client, navigator, firmware, test_name, psbt,
+                           NotSupportedError, EC_SIGN_PSBT_BIP322_UNSUPPORTED)
+
+
 def test_sign_bip322_musig_keypath(navigator: Navigator, firmware: Firmware, client: RaggerClient,
                                    test_name: str, speculos_globals: SpeculosGlobals):
     # BIP-322 message signing for a taproot keypath musig() policy. The device controls one of

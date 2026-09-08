@@ -96,7 +96,8 @@
 #define EC_SIGN_PSBT_BIP322_FORBIDDEN_SIGHASH 0x0012
 
 // The PSBT is a valid BIP-322 message signing request, but uses features that are not yet
-// supported: timelocks (non-zero locktime or sequence).
+// supported: timelocks (non-zero locktime, non-zero sequence of the first input, or a
+// relative timelock on a proof-of-funds input).
 #define EC_SIGN_PSBT_BIP322_UNSUPPORTED 0x0013
 
 // BIP-322 message signing is not allowed when called from the Exchange app.
