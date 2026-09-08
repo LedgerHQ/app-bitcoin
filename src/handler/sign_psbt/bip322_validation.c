@@ -108,7 +108,9 @@ bool __attribute__((noinline)) validate_bip322_request(dispatcher_context_t *dc,
             continue;
         }
 
-        // The first input must spend output 0 of to_spend.
+        // The first input must spend output 0 of to_spend. This holds for a proof-of-funds
+        // too: per BIP-322 v2.0.0, the message_challenge is not optional, so a request made
+        // only of real UTXOs (no virtual input) fails below, on the txid binding.
         uint32_t prevout_index;
         if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_index(dc, &input_map, &prevout_index) ||
             prevout_index != 0) {

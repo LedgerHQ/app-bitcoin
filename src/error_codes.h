@@ -86,9 +86,10 @@
 // Note: the app cannot verify whether the additional inputs of a proof of funds spend real coins.
 #define EC_SIGN_PSBT_BIP322_INVALID_STRUCTURE 0x0010
 
-// The input of the BIP-322 to_sign transaction does not spend the to_spend transaction
-// recomputed from the signed message and the input's scriptPubKey. The message in the PSBT is
-// not the message that would be signed.
+// The first input of the BIP-322 to_sign transaction does not spend the to_spend transaction
+// recomputed from the signed message and the input's scriptPubKey. Either the message in the
+// PSBT is not the message that would be signed, or (for a proof-of-funds) the mandatory
+// message_challenge input is missing.
 #define EC_SIGN_PSBT_BIP322_TOSPEND_MISMATCH 0x0011
 
 // BIP-322 requires all signatures to use SIGHASH_ALL (or SIGHASH_DEFAULT for taproot inputs).

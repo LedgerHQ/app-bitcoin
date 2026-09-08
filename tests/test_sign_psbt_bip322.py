@@ -23,6 +23,7 @@ from test_utils import bip0340, SpeculosGlobals
 from test_utils.bip0322 import (
     build_bip322_psbt,
     build_bip322_pof_psbt,
+    build_wallet_utxo_input,
     build_to_spend_tx,
     bip322_segwitv0_sighash_all,
     bip322_pof_segwitv0_sighash_all,
@@ -541,6 +542,25 @@ def test_sign_bip322_pof_external_input(navigator: Navigator, firmware: Firmware
 
     expect_sign_psbt_error(client, navigator, firmware, test_name, psbt,
                            IncorrectDataError, EC_SIGN_PSBT_BIP322_EXTERNAL_INPUTS)
+
+
+def test_sign_bip322_pof_missing_challenge(navigator: Navigator, firmware: Firmware,
+                                           client: RaggerClient, test_name: str):
+    # BIP-322 v2.0.0 clarifies that the message_challenge (the first input, spending the
+    # virtual to_spend transaction) is not optional in a proof of funds. A request whose
+    # inputs are all real UTXOs, with no virtual input, must be refused.
+    # The real UTXO used as the first input has zero value and output index 0, so that the
+    # request passes the amount and prevout index checks and is rejected by the to_spend
+    # txid binding itself, rather than by an earlier structural check.
+    psbt = build_bip322_pof_psbt(wallet_wpkh, b"I control these coins", [50_000])
+
+    txin, psbt_input = build_wallet_utxo_input(wallet_wpkh, 0, n_outputs=1)
+    assert txin.prevout.n == 0
+    psbt.tx.vin[0] = txin
+    psbt.inputs[0] = psbt_input
+
+    expect_sign_psbt_error(client, navigator, firmware, test_name, psbt,
+                           IncorrectDataError, EC_SIGN_PSBT_BIP322_TOSPEND_MISMATCH)
 
 
 def test_sign_bip322_musig_keypath(navigator: Navigator, firmware: Firmware, client: RaggerClient,
