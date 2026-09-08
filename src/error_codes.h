@@ -85,7 +85,8 @@
 // Therefore, it is not possible to prevent the app from producing invalid BIP-322 signatures.
 #define EC_SIGN_PSBT_BIP322_INVALID_STRUCTURE 0x0010
 
-// The input of the BIP-322 to_sign transaction does not spend the to_spend transaction.
+// The first input of the BIP-322 to_sign transaction does not spend the to_spend transaction.
+// For a proof-of-funds, this includes a missing message_challenge input (BIP-322 v2.0.0).
 #define EC_SIGN_PSBT_BIP322_TOSPEND_MISMATCH 0x0011
 
 // BIP-322 requires all signatures to use SIGHASH_ALL (or SIGHASH_DEFAULT for taproot inputs).

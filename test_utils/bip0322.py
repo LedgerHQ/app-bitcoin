@@ -1,15 +1,19 @@
 """Helpers to build and verify BIP-322 message-signing PSBTs for the tests.
 
 BIP-322 defines message signing as signing a virtual "to_sign" transaction that spends a
-virtual "to_spend" transaction committing to the message. The PSBT-based flow (BIP-322 v1.0.0+)
+virtual "to_spend" transaction committing to the message. The PSBT-based flow (BIP-322 v2.0.0)
 carries the message in the PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE (0x09) global field, which the
 signing device uses to recognize the request and display a message-signing UI.
+
+In a proof of funds, the first input is still the message_challenge (spending to_spend); the
+additional inputs spend real UTXOs. BIP-322 v2.0.0 clarifies that the first input is not
+optional.
 """
 
 import base64
 import struct
 from hashlib import sha256
-from typing import List
+from typing import List, Tuple
 
 from bitcoin_client.ledger_bitcoin import WalletPolicy
 from bitcoin_client.ledger_bitcoin.key import ExtendedKey, KeyOriginInfo
@@ -121,30 +125,42 @@ def build_bip322_pof_psbt(wallet_policy: WalletPolicy,
     psbt = build_bip322_psbt(wallet_policy, message,
                              is_change=is_change, address_index=address_index)
 
-    desc_tmpl = DescriptorTemplate.from_string(wallet_policy.descriptor_template)
-
     for amount in utxo_amounts:
-        prevout, prevout_n, prevout_is_change, prevout_addr_idx = createFakeWalletTransaction(
-            1, 2, amount, wallet_policy)
-
-        txin = CTxIn()
-        txin.prevout = COutPoint(prevout.sha256, prevout_n)
-        txin.scriptSig = b""
-        txin.nSequence = 0
+        txin, psbt_input = build_wallet_utxo_input(wallet_policy, amount)
         psbt.tx.vin.append(txin)
-
-        psbt_input = PartiallySignedInput(0)
-        if desc_tmpl.is_segwit():
-            psbt_input.witness_utxo = prevout.vout[prevout_n]
-        if desc_tmpl.is_legacy() or (desc_tmpl.is_segwit() and not desc_tmpl.is_taproot()):
-            psbt_input.non_witness_utxo = prevout
-
-        fill_inout(wallet_policy, psbt_input, is_change=bool(prevout_is_change),
-                   address_index=prevout_addr_idx)
-
         psbt.inputs.append(psbt_input)
 
     return psbt
+
+
+def build_wallet_utxo_input(wallet_policy: WalletPolicy,
+                            amount: int,
+                            *,
+                            n_outputs: int = 2) -> Tuple[CTxIn, PartiallySignedInput]:
+    """Builds a transaction input (with sequence 0) spending a real (fake, wallet-owned) UTXO
+    of the given amount, together with its PSBT input map. The UTXO is one of the n_outputs
+    outputs of a fake transaction; with n_outputs=1, the spent output index is always 0."""
+
+    desc_tmpl = DescriptorTemplate.from_string(wallet_policy.descriptor_template)
+
+    prevout, prevout_n, prevout_is_change, prevout_addr_idx = createFakeWalletTransaction(
+        1, n_outputs, amount, wallet_policy)
+
+    txin = CTxIn()
+    txin.prevout = COutPoint(prevout.sha256, prevout_n)
+    txin.scriptSig = b""
+    txin.nSequence = 0
+
+    psbt_input = PartiallySignedInput(0)
+    if desc_tmpl.is_segwit():
+        psbt_input.witness_utxo = prevout.vout[prevout_n]
+    if desc_tmpl.is_legacy() or (desc_tmpl.is_segwit() and not desc_tmpl.is_taproot()):
+        psbt_input.non_witness_utxo = prevout
+
+    fill_inout(wallet_policy, psbt_input, is_change=bool(prevout_is_change),
+               address_index=prevout_addr_idx)
+
+    return txin, psbt_input
 
 
 def bip322_pof_segwitv0_sighash_all(to_sign_tx: CTransaction,
