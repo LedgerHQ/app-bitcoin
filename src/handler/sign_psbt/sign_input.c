@@ -34,12 +34,12 @@
 #include "dispatcher.h"
 #include "error_codes.h"
 #include "get_merkleized_map.h"
-#include "get_merkleized_map_value.h"
 #include "init_global_state.h"
 #include "musig_signing.h"
 #include "policy.h"
 #include "preprocess_inputs.h"
 #include "psbt.h"
+#include "psbt_fields.h"
 #include "sign_psbt_cache.h"
 #include "sw.h"
 #include "txhashes.h"
@@ -231,11 +231,8 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
     // changes depending on the type of spend; therefore, we set it later.
     if (input->has_sighash_type) {
         // Get sighash type
-        if (4 != call_get_merkleized_map_value_u32_le(dc,
-                                                      &input->in_out.map,
-                                                      (uint8_t[]) {PSBT_IN_SIGHASH_TYPE},
-                                                      1,
-                                                      &input->sighash_type)) {
+        if (PSBT_FIELD_PRESENT !=
+            psbt_get_input_sighash_type(dc, &input->in_out.map, &input->sighash_type)) {
             PRINTF("Malformed PSBT_IN_SIGHASH_TYPE for input %d\n", cur_input_index);
 
             SEND_SW(dc, SW_INCORRECT_DATA);
@@ -324,14 +321,12 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 // wrapped segwit transactions that we support
                 uint8_t redeemScript[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
 
-                int redeemScript_length =
-                    call_get_merkleized_map_value(dc,
-                                                  &input->in_out.map,
-                                                  (uint8_t[]) {PSBT_IN_REDEEM_SCRIPT},
-                                                  1,
-                                                  redeemScript,
-                                                  sizeof(redeemScript));
-                if (redeemScript_length < 0) {
+                size_t redeemScript_length;
+                if (PSBT_FIELD_PRESENT != psbt_get_input_redeem_script(dc,
+                                                                       &input->in_out.map,
+                                                                       redeemScript,
+                                                                       sizeof(redeemScript),
+                                                                       &redeemScript_length)) {
                     PRINTF("Error fetching redeem script\n");
                     SEND_SW(dc, SW_INCORRECT_DATA);
                     return false;
@@ -405,7 +400,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 return false;
 
             policy_node_tr_t *policy = (policy_node_tr_t *) st->account.policy_map;
-            if (!keyexpr_info->is_tapscript && !isnull_policy_node_tree(&policy->tree)) {
+            if (!keyexpr_info->is_tapscript && policy->tree != NULL) {
                 // keypath spend, we compute the taptree hash
                 if (0 > compute_taptree_hash(
                             dc,
@@ -416,7 +411,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                 .n_keys = st->account.wallet_header.n_keys,
                                 .wallet_version = st->account.wallet_header.version,
                                 .sign_psbt_cache = sign_psbt_cache},
-                            r_policy_node_tree(&policy->tree),
+                            policy->tree,
                             input->taptree_hash)) {
                     PRINTF("Error while computing taptree hash\n");
                     SEND_SW(dc, SW_BAD_STATE);
@@ -429,7 +424,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
             const uint8_t *tapleaf_hash = NULL;
             if (!keyexpr_info->is_tapscript) {
                 // keypath spend
-                if (isnull_policy_node_tree(&policy->tree)) {
+                if (policy->tree == NULL) {
                     // tweak as specified in BIP-86 and BIP-386
                     tweak_data = (uint8_t[]) {};
                     tweak_data_len = 0;
@@ -605,7 +600,7 @@ bool __attribute__((noinline)) produce_musig2_pubnonces(
                 // an internal key), and might not be needed at all otherwise. Therefore, it is
                 // actually more efficient to compute it here.
                 policy_node_tr_t *policy = (policy_node_tr_t *) st->account.policy_map;
-                bool has_taptree = !isnull_policy_node_tree(&policy->tree);
+                bool has_taptree = policy->tree != NULL;
                 if (has_taptree) {
                     if (0 >
                         compute_taptree_hash(
@@ -617,7 +612,7 @@ bool __attribute__((noinline)) produce_musig2_pubnonces(
                                 .n_keys = st->account.wallet_header.n_keys,
                                 .wallet_version = st->account.wallet_header.version,
                                 .sign_psbt_cache = sign_psbt_cache},
-                            r_policy_node_tree(&policy->tree),
+                            policy->tree,
                             input.taptree_hash)) {
                         PRINTF("Error while computing taptree hash\n");
                         SEND_SW(dc, SW_BAD_STATE);

@@ -33,6 +33,9 @@ bool get_address_from_compressed_public_key(unsigned char format,
                                             unsigned char max_address_length) {
     int address_length;
 
+    // at least one byte is needed for the terminating null character
+    if (max_address_length == 0) return false;
+
     // clang-format off
     if (format == P2_LEGACY) {
         // clang-format on
@@ -65,6 +68,12 @@ bool get_address_from_compressed_public_key(unsigned char format,
             address[address_length] = 0;
         } else {  // native segwit or taproot
             if (!native_segwit_prefix) return false;
+
+            // make sure that the output buffer is large enough
+            if (max_address_length < 73 + strlen(native_segwit_prefix)) {
+                return false;
+            }
+
             if (format == P2_NATIVE_SEGWIT) {
                 if (!segwit_addr_encode(address, native_segwit_prefix, 0, script + 2, 20)) {
                     return false;

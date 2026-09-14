@@ -17,6 +17,7 @@
 #include <cmocka.h>
 
 #include "mock_dispatcher.h"
+#include "test_assertions.h"
 
 #include "client_commands.h"
 #include "handler/lib/get_merkle_leaf_element.h"
@@ -157,11 +158,13 @@ static void test_get_leaf_element_buffer_too_small(void **state) {
     build_tree(mock, elems, lens, 1, root);
 
     uint8_t out[10]; /* Too small */
+    memset(out, 0xEE, sizeof(out));
 
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_element(dc, root, 1, 0, out, sizeof(out));
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -182,11 +185,13 @@ static void test_get_leaf_element_wrong_root(void **state) {
     memset(bad_root, 0xFF, 32);
 
     uint8_t out[256];
+    memset(out, 0xEE, sizeof(out));
 
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_element(dc, bad_root, 1, 0, out, sizeof(out));
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -202,11 +207,13 @@ static void test_get_leaf_element_index_out_of_bounds(void **state) {
     build_tree(mock, elems, lens, 2, root);
 
     uint8_t out[256];
+    memset(out, 0xEE, sizeof(out));
 
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_element(dc, root, 2, 5, out, sizeof(out));
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -283,10 +290,12 @@ static void test_get_leaf_element_corrupted_proof(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_leaf_in_proof, NULL);
 
     uint8_t out[256];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_element(dc, root, 4, 0, out, sizeof(out));
 
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /**
@@ -321,11 +330,13 @@ static void test_get_leaf_element_corrupted_preimage(void **state) {
     mock_dispatcher_set_tamper_hook(mock, tamper_corrupt_preimage_after_proof, NULL);
 
     uint8_t out[256];
+    memset(out, 0xEE, sizeof(out));
     dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
     int result = call_get_merkle_leaf_element(dc, root, 1, 0, out, sizeof(out));
 
     /* Preimage hash mismatch → must fail */
     assert_true(result < 0);
+    assert_cleared(out, sizeof(out));
 }
 
 /* ---------- Main ---------- */

@@ -115,7 +115,9 @@ bool parser_consolidate_buffers(buffer_t *buffers[2], size_t max_size) {
     }
 
     memmove(buffers[0]->ptr, buffers[0]->ptr + buffers[0]->offset, length0);
-    memmove(buffers[0]->ptr + length0, buffers[1]->ptr + buffers[1]->offset, length1);
+    if (length1 > 0) {
+        memmove(buffers[0]->ptr + length0, buffers[1]->ptr + buffers[1]->offset, length1);
+    }
     buffers[0]->offset = 0;
     buffers[0]->size = length0 + length1;
     return true;

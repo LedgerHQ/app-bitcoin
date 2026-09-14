@@ -24,10 +24,12 @@ int call_check_merkle_tree_sorted_with_callback(dispatcher_context_t *dispatcher
 
     for (size_t cur_el_idx = 0; cur_el_idx < size; cur_el_idx++) {
         uint8_t cur_el[MAX_CHECK_MERKLE_TREE_SORTED_PREIMAGE_SIZE];
+        // tree size and leaf index are bounded well below 2^32 in practice;
+        // cast to the callee's uint32_t parameters explicitly.
         int cur_el_len = call_get_merkle_leaf_element(dispatcher_context,
                                                       root,
-                                                      size,
-                                                      cur_el_idx,
+                                                      (uint32_t) size,
+                                                      (uint32_t) cur_el_idx,
                                                       cur_el,
                                                       sizeof(cur_el));
 

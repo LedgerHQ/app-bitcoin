@@ -8,7 +8,8 @@
  * and `tree_size`, and verifies the proof returned by the host against `merkle_root`.
  *
  * On success, writes the 32-byte leaf hash to `out` and returns 0. Returns a negative value on
- * failure.
+ * failure; `out` is then fully zeroed, as the leaf hash is copied out before the proof is
+ * verified (see call_get_preimage).
  */
 int call_get_merkle_leaf_hash(dispatcher_context_t *dispatcher_context,
                               const uint8_t merkle_root[static 32],

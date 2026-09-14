@@ -270,6 +270,17 @@ wallet_name = "Missing a key"
 error = "INCORRECT_DATA"
 
 [[case]]
+name = "unreferenced_internal_key"
+description = "our genuine key is supplied as unused @0 while the descriptor references only the attacker's @1; must be rejected instead of bypassing the internal-key check"
+descriptor_template = "wsh(sortedmulti(1,@1/**))"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+    "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+]
+wallet_name = "Gap attack"
+error = "INCORRECT_DATA"
+
+[[case]]
 name = "unsupported_bare_pk"
 description = "bare pk() top-level descriptor is not supported"
 descriptor_template = "pk(@0/**)"

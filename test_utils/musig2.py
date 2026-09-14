@@ -46,7 +46,7 @@ from test_utils.wallet_policy import (
     extract_placeholders,
 )
 
-from bitcoin_client.ledger_bitcoin.embit.descriptor.miniscript import Miniscript
+from bitcoin_client.ledger_bitcoin._embit.descriptor.miniscript import Miniscript
 from bitcoin_client.ledger_bitcoin.psbt import PSBT, PartiallySignedInput
 from bitcoin_client.ledger_bitcoin.key import G, ExtendedKey, bytes_to_point, point_add, point_mul, point_to_bytes
 from bitcoin_client.ledger_bitcoin.wallet import WalletPolicy

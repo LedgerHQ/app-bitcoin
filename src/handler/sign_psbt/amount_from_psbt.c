@@ -20,7 +20,11 @@
 /* Local headers */
 #include "get_merkleized_map_value.h"
 #include "psbt.h"
+#include "psbt_fields.h"
 #include "psbt_parse_rawtx.h"
+
+/* SDK headers */
+#include "read.h"
 
 /*
  Convenience function to get the amount and scriptpubkey from the non-witness-utxo of a certain
@@ -42,11 +46,7 @@ int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness(
 
     // Read the prevout index
     uint32_t prevout_n;
-    if (4 != call_get_merkleized_map_value_u32_le(dc,
-                                                  input_map,
-                                                  (uint8_t[]) {PSBT_IN_OUTPUT_INDEX},
-                                                  1,
-                                                  &prevout_n)) {
+    if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_index(dc, input_map, &prevout_n)) {
         return -1;
     }
 
@@ -114,9 +114,9 @@ int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_witness(
     if (wit_utxo_len < 8 + 1) {
         return -1;
     }
-    int wit_utxo_scriptPubkey_len = raw_witnessUtxo[8];
+    size_t wit_utxo_scriptPubkey_len = raw_witnessUtxo[8];
 
-    if (wit_utxo_len != 8 + 1 + wit_utxo_scriptPubkey_len) {
+    if ((size_t) wit_utxo_len != 8 + 1 + wit_utxo_scriptPubkey_len) {
         PRINTF("Length mismatch for witness utxo's scriptPubKey\n");
         return -1;
     }

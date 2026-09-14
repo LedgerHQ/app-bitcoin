@@ -3,10 +3,10 @@ from typing import Tuple, List, Mapping, Optional, Union
 import base64
 from io import BytesIO, BufferedReader
 
-from .embit import base58
-from .embit.base import EmbitError 
-from .embit.descriptor import Descriptor
-from .embit.networks import NETWORKS
+from ._embit import base58
+from ._embit.base import EmbitError
+from ._embit.descriptor import Descriptor
+from ._embit.networks import NETWORKS
 
 from .command_builder import BitcoinCommandBuilder, BitcoinInsType
 from .common import Chain, read_uint, read_varint

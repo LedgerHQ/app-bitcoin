@@ -1,0 +1,52 @@
+# Domain overrides for the Bitcoin fuzzer: constrain enum/state fields to
+# valid values so Absolution explores meaningful combinations instead of
+# invalid byte patterns. Applied on top of the synced invariant by
+# invariant.py. Syntax and how/when to edit this file: see the "Invariants"
+# page of the SDK Fuzzing Framework docs.
+#
+# Format:
+#   GLOBAL.field = values \xHH [\xHH ...]   (enumerated values)
+#   GLOBAL.field = top                      (fully fuzzable)
+#   GLOBAL. = values ...                    (flat global, unnamed field)
+
+# G_swap_state (swap_globals.h): booleans/enums constrained; large comparison
+# fields stay `top` so execute_swap_checks() pass/fail paths are explored.
+# Note: called_from_swap is NOT a field here — see G_called_from_swap below.
+G_swap_state.should_exit = values \x00 \x01
+G_swap_state.mode = values \x00 \x01 \xFF
+G_swap_state.amount = top
+G_swap_state.fees = top
+# NOT `top`. swap_checks.c:212 runs strlen() on this char[65]; 65 uniform bytes
+# contain no NUL with probability (255/256)^65 = 77%, so strlen walks into
+# should_exit/mode/payin_extra_id and off the end of the 120-byte object. In
+# production handle_swap_sign_transaction.c:65 fills it from the exchange app's
+# fixed 65-byte slot and it is always terminated, so an over-read found here would
+# be a finding no production caller can produce. Keep the bytes fuzzer-driven but
+# bounded to values that always terminate.
+G_swap_state.destination_address = values \x00 \x31 \x62 \x7A
+G_swap_state.payin_extra_id = top
+
+# G_called_from_swap (SDK swap_utils.h): standalone byte gating swap paths in
+# sign_psbt.c/get_wallet_address.c/io_ext.c/main.c. Keep 0/1 for both paths.
+G_called_from_swap. = values \x00 \x01
+# G_swap_response_ready gates the response short-circuit in io.c.
+G_swap_response_ready. = values \x00 \x01
+
+# G_was_processing_screen_shown (dispatcher.c): gates UX spinner / termination.
+G_was_processing_screen_shown. = values \x00 \x01
+
+# g_ux_flow_ended / g_ux_flow_response (display.c): UI termination loop and
+# approval result returned from io_ui_process().
+g_ux_flow_ended. = values \x00 \x01
+g_ux_flow_response. = values \x00 \x01
+
+# UI verdict driving io_seproxyhal_io_heartbeat(): 0 = approve, 1 = reject,
+# same polarity as the SDK's fuzz_mock_nbgl_reject.
+fuzz_mock_ui_reject. = values \x00 \x01
+
+# g_xpub_derived (psbt_model.c): unlock both to explore cached and fresh paths.
+g_xpub_derived. = values \x00 \x01
+
+# SDK mock toggles: unlock both to explore success and failure paths.
+fuzz_mock_nbgl_reject. = values \x00 \x01
+fuzz_mock_crypto_fail. = values \x00 \x01

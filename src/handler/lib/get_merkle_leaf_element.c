@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "get_merkle_leaf_element.h"
 
 /* Local headers */
@@ -20,6 +22,9 @@ int call_get_merkle_leaf_element(dispatcher_context_t *dispatcher_context,
                                         leaf_index,
                                         leaf_hash);
     if (res < 0) {
+        // Nothing was written to `out_ptr` here, but clear it anyway to keep the postcondition
+        // uniform; call_get_merkle_preimage covers the other failures.
+        explicit_bzero(out_ptr, out_ptr_len);
         return res;
     }
     return call_get_merkle_preimage(dispatcher_context, leaf_hash, out_ptr, out_ptr_len);

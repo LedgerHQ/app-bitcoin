@@ -28,7 +28,7 @@ include $(BOLOS_SDK)/Makefile.target
 # Application version
 APPVERSION_M = 2
 APPVERSION_N = 5
-APPVERSION_P = 0
+APPVERSION_P = 1
 APPVERSION_SUFFIX = # if not empty, appended at the end. Do not add a dash.
 
 ifeq ($(APPVERSION_SUFFIX),)
@@ -149,6 +149,11 @@ ENABLE_SWAP = 1
 ENABLE_STACK_PROTECTOR = 1
 
 ########################################
+#                 LTO                  #
+########################################
+ENABLE_LINK_TIME_OPTIMIZATION = 1
+
+########################################
 #          Features disablers          #
 ########################################
 # Don't use standard app file to avoid conflicts for now
@@ -165,9 +170,9 @@ DEFINES   += HAVE_BOLOS_APP_STACK_CANARY
 
 # Estimated maximum stack usage.
 # It acts as a build-time check to protect global variables.
-# On the Nano X, the stack size is limited to 8K at the OS level.
+# On the Nano X, the RAM size is smaller, so we keep a smaller stack size.
 ifeq ($(TARGET_NAME),TARGET_NANOX)
-    APP_STACK_MIN_SIZE := 8192
+    APP_STACK_MIN_SIZE := 12288
 else
     APP_STACK_MIN_SIZE := 16384
 endif
@@ -194,9 +199,6 @@ ifeq ($(DEBUG),10)
     $(warning Using semihosted PRINTF. Only run with speculos!)
     DEFINES   += HAVE_SEMIHOSTED_PRINTF
 endif
-
-# Needed to be able to include the definition of G_cx
-INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
 
 ########################################
 #          Features enablers           #

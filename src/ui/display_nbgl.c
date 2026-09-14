@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdint.h>
+#include <string.h>
 
 /* SDK headers */
 #include "nbgl_use_case.h"
@@ -76,13 +77,36 @@ const char GA_UNVERIFIED_INPUTS_TITLE[] = "External inputs amount";
 const char GA_UNVERIFIED_INPUTS_TITLE[] = "External amounts";
 #endif
 
-// Size of the tag/value pool for a transaction review; see the breakdown in the static assert
-// below (account row, per-output rows, external-inputs rows, fees, high-fee, "Signing rule").
-#define N_UX_PAIRS 54
+// Size of the tag/value pool, the larger of what the two greediest flows need. Derived rather
+// than hardcoded so it tracks MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER, which is smaller on Nano X, and so
+// the _Static_asserts in the two flows below hold by construction.
+//   transaction review: 1 account row + 3 per external output + 2 external-inputs rows + 1 fees
+//                       + 1 high-fee notice + 1 "Signing rule"
+//   register wallet:    1 account name + 1 descriptor template + 1 co-signer separator
+//                       + 1 per key + 1 per cleartext line
+#define N_UX_PAIRS                                                \
+    MAX(1 + 3 * MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER + 2 + 1 + 1 + 1, \
+        3 + MAX_N_KEYS_IN_WALLET_POLICY + CT_MAX_LINES)
+
+//`nbPairs` is `uint8_t` in `nbgl_layoutTagValueList_t`
+_Static_assert(N_UX_PAIRS <= UINT8_MAX, "N_UX_PAIRS must fit in a uint8_t");
 
 static nbgl_layoutTagValue_t pairs[N_UX_PAIRS];
 static unsigned int n_pairs;
 static nbgl_layoutTagValueList_t pairList;
+
+// Clears the row pool at the start of a review.
+// Only call this from the functions that *start* a review, never from the `_add`/`_show` steps or
+// the streaming continuations: those run mid-review, while the previous page is still displayed.
+static void reset_flow_state(void) {
+    memset(pairs, 0, sizeof(pairs));
+    n_pairs = 0;
+    // Only the two flows using `status_operation_callback` set these; clearing them means a flow
+    // that forgets fails the assertions at the read sites instead of showing the previous
+    // command's status text.
+    confirmed_status = NULL;
+    rejected_status = NULL;
+}
 
 // Account row label: direction (From/To/unknown) + type. "default" = a standard derivation,
 // "registered" = a registered policy. On Nano there's no room for the type, so we keep only
@@ -188,6 +212,10 @@ extern bool G_was_processing_screen_shown;
 static void finish_transaction_flow(bool choice);
 
 static nbgl_layoutTagValueList_t *make_pair_list(unsigned int nbPairs, bool wrapping) {
+    // Guards both an overflow of the pool and the silent truncation of `nbPairs` into the
+    // `uint8_t` field of nbgl_layoutTagValueList_t.
+    LEDGER_ASSERT(nbPairs <= N_UX_PAIRS, "Too many tag/value pairs");
+
     pairList = (nbgl_layoutTagValueList_t) {
         .pairs = pairs,
         .nbPairs = nbPairs,
@@ -210,6 +238,7 @@ static void ux_flow_response_true(void) {
 // Statuses
 static void status_operation_cancel(void) {
     ux_flow_response_false();
+    LEDGER_ASSERT(rejected_status != NULL, "Rejection status not set by the flow");
     nbgl_useCaseStatus(rejected_status, false, ui_menu_main);
 }
 
@@ -231,6 +260,7 @@ static void status_address_cancel(void) {
 static void status_operation_callback(bool confirm) {
     if (confirm) {
         ux_flow_response_true();
+        LEDGER_ASSERT(confirmed_status != NULL, "Confirmation status not set by the flow");
         nbgl_useCaseStatus(confirmed_status, true, ui_menu_main);
     } else {
         status_operation_cancel();
@@ -285,7 +315,7 @@ void ui_display_transaction_simplified_flow_init(void) {
      * + 1 Signing rule */
     _Static_assert(N_UX_PAIRS >= (1 + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER * 3 + 2 + 1 + 1 + 1),
                    "Insufficient pairs for this flow");
-    n_pairs = 0;
+    reset_flow_state();
 
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
@@ -295,6 +325,8 @@ void ui_display_transaction_simplified_flow_init(void) {
 
 void ui_display_transaction_simplified_flow_add(void) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
+
+    LEDGER_ASSERT(n_pairs + 3 <= N_UX_PAIRS, "Too many tag/value pairs");
 
     unsigned int output_index = state->output_index;
     if (!state->is_self_transfer) {
@@ -367,6 +399,8 @@ void ui_display_transaction_simplified_flow_show(void) {
 }
 
 void ui_display_transaction_streaming_prompt(void) {
+    reset_flow_state();
+
     nbgl_useCaseReviewStreamingStart(TYPE_TRANSACTION,
                                      &ICON_APP_ACTION,
                                      GA_REVIEW_TRANSACTION,
@@ -385,14 +419,12 @@ void ui_display_transaction_streaming_prompt(void) {
 void ui_display_transaction_streaming_output_address_amount(void) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    pairs[0].item = "Transaction output";
-    pairs[0].value = state->output_index_str[0];
-
-    pairs[1].item = "Amount";
-    pairs[1].value = state->amount[0];
-
-    pairs[2].item = "To";
-    pairs[2].value = state->address_or_description[0];
+    // Whole-struct assignments: the pool is shared with the other flows, and a partial write
+    // would inherit `centeredInfo`/`forcePageStart`/`valueIcon` from whoever used the index last.
+    pairs[0] =
+        (nbgl_layoutTagValue_t) {.item = "Transaction output", .value = state->output_index_str[0]};
+    pairs[1] = (nbgl_layoutTagValue_t) {.item = "Amount", .value = state->amount[0]};
+    pairs[2] = (nbgl_layoutTagValue_t) {.item = "To", .value = state->address_or_description[0]};
 
     nbgl_useCaseReviewStreamingContinue(make_pair_list(3, false), start_transaction_callback);
 }
@@ -410,8 +442,7 @@ void ui_display_transaction_streaming_flow(bool is_self_transfer) {
     }
 
     if (is_self_transfer) {
-        pairs[l_n_pairs].item = "Amount";
-        pairs[l_n_pairs++].value = "Self-transfer";
+        pairs[l_n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Amount", .value = "Self-transfer"};
     }
 
     if (state->display_mode == TX_DISPLAY_NET_ONLY) {
@@ -426,8 +457,7 @@ void ui_display_transaction_streaming_flow(bool is_self_transfer) {
             // "External inputs amount" + net "You spend/receive", then the trustworthy fee.
             l_n_pairs = append_external_inputs_pairs(state, l_n_pairs, /* force_page */ false);
         }
-        pairs[l_n_pairs].item = "Fees";
-        pairs[l_n_pairs++].value = state->fee;
+        pairs[l_n_pairs++] = (nbgl_layoutTagValue_t) {.item = "Fees", .value = state->fee};
     }
 
     nbgl_useCaseReviewStreamingContinue(make_pair_list(l_n_pairs, false), finish_transaction_flow);
@@ -444,14 +474,15 @@ static void finish_transaction_flow(bool choice) {
 
 // Continue light notify callback
 void ui_display_pubkey_flow(void) {
+    reset_flow_state();
+
     confirmed_status = "Public key\napproved";
     rejected_status = "Public key rejected";
 
-    pairs[0].item = "Path";
-    pairs[0].value = g_ui_state.path_and_pubkey.bip32_path_str;
-
-    pairs[1].item = "Public key";
-    pairs[1].value = g_ui_state.path_and_pubkey.pubkey;
+    pairs[0] = (nbgl_layoutTagValue_t) {.item = "Path",
+                                        .value = g_ui_state.path_and_pubkey.bip32_path_str};
+    pairs[1] =
+        (nbgl_layoutTagValue_t) {.item = "Public key", .value = g_ui_state.path_and_pubkey.pubkey};
 
     nbgl_useCaseReviewLight(TYPE_OPERATION,
                             make_pair_list(2, false),
@@ -463,9 +494,11 @@ void ui_display_pubkey_flow(void) {
 }
 
 void ui_display_receive_in_wallet_flow(void) {
+    reset_flow_state();
+
     // Setup list
-    pairs[0].item = "Account name";
-    pairs[0].value = g_ui_state.wallet.wallet_name;
+    pairs[0] =
+        (nbgl_layoutTagValue_t) {.item = "Account name", .value = g_ui_state.wallet.wallet_name};
 
     nbgl_useCaseAddressReview(g_ui_state.wallet.address,
                               make_pair_list(1, false),
@@ -479,10 +512,10 @@ void ui_display_register_wallet_policy_flow(void) {
     _Static_assert(N_UX_PAIRS >= 3 + MAX_N_KEYS_IN_WALLET_POLICY + CT_MAX_LINES,
                    "Insufficient pairs for this flow");
 
+    reset_flow_state();
+
     confirmed_status = "Account registered";
     rejected_status = "Account rejected";
-
-    n_pairs = 0;
 
     pairs[n_pairs++] = (nbgl_layoutTagValue_t) {
         .item = "Account name",
@@ -546,20 +579,23 @@ void ui_display_register_wallet_policy_flow(void) {
 }
 
 void ui_sign_message_and_confirm_flow(bool is_hash) {
-    pairs[0].item = "Path";
-    pairs[0].value = g_ui_state.path_and_message.bip32_path_str;
+    reset_flow_state();
 
+    const char *message_label;
     if (!is_hash) {
 #ifdef SCREEN_SIZE_WALLET
-        pairs[1].item = "Message content";
+        message_label = "Message content";
 #else
-        pairs[1].item = "Message";
+        message_label = "Message";
 #endif
     } else {
-        pairs[1].item = "Message hash";
+        message_label = "Message hash";
     }
 
-    pairs[1].value = g_ui_state.path_and_message.message;
+    pairs[0] = (nbgl_layoutTagValue_t) {.item = "Path",
+                                        .value = g_ui_state.path_and_message.bip32_path_str};
+    pairs[1] = (nbgl_layoutTagValue_t) {.item = message_label,
+                                        .value = g_ui_state.path_and_message.message};
 
     nbgl_useCaseReview(TYPE_MESSAGE,
                        make_pair_list(2, true),
@@ -572,6 +608,8 @@ void ui_sign_message_and_confirm_flow(bool is_hash) {
 
 // Address flow
 void ui_display_default_wallet_address_flow(void) {
+    reset_flow_state();
+
     nbgl_useCaseAddressReview(g_ui_state.wallet.address,
                               NULL,
                               &ICON_APP_ACTION,

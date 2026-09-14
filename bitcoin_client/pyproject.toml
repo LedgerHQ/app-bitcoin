@@ -1,8 +1,6 @@
 [build-system]
 requires = [
-    "ledgercomm>=1.1.0",
     "setuptools>=42",
-    "typing-extensions>=3.7",
     "wheel"
 ]
 build-backend = "setuptools.build_meta"

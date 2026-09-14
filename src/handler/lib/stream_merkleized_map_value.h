@@ -2,6 +2,7 @@
 
 /* Local headers */
 #include "dispatcher.h"
+#include "map_value_status.h"
 #include "merkle.h"
 
 /**
@@ -9,10 +10,12 @@
  * corresponding element, then it fetches it and it streams it back via the callback. If
  * len_callback is not NONE, it is called before the other callback with the length of the element.
  *
- * Returns a negative number on failure, or the preimage length on success.
+ * Returns the preimage length on success, MAP_VALUE_ABSENT if the key is not in the map, or
+ * MAP_VALUE_ERROR on failure. See map_value_status.h; in particular, callers must branch on
+ * MAP_VALUE_ABSENT explicitly rather than on `res < 0` when a missing key is not an error.
  *
- * NOTE: this does _not_ check that the keys are lexicographically sorted; the sanity check needs to
- * be done before.
+ * PRECONDITION: the map's keys must have already been verified to be lexicographically sorted;
+ * this function asserts it (LEDGER_ASSERT on `map->_keys_are_sorted`).
  */
 int call_stream_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                      const merkleized_map_commitment_t *map,

@@ -569,7 +569,7 @@ def test_register_wallet_deep_wrapper_chain(client: RaggerClient):
     """A policy far deeper than its template must be refused, without crashing the app."""
     # "n:" maps B -> B, so the chain type-checks whatever its length, and each wrapper adds an AST
     # level for one template byte. 59 of them describe a 60-level policy in 74 bytes, and still fit
-    # the app's 896-byte policy buffer, so the deep walk is really reached.
+    # the app's policy buffer (MAX_WALLET_POLICY_BYTES), so the deep walk is really reached.
     wallet = WalletPolicy(
         name="Wrapper chain",
         descriptor_template="wsh(" + "n" * 59 + ":pk(@0/**))",

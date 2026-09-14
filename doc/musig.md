@@ -8,7 +8,8 @@ MuSig2 is a 2-round multi-signature scheme compatible with the public keys and s
 
 `musig()` key expressions are supported for all taproot policies, including taproot keypaths and miniscript.
 
-- At most 16 keys are allowed in the musig expression; performance limitations, however, might apply in practice.
+- At most 5 keys are allowed in the musig expression; performance limitations, however, might apply in practice.
+- `musig(...)` is allowed among the key expressions of `multi_a`, but not of `sortedmulti_a`.
 - At most 8 parallel MuSig signing sessions are supported, due to the need to persist state in the device's memory.
 - Only `musig(...)/**` or `musig(...)/<M;N>/*` key expressions are supported; the public keys must be xpubs aggregated without any further derivation. Schemes where each pubkey is derived prior to aggregation (for example descriptors similar to `musig(xpub1/<0;1>/*,xpub2/<0;1>/*,...)`) are not supported.
 

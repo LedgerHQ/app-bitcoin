@@ -62,8 +62,8 @@ bool compute_musig_per_input_info(dispatcher_context_t *dc,
     serialized_extended_pubkey_t ext_pubkey;
 
     const policy_node_keyexpr_t *key_expr = keyexpr_info->key_expression_ptr;
-    const musig_aggr_key_info_t *musig_info = r_musig_aggr_key_info(&key_expr->m.musig_info);
-    const uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
+    const musig_aggr_key_info_t *musig_info = key_expr->m.musig_info;
+    const uint16_t *key_indexes = musig_info->key_indexes;
 
     LEDGER_ASSERT(musig_info->n <= MAX_PUBKEYS_PER_MUSIG, "Too many keys in musig key expression");
     for (int i = 0; i < musig_info->n; i++) {
@@ -121,7 +121,7 @@ bool compute_musig_per_input_info(dispatcher_context_t *dc,
             32,
             input->taptree_hash,
             // BIP-86 compliant tweak if there's no taptree, otherwise use the taptree hash
-            isnull_policy_node_tree(&tr_policy->tree) ? 0 : 32,
+            tr_policy->tree == NULL ? 0 : 32,
             out->tweaks[2]);
 
         // also apply the taptweak to agg_key_tweaked
@@ -129,7 +129,7 @@ bool compute_musig_per_input_info(dispatcher_context_t *dc,
         uint8_t parity = 0;
         crypto_tr_tweak_pubkey(out->agg_key_tweaked.compressed_pubkey + 1,
                                input->taptree_hash,
-                               isnull_policy_node_tree(&tr_policy->tree) ? 0 : 32,
+                               tr_policy->tree == NULL ? 0 : 32,
                                &parity,
                                out->agg_key_tweaked.compressed_pubkey + 1);
         out->agg_key_tweaked.compressed_pubkey[0] = 0x02 + parity;
@@ -368,12 +368,14 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
         memcpy(musig_my_psbt_id + 33 + 33, keyexpr_info->tapleaf_hash, 32);
     }
     musig_pubnonce_t my_pubnonce;
-    if (sizeof(musig_pubnonce_t) != call_get_merkleized_map_value(dc,
-                                                                  &input->in_out.map,
-                                                                  musig_my_psbt_id_key,
-                                                                  1 + psbt_id_len,
-                                                                  my_pubnonce.raw,
-                                                                  sizeof(musig_pubnonce_t))) {
+    // call_get_merkleized_map_value returns int (negative on error); cast the
+    // unsigned sizeof so the comparison doesn't trip UBSan's sign-change check.
+    if ((int) sizeof(musig_pubnonce_t) != call_get_merkleized_map_value(dc,
+                                                                        &input->in_out.map,
+                                                                        musig_my_psbt_id_key,
+                                                                        1 + psbt_id_len,
+                                                                        my_pubnonce.raw,
+                                                                        sizeof(musig_pubnonce_t))) {
         PRINTF("Missing or erroneous pubnonce in PSBT\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
@@ -397,7 +399,7 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
     // collect all pubnonces
 
     const policy_node_keyexpr_t *key_expr = keyexpr_info->key_expression_ptr;
-    const musig_aggr_key_info_t *musig_info = r_musig_aggr_key_info(&key_expr->m.musig_info);
+    const musig_aggr_key_info_t *musig_info = key_expr->m.musig_info;
 
     musig_pubnonce_t nonces[MAX_PUBKEYS_PER_MUSIG];
 

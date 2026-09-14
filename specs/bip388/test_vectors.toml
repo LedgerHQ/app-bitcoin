@@ -647,6 +647,60 @@ cleartext = [
 has_cleartext = true
 
 # =============================================================================
+# musig() inside a multi-key list: NOT recognised.
+#
+# A cleartext key list (the `$keys` binding of `multi`/`sortedmulti`/`multi_a`/
+# `sortedmulti_a`) matches only lists whose every element is a *plain* key. A
+# musig key expression is recognised solely where a pattern names the `musig(...)`
+# primitive explicitly.
+# Inside `tr()`, while `musig(...)` is valid as a key in `multi_a`/`sortedmulti_a`
+# they have no cleartext form and fall back to the raw "Raw policy: " rendering.
+#
+# =============================================================================
+
+[[vector]]
+template = "tr(@0/**,multi_a(2,musig(@1,@2)/**,@3/**))"
+confusion_score = 1
+cleartext = [
+    "Main path: spendable by @0",
+    "Raw policy: multi_a(2,musig(@1,@2)/**,@3/**)",
+]
+has_cleartext = false
+
+[[vector]]
+template = "tr(@0/**,sortedmulti_a(2,musig(@1,@2)/**,@3/**))"
+confusion_score = 1
+cleartext = [
+    "Main path: spendable by @0",
+    "Raw policy: sortedmulti_a(2,musig(@1,@2)/**,@3/**)",
+]
+has_cleartext = false
+
+# The unrecognised leaf does not affect its siblings: the recognised leaf keeps
+# its cleartext and the raw one sorts last (as always).
+[[vector]]
+template = "tr(@0/**,{pk(@1/**),multi_a(2,musig(@2,@3)/**,@4/**)})"
+confusion_score = 1
+cleartext = [
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "Raw policy: multi_a(2,musig(@2,@3)/**,@4/**)",
+]
+has_cleartext = false
+
+# The fallback propagates outward through a combinator: because the `$sub`
+# sub-policy of a `Timelocked` leaf cannot be classified, the *whole* `and_v`
+# leaf is rendered raw -- the timelock is not displayed separately.
+[[vector]]
+template = "tr(@0/**,and_v(v:multi_a(2,musig(@1,@2)/**,@3/**),older(1008)))"
+confusion_score = 1
+cleartext = [
+    "Main path: spendable by @0",
+    "Raw policy: and_v(v:multi_a(2,musig(@1,@2)/**,@3/**),older(1008))",
+]
+has_cleartext = false
+
+# =============================================================================
 # Key derivation orderings: same key appears multiple times with canonical
 # derivations (0;1), (2;3), (4;5), ... in some order. The confusion score
 # picks up an extra factor of k! per key (where k is its multiplicity).

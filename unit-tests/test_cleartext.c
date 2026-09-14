@@ -33,6 +33,24 @@ static int parse_template(const char *s, uint8_t *out, size_t out_size) {
     return parse_descriptor_template(&b, out, out_size, WALLET_POLICY_VERSION_V2);
 }
 
+// Templates of shared vectors that this port's parser rejects, and that therefore cannot be
+// exercised by the vector loops below. The reference implementation accepts musig() among the key
+// expressions of both multi_a and sortedmulti_a; this parser only allows it in multi_a, as sorting
+// the keys of a sortedmulti_a would require recomputing each aggregate key once per position.
+// The loops assert that these templates do fail to parse, so that the list cannot go stale
+// unnoticed once the parser grows support for them.
+static const char *const CT_UNPARSEABLE_TEMPLATES[] = {
+    "tr(@0/**,sortedmulti_a(2,musig(@1,@2)/**,@3/**))",
+};
+
+static bool is_unparseable_template(const char *tmpl) {
+    for (size_t i = 0; i < sizeof(CT_UNPARSEABLE_TEMPLATES) / sizeof(CT_UNPARSEABLE_TEMPLATES[0]);
+         i++) {
+        if (strcmp(tmpl, CT_UNPARSEABLE_TEMPLATES[i]) == 0) return true;
+    }
+    return false;
+}
+
 static void test_ct_confusion_score(void **state) {
     (void) state;
 
@@ -42,6 +60,16 @@ static void test_ct_confusion_score(void **state) {
 
         uint8_t buf[POLICY_BUF_SIZE];
         int r = parse_template(v->template_str, buf, sizeof(buf));
+        if (is_unparseable_template(v->template_str)) {
+            if (r >= 0) {
+                fprintf(stderr,
+                        "Vector %zu: %s parses now; drop it from CT_UNPARSEABLE_TEMPLATES\n",
+                        i,
+                        v->template_str);
+                fail();
+            }
+            continue;
+        }
         if (r < 0) {
             fprintf(stderr, "Vector %zu: parse failed for %s\n", i, v->template_str);
             fail();
@@ -69,6 +97,17 @@ static void test_ct_to_cleartext(void **state) {
 
         uint8_t buf[POLICY_BUF_SIZE];
         int r = parse_template(v->template_str, buf, sizeof(buf));
+        if (is_unparseable_template(v->template_str)) {
+            if (r >= 0) {
+                fprintf(stderr,
+                        "Vector %zu: %s parses now; drop it from CT_UNPARSEABLE_TEMPLATES\n",
+                        i,
+                        v->template_str);
+                fail();
+            }
+            // since this is rejected at parsing time we cannot exercise the cleartext encoder
+            continue;
+        }
         if (r < 0) {
             fprintf(stderr, "Vector %zu: parse failed for %s\n", i, v->template_str);
             fail();
@@ -147,7 +186,7 @@ static void test_ct_to_cleartext(void **state) {
 
 // A generous buffer: some cases below build large taptrees whose parsed form
 // does not fit in POLICY_BUF_SIZE.
-#define BIG_POLICY_BUF_SIZE 4096
+#define BIG_POLICY_BUF_SIZE 8192
 
 static const policy_node_t *parse_or_fail(const char *tmpl, uint8_t *buf, size_t bufsize) {
     int r = parse_template(tmpl, buf, bufsize);
@@ -193,7 +232,11 @@ static void expect_encode(const char *tmpl,
     }
     if (rc <= 0) return;  // error / no-output: nothing more to compare
     if (has_ct != want_has_ct) {
-        fprintf(stderr, "encode(%s): has_cleartext got %d, want %d\n", tmpl, (int) has_ct, (int) want_has_ct);
+        fprintf(stderr,
+                "encode(%s): has_cleartext got %d, want %d\n",
+                tmpl,
+                (int) has_ct,
+                (int) want_has_ct);
         fail();
     }
     if (want_lines == NULL) return;
@@ -204,7 +247,12 @@ static void expect_encode(const char *tmpl,
     }
     for (size_t j = 0; j < n_lines; j++) {
         if (strcmp(lines[j], want_lines[j]) != 0) {
-            fprintf(stderr, "encode(%s): line %zu got %s, want %s\n", tmpl, j, lines[j], want_lines[j]);
+            fprintf(stderr,
+                    "encode(%s): line %zu got %s, want %s\n",
+                    tmpl,
+                    j,
+                    lines[j],
+                    want_lines[j]);
             fail();
         }
     }
@@ -254,12 +302,37 @@ static void test_ct_too_many_leaves(void **state) {
     expect_encode(big, 1, false, NULL, 0);
 }
 
+// A musig() among the keys of a multi_a is not classified: the `$keys` binding of the multisig
+// patterns only accepts plain key expressions, since a single-element list holding a musig is how
+// pk(musig(...)) is bound. Such a leaf therefore renders as the "(unknown)" marker, and the app
+// falls back to showing the raw descriptor template.
+// The shared vectors of specs/bip388/test_vectors.toml cover the same case, but the vector loop
+// only compares the has_cleartext flag and the line count when the cleartext is incomplete; the
+// check on the rendered "(unknown)" marker is therefore only made here.
+static void test_ct_musig_in_multi_a_is_not_classified(void **state) {
+    (void) state;
+    static const char *const want[] = {"Main path: spendable by @0", "(unknown)"};
+    expect_encode("tr(@0/**,multi_a(2,musig(@1,@2)/**,@3/**))", 1, false, want, 2);
+
+    // The 1-key case is the sharp one: a single-element key list holding a musig is precisely the
+    // sentinel for pk(musig(...)), whose keys are rendered flattened. Without the guard, this leaf
+    // would therefore read "any 1 of @1 and @2 must sign", while a musig aggregate key requires
+    // *both* of them to sign.
+    expect_encode("tr(@0/**,multi_a(1,musig(@1,@2)/**))", 1, false, want, 2);
+
+    // for comparison: the same leaf with plain key expressions does classify
+    static const char *const want_plain[] = {"Main path: spendable by @0",
+                                             "Any 2 of @1, @2 and @3 must sign"};
+    expect_encode("tr(@0/**,multi_a(2,@1/**,@2/**,@3/**))", 1, true, want_plain, 2);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_ct_confusion_score),
         cmocka_unit_test(test_ct_to_cleartext),
         cmocka_unit_test(test_ct_line_overflow),
         cmocka_unit_test(test_ct_too_many_leaves),
+        cmocka_unit_test(test_ct_musig_in_multi_a_is_not_classified),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

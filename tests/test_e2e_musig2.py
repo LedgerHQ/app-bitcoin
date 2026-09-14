@@ -301,6 +301,32 @@ def test_e2e_musig2_scriptpath(navigator: Navigator, firmware: Firmware, client:
                         e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
 
 
+def test_e2e_musig2_multi_a_scriptpath(navigator: Navigator, firmware: Firmware, client: RaggerClient,
+                                       test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
+    path = "48'/1'/0'/2'"
+    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
+
+    core_wallet_name_1, core_xpub_orig_1 = create_new_wallet()
+    core_wallet_name_2, core_xpub_orig_2 = create_new_wallet()
+
+    # In this policy, the keypath is unspendable; the only spending path is a 2-of-2 multi_a where
+    # one of the two keys is a musig() of the device key and the first cosigner
+    # (so, in practice, all keys must sign)
+
+    wallet_policy = WalletPolicy(
+        name="Musig in multi_a",
+        descriptor_template="tr(@0/**,multi_a(2,musig(@1,@2)/**,@3/**))",
+        keys_info=[
+            "tpubD6NzVbkrYhZ4WLczPJWReQycCJdd6YVWXubbVUFnJ5KgU5MDQrD998ZJLSmaB7GVcCnJSDWprxmrGkJ6SvgQC6QAffVpqSvonXmeizXcrkN",
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
+            f"{core_xpub_orig_1}",
+            f"{core_xpub_orig_2}",
+        ])
+
+    run_test_e2e_musig2(navigator, client, wallet_policy, [core_wallet_name_1, core_wallet_name_2], rpc, rpc_test_wallet, speculos_globals,
+                        e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+
+
 def test_e2e_musig2_3of3keypath_decaying_scriptpath(navigator: Navigator, firmware: Firmware, client: RaggerClient,
                                                     test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
     path = "48'/1'/0'/2'"
@@ -365,6 +391,8 @@ def test_e2e_musig2_5of5(navigator: Navigator, firmware: Firmware, client: Ragge
 def test_e2e_musig_invalid(client: RaggerClient, speculos_globals: SpeculosGlobals):
     path = "48'/1'/0'/2'"
     text_xpub_1 = "tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
+    text_xpub_2 = "tpubD6NzVbkrYhZ4WLczPJWReQycCJdd6YVWXubbVUFnJ5KgU5MDQrD998ZJLSmaB7GVcCnJSDWprxmrGkJ6SvgQC6QAffVpqSvonXmeizXcrkN"
+    text_xpub_3 = "tpubD6NzVbkrYhZ4YAPXpMw61GrdqXJJEiYhHo6wxVkfwZgUged5qXm6Df4NLf8ZTFXxW1UhxDKGeKdAVxZtmodC8KfR7SqmW6LGQfDGfnFLmQ6"
     internal_xpub = get_internal_xpub(speculos_globals.seed, path)
     internal_xpub_orig = f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}"
 
@@ -398,3 +426,8 @@ def test_e2e_musig_invalid(client: RaggerClient, speculos_globals: SpeculosGloba
 
     # supported in BIP-390, not in BIP-388
     run_test_invalid(client, "tr(musig(@0/**,@1/**))",  two_keys)
+
+    # musig() is supported in multi_a, but we do not support it in sortedmulti_a.
+    # The same policy with multi_a instead is valid, and covered by test_e2e_musig2_multi_a_scriptpath.
+    run_test_invalid(client, "tr(@0/**,sortedmulti_a(2,musig(@1,@2)/**,@3/**))",
+                     [text_xpub_1, internal_xpub_orig, text_xpub_2, text_xpub_3])

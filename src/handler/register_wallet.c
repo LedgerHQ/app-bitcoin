@@ -109,6 +109,15 @@ __attribute__((noinline)) static void confirm_and_register_wallet(
             return;
         }
 
+        // Reject invalid pubkeys (not on the curve)
+        uint8_t uncompressed_pubkey[65];
+        if (0 > crypto_get_uncompressed_pubkey(key_info.ext_pubkey.compressed_pubkey,
+                                               uncompressed_pubkey)) {
+            PRINTF("The pubkey is not a valid point of the curve\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
         // We refuse to register wallets without key origin information, or whose keys don't end
         // with the wildcard ('/**'). The key origin information is necessary when signing to
         // identify which one is our key. Using addresses without a wildcard could potentially be
@@ -263,7 +272,8 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         return;
     }
 
-    if (count_distinct_keys_info(&policy_map.parsed) != (int) wallet_header.n_keys) {
+    if (count_distinct_keys_info(&policy_map.parsed, wallet_header.n_keys) !=
+        (int) wallet_header.n_keys) {
         PRINTF("The number of keys in descriptor template doesn't match the provided keys\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;

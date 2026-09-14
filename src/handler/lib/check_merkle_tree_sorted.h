@@ -45,3 +45,25 @@ static inline int call_check_merkle_tree_sorted(dispatcher_context_t *dispatcher
                                                        NULL,
                                                        NULL);
 }
+
+/**
+ * Validates a merkleized map commitment whose fields were populated directly (rather than obtained
+ * from call_get_merkleized_map): checks that its keys tree is lexicographically sorted, and on
+ * success marks the commitment as validated so that its values can be read by key.
+ *
+ * This is the counterpart of call_get_merkleized_map for maps that are not fetched from an outer
+ * Merkle tree of maps (e.g. the PSBT global map, whose commitment comes straight from the APDU).
+ *
+ * Returns 0 on success, or a negative number on failure.
+ */
+static inline int call_check_merkleized_map_sorted(dispatcher_context_t *dispatcher_context,
+                                                   merkleized_map_commitment_t *map) {
+    // The map is not yet validated; explicitly mark it as such
+    map->_keys_are_sorted = false;
+
+    int ret = call_check_merkle_tree_sorted(dispatcher_context, map->keys_root, (size_t) map->size);
+    if (ret >= 0) {
+        map->_keys_are_sorted = true;
+    }
+    return ret;
+}

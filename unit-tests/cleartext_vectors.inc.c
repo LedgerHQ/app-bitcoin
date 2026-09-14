@@ -279,91 +279,108 @@ static const char *const vec_064_ct[] = {
 };
 static const char *const vec_065_ct[] = {
     "Main path: spendable by @0",
+    "Raw policy: multi_a(2,musig(@1,@2)/**,@3/**)",
+};
+static const char *const vec_066_ct[] = {
+    "Main path: spendable by @0",
+    "Raw policy: sortedmulti_a(2,musig(@1,@2)/**,@3/**)",
+};
+static const char *const vec_067_ct[] = {
+    "Main path: spendable by @0",
+    "@1 must sign",
+    "Raw policy: multi_a(2,musig(@2,@3)/**,@4/**)",
+};
+static const char *const vec_068_ct[] = {
+    "Main path: spendable by @0",
+    "Raw policy: and_v(v:multi_a(2,musig(@1,@2)/**,@3/**),older(1008))",
+};
+static const char *const vec_069_ct[] = {
+    "Main path: spendable by @0",
     "@2 and @1 must both sign",
     "@1 must sign, 4383 blocks after receiving",
 };
-static const char *const vec_066_ct[] = {
+static const char *const vec_070_ct[] = {
     "Main path: spendable by @0",
     "@1 and @2 must both sign",
     "Any 2 of @1, @2 and @3 must sign, 144 blocks after receiving",
 };
-static const char *const vec_067_ct[] = {
-    "Main path: spendable by @0",
-    "@0 must sign",
-};
-static const char *const vec_068_ct[] = {
-    "Main path: spendable by @0",
-    "@0 must sign",
-};
-static const char *const vec_069_ct[] = {
-    "Main path: spendable by @0",
-    "Each of @1 and @2 must sign",
-    "Each of @1 and @2 must sign",
-};
-static const char *const vec_070_ct[] = {
-    "Main path: spendable by @0",
-    "@0 must sign",
-    "@0 must sign",
-};
 static const char *const vec_071_ct[] = {
     "Main path: spendable by @0",
+    "@0 must sign",
+};
+static const char *const vec_072_ct[] = {
+    "Main path: spendable by @0",
+    "@0 must sign",
+};
+static const char *const vec_073_ct[] = {
+    "Main path: spendable by @0",
+    "Each of @1 and @2 must sign",
+    "Each of @1 and @2 must sign",
+};
+static const char *const vec_074_ct[] = {
+    "Main path: spendable by @0",
+    "@0 must sign",
+    "@0 must sign",
+};
+static const char *const vec_075_ct[] = {
+    "Main path: spendable by @0",
     "@1 must sign",
     "@1 must sign",
 };
-static const char *const vec_072_ct[] = {
+static const char *const vec_076_ct[] = {
     "Main path: spendable by @0",
     "@1 must sign",
     "@1 must sign, 4383 blocks after receiving",
 };
-static const char *const vec_073_ct[] = {
+static const char *const vec_077_ct[] = {
     "Main path: spendable by @0",
     "@0 must sign",
     "@1 and @1 must both sign",
 };
-static const char *const vec_074_ct[] = {
+static const char *const vec_078_ct[] = {
     "Main path: each of @0, @1 and @2 must sign",
     "Each of @0 and @1 must sign, 1 day 1 hour 36 minutes after receiving",
     "Each of @0 and @2 must sign, 1 day 1 hour 36 minutes after receiving",
     "Each of @1 and @2 must sign, 1 day 1 hour 36 minutes after receiving",
 };
-static const char *const vec_075_ct[] = {
+static const char *const vec_079_ct[] = {
     "Main path: spendable by @0",
     "@1 must sign - and also - each of @2 and @3 must sign",
 };
-static const char *const vec_076_ct[] = {
+static const char *const vec_080_ct[] = {
     "Main path: spendable by @0",
     "@1 must sign - and also - each of @2 and @3 must sign",
 };
-static const char *const vec_077_ct[] = {
+static const char *const vec_081_ct[] = {
     "Main path: spendable by @0",
     "@1 must sign - and also - each of @2 and @3 must sign",
 };
-static const char *const vec_078_ct[] = {
+static const char *const vec_082_ct[] = {
     "Main path: spendable by @0",
     "Each of @1 and @2 must sign - and also - each of @3 and @4 must sign",
 };
-static const char *const vec_079_ct[] = {
+static const char *const vec_083_ct[] = {
     "Main path: spendable by @0",
     "@1 and @2 must both sign - and also - each of @3 and @4 must sign",
 };
-static const char *const vec_080_ct[] = {
+static const char *const vec_084_ct[] = {
     "Main path: spendable by @0",
     "@1 must sign",
     "@2 must sign - and also - each of @3 and @4 must sign",
 };
-static const char *const vec_081_ct[] = {
+static const char *const vec_085_ct[] = {
     "pkh(@0/<2;3>/*)",
 };
-static const char *const vec_082_ct[] = {
+static const char *const vec_086_ct[] = {
     "wpkh(@0/<0;2>/*)",
 };
-static const char *const vec_083_ct[] = {
+static const char *const vec_087_ct[] = {
     "tr(@0/<4;5>/*)",
 };
-static const char *const vec_084_ct[] = {
+static const char *const vec_088_ct[] = {
     "tr(@0/**,pk(@1/<2;3>/*))",
 };
-static const char *const vec_085_ct[] = {
+static const char *const vec_089_ct[] = {
     "wsh(and_v(v:pk(@0/**),pk(@1/**)))",
 };
 
@@ -433,27 +450,31 @@ static const ct_vector_t CT_VECTORS[] = {
     { .template_str = "tr(@0/**,and_v(v:pk(musig(@1,@2)/**),after(1700000000)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_062_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(@0/**,{pk(@1/**),pk(musig(@2,@3)/**)})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_063_ct, .has_has_cleartext = true, .cleartext_flag = true },
     { .template_str = "tr(@0/**,{multi_a(2,@1/**,@2/**,@3/**),pk(musig(@4,@5)/**)})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_064_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/<0;1>/*,{and_v(v:pk(@1/<0;1>/*),older(4383)),and_v(v:pk(@2/<0;1>/*),pk(@1/<2;3>/*))})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_065_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/<0;1>/*,{and_v(v:multi_a(2,@1/<0;1>/*,@2/<0;1>/*,@3/<0;1>/*),older(144)),and_v(v:pk(@1/<2;3>/*),pk(@2/<2;3>/*))})", .has_confusion_score = true, .confusion_score = 4ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_066_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/<0;1>/*,pk(@0/<2;3>/*))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_067_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/<2;3>/*,pk(@0/<0;1>/*))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_068_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{multi_a(2,@1/<0;1>/*,@2/<0;1>/*),multi_a(2,@1/<2;3>/*,@2/<2;3>/*)})", .has_confusion_score = true, .confusion_score = 16ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_069_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/<0;1>/*,{pk(@0/<2;3>/*),pk(@0/<4;5>/*)})", .has_confusion_score = true, .confusion_score = 6ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_070_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{pk(@1/<0;1>/*),pk(@1/<2;3>/*)})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_071_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{and_v(v:pk(@1/<0;1>/*),older(4383)),pk(@1/<2;3>/*)})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_072_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/<0;1>/*,{pk(@0/<2;3>/*),and_v(v:pk(@1/<0;1>/*),pk(@1/<2;3>/*))})", .has_confusion_score = true, .confusion_score = 4ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_073_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(musig(@0,@1,@2)/**,{and_v(v:pk(musig(@0,@1)/**),older(4194484)),{and_v(v:pk(musig(@0,@2)/**),older(4194484)),and_v(v:pk(musig(@1,@2)/**),older(4194484))}})", .has_confusion_score = true, .confusion_score = 5184ULL, .has_cleartext_array = true, .cleartext_n = 4, .cleartext = vec_074_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:pk(@1/**),multi_a(2,@2/**,@3/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_075_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:pk(@1/**),pk(musig(@2,@3)/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_076_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:pk(@1/**),multi_a(2,@2/**,@3/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_077_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:multi_a(2,@1/**,@2/**),multi_a(2,@3/**,@4/**)))", .has_confusion_score = true, .confusion_score = 4ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_078_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,and_v(v:and_v(v:pk(@1/**),pk(@2/**)),multi_a(2,@3/**,@4/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_079_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/**),multi_a(2,@3/**,@4/**))})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_080_ct, .has_has_cleartext = true, .cleartext_flag = true },
-    { .template_str = "pkh(@0/<2;3>/*)", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_081_ct, .has_has_cleartext = true, .cleartext_flag = false },
-    { .template_str = "wpkh(@0/<0;2>/*)", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_082_ct, .has_has_cleartext = true, .cleartext_flag = false },
-    { .template_str = "tr(@0/<4;5>/*)", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_083_ct, .has_has_cleartext = true, .cleartext_flag = false },
-    { .template_str = "tr(@0/**,pk(@1/<2;3>/*))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_084_ct, .has_has_cleartext = true, .cleartext_flag = false },
-    { .template_str = "wsh(and_v(v:pk(@0/**),pk(@1/**)))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_085_ct, .has_has_cleartext = true, .cleartext_flag = false },
+    { .template_str = "tr(@0/**,multi_a(2,musig(@1,@2)/**,@3/**))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_065_ct, .has_has_cleartext = true, .cleartext_flag = false },
+    { .template_str = "tr(@0/**,sortedmulti_a(2,musig(@1,@2)/**,@3/**))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_066_ct, .has_has_cleartext = true, .cleartext_flag = false },
+    { .template_str = "tr(@0/**,{pk(@1/**),multi_a(2,musig(@2,@3)/**,@4/**)})", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_067_ct, .has_has_cleartext = true, .cleartext_flag = false },
+    { .template_str = "tr(@0/**,and_v(v:multi_a(2,musig(@1,@2)/**,@3/**),older(1008)))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_068_ct, .has_has_cleartext = true, .cleartext_flag = false },
+    { .template_str = "tr(@0/<0;1>/*,{and_v(v:pk(@1/<0;1>/*),older(4383)),and_v(v:pk(@2/<0;1>/*),pk(@1/<2;3>/*))})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_069_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/<0;1>/*,{and_v(v:multi_a(2,@1/<0;1>/*,@2/<0;1>/*,@3/<0;1>/*),older(144)),and_v(v:pk(@1/<2;3>/*),pk(@2/<2;3>/*))})", .has_confusion_score = true, .confusion_score = 4ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_070_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/<0;1>/*,pk(@0/<2;3>/*))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_071_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/<2;3>/*,pk(@0/<0;1>/*))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_072_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{multi_a(2,@1/<0;1>/*,@2/<0;1>/*),multi_a(2,@1/<2;3>/*,@2/<2;3>/*)})", .has_confusion_score = true, .confusion_score = 16ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_073_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/<0;1>/*,{pk(@0/<2;3>/*),pk(@0/<4;5>/*)})", .has_confusion_score = true, .confusion_score = 6ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_074_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{pk(@1/<0;1>/*),pk(@1/<2;3>/*)})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_075_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{and_v(v:pk(@1/<0;1>/*),older(4383)),pk(@1/<2;3>/*)})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_076_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/<0;1>/*,{pk(@0/<2;3>/*),and_v(v:pk(@1/<0;1>/*),pk(@1/<2;3>/*))})", .has_confusion_score = true, .confusion_score = 4ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_077_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(musig(@0,@1,@2)/**,{and_v(v:pk(musig(@0,@1)/**),older(4194484)),{and_v(v:pk(musig(@0,@2)/**),older(4194484)),and_v(v:pk(musig(@1,@2)/**),older(4194484))}})", .has_confusion_score = true, .confusion_score = 5184ULL, .has_cleartext_array = true, .cleartext_n = 4, .cleartext = vec_078_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:pk(@1/**),multi_a(2,@2/**,@3/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_079_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:pk(@1/**),pk(musig(@2,@3)/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_080_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:pk(@1/**),multi_a(2,@2/**,@3/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_081_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:multi_a(2,@1/**,@2/**),multi_a(2,@3/**,@4/**)))", .has_confusion_score = true, .confusion_score = 4ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_082_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,and_v(v:and_v(v:pk(@1/**),pk(@2/**)),multi_a(2,@3/**,@4/**)))", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 2, .cleartext = vec_083_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "tr(@0/**,{pk(@1/**),and_v(v:pk(@2/**),multi_a(2,@3/**,@4/**))})", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 3, .cleartext = vec_084_ct, .has_has_cleartext = true, .cleartext_flag = true },
+    { .template_str = "pkh(@0/<2;3>/*)", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_085_ct, .has_has_cleartext = true, .cleartext_flag = false },
+    { .template_str = "wpkh(@0/<0;2>/*)", .has_confusion_score = true, .confusion_score = 2ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_086_ct, .has_has_cleartext = true, .cleartext_flag = false },
+    { .template_str = "tr(@0/<4;5>/*)", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_087_ct, .has_has_cleartext = true, .cleartext_flag = false },
+    { .template_str = "tr(@0/**,pk(@1/<2;3>/*))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_088_ct, .has_has_cleartext = true, .cleartext_flag = false },
+    { .template_str = "wsh(and_v(v:pk(@0/**),pk(@1/**)))", .has_confusion_score = true, .confusion_score = 1ULL, .has_cleartext_array = true, .cleartext_n = 1, .cleartext = vec_089_ct, .has_has_cleartext = true, .cleartext_flag = false },
 };
 static const size_t CT_VECTORS_N = sizeof(CT_VECTORS) / sizeof(CT_VECTORS[0]);
 

@@ -17,6 +17,14 @@ tests/.test_bitcoin
 
 # Fuzzing
 fuzzing/build/
+.fuzz-artifacts/
+# Per-build Absolution invariant snapshot (machine-local; see the SDK fuzzing docs).
+fuzzing/invariants/fuzz_globals.zon
+
+# Build artefacts
+compile_commands.json
+*.profraw
+*.profdata
 
 # Editors
 .idea/

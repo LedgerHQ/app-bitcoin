@@ -263,6 +263,7 @@ if(SPECULOS AND SPECULOS_SRC)
     ../src/handler/lib/stream_merkleized_map_value.c
     ../src/handler/lib/stream_preimage.c
     ../src/handler/sign_psbt/extract_bip32_derivation.c
+    ../src/handler/sign_psbt/psbt_fields.c
     ../src/handler/sign_psbt/sign_psbt_cache.c
     ../src/musig/musig.c
     $ENV{BOLOS_SDK}/lib_standard_app/crypto_helpers.c
@@ -307,13 +308,14 @@ if(SPECULOS AND SPECULOS_SRC)
   add_unit_test(test_stream_merkleized_map_value  LIBS test_merkle_common)
   add_unit_test(test_get_merkleized_map        LIBS test_merkle_common)
   add_unit_test(test_get_merkleized_map_value  LIBS test_merkle_common)
+  add_unit_test(test_psbt_fields               LIBS test_merkle_common)
 
   foreach(t
     test_get_preimage test_get_merkle_preimage test_extract_bip32_derivation
     test_check_merkle_tree_sorted test_get_merkle_leaf_element
     test_get_merkle_leaf_hash test_get_merkle_leaf_index test_stream_preimage
     test_stream_merkle_leaf_element test_stream_merkleized_map_value
-    test_get_merkleized_map test_get_merkleized_map_value)
+    test_get_merkleized_map test_get_merkleized_map_value test_psbt_fields)
     app_apply_real_sdk_config(${t})
   endforeach()
 
