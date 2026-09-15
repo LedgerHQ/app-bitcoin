@@ -22,6 +22,14 @@ typedef struct musig_psbt_session_s {
 
 // volatile state for musig signing. Members are private and must not be accessed directly by any
 // code outside of musig_sessions.c.
+//
+// WARNING: an instance of this struct MUST NOT outlive the signing flow that uses it, and therefore
+// MUST NOT be a global or static variable. The whole guarantee that a MuSig2 nonce is never reused
+// rests on `_round2` being popped from the persistent storage exactly once and then discarded with
+// the flow that popped it: reusing the same `_rand_root` to sign two different transactions would
+// let an attacker recover the private key. Note that the psbt_session_id no longer depends on the
+// transaction, so an `_round2` surviving into another flow would be accepted by
+// musigsession_round2_initialize() rather than rejected.
 typedef struct musig_signing_state_s {
     // a session created during round 1; if signing completes (and in no other case), it is moved to
     // the persistent storage
@@ -100,7 +108,7 @@ __attribute__((warn_unused_result)) const musig_psbt_session_t *musigsession_rou
 
 /**
  * If a session produced in round 1 is active in volatile memory, it is stored in the persistent
- * memory.
+ * memory. The signing state is then zeroed out, as the signing flow is over.
  * This must be called at the end of a successful signing flow, after all the public nonces have
  * been returned to the client. It must _not_ be called if any error occurs, or if the signing
  * process is aborted for any reason.

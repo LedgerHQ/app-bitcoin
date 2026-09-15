@@ -92,6 +92,15 @@ void compute_rand_i_j(const musig_psbt_session_t *psbt_session,
 }
 
 void musigsession_initialize_signing_state(musig_signing_state_t *musig_signing_state) {
+    // Canary for the invariant documented in musig_sessions.h: the signing state must be a fresh,
+    // zeroed object for each signing flow. A non-zero _round2 here means that a previous flow left
+    // a session behind, which is only possible if the state outlived it (for example because it was
+    // promoted to a global to save stack space). That must never happen: it would allow the same
+    // secnonce to sign two different transactions.
+    LEDGER_ASSERT(is_array_all_zeros((uint8_t *) &musig_signing_state->_round2,
+                                     sizeof(musig_signing_state->_round2)),
+                  "MuSig2 signing state was not freshly zeroed");
+
     memset(musig_signing_state, 0, sizeof(musig_signing_state_t));
 }
 
@@ -145,4 +154,8 @@ void musigsession_commit(musig_signing_state_t *musig_signing_state) {
                             sizeof(musig_signing_state->_round1._id))) {
         musigsession_store(musig_signing_state->_round1._id, &musig_signing_state->_round1);
     }
+
+    // The signing flow is over: leave no secret behind, and make sure that a session popped during
+    // round 2 cannot be used again even if the caller were to reuse this state.
+    explicit_bzero(musig_signing_state, sizeof(musig_signing_state_t));
 }
