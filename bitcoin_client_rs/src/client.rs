@@ -262,42 +262,22 @@ impl<T: Transport> BitcoinClient<T> {
         // necessary for version 1 of the protocol (introduced in version 2.1.0)
         intpr.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
 
-        let global_map: Vec<(Vec<u8>, Vec<u8>)> = get_v2_global_pairs(psbt)
-            .into_iter()
-            .map(deserialize_pair)
-            .collect();
-        intpr.add_known_mapping(&global_map);
-        let global_mapping_commitment = get_merkleized_map_commitment(&global_map);
+        let maps = get_v2_maps(psbt).map_err(|_| BitcoinClientError::InvalidPsbt)?;
 
-        let mut input_commitments: Vec<Vec<u8>> = Vec::with_capacity(psbt.inputs.len());
-        for (index, input) in psbt.inputs.iter().enumerate() {
-            let txin = psbt
-                .unsigned_tx
-                .input
-                .get(index)
-                .ok_or(BitcoinClientError::InvalidPsbt)?;
-            let input_map: Vec<(Vec<u8>, Vec<u8>)> = get_v2_input_pairs(input, txin)
-                .into_iter()
-                .map(deserialize_pair)
-                .collect();
-            intpr.add_known_mapping(&input_map);
-            input_commitments.push(get_merkleized_map_commitment(&input_map));
+        intpr.add_known_mapping(&maps.global);
+        let global_mapping_commitment = get_merkleized_map_commitment(&maps.global);
+
+        let mut input_commitments: Vec<Vec<u8>> = Vec::with_capacity(maps.inputs.len());
+        for input_map in &maps.inputs {
+            intpr.add_known_mapping(input_map);
+            input_commitments.push(get_merkleized_map_commitment(input_map));
         }
         let input_commitments_root = intpr.add_known_list(&input_commitments);
 
-        let mut output_commitments: Vec<Vec<u8>> = Vec::with_capacity(psbt.outputs.len());
-        for (index, output) in psbt.outputs.iter().enumerate() {
-            let txout = psbt
-                .unsigned_tx
-                .output
-                .get(index)
-                .ok_or(BitcoinClientError::InvalidPsbt)?;
-            let output_map: Vec<(Vec<u8>, Vec<u8>)> = get_v2_output_pairs(output, txout)
-                .into_iter()
-                .map(deserialize_pair)
-                .collect();
-            intpr.add_known_mapping(&output_map);
-            output_commitments.push(get_merkleized_map_commitment(&output_map));
+        let mut output_commitments: Vec<Vec<u8>> = Vec::with_capacity(maps.outputs.len());
+        for output_map in &maps.outputs {
+            intpr.add_known_mapping(output_map);
+            output_commitments.push(get_merkleized_map_commitment(output_map));
         }
         let output_commitments_root = intpr.add_known_list(&output_commitments);
 
