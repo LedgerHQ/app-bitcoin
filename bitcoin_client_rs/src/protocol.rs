@@ -79,18 +79,6 @@ impl Decodable for UncheckedVarInt {
     }
 }
 
-impl UncheckedVarInt {
-    /// Returns the number of bytes this varint occupies when serialized.
-    pub fn size(&self) -> usize {
-        match self.0 {
-            0..=0xFC => 1,
-            0xFD..=0xFFFF => 3,
-            0x10000..=0xFFFFFFFF => 5,
-            _ => 9,
-        }
-    }
-}
-
 /// Tag yielded by the device to introduce a MuSig2 pubnonce payload.
 pub const CCMD_YIELD_MUSIG_PUBNONCE_TAG: u64 = 0xFFFFFFFF;
 /// Tag yielded by the device to introduce a MuSig2 partial-signature payload.
