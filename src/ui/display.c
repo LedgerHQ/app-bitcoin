@@ -24,6 +24,20 @@ extern dispatcher_context_t G_dispatcher_context;
 
 ui_state_t g_ui_state;
 
+/**
+ * Drop-in replacement for `strncpy(dst, src, dst_size)` for the strings displayed by this module.
+ *
+ * Copies the 0-terminated string `src` into the `dst_size`-byte buffer `dst`, terminator included.
+ * Unlike `strncpy`, the result is always 0-terminated, and the copy is never truncated: if `src`
+ * does not fit (or has no terminator within the first `dst_size` bytes), that is a programming
+ * error and the app is halted, rather than continuing with a possibly misrepresented UI flow.
+ */
+static void copy_ui_string(char *dst, const char *src, size_t dst_size) {
+    size_t len = strnlen(src, dst_size);
+    LEDGER_ASSERT(len < dst_size, "String does not fit in the UI buffer");
+    memcpy(dst, src, len + 1);
+}
+
 void send_deny_sw(dispatcher_context_t *dc) {
     SEND_SW(dc, SW_DENY);
 }
@@ -89,8 +103,8 @@ bool ui_display_pubkey(dispatcher_context_t *context,
                        const char *pubkey) {
     ui_path_and_pubkey_state_t *state = (ui_path_and_pubkey_state_t *) &g_ui_state;
 
-    strncpy(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
-    strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
+    copy_ui_string(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
+    copy_ui_string(state->pubkey, pubkey, sizeof(state->pubkey));
 
     if (!is_path_suspicious) {
         ui_display_pubkey_flow();
@@ -106,8 +120,8 @@ bool ui_display_path_and_message_content(dispatcher_context_t *context,
                                          const char *message_content,
                                          uint8_t pageCount) {
     ui_path_and_message_state_t *state = (ui_path_and_message_state_t *) &g_ui_state;
-    strncpy(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
-    strncpy(state->message, message_content, sizeof(state->message));
+    copy_ui_string(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
+    copy_ui_string(state->message, message_content, sizeof(state->message));
 
     ui_sign_message_content_flow(pageCount);
 
@@ -118,8 +132,8 @@ bool ui_display_message_path_hash_and_confirm(dispatcher_context_t *context,
                                               const char *path_str,
                                               const char *message_hash) {
     ui_path_and_message_state_t *state = (ui_path_and_message_state_t *) &g_ui_state;
-    strncpy(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
-    strncpy(state->message, message_hash, sizeof(state->message));
+    copy_ui_string(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
+    copy_ui_string(state->message, message_hash, sizeof(state->message));
 
     ui_sign_message_path_hash_and_confirm_flow();
 
@@ -138,9 +152,9 @@ bool ui_display_register_wallet(dispatcher_context_t *context,
                                 const char *policy_descriptor) {
     ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
-    strncpy(state->wallet_name, wallet_header->name, sizeof(state->wallet_name));
+    copy_ui_string(state->wallet_name, wallet_header->name, sizeof(state->wallet_name));
     state->wallet_name[wallet_header->name_len] = 0;
-    strncpy(state->descriptor_template, policy_descriptor, sizeof(state->descriptor_template));
+    copy_ui_string(state->descriptor_template, policy_descriptor, sizeof(state->descriptor_template));
     state->descriptor_template[wallet_header->descriptor_template_len] = 0;
 
     ui_display_register_wallet_flow();
@@ -158,7 +172,7 @@ bool ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
     ui_cosigner_pubkey_and_index_state_t *state =
         (ui_cosigner_pubkey_and_index_state_t *) &g_ui_state;
 
-    strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
+    copy_ui_string(state->pubkey, pubkey, sizeof(state->pubkey));
 
     if (key_type == PUBKEY_TYPE_INTERNAL) {
         snprintf(state->signer_index, sizeof(state->signer_index), "Key @%u, ours", cosigner_index);
@@ -185,12 +199,12 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
                                const char *address) {
     ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
-    strncpy(state->address, address, sizeof(state->address));
+    copy_ui_string(state->address, address, sizeof(state->address));
 
     if (wallet_name == NULL) {
         ui_display_default_wallet_address_flow();
     } else {
-        strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
+        copy_ui_string(state->wallet_name, wallet_name, sizeof(state->wallet_name));
         ui_display_receive_in_wallet_flow();
     }
 
@@ -200,7 +214,7 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
 bool ui_authorize_wallet_spend(dispatcher_context_t *context, const char *wallet_name) {
     ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
-    strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
+    copy_ui_string(state->wallet_name, wallet_name, sizeof(state->wallet_name));
     ui_display_spend_from_wallet_flow();
 
     return io_ui_process(context, true);
@@ -234,7 +248,7 @@ bool ui_validate_output(dispatcher_context_t *context,
                         uint64_t amount) {
     ui_validate_output_state_t *state = (ui_validate_output_state_t *) &g_ui_state;
 
-    strncpy(state->address_or_description,
+    copy_ui_string(state->address_or_description,
             address_or_description,
             sizeof(state->address_or_description));
     format_sats_amount(coin_name, amount, state->amount);
