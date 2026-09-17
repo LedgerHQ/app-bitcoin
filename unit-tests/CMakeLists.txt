@@ -340,6 +340,14 @@ if(SPECULOS AND SPECULOS_SRC)
   target_link_libraries(test_sighash PRIVATE cmocka)
   add_test(test_sighash test_sighash)
 
+  # test_locktime exercises the BIP-0370 lock time determination
+  # (src/common/locktime.h). Like test_sighash it is pure logic over
+  # constants.h, so it needs no app object code either.
+  add_executable(test_locktime test_locktime.c)
+  app_apply_real_sdk_config(test_locktime)
+  target_link_libraries(test_locktime PRIVATE cmocka)
+  add_test(test_locktime test_locktime)
+
   add_executable(test_wallet test_wallet.c)
   app_apply_real_sdk_config(test_wallet)
   target_link_libraries(test_wallet PRIVATE cmocka app_crypto buffer buffer_ext)

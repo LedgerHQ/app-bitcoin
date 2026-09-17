@@ -116,7 +116,7 @@ static bool __attribute__((noinline)) parse_sign_psbt_apdu(dispatcher_context_t 
 /**
  * Verifies the integrity of the PSBT global map (already committed to by
  * st->global_map) and extracts the transaction-wide fields from it
- * (tx_version, locktime).
+ * (tx_version, fallback_locktime).
  *
  * Returns true on success; on failure, an error status word has already been
  * sent.
@@ -136,13 +136,15 @@ static bool __attribute__((noinline)) process_global_map(dispatcher_context_t *d
         return false;
     }
 
-    // Read fallback locktime.
-    // Unlike BIP-0370 recommendation, we use the fallback locktime as-is, ignoring each input's
-    // preferred height/block locktime. If that's relevant, the client must set the fallback
-    // locktime to the appropriate value before calling sign_psbt.
-    switch (psbt_get_global_fallback_locktime(dc, &st->global_map, &st->locktime)) {
+    // Read the fallback locktime. Per BIP-0370 this is only the value to use when no input
+    // declares a required locktime; the transaction's nLockTime is determined at the end of
+    // preprocess_inputs, once every input has been seen.
+    //
+    // ABSENT means 0. ERROR (present but not 4 bytes) is fatal: treating it as absent would sign
+    // a locktime the client never committed to.
+    switch (psbt_get_global_fallback_locktime(dc, &st->global_map, &st->fallback_locktime)) {
         case PSBT_FIELD_ABSENT:
-            st->locktime = 0;
+            st->fallback_locktime = 0;
             break;
         case PSBT_FIELD_PRESENT:
             break;

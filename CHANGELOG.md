@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [Unreleased]
+
+### Fixed
+
+- The transaction lock time is now determined as BIP-370 prescribes, from each input's `PSBT_IN_REQUIRED_TIME_LOCKTIME` / `PSBT_IN_REQUIRED_HEIGHT_LOCKTIME` together with `PSBT_GLOBAL_FALLBACK_LOCKTIME`, instead of always using the fallback verbatim. Note that the fallback is now ignored entirely whenever an input declares a required lock time; PSBTs whose inputs require incompatible lock time types, or whose required lock times are out of range, are rejected instead of signed. PSBTs without per-input required lock times — which is to say nearly all of them — are unaffected.
+
 ## [2.5.1] - 09-09-2026
 
 ## Fixed

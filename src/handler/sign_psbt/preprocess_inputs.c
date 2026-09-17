@@ -34,6 +34,7 @@
 #include "error_codes.h"
 #include "get_merkleized_map.h"
 #include "init_global_state.h"
+#include "locktime.h"
 #include "policy.h"
 #include "process_in_outs.h"
 #include "psbt.h"
@@ -63,6 +64,10 @@ void input_keys_callback(dispatcher_context_t *dc,
             callback_data->input->has_redeemScript = true;
         } else if (key_type == PSBT_IN_SIGHASH_TYPE) {
             callback_data->input->has_sighash_type = true;
+        } else if (key_type == PSBT_IN_REQUIRED_TIME_LOCKTIME) {
+            callback_data->input->has_required_time_locktime = true;
+        } else if (key_type == PSBT_IN_REQUIRED_HEIGHT_LOCKTIME) {
+            callback_data->input->has_required_height_locktime = true;
         } else if (key_type == PSBT_IN_BIP32_DERIVATION ||
                    key_type == PSBT_IN_TAP_BIP32_DERIVATION) {
             derivation_info_t derivation_info;
@@ -117,6 +122,59 @@ static void track_seen_sighash(sign_psbt_state_t *st, uint32_t sighash_type) {
     }
 }
 
+/**
+ * Reads this input's required locktime fields and folds them into `acc` (BIP-0370).
+ *
+ * Only the fields that the committed key enumeration reported are read, so an input declaring
+ * neither - which is every input of essentially every PSBT - costs no extra round trip.
+ *
+ * A key the enumeration reported but whose value cannot be read is a malformed PSBT, and both
+ * PSBT_FIELD_ABSENT and PSBT_FIELD_ERROR are fatal here: the presence flag comes from the keys the
+ * client committed to under keys_root, so carrying on as if the field were absent would let a
+ * client steer the signed nLockTime by withholding a value it had already committed to. This
+ * mirrors how PSBT_IN_SIGHASH_TYPE is handled below.
+ *
+ * Returns false after sending an error status word.
+ */
+static bool __attribute__((noinline)) accumulate_input_locktime(dispatcher_context_t *dc,
+                                                                const input_info_t *input,
+                                                                unsigned int cur_input_index,
+                                                                locktime_acc_t *acc) {
+    UNUSED(cur_input_index);  // only used by the PRINTFs below, which are compiled out in release
+
+    locktime_input_t in = {0};
+
+    if (input->has_required_time_locktime) {
+        if (PSBT_FIELD_PRESENT !=
+            psbt_get_input_required_time_locktime(dc, &input->in_out.map, &in.time_locktime)) {
+            PRINTF("Missing or malformed PSBT_IN_REQUIRED_TIME_LOCKTIME for input %d\n",
+                   cur_input_index);
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+        in.has_time_locktime = true;
+    }
+
+    if (input->has_required_height_locktime) {
+        if (PSBT_FIELD_PRESENT !=
+            psbt_get_input_required_height_locktime(dc, &input->in_out.map, &in.height_locktime)) {
+            PRINTF("Missing or malformed PSBT_IN_REQUIRED_HEIGHT_LOCKTIME for input %d\n",
+                   cur_input_index);
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+        in.has_height_locktime = true;
+    }
+
+    if (LOCKTIME_OK != locktime_acc_add_input(acc, &in)) {
+        PRINTF("Required locktime out of range for input %d\n", cur_input_index);
+        SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_REQUIRED_LOCKTIME_OUT_OF_RANGE);
+        return false;
+    }
+
+    return true;
+}
+
 bool __attribute__((noinline)) preprocess_inputs(
     dispatcher_context_t *dc,
     sign_psbt_state_t *st,
@@ -127,6 +185,9 @@ bool __attribute__((noinline)) preprocess_inputs(
     memset(internal_inputs, 0, BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN));
 
     if (!fill_internal_key_expressions(dc, st)) return false;
+
+    // BIP-0370 lock time determination, resolved into st->locktime after the loop
+    locktime_acc_t locktime_acc = {0};
 
     // process each input
     for (unsigned int cur_input_index = 0; cur_input_index < st->n_inputs; cur_input_index++) {
@@ -152,6 +213,12 @@ bool __attribute__((noinline)) preprocess_inputs(
             PRINTF("Unexpected pubkey length\n");  // only compressed pubkeys are supported
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
+        }
+
+        // Every input has a say in the nLockTime, including external inputs and inputs we will
+        // not sign, so this must stay above every `continue` in this loop.
+        if (!accumulate_input_locktime(dc, &input, cur_input_index, &locktime_acc)) {
+            return false;  // status word already sent
         }
 
         // either witness utxo or non-witness utxo (or both) must be present.
@@ -359,6 +426,22 @@ bool __attribute__((noinline)) preprocess_inputs(
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }
+
+    // Determine the nLockTime that every signature will commit to. Note that the fallback is used
+    // only if no input declared a required locktime: it is not a lower bound on one.
+    switch (locktime_acc_resolve(&locktime_acc, st->fallback_locktime, &st->locktime)) {
+        case LOCKTIME_OK:
+            break;
+        case LOCKTIME_ERR_UNDETERMINED:
+            PRINTF("Inputs require incompatible locktime types\n");
+            SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_UNDETERMINABLE_LOCKTIME);
+            return false;
+        default:
+            // unreachable: resolve has no other failure mode
+            SEND_SW(dc, SW_BAD_STATE);
+            return false;
+    }
+    st->locktime_determined = true;
 
     return true;
 }

@@ -155,6 +155,36 @@ To use them, the user must first opt in through the application settings. Once e
 with a non-default sighash is allowed, but still *always* requires explicit user confirmation,
 after a warning and a clear description of the signing rule in use.
 
+### Lock time
+
+A PSBTv2 has no `nLockTime` field, so the app derives the value it signs over exactly as
+[BIP-370](https://github.com/bitcoin/bips/blob/master/bip-0370.mediawiki) prescribes in
+*Determining Lock Time*, from `PSBT_GLOBAL_FALLBACK_LOCKTIME` and each input's
+`PSBT_IN_REQUIRED_TIME_LOCKTIME` / `PSBT_IN_REQUIRED_HEIGHT_LOCKTIME`.
+
+The rule most likely to surprise a host: **as soon as any input declares a required lock time, the
+fallback is ignored entirely**. It is not a lower bound and it is not combined with the required
+values. So a host that carries per-input required lock times alongside a disagreeing
+`PSBT_GLOBAL_FALLBACK_LOCKTIME` (or, having converted from a PSBTv0, a disagreeing
+`nLockTime` in the original unsigned transaction) will get signatures over the BIP-370 value, which
+is the one a conforming finalizer will also compute — not over the fallback.
+
+Two malformed cases are rejected rather than resolved arbitrarily:
+
+- If one input can only accept a height-based lock time while another can only accept a time-based
+  one, no `nLockTime` satisfies both, and the PSBT is rejected with `SW_INCORRECT_DATA` (error code
+  `0x000e`, `EC_SIGN_PSBT_UNDETERMINABLE_LOCKTIME`). An input that declares *both* fields accepts
+  either type and does not cause a conflict; when both types remain acceptable to every input, the
+  height is used.
+- The value ranges of the two fields are enforced: a `PSBT_IN_REQUIRED_HEIGHT_LOCKTIME` must be in
+  `[1, 499999999]` and a `PSBT_IN_REQUIRED_TIME_LOCKTIME` must be at least `500000000`, otherwise
+  the PSBT is rejected with `SW_INCORRECT_DATA` (error code `0x000f`,
+  `EC_SIGN_PSBT_REQUIRED_LOCKTIME_OUT_OF_RANGE`). Outside those ranges the value would not mean
+  what the field it sits in says it means, since consensus reads an `nLockTime` below `500000000`
+  as a height and anything else as a timestamp.
+
+`PSBT_GLOBAL_FALLBACK_LOCKTIME` itself is unconstrained: any 32-bit value is a legal `nLockTime`.
+
 ### What the device shows when signing
 
 The trusted-screen review adapts to *what the signatures actually commit to*, so the amounts the
