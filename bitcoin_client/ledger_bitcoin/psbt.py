@@ -1051,7 +1051,7 @@ class PSBT(object):
         """
         # To make things easier, we split up the global transaction
         # and use the PSBTv2 fields for PSBTv0
-        if self.tx is not None:
+        if self.version == 0:
             self.setup_from_tx(self.tx)
 
     def setup_from_tx(self, tx: CTransaction):
@@ -1121,7 +1121,7 @@ class PSBT(object):
 
         tx = CTransaction()
         tx.nVersion = self.tx_version
-        self.nLockTime = self.compute_lock_time()
+        tx.nLockTime = self.compute_lock_time()
 
         for psbt_in in self.inputs:
             assert psbt_in.prev_txid is not None
@@ -1163,6 +1163,9 @@ class PSBT(object):
         Sets this PSBT to version 0
         """
 
+        # Build the unsigned transaction before stripping the v2 fields
+        tx = self.get_unsigned_tx()
+
         if self.version == 2:
             # strip PSBT version 2 fields
             self.tx_version = None
@@ -1170,7 +1173,7 @@ class PSBT(object):
             self.tx_modifiable = None
 
         self._convert_version(0)
-        self.tx = self.get_unsigned_tx()
+        self.tx = tx
         self.explicit_version = False
 
 
