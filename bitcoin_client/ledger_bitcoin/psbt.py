@@ -1050,8 +1050,13 @@ class PSBT(object):
         Does nothing if the PSBT is already v2.
         """
         # To make things easier, we split up the global transaction
-        # and use the PSBTv2 fields for PSBTv0
-        if self.tx is not None:
+        # and use the PSBTv2 fields for PSBTv0.
+        #
+        # This must test the version, not `self.tx is not None`: __init__ always creates a
+        # CTransaction, so that condition is always true, and for a deserialized PSBTv2 -- whose
+        # tx is null -- setup_from_tx would overwrite tx_version and fallback_locktime with the
+        # null transaction's defaults, discarding the values just parsed.
+        if self.version == 0:
             self.setup_from_tx(self.tx)
 
     def setup_from_tx(self, tx: CTransaction):
@@ -1121,7 +1126,7 @@ class PSBT(object):
 
         tx = CTransaction()
         tx.nVersion = self.tx_version
-        self.nLockTime = self.compute_lock_time()
+        tx.nLockTime = self.compute_lock_time()
 
         for psbt_in in self.inputs:
             assert psbt_in.prev_txid is not None
@@ -1163,6 +1168,10 @@ class PSBT(object):
         Sets this PSBT to version 0
         """
 
+        # Build the unsigned transaction before stripping the v2 fields: get_unsigned_tx() reads
+        # tx_version, and compute_lock_time() reads fallback_locktime.
+        tx = self.get_unsigned_tx()
+
         if self.version == 2:
             # strip PSBT version 2 fields
             self.tx_version = None
@@ -1170,7 +1179,7 @@ class PSBT(object):
             self.tx_modifiable = None
 
         self._convert_version(0)
-        self.tx = self.get_unsigned_tx()
+        self.tx = tx
         self.explicit_version = False
 
 
