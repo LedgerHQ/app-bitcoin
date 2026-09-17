@@ -148,7 +148,7 @@ int read_wallet_policy_header(buffer_t *buffer, policy_map_wallet_header_t *head
     header->descriptor_template_len = (uint16_t) descriptor_template_len;
 
     uint64_t n_keys;
-    if (!buffer_read_varint(buffer, &n_keys) || n_keys > 252) {
+    if (!buffer_read_varint(buffer, &n_keys) || n_keys > MAX_N_KEYS_IN_WALLET_POLICY) {
         return WITH_ERROR(-1, "Invalid wallet policy header");
     }
     header->n_keys = (uint16_t) n_keys;

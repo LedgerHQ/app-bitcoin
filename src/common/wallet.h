@@ -35,6 +35,13 @@
 #define MAX_POLICY_KEY_INFO_LEN MAX(MAX_POLICY_KEY_INFO_LEN_V1, MAX_POLICY_KEY_INFO_LEN_V2)
 
 // longest supported policy in V1 is "sh(wsh(sortedmulti(5,@0,@1,@2,@3,@4)))", 38 bytes
+/**
+ * Maximum number of keys in the keys information vector of a wallet policy. This is the cap
+ * enforced while parsing the header; it also bounds the bitvector used to count the distinct
+ * key indices actually referenced by the descriptor template.
+ */
+#define MAX_N_KEYS_IN_WALLET_POLICY 252
+
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1 40
 
 #ifdef TARGET_NANOS

@@ -1725,8 +1725,14 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
     return -1;
 }
 
-int count_distinct_keys_info(const policy_node_t *policy) {
-    int ret = -1;
+int count_distinct_keys_info(const policy_node_t *policy, size_t n_keys) {
+    if (n_keys > MAX_N_KEYS_IN_WALLET_POLICY) {
+        return -1;
+    }
+
+    // bitvector of key indices referenced anywhere in the policy
+    uint8_t used[BITVECTOR_REAL_SIZE(MAX_N_KEYS_IN_WALLET_POLICY)];
+    memset(used, 0, sizeof(used));
 
     int n_placeholders = get_key_placeholder_by_index(policy, 0, NULL, NULL);
     if (n_placeholders < 0) {
@@ -1738,9 +1744,19 @@ int count_distinct_keys_info(const policy_node_t *policy) {
         if (0 > get_key_placeholder_by_index(policy, cur, NULL, &placeholder)) {
             return -1;
         }
-        ret = MAX(ret, placeholder.key_index + 1);
+        if (placeholder.key_index < 0 || (size_t) placeholder.key_index >= n_keys) {
+            return -1;
+        }
+        bitvector_set(used, (unsigned int) placeholder.key_index, true);
     }
-    return ret;
+
+    int n_distinct = 0;
+    for (size_t i = 0; i < n_keys; i++) {
+        if (bitvector_get(used, (unsigned int) i)) {
+            ++n_distinct;
+        }
+    }
+    return n_distinct;
 }
 
 // Utility function to extract and decode the i-th xpub from the keys information vector
