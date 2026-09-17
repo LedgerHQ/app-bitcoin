@@ -473,6 +473,28 @@ static uint8_t pm_tape_u8(pm_tape_t *t) {
 #define PM_TAPE_KV_MAX    128   /* ceiling for a key or value */
 #define PM_TAPE_VAL_SHORT  40   /* the common case; covers 32B hashes and 33B pubkeys */
 
+/* Retype one of the map's entries as a keyless PSBT field of `key_type`.
+ *
+ * Used to plant the two required-locktime keys, which the tape would otherwise essentially never
+ * produce: a 1-byte key holding 0x11 or 0x12 with a 4-byte value is about 5e-5 per entry, and the
+ * mixed height-only/time-only case across two inputs is ~1e-6 -- so the BIP-370 derivation would
+ * sit at 0% coverage for any campaign length.
+ *
+ * Only the key type, the key length and (when the tape drew enough bytes) the value length are
+ * forced. The value bytes are always the tape's own, so nothing here authors content and nothing
+ * exposes the stale contents of the static buffers. When the tape drew fewer than `val_len` bytes
+ * the length is left alone, which reaches the malformed-field rejection instead.
+ */
+static void pm_force_key(pm_merkle_map_t *map, int idx, uint8_t key_type, size_t val_len) {
+    if (idx < 0 || idx >= map->n_entries) return;
+
+    ((uint8_t *) map->keys[idx])[0] = key_type;   /* points into kb[], writable */
+    map->key_lens[idx] = 1;
+    if (map->val_lens[idx] >= val_len) {
+        map->val_lens[idx] = val_len;
+    }
+}
+
 /* Read one PSBT map off the tape: an entry count, then per entry a key length, the
  * key bytes, a value length and the value bytes.
  *
@@ -511,6 +533,39 @@ static int pm_map_from_tape(pm_tape_t *t, mock_dispatcher_t *host,
         for (size_t j = 0; j < kl; j++) kb[i][j] = pm_tape_u8(t);
         for (size_t j = 0; j < vl; j++) vb[i][j] = pm_tape_u8(t);
         if (pm_map_add(&map, kb[i], kl, vb[i], vl) < 0) break;
+    }
+
+    /* One control byte, two uses. Its low nibble gates the host bindings below, as it always
+     * has; its high nibble -- previously read and discarded -- selects a required-locktime
+     * injection. Reading it here rather than at the binding block keeps the number and order of
+     * pm_tape_u8() calls per map exactly as before, so the tape framing is unchanged and the
+     * promoted base corpus stays as effective as it was.
+     *
+     * The injection happens before the sort because the app runs check_merkle_tree_sorted() on
+     * every map it opens: a key rewritten afterwards would make the map unreadable rather than
+     * interesting, and a collision with a key the tape already produced is handled by the dedup
+     * pass below.
+     *
+     * Per the exhaustion rule below, an unfunded read yields 0, so 0 must be the benign case --
+     * hence the injection nibbles are at the top of the range. Each input map draws its own
+     * control byte, so the mixed height-only/time-only rejection (BIP-370 cannot determine a lock
+     * time) falls out of two inputs happening to draw 12 and 13. */
+    uint8_t ctl = pm_tape_u8(t);
+    switch (ctl >> 4) {
+        case 12:
+            pm_force_key(&map, 0, PSBT_IN_REQUIRED_HEIGHT_LOCKTIME, 4);
+            break;
+        case 13:
+            pm_force_key(&map, 0, PSBT_IN_REQUIRED_TIME_LOCKTIME, 4);
+            break;
+        case 14:
+            /* both on one input: BIP-370 says such an input accepts either type, and the height
+             * is then the one chosen */
+            pm_force_key(&map, 0, PSBT_IN_REQUIRED_HEIGHT_LOCKTIME, 4);
+            pm_force_key(&map, 1, PSBT_IN_REQUIRED_TIME_LOCKTIME, 4);
+            break;
+        default:
+            break; /* 0..11 and 15: no injection, so the common case stays common */
     }
 
     /* Sort by key, strictly, and drop equal keys.
@@ -565,8 +620,9 @@ static int pm_map_from_tape(pm_tape_t *t, mock_dispatcher_t *host,
      * must satisfy for the conversation to continue, not a value the harness chose.
      *
      * Deliberately not always. One time in sixteen the txid is left exactly as the
-     * tape wrote it, so the mismatch rejection stays reachable as well. */
-    if ((pm_tape_u8(t) & 0x0Fu) != 0x0Fu) {
+     * tape wrote it, so the mismatch rejection stays reachable as well. (`ctl` was drawn before
+     * the sort above; only its low nibble is used here.) */
+    if ((ctl & 0x0Fu) != 0x0Fu) {
         const uint8_t *rawtx = NULL;
         size_t rawtx_len = 0;
         uint8_t *txid = NULL;

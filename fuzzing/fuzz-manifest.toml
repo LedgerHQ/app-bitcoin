@@ -30,6 +30,10 @@ key_files = [
     "src/common/wallet.c",
     "src/handler/get_wallet_address.c",
     "src/handler/sign_psbt/txhashes.c",
+    # preprocess_inputs.c also carries the BIP-370 lock time determination; the decision
+    # procedure itself is static inline in src/common/locktime.h, so its coverage is
+    # attributed to this translation unit.
+    "src/handler/sign_psbt/preprocess_inputs.c",
     "src/common/segwit_addr.c",
     "src/swap/handle_check_address.c",
     "src/swap/handle_swap_sign_transaction.c",
@@ -205,6 +209,12 @@ tokens = [
     { name = "sequence", value = "\\x10" },
     { name = "psbt_in_req_time_locktime", value = "\\x11" },
     { name = "psbt_in_req_height_locktime", value = "\\x12" },
+    # BIP-370's height/time boundary, 500000000, little-endian, and one below it: the only
+    # value the required-locktime range checks branch on. The SPECIAL_LOCKTIMES table in
+    # fuzz_dispatcher.c has the decimal value but only feeds the *global* fallback slot; the
+    # per-input values come off the tape, where a dictionary token can reach them.
+    { name = "locktime_threshold_le", value = "\\x00\\x65\\xCD\\x1D" },
+    { name = "locktime_threshold_minus1_le", value = "\\xFF\\x64\\xCD\\x1D" },
     { name = "tap_key_sig", value = "\\x13" },
     { name = "tap_script_sig", value = "\\x14" },
     { name = "tap_leaf_script", value = "\\x15" },

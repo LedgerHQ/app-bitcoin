@@ -128,6 +128,8 @@ IN_BIP32_DERIVATION = 0x06
 IN_PREVIOUS_TXID = 0x0E
 IN_OUTPUT_INDEX = 0x0F
 IN_SEQUENCE = 0x10
+IN_REQUIRED_TIME_LOCKTIME = 0x11
+IN_REQUIRED_HEIGHT_LOCKTIME = 0x12
 IN_TAP_BIP32_DERIVATION = 0x16
 OUT_BIP32_DERIVATION = 0x02
 OUT_AMOUNT = 0x03
@@ -313,6 +315,31 @@ def psbt_cases():
         (bytes([IN_SEQUENCE]), b"\xfe\xff\xff\xff"),
     ], {}, {}))
 
+    # The BIP-370 lock time derivation (src/common/locktime.h), reached from
+    # preprocess_inputs.c. Only a per-input required lock time gets past the fallback-only
+    # branch, so without one of these keys present the whole accumulator is dead code.
+    # LOCKTIME_THRESHOLD is 500000000: below it a value means a height, at or above it a time,
+    # and the app rejects a value on the wrong side of the boundary for the field it sits in.
+    lt = [
+        ("height", [(bytes([IN_REQUIRED_HEIGHT_LOCKTIME]), (10000).to_bytes(4, "little"))]),
+        ("time", [(bytes([IN_REQUIRED_TIME_LOCKTIME]), (1657048460).to_bytes(4, "little"))]),
+        ("both", [(bytes([IN_REQUIRED_HEIGHT_LOCKTIME]), (10000).to_bytes(4, "little")),
+                  (bytes([IN_REQUIRED_TIME_LOCKTIME]), (1657048460).to_bytes(4, "little"))]),
+        ("height-zero", [(bytes([IN_REQUIRED_HEIGHT_LOCKTIME]), (0).to_bytes(4, "little"))]),
+        ("height-over", [(bytes([IN_REQUIRED_HEIGHT_LOCKTIME]),
+                          (500000000).to_bytes(4, "little"))]),
+        ("time-under", [(bytes([IN_REQUIRED_TIME_LOCKTIME]),
+                         (499999999).to_bytes(4, "little"))]),
+        ("short", [(bytes([IN_REQUIRED_HEIGHT_LOCKTIME]), b"\x10\x27\x00")]),
+    ]
+    for tag, entries in lt:
+        cases.append((f"locktime-{tag}", [
+            (bytes([IN_WITNESS_UTXO]), witness_utxo()),
+            (bytes([IN_PREVIOUS_TXID]), txid_slot),
+            (bytes([IN_OUTPUT_INDEX]), idx0),
+            (bytes([IN_BIP32_DERIVATION]) + pk33, bip32_derivation()),
+        ] + entries, {}, {}))
+
     return cases
 
 
@@ -347,6 +374,23 @@ def build_seeds(prefix):
     seeds["psbt-two-in-two-out"] = make_input(
         prefix, 0, tape_map(common) * 2 + output_map() * 2,
         n_inputs=2, n_outputs=2,
+    )
+
+    # One input satisfiable only by a height, another only by a time: BIP-370 cannot determine a
+    # lock time, which is the rejection path in preprocess_inputs. It needs two *differing* input
+    # maps, so unlike the seeds above it cannot reuse `tape_map(common) * 2`.
+    #
+    # The lock time is resolved after the "no internal inputs" check, so the derivation has to be
+    # there for the inputs to be internal -- otherwise the scenario is rejected for having nothing
+    # to sign and this path is never reached.
+    internal = common + [
+        (bytes([IN_BIP32_DERIVATION]) + bytes([0x02]) + bytes([0x33]) * 32, bip32_derivation())]
+    height_only = internal + [
+        (bytes([IN_REQUIRED_HEIGHT_LOCKTIME]), (10000).to_bytes(4, "little"))]
+    time_only = internal + [
+        (bytes([IN_REQUIRED_TIME_LOCKTIME]), (1657048460).to_bytes(4, "little"))]
+    seeds["psbt-locktime-mixed"] = make_input(
+        prefix, 0, tape_map(height_only) + tape_map(time_only) + output_map(), n_inputs=2
     )
 
     # A declared entry count that disagrees with the leaves actually served.
