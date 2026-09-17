@@ -26,16 +26,22 @@ int call_stream_merkleized_map_value(dispatcher_context_t *dispatcher_context,
     int index =
         call_get_merkle_leaf_index(dispatcher_context, map->size, map->keys_root, key_merkle_hash);
 
+    if (index == MERKLE_LEAF_NOT_FOUND) {
+        return MAP_VALUE_ABSENT;
+    }
     if (index < 0) {
-        PRINTF("Key not found, or incorrect data.\n");
-        return -1;
+        PRINTF("Failed to look up the key.\n");
+        return MAP_VALUE_ERROR;
     }
 
-    return call_stream_merkle_leaf_element(dispatcher_context,
-                                           map->values_root,
-                                           map->size,
-                                           index,
-                                           len_callback,
-                                           callback,
-                                           callback_state);
+    int res = call_stream_merkle_leaf_element(dispatcher_context,
+                                              map->values_root,
+                                              map->size,
+                                              index,
+                                              len_callback,
+                                              callback,
+                                              callback_state);
+    // Normalize: the failure codes of the underlying flows overlap with MAP_VALUE_ABSENT, and
+    // leaking them would make a transport error look like a missing key.
+    return res < 0 ? MAP_VALUE_ERROR : res;
 }
