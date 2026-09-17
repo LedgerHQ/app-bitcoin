@@ -42,7 +42,11 @@ static bool display_message_content_and_confirm(dispatcher_context_t* dc,
                                                 size_t n_chunks,
                                                 uint8_t* path_str) {
     reset_streaming_index();
-    while (get_streaming_index() <= (n_chunks - 1) / MESSAGE_CHUNK_PER_DISPLAY) {
+    // An empty message has no chunks; computing the last page as (n_chunks - 1) / N would underflow
+    // size_t and make this loop run until the uint8_t streaming index wraps. One empty page is the
+    // correct rendering, matching what the larger-screen code shows for a zero-length message.
+    size_t last_page = n_chunks == 0 ? 0 : (n_chunks - 1) / MESSAGE_CHUNK_PER_DISPLAY;
+    while (get_streaming_index() <= last_page) {
         uint8_t message_chunk[MESSAGE_MAX_DISPLAY_SIZE];
 
         int total_chunk_len = 0;
@@ -92,7 +96,7 @@ static bool display_message_content_and_confirm(dispatcher_context_t* dc,
         if (!ui_display_path_and_message_content(dc,
                                                  (char*) path_str,
                                                  (char*) message_chunk,
-                                                 (n_chunks - 1) / MESSAGE_CHUNK_PER_DISPLAY)) {
+                                                 last_page)) {
             return false;
         }
     }
