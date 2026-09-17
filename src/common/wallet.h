@@ -81,6 +81,9 @@
 #define MAX_PARSE_SCRIPT_RECURSION_DEPTH 16
 #endif
 
+// Maximum supported nesting of thresh operators
+#define MAX_THRESH_NESTING 4
+
 // at most 92 bytes
 // wallet type (1 byte)
 // name length (1 byte)
