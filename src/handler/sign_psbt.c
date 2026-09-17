@@ -556,6 +556,11 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return false;
     }
+    if (n_outputs_u64 > MAX_N_OUTPUTS_CAN_SIGN) {
+        PRINTF("At most %d outputs are supported\n", MAX_N_OUTPUTS_CAN_SIGN);
+        SEND_SW(dc, SW_NOT_SUPPORTED);
+        return false;
+    }
     st->n_outputs = (unsigned int) n_outputs_u64;
 
     policy_map_wallet_header_t wallet_header;

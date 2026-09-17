@@ -46,6 +46,11 @@
  */
 #define MAX_N_INPUTS_CAN_SIGN 512
 
+/**
+ * Maximum number of outputs supported while signing a transaction.
+ */
+#define MAX_N_OUTPUTS_CAN_SIGN 512
+
 // SIGHASH flags
 #define SIGHASH_DEFAULT      0x00000000
 #define SIGHASH_ALL          0x00000001
