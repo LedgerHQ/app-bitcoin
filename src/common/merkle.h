@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 // TODO: RFC6962 defines the empty list hash as sha256(b''); while we're using 0 here. Should we
@@ -86,4 +87,11 @@ typedef struct {
     uint64_t size;
     uint8_t keys_root[32];
     uint8_t values_root[32];
+
+    // PRIVATE - managed only by the merkleized-map API (call_get_merkleized_map* /
+    // call_check_merkleized_map_sorted). Set to true once the keys tree has been verified to be
+    // lexicographically sorted (and therefore the keys are unique), which is the precondition for
+    // reading a value by key. The by-key readers assert this is set.
+    // Callers must not read or set it directly.
+    bool _keys_are_sorted;
 } merkleized_map_commitment_t;
