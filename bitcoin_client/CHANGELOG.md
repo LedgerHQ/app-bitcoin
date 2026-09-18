@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [0.4.2] - 18-09-2026
+
+### Fixed
+
+- Improve support of PsbtV2 fields and V0-to-V2 conversion.
+
 ## [0.4.1] - 16-04-2026
 
 ### Added
