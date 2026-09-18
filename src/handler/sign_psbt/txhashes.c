@@ -162,6 +162,12 @@ static int hash_outputs(dispatcher_context_t *dc,
 bool __attribute__((noinline)) compute_tx_hashes(dispatcher_context_t *dc,
                                                  sign_psbt_state_t *st,
                                                  tx_hashes_t *hashes) {
+    // st->locktime is determined at the end of preprocess_inputs, and everything from here on
+    // signs over it. Asserting here rather than in each compute_sighash_* keeps it to one place:
+    // st is memset to zero at the start of the flow, so skipping the determination would sign
+    // nLockTime 0 - a plausible-looking value, hence an invisible bug.
+    LEDGER_ASSERT(st->locktime_determined, "locktime not determined");
+
     {
         // compute sha_prevouts and sha_sequences
         cx_sha256_t sha_prevouts_context, sha_sequences_context;

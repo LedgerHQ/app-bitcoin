@@ -95,6 +95,33 @@ psbt_field_status_t psbt_get_input_sequence(dispatcher_context_t *dc,
                                             uint32_t *out);
 
 /**
+ * PSBT_IN_REQUIRED_TIME_LOCKTIME: optional 4-byte little-endian UNIX timestamp, the earliest time
+ * at which this input can be spent. Used to derive the transaction's nLockTime (BIP-0370).
+ *
+ * This accessor only guarantees "present and exactly 4 bytes". The value range BIP-0370 requires
+ * (at least 500000000) is a semantic rule, checked in common/locktime.h alongside the rest of the
+ * lock time rules.
+ *
+ * Read only for inputs whose committed key enumeration reported the key; for those, ABSENT is a
+ * malformed PSBT just like ERROR, and must not be taken to mean "no required lock time".
+ */
+psbt_field_status_t psbt_get_input_required_time_locktime(
+    dispatcher_context_t *dc,
+    const merkleized_map_commitment_t *input_map,
+    uint32_t *out);
+
+/**
+ * PSBT_IN_REQUIRED_HEIGHT_LOCKTIME: optional 4-byte little-endian block height, the earliest
+ * height at which this input can be spent. Same contract as
+ * psbt_get_input_required_time_locktime above; its range rule (greater than 0 and less than
+ * 500000000) likewise lives in common/locktime.h.
+ */
+psbt_field_status_t psbt_get_input_required_height_locktime(
+    dispatcher_context_t *dc,
+    const merkleized_map_commitment_t *input_map,
+    uint32_t *out);
+
+/**
  * PSBT_IN_SIGHASH_TYPE: 4-byte little-endian sighash type. Callers that only read it once
  * has_sighash_type is set treat ABSENT as a malformed PSBT.
  */

@@ -154,6 +154,20 @@ psbt_field_status_t psbt_get_input_sequence(dispatcher_context_t *dc,
     return read_u32_le_field(dc, input_map, PSBT_IN_SEQUENCE, out);
 }
 
+psbt_field_status_t psbt_get_input_required_time_locktime(
+    dispatcher_context_t *dc,
+    const merkleized_map_commitment_t *input_map,
+    uint32_t *out) {
+    return read_u32_le_field(dc, input_map, PSBT_IN_REQUIRED_TIME_LOCKTIME, out);
+}
+
+psbt_field_status_t psbt_get_input_required_height_locktime(
+    dispatcher_context_t *dc,
+    const merkleized_map_commitment_t *input_map,
+    uint32_t *out) {
+    return read_u32_le_field(dc, input_map, PSBT_IN_REQUIRED_HEIGHT_LOCKTIME, out);
+}
+
 psbt_field_status_t psbt_get_input_sighash_type(dispatcher_context_t *dc,
                                                 const merkleized_map_commitment_t *input_map,
                                                 uint32_t *out) {
