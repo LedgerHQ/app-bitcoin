@@ -35,6 +35,13 @@
 #define MAX_POLICY_KEY_INFO_LEN MAX(MAX_POLICY_KEY_INFO_LEN_V1, MAX_POLICY_KEY_INFO_LEN_V2)
 
 // longest supported policy in V1 is "sh(wsh(sortedmulti(5,@0,@1,@2,@3,@4)))", 38 bytes
+/**
+ * Maximum number of keys in the keys information vector of a wallet policy. This is the cap
+ * enforced while parsing the header; it also bounds the bitvector used to count the distinct
+ * key indices actually referenced by the descriptor template.
+ */
+#define MAX_N_KEYS_IN_WALLET_POLICY 252
+
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1 40
 
 #ifdef TARGET_NANOS
@@ -73,6 +80,17 @@
 #else
 #define MAX_PARSE_SCRIPT_RECURSION_DEPTH 16
 #endif
+
+// Maximum supported nesting of thresh operators
+#define MAX_THRESH_NESTING 4
+
+// Maximum supported value for n in a thresh miniscript operator (technical limitation).
+// It also bounds the stack used while analyzing a policy: the arrays of compute_thresh_ops() and
+// compute_thresh_stacksize() are proportional to it, and up to MAX_THRESH_NESTING of them are
+// alive at the same time due to recursion, therefore this ends up eating a substantial amount of
+// memory.
+// This limit is extremely unlikely to be hit in practice.
+#define MAX_N_IN_THRESH 24
 
 // at most 92 bytes
 // wallet type (1 byte)

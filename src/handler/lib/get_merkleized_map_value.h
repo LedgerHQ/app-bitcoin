@@ -1,8 +1,12 @@
 #pragma once
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../common/merkle.h"
-#include "../../common/read.h"
+/* SDK headers */
+#include "read.h"
+
+/* Local headers */
+#include "dispatcher.h"
+#include "map_value_status.h"
+#include "merkle.h"
 
 /**
  * Given a commitment to a merkleized key-value map, this flow finds out the index of the element
@@ -10,11 +14,20 @@
  * Merkle proof matches. The value is then stored in the `out` pointer, which must be large enough
  * to contain the preimage.
  *
- * Returns a negative number if the response is too long to fit into the output buffer, or if the
- * key is not found, or if any of the proofs failed. Returns the length of the preimage on success.
+ * Returns the length of the preimage on success, MAP_VALUE_ABSENT if the key is not in the map, or
+ * MAP_VALUE_ERROR if any of the proofs failed, the response was malformed, or the value is too
+ * long to fit into the output buffer. See map_value_status.h; in particular, callers must branch
+ * on MAP_VALUE_ABSENT explicitly rather than on `res < 0` when a missing key is not an error.
  *
- * NOTE: this does _not_ check that the keys are lexicographically sorted; the sanity check needs to
- * be done before.
+ * PRECONDITION: the map's keys must have already been verified to be lexicographically sorted (and
+ * therefore unique); this is what makes a by-key lookup unambiguous. A map is validated either by
+ * `call_get_merkleized_map[_with_callback]` (which validates before returning) or by
+ * `call_check_merkleized_map_sorted`. This function asserts that precondition (LEDGER_ASSERT on
+ * `map->_keys_are_sorted`); it does NOT re-check the ordering itself.
+ *
+ * NOTE for callbacks fired during validation (via call_get_merkleized_map_with_callback): at that
+ * point the map is not yet validated, so values must be read by index (on `values_root`) and never
+ * by key through this function or its siblings.
  */
 int call_get_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                   const merkleized_map_commitment_t *map,

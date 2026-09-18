@@ -556,6 +556,11 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return false;
     }
+    if (n_outputs_u64 > MAX_N_OUTPUTS_CAN_SIGN) {
+        PRINTF("At most %d outputs are supported\n", MAX_N_OUTPUTS_CAN_SIGN);
+        SEND_SW(dc, SW_NOT_SUPPORTED);
+        return false;
+    }
     st->n_outputs = (unsigned int) n_outputs_u64;
 
     policy_map_wallet_header_t wallet_header;
@@ -570,7 +575,9 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
     {  // process global map
         // Check integrity of the global map
-        if (call_check_merkle_tree_sorted(dc, global_map.keys_root, (size_t) global_map.size) < 0) {
+        // Check integrity of the global map (this also marks it as validated, so that its values
+        // may be read by key below).
+        if (call_check_merkleized_map_sorted(dc, &global_map) < 0) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
