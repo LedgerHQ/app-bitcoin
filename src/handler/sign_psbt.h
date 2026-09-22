@@ -50,6 +50,8 @@ typedef struct {
     bool has_nonWitnessUtxo;
     bool has_redeemScript;
     bool has_sighash_type;
+    bool has_required_time_locktime;    // PSBT_IN_REQUIRED_TIME_LOCKTIME (0x11)
+    bool has_required_height_locktime;  // PSBT_IN_REQUIRED_HEIGHT_LOCKTIME (0x12)
 
     uint64_t prevout_amount;  // the value of the prevout of the current input
 
@@ -148,7 +150,16 @@ typedef struct {
 typedef struct {
     uint32_t master_key_fingerprint;
     uint32_t tx_version;
+
+    // PSBT_GLOBAL_FALLBACK_LOCKTIME, or 0 if absent. Per BIP-0370 this is used *only* when no
+    // input declares a required locktime; it is never a lower bound on one.
+    uint32_t fallback_locktime;
+
+    // The nLockTime that every signature commits to. Determined per BIP-0370 at the end of
+    // preprocess_inputs, and only there; it is not meaningful before that, which is what
+    // locktime_determined records.
     uint32_t locktime;
+    bool locktime_determined;
 
     merkleized_map_commitment_t global_map;
 
