@@ -155,6 +155,15 @@ To use them, the user must first opt in through the application settings. Once e
 with a non-default sighash is allowed, but still *always* requires explicit user confirmation,
 after a warning and a clear description of the signing rule in use.
 
+### Lock time
+
+A PSBTv2 has no `nLockTime` field, so the app derives the value it signs over exactly as
+[BIP-370](https://github.com/bitcoin/bips/blob/master/bip-0370.mediawiki) prescribes in
+*Determining Lock Time*, from `PSBT_GLOBAL_FALLBACK_LOCKTIME` and each input's
+`PSBT_IN_REQUIRED_TIME_LOCKTIME` / `PSBT_IN_REQUIRED_HEIGHT_LOCKTIME`.
+
+Note: up until version 2.5.1, the app ignored each input's required locktime fields, and directly used `PSBT_GLOBAL_FALLBACK_LOCKTIME` as the transaction's `nLockTime`.
+
 ### What the device shows when signing
 
 The trusted-screen review adapts to *what the signatures actually commit to*, so the amounts the
