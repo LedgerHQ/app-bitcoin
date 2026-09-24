@@ -9,6 +9,11 @@ Dates are in `dd-mm-yyyy` format.
 
 ## [2.X.X] - XX-XX-XXXX
 
+### Changed
+
+- MuSig2: the pubnonces no longer depend directly on the transaction, so they can be pre-generated before the transaction is known. See [doc/musig.md](doc/musig.md).
+- MuSig2: at most one signing session can be pending for a given wallet policy; executing round 1 again for the same wallet policy discards the previous session.
+
 ### Fixed
 
 - The transaction lock time is now determined as BIP-370 prescribes, from each input's `PSBT_IN_REQUIRED_TIME_LOCKTIME` / `PSBT_IN_REQUIRED_HEIGHT_LOCKTIME` together with `PSBT_GLOBAL_FALLBACK_LOCKTIME`, instead of always using the fallback verbatim. PSBTs not using the individual preferred locktime fields are unaffected, as they will keep depending on `PSBT_GLOBAL_FALLBACK_LOCKTIME` alone.
