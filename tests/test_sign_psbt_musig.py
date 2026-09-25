@@ -3,7 +3,7 @@ from pathlib import Path
 
 from hashlib import sha256
 import hmac
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import pytest
 
@@ -12,7 +12,7 @@ from ragger.error import ExceptionRAPDU
 from ledger_bitcoin.exception.errors import IncorrectDataError
 from ledger_bitcoin.exception.device_exception import DeviceException
 from ledger_bitcoin.client_base import Client, MusigPartialSignature, MusigPubNonce
-from ledger_bitcoin.key import ExtendedKey
+from ledger_bitcoin.key import ExtendedKey, KeyOriginInfo
 from ledger_bitcoin.psbt import PSBT
 from ragger.navigator import Navigator
 from ragger.firmware import Firmware
@@ -20,7 +20,8 @@ from ragger.firmware import Firmware
 from ledger_bitcoin.wallet import WalletPolicy
 from ragger_bitcoin import RaggerClient
 from test_utils import SpeculosGlobals, bip0327
-from test_utils.musig2 import HotMusig2Cosigner, MuSig2KeyPlaceholder, PsbtMusig2Cosigner, TrDescriptorTemplate, run_musig2_test
+from test_utils.musig2 import HotMusig2Cosigner, MuSig2KeyPlaceholder, PsbtMusig2Cosigner, TrDescriptorTemplate, aggregate_musig_pubkey, process_placeholder, run_musig2_test, tapleaf_hash
+from test_utils.taproot import taproot_output_script
 from .instructions import *
 
 tests_root: Path = Path(__file__).parent
@@ -185,6 +186,162 @@ def test_sign_psbt_musig2_scriptpath(navigator: Navigator, firmware: Firmware, c
     signer_2 = HotMusig2Cosigner(wallet_policy, cosigner_2_xpriv)
 
     run_musig2_test(wallet_policy, psbt, [signer_1, signer_2], sighashes)
+
+
+def musig_pubnonce_ids(wallet_policy: WalletPolicy, psbt: PSBT) -> Dict[Tuple[int, int], Tuple[bytes, Optional[bytes]]]:
+    """
+    For each (input index, musig() key placeholder index) pair of the psbt, returns the
+    (aggregate pubkey after the tweaks, tapleaf hash) pair that, together with the participant's
+    pubkey, identifies the pubnonces and partial signatures in the psbt.
+    """
+    desc_tmpl = TrDescriptorTemplate.from_string(wallet_policy.descriptor_template)
+    result = {}
+    for placeholder_index, (placeholder, tapleaf_desc) in enumerate(desc_tmpl.placeholders()):
+        if not isinstance(placeholder, MuSig2KeyPlaceholder):
+            continue
+
+        agg_xpub_str, keyagg_ctx = aggregate_musig_pubkey(
+            wallet_policy.keys_info[i] for i in placeholder.key_indexes)
+        agg_xpub = ExtendedKey.deserialize(agg_xpub_str)
+
+        for input_index, input in enumerate(psbt.inputs):
+            res = process_placeholder(
+                wallet_policy, input, placeholder, keyagg_ctx, agg_xpub, tapleaf_desc, desc_tmpl)
+            if res is not None:
+                (_, _, leaf_script, aggpk_tweaked) = res
+                result[(input_index, placeholder_index)] = (
+                    aggpk_tweaked, tapleaf_hash(leaf_script))
+    return result
+
+
+class Round1OnOtherTxCosigner(LedgerMusig2Cosigner):
+    """
+    A LedgerMusig2Cosigner that executes round 1 on a completely different transaction than the one
+    that is going to be signed, and then reuses the resulting pubnonces. This is what a software
+    wallet does when it pre-generates the pubnonces before the transaction is known.
+    """
+
+    def __init__(self, other_psbt: PSBT, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.other_psbt = other_psbt
+
+    def generate_public_nonces(self, psbt: PSBT) -> None:
+        # the device only ever sees the unrelated transaction during round 1
+        super().generate_public_nonces(self.other_psbt)
+
+        # Transplant the pubnonces into the transaction that will actually be signed.
+        src_ids = musig_pubnonce_ids(self.wallet_policy, self.other_psbt)
+        dst_ids = musig_pubnonce_ids(self.wallet_policy, psbt)
+        n_transplanted = 0
+        for (input_index, placeholder_index), (src_aggpk, src_leaf_hash) in src_ids.items():
+            dst_aggpk, dst_leaf_hash = dst_ids[(input_index, placeholder_index)]
+            src_key = (self.pubkey.pubkey, src_aggpk, src_leaf_hash)
+            if src_key in self.other_psbt.inputs[input_index].musig2_pub_nonces:
+                psbt.inputs[input_index].musig2_pub_nonces[(self.pubkey.pubkey, dst_aggpk, dst_leaf_hash)] = \
+                    self.other_psbt.inputs[input_index].musig2_pub_nonces[src_key]
+                n_transplanted += 1
+        assert n_transplanted > 0
+
+
+def test_sign_psbt_musig2_round1_on_another_transaction(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals):
+    # Neither the pubnonces nor the psbt_session_id depend on the transaction, therefore pubnonces
+    # obtained in round 1 for one transaction are valid for any other transaction of the same wallet
+    # policy, as long as the inputs are at the same indexes.
+    # This is needed by software wallets that want to pre-generate the pubnonces before the
+    # transaction is known, keeping the UX of musig similar to a regular multisig.
+    #
+    # This test would have failed on versions of the app until 2.5.1, since the psbt_session_id
+    # used to depend on the transaction.
+    wallet_policy, wallet_hmac = keypath_wallet_policy(speculos_globals)
+
+    psbt = PSBT()
+    psbt.deserialize(KEYPATH_PSBT_B64)
+
+    other_psbt = PSBT()
+    other_psbt.deserialize(KEYPATH_PSBT_B64)
+    other_psbt.tx.vin[0].prevout.hash ^= 1
+    other_psbt.tx.vout[0].nValue += 1000
+    other_psbt.tx.rehash()
+
+    other_input = other_psbt.inputs[0]
+    ((_, (_, key_origin)),) = other_input.tap_bip32_paths.items()
+    assert key_origin.path == [0, 3]
+    other_steps = [1, 7]  # change address with index 7, instead of receive address with index 3
+    agg_xpub = ExtendedKey.deserialize(aggregate_musig_pubkey(wallet_policy.keys_info)[0])
+    other_internal_key = agg_xpub.derive_pub_path(other_steps).pubkey[1:]
+    other_input.tap_bip32_paths = {
+        other_internal_key: (set(), KeyOriginInfo(key_origin.fingerprint, other_steps))
+    }
+    other_input.witness_utxo.scriptPubKey = taproot_output_script(other_internal_key, None)
+
+    assert musig_pubnonce_ids(wallet_policy, other_psbt)[(0, 0)] != \
+        musig_pubnonce_ids(wallet_policy, psbt)[(0, 0)]
+
+    signer_1 = Round1OnOtherTxCosigner(other_psbt, client, wallet_policy, wallet_hmac,
+                                       navigator=navigator, instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False, has_spend_from_wallet=True, has_feewarning=True), testname=test_name)
+    signer_2 = HotMusig2Cosigner(wallet_policy, KEYPATH_COSIGNER_2_XPRIV)
+
+    # run_musig2_test also aggregates the partial signatures and checks the resulting Schnorr
+    # signature against the sighash of `psbt`
+    run_musig2_test(wallet_policy, psbt, [signer_1, signer_2], KEYPATH_SIGHASHES)
+
+
+class Round1ForOtherPolicyCosigner(PsbtMusig2Cosigner):
+    """
+    Not a real cosigner: when asked for its pubnonces, it makes the device execute round 1 for a
+    different wallet policy, on a copy of the psbt. Used to check that this does not interfere with
+    the pending session of the policy that is actually being signed.
+    """
+
+    def __init__(self, ledger_cosigner: LedgerMusig2Cosigner) -> None:
+        super().__init__()
+        self.ledger_cosigner = ledger_cosigner
+
+    def get_participant_pubkey(self) -> bip0327.Point:
+        return self.ledger_cosigner.get_participant_pubkey()
+
+    def generate_public_nonces(self, psbt: PSBT) -> None:
+        # the copy must not contain any pubnonce, or the device would execute round 2
+        psbt_copy = PSBT()
+        psbt_copy.deserialize(psbt.serialize())
+        for input in psbt_copy.inputs:
+            input.musig2_pub_nonces.clear()
+        self.ledger_cosigner.generate_public_nonces(psbt_copy)
+        assert any(len(input.musig2_pub_nonces) > 0 for input in psbt_copy.inputs)
+
+    def generate_partial_signatures(self, psbt: PSBT) -> None:
+        pass
+
+
+def test_sign_psbt_musig2_policies_with_same_keys(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals):
+    # Two wallet policies with the same keys, but different descriptor templates, must not share the
+    # same psbt_session_id: otherwise, round 1 for one policy would delete the session that the
+    # other policy is waiting to use in round 2.
+    wallet_policy, wallet_hmac = keypath_wallet_policy(speculos_globals)
+
+    # The keys in musig() are sorted, so this policy has the same aggregate key and the same
+    # addresses as wallet_policy; it can therefore execute round 1 on the very same psbt.
+    other_wallet_policy = WalletPolicy(
+        name="Musig for my other ears",
+        descriptor_template="tr(musig(@1,@0)/**)",
+        keys_info=wallet_policy.keys_info
+    )
+    other_wallet_hmac = hmac.new(
+        speculos_globals.wallet_registration_key, other_wallet_policy.id, sha256).digest()
+    assert other_wallet_policy.id != wallet_policy.id
+
+    psbt = PSBT()
+    psbt.deserialize(KEYPATH_PSBT_B64)
+
+    signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac,
+                                    navigator=navigator, instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False, has_spend_from_wallet=True, has_feewarning=True), testname=test_name)
+    interloper = Round1ForOtherPolicyCosigner(
+        LedgerMusig2Cosigner(client, other_wallet_policy, other_wallet_hmac, testname=test_name))
+    signer_2 = HotMusig2Cosigner(wallet_policy, KEYPATH_COSIGNER_2_XPRIV)
+
+    # the device executes round 1 for wallet_policy, then for other_wallet_policy, then round 2 for
+    # wallet_policy
+    run_musig2_test(wallet_policy, psbt, [signer_1, interloper, signer_2], KEYPATH_SIGHASHES)
 
 
 def test_sign_psbt_musig2_wrong_pubnonce(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals):

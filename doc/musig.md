@@ -10,7 +10,8 @@ MuSig2 is a 2-round multi-signature scheme compatible with the public keys and s
 
 - At most 5 keys are allowed in the musig expression; performance limitations, however, might apply in practice.
 - `musig(...)` is allowed among the key expressions of `multi_a`, but not of `sortedmulti_a`.
-- At most 8 parallel MuSig signing sessions are supported, due to the need to persist state in the device's memory.
+- At most 8 MuSig2 signing sessions can be pending at the same time, due to the need to persist state in the device's memory; moreover, at most one session can be pending for each wallet policy (see [below](#generalization-to-multiple-psbt-signing-sessions)).
+- The pubnonces can be generated before the transaction is known, and then used for a different transaction than the one given to the device in round 1 (see [below](#pre-generating-the-pubnonces)).
 - Only `musig(...)/**` or `musig(...)/<M;N>/*` key expressions are supported; the public keys must be xpubs aggregated without any further derivation. Schemes where each pubkey is derived prior to aggregation (for example descriptors similar to `musig(xpub1/<0;1>/*,xpub2/<0;1>/*,...)`) are not supported.
 
 ## State minimization
@@ -92,4 +93,18 @@ BIP-0327 suggests using the tweaked aggregate key as *aggpk*. Using the untweake
 
 The approach described above assumes that no attempt to sign a PSBT for a wallet policy containing `musig()` keys is initiated while a session is already in progress.
 
-In order to generalize this to an arbitrary number of parallel signing sessions, one can identify each signing session with a `psbt_session_id`. Such `psbt_session_id` should deterministically depend on the transaction being signed (ignoring all the other PSBT fields), and the wallet policy being signed. In praticular, the computed `psbt_session_id` should be identical between Round 1 and Round 2 of the protocol. Note that malicious collisions of the `psbt_session_id` (for example by tampering with some details of the PSBT, like the SIGHASH flags) _are_ possible, but they do not constitute a security risk.
+In order to generalize this to multiple parallel signing sessions, each signing session is identified by a `psbt_session_id`, which must be identical between Round 1 and Round 2 of the protocol. The device computes it as:
+
+$\qquad psbt\_session\_id = H_{PsbtSessionId}(descriptor\_template\_hash \| keys\_info\_merkle\_root)$
+
+where $H_{tag}$ is the BIP-0340 tagged hash, and the two arguments are the hash of the descriptor template and the root of the Merkle tree of the keys information of the wallet policy. The name of the wallet policy is not committed to, as it plays no role in signing.
+
+The `psbt_session_id` deliberately depends only on the wallet policy, and not on the transaction; together with the transaction-independent arguments of _NonceGen_, this is what allows [pre-generating the pubnonces](#pre-generating-the-pubnonces). The tradeoff is that at most one session can be pending for each wallet policy; the device can store up to 8 sessions, each for a different wallet policy.
+
+Collisions of the `psbt_session_id` do not constitute a security risk: they only cause the previous session to be deleted, and the following Phase 2 to fail.
+
+### Pre-generating the pubnonces
+
+Since neither the pubnonces nor the `psbt_session_id` depend on the transaction, a software wallet can execute Phase 1 before the transaction is known, for example while the device happens to be connected. It can then use the pubnonces returned by the device for a different transaction, provided that:
+- the transaction is for the same wallet policy, and no other Phase 1 or Phase 2 for that wallet policy was executed in the meantime;
+- the PSBT used in Phase 1 has at least as many inputs as the PSBT used in Phase 2, and each pubnonce is put in the PSBT under the key (of the `PSBT_IN_MUSIG2_PUB_NONCE` field) of the new transaction. The key of a `PSBT_IN_MUSIG2_PUB_NONCE` field contains the aggregate public key _after_ the tweaks, and, for script path spends, the tapleaf hash; therefore, it depends on the transaction.
