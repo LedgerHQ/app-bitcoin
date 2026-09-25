@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.X.X] - XX-XX-XXXX
+
+### Fixed
+
+- The transaction lock time is now determined as BIP-370 prescribes, from each input's `PSBT_IN_REQUIRED_TIME_LOCKTIME` / `PSBT_IN_REQUIRED_HEIGHT_LOCKTIME` together with `PSBT_GLOBAL_FALLBACK_LOCKTIME`, instead of always using the fallback verbatim. PSBTs not using the individual preferred locktime fields are unaffected, as they will keep depending on `PSBT_GLOBAL_FALLBACK_LOCKTIME` alone.
+
 ## [2.5.1] - 09-09-2026
 
 ## Fixed

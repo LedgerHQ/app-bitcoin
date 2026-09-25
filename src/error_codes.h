@@ -68,6 +68,17 @@
 // in the application settings. Enable "Allow non-standard sighash" in the app settings to proceed.
 #define EC_SIGN_PSBT_NONDEFAULT_SIGHASH_NOT_ALLOWED 0x000d
 
+// At least one input only accepts a height-based lock time (it has
+// PSBT_IN_REQUIRED_HEIGHT_LOCKTIME but not PSBT_IN_REQUIRED_TIME_LOCKTIME) while another only
+// accepts a time-based one, so no nLockTime satisfies every input. The inputs must be reconciled.
+// See BIP-0370, "Determining Lock Time".
+#define EC_SIGN_PSBT_UNDETERMINABLE_LOCKTIME 0x000e
+
+// An input declares a required lock time whose value is out of range:
+// - a PSBT_IN_REQUIRED_HEIGHT_LOCKTIME must be in [1, 499999999];
+// - a PSBT_IN_REQUIRED_TIME_LOCKTIME must be at least 500000000.
+#define EC_SIGN_PSBT_REQUIRED_LOCKTIME_OUT_OF_RANGE 0x000f
+
 /**
  * Swap
  */
