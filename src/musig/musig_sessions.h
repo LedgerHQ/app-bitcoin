@@ -100,7 +100,7 @@ __attribute__((warn_unused_result)) const musig_psbt_session_t *musigsession_rou
 
 /**
  * If a session produced in round 1 is active in volatile memory, it is stored in the persistent
- * memory.
+ * memory. The signing state is then zeroed out, as the signing flow is over.
  * This must be called at the end of a successful signing flow, after all the public nonces have
  * been returned to the client. It must _not_ be called if any error occurs, or if the signing
  * process is aborted for any reason.
