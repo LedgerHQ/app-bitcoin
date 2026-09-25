@@ -9,7 +9,7 @@ import pytest
 
 from ragger.error import ExceptionRAPDU
 
-from ledger_bitcoin.exception.errors import IncorrectDataError
+from ledger_bitcoin.exception.errors import BadStateError, IncorrectDataError
 from ledger_bitcoin.exception.device_exception import DeviceException
 from ledger_bitcoin.client_base import Client, MusigPartialSignature, MusigPubNonce
 from ledger_bitcoin.key import ExtendedKey, KeyOriginInfo
@@ -383,3 +383,77 @@ def test_sign_psbt_musig2_wrong_pubnonce(navigator: Navigator, firmware: Firmwar
         signer_1.generate_partial_signatures(psbt)
 
     assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+
+
+def test_sign_psbt_musig2_session_is_single_use(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals):
+    # Since the psbt_session_id and the nonces do not depend on the transaction, the only thing
+    # preventing the device from reusing a nonce is that round 2 deletes the session from storage
+    # before producing any partial signature, whether it then succeeds or not. Reusing a secnonce for
+    # a different message, or with a different aggregate nonce, would leak the private key.
+    wallet_policy, wallet_hmac = keypath_wallet_policy(speculos_globals)
+    ledger_instructions = sign_psbt_instruction_approve(
+        firmware, save_screenshot=False, has_spend_from_wallet=True, has_feewarning=True)
+
+    signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac,
+                                    navigator=navigator, instructions=ledger_instructions, testname=test_name)
+    signer_2 = HotMusig2Cosigner(wallet_policy, KEYPATH_COSIGNER_2_XPRIV)
+    ledger_pubkey = signer_1.pubkey.pubkey
+
+    def replace_pubnonces(psbt: PSBT, own: bool, rand_: bytes) -> None:
+        # replaces the pubnonce of the device (if own is True) or of the other cosigner with a
+        # different, but still valid, one
+        n_replaced = 0
+        for input in psbt.inputs:
+            for psbt_key in input.musig2_pub_nonces.keys():
+                if (psbt_key[0] == ledger_pubkey) != own:
+                    continue
+                _, other_pubnonce = bip0327.nonce_gen_internal(
+                    rand_=rand_, sk=None, pk=psbt_key[0], aggpk=None, msg=None, extra_in=None)
+                assert other_pubnonce != input.musig2_pub_nonces[psbt_key]
+                input.musig2_pub_nonces[psbt_key] = other_pubnonce
+                n_replaced += 1
+        assert n_replaced == 1
+
+    def copy_psbt(psbt: PSBT) -> PSBT:
+        result = PSBT()
+        result.deserialize(psbt.serialize())
+        return result
+
+    # 1) A successful round 2 consumes the session: a second round 2 for a different transaction, and
+    #    with a different aggregate nonce, must not produce another partial signature.
+    psbt = PSBT()
+    psbt.deserialize(KEYPATH_PSBT_B64)
+    signer_1.generate_public_nonces(psbt)
+    signer_2.generate_public_nonces(psbt)
+
+    replayed_psbt = copy_psbt(psbt)
+    replayed_psbt.tx.vout[0].nValue += 1000
+    replayed_psbt.tx.rehash()
+    replace_pubnonces(replayed_psbt, own=False, rand_=b'\x42' * 32)
+
+    signer_1.generate_partial_signatures(psbt)
+    assert len(psbt.inputs[0].musig2_partial_sigs) == 1
+
+    with pytest.raises(ExceptionRAPDU) as e:
+        signer_1.generate_partial_signatures(replayed_psbt)
+    assert DeviceException.exc.get(e.value.status) == BadStateError
+    assert len(replayed_psbt.inputs[0].musig2_partial_sigs) == 0
+
+    # 2) A failed round 2 consumes the session as well: after a round 2 that is rejected because of
+    #    a wrong pubnonce, retrying with the correct psbt must fail too.
+    psbt = PSBT()
+    psbt.deserialize(KEYPATH_PSBT_B64)
+    signer_1.generate_public_nonces(psbt)
+    signer_2.generate_public_nonces(psbt)
+
+    wrong_psbt = copy_psbt(psbt)
+    replace_pubnonces(wrong_psbt, own=True, rand_=b'\x43' * 32)
+
+    with pytest.raises(ExceptionRAPDU) as e:
+        signer_1.generate_partial_signatures(wrong_psbt)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+
+    with pytest.raises(ExceptionRAPDU) as e:
+        signer_1.generate_partial_signatures(psbt)
+    assert DeviceException.exc.get(e.value.status) == BadStateError
+    assert len(psbt.inputs[0].musig2_partial_sigs) == 0
