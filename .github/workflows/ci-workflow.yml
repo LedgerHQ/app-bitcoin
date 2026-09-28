@@ -173,10 +173,79 @@ jobs:
           name: benchmarks-log
           path: tests_perf/benchmarks.json
 
+  validate_release_tag:
+    name: Validate client release tag
+    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/pyclient') || startsWith(github.ref, 'refs/tags/jsclient') || startsWith(github.ref, 'refs/tags/rsclient'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check tag format, package version and ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$GITHUB_REF_NAME" =~ ^(pyclient|jsclient|rsclient)-([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+              echo "[ERROR] Malformed release tag: $GITHUB_REF_NAME"
+              exit 1
+          fi
+          component="${BASH_REMATCH[1]}"
+          tag_version="${BASH_REMATCH[2]}"
+          case "$component" in
+              pyclient)
+                  package_version=$(grep -m1 -E "^__version__ = " bitcoin_client/ledger_bitcoin/__init__.py | sed -E "s/^__version__ = ['\"](.*)['\"]$/\1/") ;;
+              jsclient)
+                  package_version=$(node -p "require('./bitcoin_client_js/package.json').version") ;;
+              rsclient)
+                  package_version=$(grep -m1 -E '^version = ' bitcoin_client_rs/Cargo.toml | sed -E 's/^version = "(.*)"$/\1/') ;;
+          esac
+          if [[ "$package_version" != "$tag_version" ]]; then
+              echo "[ERROR] Tag version $tag_version does not match package version $package_version"
+              exit 1
+          fi
+          git fetch --no-tags origin master:refs/remotes/origin/master develop:refs/remotes/origin/develop
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master && ! git merge-base --is-ancestor "$GITHUB_SHA" origin/develop; then
+              echo "[ERROR] Tagged commit $GITHUB_SHA is not part of master or develop"
+              exit 1
+          fi
+          echo "[INFO] Release tag $GITHUB_REF_NAME validated"
+
+  check_ragger_tests:
+    name: Check that ragger tests passed on the tagged commit
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/pyclient-')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+
+    steps:
+      - name: Check ragger_tests result in build_and_functional_tests.yml
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_ids=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/build_and_functional_tests.yml/runs?head_sha=$GITHUB_SHA&event=push&status=completed" --jq '.workflow_runs[].id')
+          for run_id in $run_ids; do
+              results=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?filter=latest&per_page=100" \
+                  --jq '.jobs[] | select(.name | startswith("Run ragger tests using the reusable workflow / Functional tests with Ragger (")) | .conclusion')
+              if [[ -n "$results" ]] && ! grep -qv '^success$' <<< "$results"; then
+                  echo "[INFO] Ragger tests passed in run $run_id"
+                  exit 0
+              fi
+          done
+          echo "[ERROR] No completed push run of build_and_functional_tests.yml with successful ragger tests for $GITHUB_SHA"
+          exit 1
+
   python_package_and_deploy:
     name: Build and deploy the bitcoin client Python package
+    needs: [validate_release_tag, check_ragger_tests]
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_pypi_deployment.yml@v1
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/pyclient')
+    if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/pyclient-')
     with:
       package_name: ledger_bitcoin
       package_directory: ./bitcoin_client/
@@ -217,32 +286,11 @@ jobs:
           yarn install --immutable
           LOG_SPECULOS=1 LOG_APDUS=1 SPECULOS="/speculos/speculos.py" yarn test
 
-  deploy_js_client_check_tag:
-    name: Check that tag matches version in package.json prior to deploying on JFrog
-    needs: job_test_js_lib
-    runs-on: ubuntu-latest
-    if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/jsclient')
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-
-      - name: Check that tag matches semver in CHANGELOG.md
-        run: |
-            cd bitcoin_client_js
-            package_version=$(sed -r -n -e '/"version":/s/^\s+"version": "([[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+)",$/\1/p' package.json)
-            tag_version=${GITHUB_REF#refs/tags/jsclient-}
-            if [[ $package_version == $tag_version ]]; then
-                echo "[INFO] Tag matches version in package.json. Continuing."
-            else
-                echo "[ERROR] mismatch between version in tag and package.json. Aborting."
-                exit 1
-            fi
-
   deploy_js_client:
     name: Deploy
-    needs: deploy_js_client_check_tag
+    needs: [validate_release_tag, job_test_js_lib]
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_npm_deployment.yml@v1
-    if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/jsclient')
+    if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/jsclient-')
     with:
       package_directory: "bitcoin_client_js"
 
@@ -265,8 +313,8 @@ jobs:
 
   deploy_rust_client:
     name: Deploy rust client library
-    needs: job_test_rust_client
-    if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/rsclient')
+    needs: [validate_release_tag, job_test_rust_client]
+    if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/rsclient-')
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_crates_deployment.yml@v1
     with:
       package_directory: "bitcoin_client_rs"
