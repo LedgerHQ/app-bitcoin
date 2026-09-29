@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
-## [0.4.2] - 18-09-2026
+## [0.4.2] - 29-09-2026
+
+### Added
+
+- `PSBT.generic_signed_message`: support for the `PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE` global field (0x09) of [BIP-0322](https://github.com/bitcoin/bips/blob/master/bip-0322.mediawiki), in both PSBT versions.
 
 ### Fixed
 
