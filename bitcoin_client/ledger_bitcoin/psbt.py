@@ -772,6 +772,7 @@ class PSBT(object):
     PSBT_GLOBAL_INPUT_COUNT = 0x04
     PSBT_GLOBAL_OUTPUT_COUNT = 0x05
     PSBT_GLOBAL_TX_MODIFIABLE = 0x06
+    PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE = 0x09
     PSBT_GLOBAL_VERSION = 0xFB
 
     def __init__(self, tx: Optional[CTransaction] = None) -> None:
@@ -789,6 +790,8 @@ class PSBT(object):
         self.tx_version: Optional[int] = None
         self.fallback_locktime: Optional[int] = None
         self.tx_modifiable: Optional[int] = None
+        # BIP-322: the message of a generic signed message request (allowed in any PSBT version)
+        self.generic_signed_message: Optional[bytes] = None
 
         # Assume version 0 PSBT
         self.version = 0
@@ -888,6 +891,12 @@ class PSBT(object):
                 if len(v) != 1:
                     raise PSBTSerializationError("Global tx modifiable flags is not 1 bytes")
                 self.tx_modifiable = struct.unpack("<B", v)[0]
+            elif key_type == PSBT.PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE:
+                if key in key_lookup:
+                    raise PSBTSerializationError("Duplicate key, global generic signed message is already provided")
+                elif len(key) > 1:
+                    raise PSBTSerializationError("Global generic signed message key is more than one byte type")
+                self.generic_signed_message = deser_string(f)
             elif key_type == PSBT.PSBT_GLOBAL_VERSION:
                 if key in key_lookup:
                     raise PSBTSerializationError("Duplicate key, global PSBT version is already provided")
@@ -1017,6 +1026,10 @@ class PSBT(object):
             if self.tx_modifiable is not None:
                 r += ser_string(ser_compact_size(PSBT.PSBT_GLOBAL_TX_MODIFIABLE))
                 r += ser_string(struct.pack("<B", self.tx_modifiable))
+
+        if self.generic_signed_message is not None:
+            r += ser_string(ser_compact_size(PSBT.PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE))
+            r += ser_string(self.generic_signed_message)
 
         if self.version > 0 or self.explicit_version:
             r += ser_string(ser_compact_size(PSBT.PSBT_GLOBAL_VERSION))
