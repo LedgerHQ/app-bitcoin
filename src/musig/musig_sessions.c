@@ -145,4 +145,7 @@ void musigsession_commit(musig_signing_state_t *musig_signing_state) {
                             sizeof(musig_signing_state->_round1._id))) {
         musigsession_store(musig_signing_state->_round1._id, &musig_signing_state->_round1);
     }
+
+    // The signing flow is over: leave no secret behind
+    explicit_bzero(musig_signing_state, sizeof(musig_signing_state_t));
 }
