@@ -332,6 +332,13 @@ if(SPECULOS AND SPECULOS_SRC)
   target_link_libraries(test_script PRIVATE cmocka app_crypto)
   add_test(test_script test_script)
 
+  # test_bip322 exercises the BIP-322 primitives of src/common/bip322.c (message hash, to_spend
+  # serialization and txid) against the vectors of the BIP.
+  add_executable(test_bip322 test_bip322.c ../src/common/bip322.c)
+  app_apply_real_sdk_config(test_bip322)
+  target_link_libraries(test_bip322 PRIVATE cmocka app_crypto write)
+  add_test(test_bip322 test_bip322)
+
   # test_sighash exercises classify_sighash (src/common/sighash.h), which only
   # depends on constants.h (and therefore the real SDK headers). No app object
   # code or syscalls are needed, so it just links cmocka.
