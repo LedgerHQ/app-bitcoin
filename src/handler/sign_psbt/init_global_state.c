@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include "init_global_state.h"
+#include "bip322.h"
 
 /* SDK headers */
 #include "crypto_helpers.h"
@@ -33,6 +34,7 @@
 #include "compare_wallet_script_at_path.h"
 #include "constants.h"
 #include "crypto.h"
+#include "display.h"
 #include "dispatcher.h"
 #include "error_codes.h"
 #include "get_merkle_leaf_element.h"
@@ -43,6 +45,7 @@
 #include "psbt.h"
 #include "psbt_fields.h"
 #include "sign_psbt_cache.h"
+#include "stream_merkleized_map_value.h"
 #include "sw.h"
 #include "wallet.h"
 
@@ -121,11 +124,39 @@ static bool __attribute__((noinline)) parse_sign_psbt_apdu(dispatcher_context_t 
  * Returns true on success; on failure, an error status word has already been
  * sent.
  */
+static void global_map_keys_callback(dispatcher_context_t *dc,
+                                     void *callback_state,
+                                     const merkleized_map_commitment_t *map_commitment,
+                                     int index,
+                                     buffer_t *data) {
+    UNUSED(dc);
+    UNUSED(map_commitment);
+    UNUSED(index);
+
+    sign_psbt_state_t *st = (sign_psbt_state_t *) callback_state;
+    // PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE has no keydata: the key is exactly the key type
+    if (data->size - data->offset == 1 &&
+        data->ptr[data->offset] == PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE) {
+        st->bip322.is_message_signing = true;
+    }
+}
+
 static bool __attribute__((noinline)) process_global_map(dispatcher_context_t *dc,
                                                          sign_psbt_state_t *st) {
     // Check integrity of the global map (this also marks it as validated, so that its values may
     // be read by key below).
-    if (call_check_merkleized_map_sorted(dc, &st->global_map) < 0) {
+    // The walk over the keys also detects a BIP-322 message signing request (the
+    // PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE field): as each key is authenticated against the
+    // committed keys root, a client cannot hide the field. A PSBT without the field gets the
+    // regular transaction review, and a to_sign transaction is then shown as a zero-value
+    // transaction with a bare OP_RETURN output. What this flow guarantees is that the message
+    // review UI is only ever shown after validate_bip322_request() has bound the displayed message
+    // to the produced signature.
+    st->bip322.is_message_signing = false;
+    if (call_check_merkleized_map_sorted_with_callback(dc,
+                                                       &st->global_map,
+                                                       st,
+                                                       global_map_keys_callback) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }
@@ -236,6 +267,74 @@ static bool __attribute__((noinline)) load_wallet_account(dispatcher_context_t *
     return true;
 }
 
+// State for the message-hashing streaming pass.
+typedef struct {
+    cx_sha256_t tagged_hash_context;  // BIP0322-signed-message tagged hash
+    cx_sha256_t sha256_context;       // plain sha256, for display of long/unprintable messages
+    bool printable;
+} msg_hash_state_t;
+
+static void message_hash_callback(buffer_t *data, void *cb_state) {
+    msg_hash_state_t *state = (msg_hash_state_t *) cb_state;
+    const uint8_t *bytes = data->ptr + data->offset;
+    size_t len = data->size - data->offset;
+
+    crypto_hash_update(&state->tagged_hash_context.header, bytes, len);
+    crypto_hash_update(&state->sha256_context.header, bytes, len);
+
+    for (size_t i = 0; i < len; i++) {
+        // Line Feed (LF) character is handled by NBGL - let's allow it
+        if ((bytes[i] < 0x20 || bytes[i] > 0x7E) && bytes[i] != '\n') {
+            state->printable = false;
+        }
+    }
+}
+
+/**
+ * Streams the message in the PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE field from the client,
+ * computing its BIP-322 tagged hash, its plain sha256 (used for display when the message is too
+ * long or not printable), and whether it is printable; the results are stored in st->bip322.
+ * Must only be called if st->bip322.is_message_signing is true, that is, if the field is known
+ * to be present in the global map.
+ *
+ * Returns true on success; returns false and sends an error status word on failure.
+ */
+static bool load_bip322_message(dispatcher_context_t *dc, sign_psbt_state_t *st) {
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
+
+    uint8_t key[] = {PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE};
+
+    // Stream the message, computing its hashes and printability.
+    msg_hash_state_t hash_state;
+    bip322_message_hash_init(&hash_state.tagged_hash_context);
+    cx_sha256_init(&hash_state.sha256_context);
+    hash_state.printable = true;
+
+    int message_length = call_stream_merkleized_map_value(dc,
+                                                          &st->global_map,
+                                                          key,
+                                                          sizeof(key),
+                                                          NULL,
+                                                          message_hash_callback,
+                                                          &hash_state);
+    if (message_length < 0) {
+        // the key is known to be present, so any failure (including the client claiming that
+        // the key is absent) is a protocol error
+        PRINTF("Failed to stream the BIP-322 message\n");
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return false;
+    }
+
+    st->bip322.message_length = (uint64_t) message_length;
+    st->bip322.message_printable =
+        hash_state.printable && message_length <= MAX_DISPLAYBLE_MESSAGE_LENGTH;
+
+    crypto_hash_digest(&hash_state.tagged_hash_context.header, st->bip322.message_hash, 32);
+    crypto_hash_digest(&hash_state.sha256_context.header, st->bip322.message_sha256, 32);
+
+    return true;
+}
+
 bool __attribute__((noinline)) init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -245,6 +344,9 @@ bool __attribute__((noinline)) init_global_state(dispatcher_context_t *dc, sign_
     if (!parse_sign_psbt_apdu(dc, st, wallet_id, wallet_hmac)) return false;
 
     if (!process_global_map(dc, st)) return false;
+
+    // for a BIP-322 message signing request, load the message hashes
+    if (st->bip322.is_message_signing && !load_bip322_message(dc, st)) return false;
 
     if (!load_wallet_account(dc, st, wallet_id, wallet_hmac)) return false;
 

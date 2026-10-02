@@ -9,15 +9,75 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from io import BytesIO
 import re
-from typing import Iterator, List, Optional, Tuple, Type, Union
+from typing import Iterable, Iterator, List, Optional, Set, Tuple, Type, Union
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
+import base58
+
 from bitcoin_client.ledger_bitcoin._embit.descriptor.miniscript import Miniscript
 from bitcoin_client.ledger_bitcoin.key import ExtendedKey
 from test_utils.taproot import ser_script, tagged_hash
+from test_utils import bip0327
+
+# BIP-328 chaincode of the synthetic xpub derived from an aggregated musig2 public key.
+BIP328_CHAINCODE = bytes.fromhex(
+    "868087ca02a6f974c4598924c36b57762d32cb45717167e300622c7167e38965")
+
+
+def unsorted_musig(pubkeys: Iterable[bytes], version_bytes: bytes) -> Tuple[str, bip0327.KeyAggContext]:
+    """
+    Constructs the musig2 aggregated extended public key from an unsorted list of
+    compressed public keys, and the version bytes.
+    """
+
+    assert all(len(pk) == 33 for pk in pubkeys)
+    assert len(version_bytes) == 4
+
+    depth = b'\x00'
+    fingerprint = b'\x00\x00\x00\x00'
+    child_number = b'\x00\x00\x00\x00'
+
+    key_agg_ctx = bip0327.key_agg(pubkeys)
+    Q = key_agg_ctx.Q
+    compressed_pubkey = (
+        b'\x02' if Q[1] % 2 == 0 else b'\x03') + bip0327.get_xonly_pk(key_agg_ctx)
+    ext_pubkey = version_bytes + depth + fingerprint + \
+        child_number + BIP328_CHAINCODE + compressed_pubkey
+    return base58.b58encode_check(ext_pubkey).decode(), key_agg_ctx
+
+
+def musig(pubkeys: Iterable[bytes], version_bytes: bytes) -> Tuple[str, bip0327.KeyAggContext]:
+    """
+    Constructs the musig2 aggregated extended public key from a list of compressed public keys,
+    and the version bytes. The keys are sorted, as required by the `musig()` key expression
+    in descriptors.
+    """
+    return unsorted_musig(sorted(pubkeys), version_bytes)
+
+
+def aggregate_musig_pubkey(keys_info: Iterable[str]) -> Tuple[str, bip0327.KeyAggContext]:
+    """
+    Constructs the musig2 aggregated extended public key from the list of keys info
+    of the participating keys.
+    """
+
+    pubkeys: list[bytes] = []
+    versions: Set[bytes] = set()
+    for ki in keys_info:
+        start = ki.find(']')
+        xpub = ki[start + 1:]
+        xpub_bytes = base58.b58decode_check(xpub)
+        versions.add(xpub_bytes[:4])
+        pubkeys.append(xpub_bytes[-33:])
+
+    if len(versions) > 1:
+        raise ValueError(
+            "All the extended public keys should be from the same network")
+
+    return musig(pubkeys, versions.pop())
 
 
 def tapleaf_hash(script: Optional[bytes], leaf_version=b'\xC0') -> Optional[bytes]:
@@ -106,6 +166,16 @@ def derive_plain_descriptor(desc_tmpl: str, keys_info: List[str], is_change: boo
         return m if not is_change else n
 
     desc_tmpl = re.sub(r'<([^;]+);([^>]+)>', replace_m_n, desc_tmpl)
+
+    # Replace each musig(...) expression with the derived aggregate xpub
+    def replace_musig(match: re.Match[str]):
+        key_indexes = [int(i.strip('@')) for i in match.group(1).split(',')]
+        steps = [int(x) for x in match.group(2).split("/")]
+        assert len(steps) == 2
+        agg_xpub = aggregate_musig_pubkey([keys_info[i] for i in key_indexes])[0]
+        return derive_from_key_info(agg_xpub, steps)
+
+    desc_tmpl = re.sub(r'musig\(([^)]+)\)/(\d+/\d+)', replace_musig, desc_tmpl)
 
     # Replace @i/a/b with the i-th element in keys_info, deriving the key appropriately
     # to get a plain xpub

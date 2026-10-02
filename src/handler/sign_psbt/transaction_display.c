@@ -16,6 +16,7 @@
  *****************************************************************************/
 
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "transaction_display.h"
@@ -34,6 +35,7 @@
 #include "psbt_fields.h"
 #include "script.h"
 #include "sighash.h"
+#include "stream_merkleized_map_value.h"
 #include "sw.h"
 #include "wallet.h"
 
@@ -432,6 +434,112 @@ bool __attribute__((noinline)) display_transaction(
             SEND_SW(dc, SW_DENY);
             return false;
         }
+    }
+
+    return true;
+}
+
+// State for the message-copying streaming pass (into the buffer shown in the review).
+typedef struct {
+    char *out;
+    size_t max;  // capacity of out, excluding the terminating NUL
+    size_t offset;
+    bool overflow;
+} msg_copy_state_t;
+
+static void message_copy_callback(buffer_t *data, void *cb_state) {
+    msg_copy_state_t *state = (msg_copy_state_t *) cb_state;
+    size_t len = data->size - data->offset;
+
+    if (state->overflow || state->offset + len > state->max) {
+        state->overflow = true;
+        return;
+    }
+    memcpy(state->out + state->offset, data->ptr + data->offset, len);
+    state->offset += len;
+}
+
+bool __attribute__((noinline)) display_bip322_message(dispatcher_context_t *dc,
+                                                      sign_psbt_state_t *st) {
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
+
+    // Show any input verification warnings, exactly as the transaction review does. The
+    // external-inputs and non-default-sighash warnings are unreachable here, as
+    // validate_bip322_request() rejects both; the missing-non-witness-utxo warning can only concern
+    // the additional inputs of a proof-of-funds, as preprocess_inputs() exempts the to_spend input.
+    // This also keeps any warning added in the future from being silently skipped in this flow.
+    if (!display_warnings(dc, st)) {
+        return false;
+    }
+
+    char address[MAX_ADDRESS_LENGTH_STR + 1];
+    if (0 > get_script_address(st->bip322.challenge_script,
+                               st->bip322.challenge_script_len,
+                               address,
+                               sizeof(address))) {
+        // wallet policies always produce scripts with an address; this should never happen
+        SEND_SW(dc, SW_BAD_STATE);
+        return false;
+    }
+
+    char account_label_buf[MAX_WALLET_NAME_LENGTH + 1];
+    const char *account_label = st->account.wallet_header.name;
+    if (st->account.is_default) {
+        account_label = NULL;
+        if (format_default_account_label(st->account.bip44_purpose,
+                                         st->account.bip44_account,
+                                         account_label_buf,
+                                         sizeof(account_label_buf))) {
+            account_label = account_label_buf;
+        }
+    }
+
+    char message[MAX_DISPLAYBLE_MESSAGE_LENGTH + 1];
+    bool is_hash = !st->bip322.message_printable;
+
+    if (!is_hash) {
+        // Stream the message again, this time into a buffer. The fetch is authenticated
+        // by the same Merkle commitment as the hashing pass in load_bip322_message(), so the client
+        // cannot provide different contents.
+        msg_copy_state_t copy_state = {.out = message,
+                                       .max = MAX_DISPLAYBLE_MESSAGE_LENGTH,
+                                       .offset = 0,
+                                       .overflow = false};
+        int message_length =
+            call_stream_merkleized_map_value(dc,
+                                             &st->global_map,
+                                             (uint8_t[]) {PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE},
+                                             1,
+                                             NULL,
+                                             message_copy_callback,
+                                             &copy_state);
+        if (message_length < 0 || copy_state.overflow ||
+            (uint64_t) message_length != st->bip322.message_length) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+        message[copy_state.offset] = '\0';
+    } else {
+        // The message is too long or not printable: show its sha256 hash instead, like the
+        // legacy message signing flow does.
+        for (int i = 0; i < 32; i++) {
+            snprintf(message + 2 * i, 3, "%02X", st->bip322.message_sha256[i]);
+        }
+    }
+
+    // For a proof-of-funds, also show the total amount of the coins whose control is proven.
+    bool is_proof_of_funds = st->n_inputs > 1;
+
+    ui_set_processing_screen_text(GA_SIGNING_MESSAGE);
+    if (!ui_display_bip322_message_and_confirm(dc,
+                                               account_label,
+                                               address,
+                                               message,
+                                               is_hash,
+                                               is_proof_of_funds,
+                                               st->inputs_total_amount)) {
+        SEND_SW(dc, SW_DENY);
+        return false;
     }
 
     return true;
