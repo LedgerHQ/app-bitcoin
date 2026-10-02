@@ -54,16 +54,37 @@ static inline int call_check_merkle_tree_sorted(dispatcher_context_t *dispatcher
  * This is the counterpart of call_get_merkleized_map for maps that are not fetched from an outer
  * Merkle tree of maps (e.g. the PSBT global map, whose commitment comes straight from the APDU).
  *
+ * If a callback to a non-NULL function is given, it is called once for each key of the map, in
+ * lexicographical order. As every key is authenticated against the committed keys root, this is
+ * the way to learn soundly which keys are present (in a by-key lookup, the client might lie
+ * about keys being absent).
+ *
  * Returns 0 on success, or a negative number on failure.
  */
-static inline int call_check_merkleized_map_sorted(dispatcher_context_t *dispatcher_context,
-                                                   merkleized_map_commitment_t *map) {
+static inline int call_check_merkleized_map_sorted_with_callback(
+    dispatcher_context_t *dispatcher_context,
+    merkleized_map_commitment_t *map,
+    void *callback_state,
+    merkle_tree_elements_callback_t callback) {
     // The map is not yet validated; explicitly mark it as such
     map->_keys_are_sorted = false;
 
-    int ret = call_check_merkle_tree_sorted(dispatcher_context, map->keys_root, (size_t) map->size);
+    int ret = call_check_merkle_tree_sorted_with_callback(dispatcher_context,
+                                                          callback_state,
+                                                          map->keys_root,
+                                                          (size_t) map->size,
+                                                          callback,
+                                                          map);
     if (ret >= 0) {
         map->_keys_are_sorted = true;
     }
     return ret;
+}
+
+/**
+ * Convenience function to call call_check_merkleized_map_sorted_with_callback with no callback.
+ */
+static inline int call_check_merkleized_map_sorted(dispatcher_context_t *dispatcher_context,
+                                                   merkleized_map_commitment_t *map) {
+    return call_check_merkleized_map_sorted_with_callback(dispatcher_context, map, NULL, NULL);
 }
