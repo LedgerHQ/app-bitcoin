@@ -6,6 +6,10 @@
  *  - Rejects elements that are not in strict lexicographic order.
  *  - Invokes the callback once per element in order.
  *  - Handles edge cases (single element, empty tree, duplicate elements).
+ *
+ * Also tests the map-level wrappers, call_check_merkleized_map_sorted_with_callback and
+ * call_check_merkleized_map_sorted: they walk the keys tree of a merkleized map commitment, and
+ * mark the commitment as validated if and only if the walk succeeds.
  */
 
 #include <stdarg.h>
@@ -395,6 +399,166 @@ static void test_map_commitment_passed(void **state) {
     assert_ptr_equal(tracker.received_commitment, &dummy_commitment);
 }
 
+/* ---------- Map-level wrappers ---------- */
+
+#define MAX_MAP_CALLBACK_CALLS 8
+
+typedef struct {
+    size_t n_calls;
+    int indices[MAX_MAP_CALLBACK_CALLS];
+    uint8_t keys[MAX_MAP_CALLBACK_CALLS][8];
+    size_t key_lens[MAX_MAP_CALLBACK_CALLS];
+    const merkleized_map_commitment_t *received_commitment;
+    bool validated_during_walk;  // true if any call saw the map already marked as validated
+} map_tracker_t;
+
+static void map_tracking_callback(dispatcher_context_t *dc,
+                                  void *state,
+                                  const merkleized_map_commitment_t *map_commitment,
+                                  int index,
+                                  buffer_t *buf) {
+    (void) dc;
+
+    map_tracker_t *tracker = (map_tracker_t *) state;
+    assert_true(tracker->n_calls < MAX_MAP_CALLBACK_CALLS);
+
+    size_t i = tracker->n_calls++;
+    tracker->indices[i] = index;
+    size_t len = buf->size - buf->offset;
+    assert_true(len <= sizeof(tracker->keys[0]));
+    memcpy(tracker->keys[i], buf->ptr + buf->offset, len);
+    tracker->key_lens[i] = len;
+    tracker->received_commitment = map_commitment;
+    if (map_commitment->_keys_are_sorted) {
+        tracker->validated_during_walk = true;
+    }
+}
+
+/**
+ * Registers a map with keys {0x01}, {0x02}, {0x03} (given to the mock in a different order,
+ * which sorts them) and fills in its commitment.
+ */
+static void add_three_key_map(mock_dispatcher_t *mock, merkleized_map_commitment_t *map) {
+    const uint8_t k0[] = {0x03};
+    const uint8_t k1[] = {0x01};
+    const uint8_t k2[] = {0x02};
+    const uint8_t v0[] = {0xC0};
+    const uint8_t v1[] = {0xA0};
+    const uint8_t v2[] = {0xB0};
+
+    const uint8_t *keys[] = {k0, k1, k2};
+    const size_t key_lens[] = {sizeof(k0), sizeof(k1), sizeof(k2)};
+    const uint8_t *values[] = {v0, v1, v2};
+    const size_t value_lens[] = {sizeof(v0), sizeof(v1), sizeof(v2)};
+
+    memset(map, 0, sizeof(*map));
+    assert_int_equal(mock_dispatcher_add_map(mock, keys, key_lens, values, value_lens, 3, map), 0);
+}
+
+/**
+ * Happy path: the callback is invoked once per key, in order, with the map commitment; the map is
+ * only marked as validated once the whole walk succeeded.
+ */
+static void test_map_sorted_with_callback(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    merkleized_map_commitment_t map;
+    add_three_key_map(mock, &map);
+
+    map_tracker_t tracker;
+    memset(&tracker, 0, sizeof(tracker));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+    int result =
+        call_check_merkleized_map_sorted_with_callback(dc, &map, &tracker, map_tracking_callback);
+    assert_int_equal(result, 0);
+    assert_true(map._keys_are_sorted);
+
+    assert_int_equal(tracker.n_calls, 3);
+    assert_ptr_equal(tracker.received_commitment, &map);
+    assert_false(tracker.validated_during_walk);
+    for (size_t i = 0; i < 3; i++) {
+        assert_int_equal(tracker.indices[i], (int) i);
+        assert_int_equal(tracker.key_lens[i], 1);
+        assert_int_equal(tracker.keys[i][0], (uint8_t) (i + 1));
+    }
+}
+
+/**
+ * Happy path: the wrapper without callback validates the map too.
+ */
+static void test_map_sorted_without_callback(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    merkleized_map_commitment_t map;
+    add_three_key_map(mock, &map);
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+    assert_int_equal(call_check_merkleized_map_sorted(dc, &map), 0);
+    assert_true(map._keys_are_sorted);
+}
+
+/**
+ * Happy path: an empty map is trivially sorted; the callback is never invoked.
+ */
+static void test_map_sorted_empty(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    merkleized_map_commitment_t map;
+    memset(&map, 0, sizeof(map));
+
+    map_tracker_t tracker;
+    memset(&tracker, 0, sizeof(tracker));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+    int result =
+        call_check_merkleized_map_sorted_with_callback(dc, &map, &tracker, map_tracking_callback);
+    assert_int_equal(result, 0);
+    assert_true(map._keys_are_sorted);
+    assert_int_equal(tracker.n_calls, 0);
+}
+
+/**
+ * Error: the keys tree of the commitment is not sorted. The map must end up marked as not
+ * validated, even if it was (wrongly) marked as validated before the call.
+ */
+static void test_map_unsorted_keys(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    const uint8_t k0[] = {0x02};
+    const uint8_t k1[] = {0x01};
+    const uint8_t *keys[] = {k0, k1};
+    const size_t key_lens[] = {1, 1};
+    mock_dispatcher_add_list(mock, keys, key_lens, 2);
+
+    merkleized_map_commitment_t map;
+    memset(&map, 0, sizeof(map));
+    map.size = 2;
+    memcpy(map.keys_root, mock->trees[mock->n_trees - 1].root, 32);
+    map._keys_are_sorted = true;
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+    assert_true(call_check_merkleized_map_sorted(dc, &map) < 0);
+    assert_false(map._keys_are_sorted);
+}
+
+/**
+ * Error: the size of the commitment does not match its keys tree. The map must end up marked as
+ * not validated.
+ */
+static void test_map_wrong_size(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    merkleized_map_commitment_t map;
+    add_three_key_map(mock, &map);
+    map.size = 5;
+    map._keys_are_sorted = true;
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+    assert_true(call_check_merkleized_map_sorted(dc, &map) < 0);
+    assert_false(map._keys_are_sorted);
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -411,6 +575,11 @@ int main(void) {
         T(test_sorted_many_elements),
         T(test_wrong_tree_size),
         T(test_map_commitment_passed),
+        T(test_map_sorted_with_callback),
+        T(test_map_sorted_without_callback),
+        T(test_map_sorted_empty),
+        T(test_map_unsorted_keys),
+        T(test_map_wrong_size),
     };
 #undef T
 
