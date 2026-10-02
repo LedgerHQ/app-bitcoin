@@ -79,6 +79,32 @@
 // - a PSBT_IN_REQUIRED_TIME_LOCKTIME must be at least 500000000.
 #define EC_SIGN_PSBT_REQUIRED_LOCKTIME_OUT_OF_RANGE 0x000f
 
+// The PSBT has the PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE field, but the transaction does not have
+// the structure mandated by BIP-322 for a to_sign transaction: a single zero-value output with a
+// bare OP_RETURN script, transaction version 0 or 2, and a first input spending output 0 of
+// to_spend, whose value is zero.
+// Note: the app cannot verify whether the additional inputs of a proof of funds spend real coins.
+#define EC_SIGN_PSBT_BIP322_INVALID_STRUCTURE 0x0010
+
+// The input of the BIP-322 to_sign transaction does not spend the to_spend transaction
+// recomputed from the signed message and the input's scriptPubKey. The message in the PSBT is
+// not the message that would be signed.
+#define EC_SIGN_PSBT_BIP322_TOSPEND_MISMATCH 0x0011
+
+// BIP-322 requires all signatures to use SIGHASH_ALL (or SIGHASH_DEFAULT for taproot inputs).
+#define EC_SIGN_PSBT_BIP322_FORBIDDEN_SIGHASH 0x0012
+
+// The PSBT is a valid BIP-322 message signing request, but uses features that are not yet
+// supported: timelocks (non-zero locktime or sequence).
+#define EC_SIGN_PSBT_BIP322_UNSUPPORTED 0x0013
+
+// BIP-322 message signing is not allowed when called from the Exchange app.
+#define EC_SIGN_PSBT_BIP322_NOT_ALLOWED_IN_SWAP 0x0014
+
+// All the inputs of a BIP-322 proof-of-funds must belong to the wallet policy: the total
+// proven amount shown to the user must be trustworthy, and external inputs cannot be signed.
+#define EC_SIGN_PSBT_BIP322_EXTERNAL_INPUTS 0x0015
+
 /**
  * Swap
  */
