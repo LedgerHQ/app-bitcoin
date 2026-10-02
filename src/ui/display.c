@@ -113,6 +113,40 @@ bool ui_display_message_and_confirm(dispatcher_context_t *context,
     return io_ui_process(context);
 }
 
+bool ui_display_bip322_message_and_confirm(dispatcher_context_t *context,
+                                           const char *account,
+                                           const char *address,
+                                           const char *message,
+                                           bool is_hash,
+                                           bool has_proven_funds,
+                                           uint64_t proven_amount) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
+    ui_bip322_message_state_t *state = (ui_bip322_message_state_t *) &g_ui_state;
+
+    copy_ui_string(state->message, message, sizeof(state->message));
+    if (account != NULL) {
+        strncpy(state->account, account, sizeof(state->account));
+        state->account[sizeof(state->account) - 1] = '\0';
+    } else {
+        state->account[0] = '\0';
+    }
+    strncpy(state->address, address, sizeof(state->address));
+    state->address[sizeof(state->address) - 1] = '\0';
+
+    if (has_proven_funds) {
+        format_sats_amount(COIN_COINID_SHORT, proven_amount, state->proven_amount);
+    } else {
+        state->proven_amount[0] = '\0';
+    }
+
+    ui_display_bip322_message_flow(account != NULL, is_hash, has_proven_funds);
+
+    return io_ui_process(context);
+}
+
 bool ui_display_register_wallet_policy(
     dispatcher_context_t *context,
     const policy_map_wallet_header_t *wallet_header,
