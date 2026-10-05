@@ -10,6 +10,7 @@ enum PsbtGlobalType {
 	PSBT_GLOBAL_INPUT_COUNT             = 0x04,
 	PSBT_GLOBAL_OUTPUT_COUNT            = 0x05,
 	PSBT_GLOBAL_TX_MODIFIABLE           = 0x06,
+	PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE  = 0x09,
 	PSBT_GLOBAL_VERSION                 = 0xFB,
 	PSBT_GLOBAL_PROPRIETARY             = 0xFC
 };

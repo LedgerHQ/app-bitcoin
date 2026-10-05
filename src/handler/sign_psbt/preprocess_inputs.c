@@ -341,8 +341,12 @@ bool __attribute__((noinline)) preprocess_inputs(
         }
 
         // For segwitv0 inputs, the non-witness utxo _should_ be present; we show a warning
-        // to the user otherwise, but we continue nonetheless on approval
-        if (segwit_version == 0 && !input.has_nonWitnessUtxo) {
+        // to the user otherwise, but we continue nonetheless on approval.
+        // The first input of a BIP-322 message signing request is exempt: it spends the virtual
+        // to_spend transaction, which validate_bip322_request() recomputes on-device and requires
+        // to match the input's prevout (aborting otherwise), so its utxo is fully authenticated.
+        bool is_bip322_to_spend = st->bip322.is_message_signing && cur_input_index == 0;
+        if (segwit_version == 0 && !input.has_nonWitnessUtxo && !is_bip322_to_spend) {
             PRINTF("Non-witness utxo missing for segwitv0 input. Will show a warning.\n");
             st->warnings.missing_nonwitnessutxo = true;
         }

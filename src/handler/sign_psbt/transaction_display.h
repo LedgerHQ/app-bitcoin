@@ -44,3 +44,12 @@ bool display_transaction(
     dispatcher_context_t *dc,
     sign_psbt_state_t *st,
     const uint8_t internal_outputs[static BITVECTOR_REAL_SIZE(MAX_N_OUTPUTS_CAN_SIGN)]);
+
+/**
+ * Shows the BIP-322 message review (account, address being proven, the total amount of the
+ * proven coins for a proof-of-funds, and the message text or its sha256 hash) and asks for
+ * user confirmation.
+ *
+ * Returns true if the user approved; returns false and sends an error status word otherwise.
+ */
+bool display_bip322_message(dispatcher_context_t *dc, sign_psbt_state_t *st);
