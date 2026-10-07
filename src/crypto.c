@@ -481,6 +481,11 @@ void crypto_tr_tapleaf_hash_init(cx_sha256_t *hash_context) {
 }
 
 int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]) {
+    // fail if x >= p
+    if (memcmp(x, secp256k1_p, 32) >= 0) {
+        return -1;
+    }
+
     // save memory by reusing output buffer for intermediate results
     uint8_t *y = out + 1 + 32;
     // we use the memory for the x-coordinate of the output as a temporary variable
