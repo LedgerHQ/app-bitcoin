@@ -260,6 +260,47 @@ def test_register_wallet_musig_multiple_internal_keys(client: RaggerClient):
         assert error_code == EC_REGISTER_WALLET_MUSIG_WITH_MULTIPLE_INTERNAL_KEYS
 
 
+def test_register_wallet_too_many_internal_key_expressions(client: RaggerClient):
+    # The same internal key can appear in many key expressions (with disjoint derivations), but
+    # signing supports at most MAX_INTERNAL_KEY_EXPRESSIONS (8) key expressions with internal keys,
+    # counting musig() key expressions that contain an internal key. Registration must reject
+    # policies with more of them.
+
+    # defined in error_codes.h
+    EC_REGISTER_WALLET_TOO_MANY_INTERNAL_KEY_EXPRESSIONS = 0x0004
+
+    internal_key = "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK"
+    external_key = "tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF"
+
+    # @0/<2;3>/*, @0/<4;5>/*, ..., @0/<16;17>/*
+    keys = [f"@0/<{2*i};{2*i+1}>/*" for i in range(1, 9)]
+    leaves = [f"pk({k})" for k in keys]
+    tree = (f"{{{{{{{leaves[0]},{leaves[1]}}},{{{leaves[2]},{leaves[3]}}}}},"
+            f"{{{{{leaves[4]},{leaves[5]}}},{{{leaves[6]},{leaves[7]}}}}}}}")
+
+    for descriptor_template, keys_info in [
+        # key path + 8 leaves
+        (f"tr(@0/<0;1>/*,{tree})", [internal_key]),
+        # 9 key expressions in a single leaf
+        (f"tr(@1/**,multi_a(1,@0/<0;1>/*,{','.join(keys)}))", [internal_key, external_key]),
+        # a musig() with an internal key counts as an internal key expression
+        (f"tr(musig(@0,@1)/<0;1>/*,multi_a(1,{','.join(keys)}))", [internal_key, external_key]),
+        # same in segwit v0
+        (f"wsh(multi(1,@0/<0;1>/*,{','.join(keys)}))", [internal_key]),
+    ]:
+        with pytest.raises(ExceptionRAPDU) as e:
+            client.register_wallet(WalletPolicy(
+                name="Too many internal keys",
+                descriptor_template=descriptor_template,
+                keys_info=keys_info,
+            ))
+
+        assert DeviceException.exc.get(e.value.status) == NotSupportedError
+        assert len(e.value.data) == 2
+        error_code = int.from_bytes(e.value.data, 'big')
+        assert error_code == EC_REGISTER_WALLET_TOO_MANY_INTERNAL_KEY_EXPRESSIONS
+
+
 def test_register_miniscript_long_policy(navigator: Navigator, firmware: Firmware, client:
                                          RaggerClient, test_name: str, speculos_globals):
     # This test makes sure that policies longer than 256 bytes work as expected on all devices

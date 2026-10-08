@@ -46,7 +46,8 @@
 
 static bool is_policy_acceptable(const policy_node_t *policy);
 static bool is_policy_name_acceptable(const char *name, size_t name_len);
-static bool has_musig_with_multiple_internal_keys(
+static bool check_policy_is_signable(
+    dispatcher_context_t *dc,
     const policy_node_t *policy,
     const key_type_e keys_type[static MAX_N_KEYS_IN_WALLET_POLICY]);
 
@@ -173,10 +174,8 @@ __attribute__((noinline)) static void confirm_and_register_wallet(
         return;
     }
 
-    // MuSig2 signing produces at most one partial signature per musig() key expression, so a
-    // musig() would be tricky to spend: we reject it instead. Not useful anyway.
-    if (has_musig_with_multiple_internal_keys(policy, keys_type)) {
-        SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_REGISTER_WALLET_MUSIG_WITH_MULTIPLE_INTERNAL_KEYS);
+    // Make sure not to register policies that we would later be unable to sign for
+    if (!check_policy_is_signable(dc, policy, keys_type)) {
         return;
     }
 
@@ -347,32 +346,63 @@ static bool is_policy_name_acceptable(const char *name, size_t name_len) {
 }
 
 /**
- * Returns true if any musig() key expression of the policy has more than one internal key.
+ * Performs the checks needed to make sure that the device will later be able to sign for the
+ * policy, beyond its validity. Rejects the policy if:
+ * - a musig() key expression has more than one internal key: MuSig2 signing produces at most one
+ *   partial signature per key expression, so such a musig() would be tricky to spend (and it is
+ *   not useful anyway);
+ * - there are more than MAX_INTERNAL_KEY_EXPRESSIONS key expressions with internal keys; signing
+ *   only supports up to that number,
+ *
+ * Returns true on success, false if at least one condition is violated.
+ * It will send the error status before returning.
  */
-static bool has_musig_with_multiple_internal_keys(
+static bool check_policy_is_signable(
+    dispatcher_context_t *dc,
     const policy_node_t *policy,
     const key_type_e keys_type[static MAX_N_KEYS_IN_WALLET_POLICY]) {
     int n_key_expressions = get_keyexpr_by_index(policy, 0, NULL, NULL);
     LEDGER_ASSERT(n_key_expressions >= 0, "Unexpected error retrieving key expression");
 
+    size_t n_internal_key_expressions = 0;
     for (int i = 0; i < n_key_expressions; i++) {
         policy_node_keyexpr_t *key_expr;
         int ret = get_keyexpr_by_index(policy, i, NULL, &key_expr);
         LEDGER_ASSERT(ret >= 0, "Unexpected error retrieving key expression");
-        if (key_expr->type != KEY_EXPRESSION_MUSIG) {
-            continue;
-        }
 
-        const musig_aggr_key_info_t *musig_info = key_expr->m.musig_info;
         int n_internal_keys = 0;
-        for (int j = 0; j < musig_info->n; j++) {
-            if (keys_type[musig_info->key_indexes[j]] == PUBKEY_TYPE_INTERNAL) {
+        if (key_expr->type == KEY_EXPRESSION_NORMAL) {
+            if (keys_type[key_expr->k.key_index] == PUBKEY_TYPE_INTERNAL) {
                 ++n_internal_keys;
             }
+        } else if (key_expr->type == KEY_EXPRESSION_MUSIG) {
+            const musig_aggr_key_info_t *musig_info = key_expr->m.musig_info;
+            for (int j = 0; j < musig_info->n; j++) {
+                if (keys_type[musig_info->key_indexes[j]] == PUBKEY_TYPE_INTERNAL) {
+                    ++n_internal_keys;
+                }
+            }
+            if (n_internal_keys > 1) {
+                PRINTF("A musig() key expression has more than one internal key\n");
+                SEND_SW_EC(dc,
+                           SW_NOT_SUPPORTED,
+                           EC_REGISTER_WALLET_MUSIG_WITH_MULTIPLE_INTERNAL_KEYS);
+                return false;
+            }
+        } else {
+            LEDGER_ASSERT(false, "Unexpected key expression type");
         }
-        if (n_internal_keys > 1) {
-            return true;
+
+        if (n_internal_keys > 0) {
+            ++n_internal_key_expressions;
         }
     }
-    return false;
+
+    if (n_internal_key_expressions > MAX_INTERNAL_KEY_EXPRESSIONS) {
+        PRINTF("Too many internal key expressions. The maximum supported is %d\n",
+               MAX_INTERNAL_KEY_EXPRESSIONS);
+        SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_REGISTER_WALLET_TOO_MANY_INTERNAL_KEY_EXPRESSIONS);
+        return false;
+    }
+    return true;
 }

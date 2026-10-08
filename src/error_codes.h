@@ -21,6 +21,9 @@
 // A musig() key expression in the wallet policy has more than one internal key.
 #define EC_REGISTER_WALLET_MUSIG_WITH_MULTIPLE_INTERNAL_KEYS 0x0003
 
+// The wallet policy has more key expressions with internal keys than supported for signing.
+#define EC_REGISTER_WALLET_TOO_MANY_INTERNAL_KEY_EXPRESSIONS 0x0004
+
 /**
  * SIGN_PSBT
  */
