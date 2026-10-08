@@ -187,16 +187,22 @@ static void sign_psbt(dispatcher_context_t *dc,
             }
         }
 
-        if (!sign_result) {
-            return;
-        }
-
 #ifdef HAVE_SWAP
         // Only if called from swap, the app should terminate after sending the response
         if (G_called_from_swap) {
+            if (!sign_result) {
+                PRINTF("Signing failed in swap after approval\n");
+                SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_GENERIC_SIGN_PSBT_FAILED);
+                finalize_exchange_sign_transaction(false);
+            }
+
             G_swap_state.should_exit = true;
         }
 #endif /* HAVE_SWAP */
+
+        if (!sign_result) {
+            return;
+        }
     }
 
     // MuSig2: if there is an active session at the end of round 1, we move it to persistent
