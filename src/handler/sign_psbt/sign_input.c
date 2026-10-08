@@ -208,6 +208,19 @@ bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_context
         return false;
     }
 
+    // As recommended in BIP-340, verify the signature before releasing it, refusing to produce
+    // an invalid signature that is the result of an incorrect/faulty computation
+    if (!cx_ecschnorr_verify(&pubkey_tweaked,
+                             CX_ECSCHNORR_BIP0340,
+                             CX_SHA256,
+                             sighash,
+                             32,
+                             sig,
+                             sig_len)) {
+        SEND_SW(dc, SW_BAD_STATE);
+        return false;
+    }
+
     // only append the sighash type byte if it is non-zero
     if (sighash_byte != 0x00) {
         // only add the sighash byte if not 0
