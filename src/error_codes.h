@@ -18,6 +18,9 @@
 // No key in the wallet policy was recognized as internal.
 #define EC_REGISTER_WALLET_POLICY_HAS_NO_INTERNAL_KEY 0x0002
 
+// A musig() key expression in the wallet policy has more than one internal key.
+#define EC_REGISTER_WALLET_MUSIG_WITH_MULTIPLE_INTERNAL_KEYS 0x0003
+
 /**
  * SIGN_PSBT
  */
