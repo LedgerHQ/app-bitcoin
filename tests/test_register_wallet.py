@@ -227,6 +227,39 @@ def test_register_wallet_unsupported_policy(navigator: Navigator, firmware: Firm
     assert len(e.value.data) == 0
 
 
+def test_register_wallet_musig_multiple_internal_keys(client: RaggerClient):
+    # The device can only produce one partial signature per musig() key expression, therefore
+    # musig() key expressions with more than one internal key are not supported.
+
+    # defined in error_codes.h
+    EC_REGISTER_WALLET_MUSIG_WITH_MULTIPLE_INTERNAL_KEYS = 0x0003
+
+    keys_info = [
+        # @0 and @1 are both internal
+        "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+        "tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    ]
+
+    for descriptor_template in [
+        "tr(musig(@0,@1)/**,pk(@2/**))",
+        "tr(musig(@2,@0,@1)/**)",
+        "tr(@0/**,pk(musig(@1,@2,@0)/**))",
+        "tr(@2/**,multi_a(1,@0/<2;3>/*,musig(@0,@1)/**))",
+    ]:
+        with pytest.raises(ExceptionRAPDU) as e:
+            client.register_wallet(WalletPolicy(
+                name="Musig with 2 internal keys",
+                descriptor_template=descriptor_template,
+                keys_info=keys_info,
+            ))
+
+        assert DeviceException.exc.get(e.value.status) == NotSupportedError
+        assert len(e.value.data) == 2
+        error_code = int.from_bytes(e.value.data, 'big')
+        assert error_code == EC_REGISTER_WALLET_MUSIG_WITH_MULTIPLE_INTERNAL_KEYS
+
+
 def test_register_miniscript_long_policy(navigator: Navigator, firmware: Firmware, client:
                                          RaggerClient, test_name: str, speculos_globals):
     # This test makes sure that policies longer than 256 bytes work as expected on all devices
