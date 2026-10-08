@@ -21,6 +21,7 @@
 /* SDK headers */
 #include "bip32.h"
 #include "cx.h"
+#include "ledger_assert.h"
 #include "os.h"
 #include "read.h"
 #include "write.h"
@@ -45,6 +46,9 @@
 
 static bool is_policy_acceptable(const policy_node_t *policy);
 static bool is_policy_name_acceptable(const char *name, size_t name_len);
+static bool has_musig_with_multiple_internal_keys(
+    const policy_node_t *policy,
+    const key_type_e keys_type[static MAX_N_KEYS_IN_WALLET_POLICY]);
 
 static const uint8_t BIP0341_NUMS_PUBKEY[] = {0x02, 0x50, 0x92, 0x9b, 0x74, 0xc1, 0xa0, 0x49, 0x54,
                                               0xb7, 0x8b, 0x4b, 0x60, 0x35, 0xe9, 0x7a, 0x5e, 0x07,
@@ -166,6 +170,13 @@ __attribute__((noinline)) static void confirm_and_register_wallet(
         // for legacy policies, we keep the restriction to exactly 1 internal key
         PRINTF("V1 policies must have exactly 1 internal key\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
+
+    // MuSig2 signing produces at most one partial signature per musig() key expression, so a
+    // musig() would be tricky to spend: we reject it instead. Not useful anyway.
+    if (has_musig_with_multiple_internal_keys(policy, keys_type)) {
+        SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_REGISTER_WALLET_MUSIG_WITH_MULTIPLE_INTERNAL_KEYS);
         return;
     }
 
@@ -333,4 +344,35 @@ static bool is_policy_name_acceptable(const char *name, size_t name_len) {
         if (name[i] < 0x20 || name[i] > 0x7E) return false;
 
     return true;
+}
+
+/**
+ * Returns true if any musig() key expression of the policy has more than one internal key.
+ */
+static bool has_musig_with_multiple_internal_keys(
+    const policy_node_t *policy,
+    const key_type_e keys_type[static MAX_N_KEYS_IN_WALLET_POLICY]) {
+    int n_key_expressions = get_keyexpr_by_index(policy, 0, NULL, NULL);
+    LEDGER_ASSERT(n_key_expressions >= 0, "Unexpected error retrieving key expression");
+
+    for (int i = 0; i < n_key_expressions; i++) {
+        policy_node_keyexpr_t *key_expr;
+        int ret = get_keyexpr_by_index(policy, i, NULL, &key_expr);
+        LEDGER_ASSERT(ret >= 0, "Unexpected error retrieving key expression");
+        if (key_expr->type != KEY_EXPRESSION_MUSIG) {
+            continue;
+        }
+
+        const musig_aggr_key_info_t *musig_info = key_expr->m.musig_info;
+        int n_internal_keys = 0;
+        for (int j = 0; j < musig_info->n; j++) {
+            if (keys_type[musig_info->key_indexes[j]] == PUBKEY_TYPE_INTERNAL) {
+                ++n_internal_keys;
+            }
+        }
+        if (n_internal_keys > 1) {
+            return true;
+        }
+    }
+    return false;
 }
