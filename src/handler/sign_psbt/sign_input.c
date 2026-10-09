@@ -173,8 +173,17 @@ bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_context
             break;
         }
 
+        // BIP-340 default signing: the first 32 bytes of sig are the auxiliary randomness, and
+        // with CX_RND_PROVIDED the SDK derives the synthetic nonce
+        // k = hash_BIP0340/nonce((d XOR hash_BIP0340/aux(aux_rand)) || P || m).
+        // This makes sure nonces are unique per message even in the event of RNG failure.
+        if (cx_get_random_bytes(sig, 32) != CX_OK) {
+            error = true;
+            break;
+        }
+
         err = cx_ecschnorr_sign_no_throw(&private_key,
-                                         CX_ECSCHNORR_BIP0340 | CX_RND_TRNG,
+                                         CX_ECSCHNORR_BIP0340 | CX_RND_PROVIDED,
                                          CX_SHA256,
                                          sighash,
                                          32,
@@ -195,6 +204,19 @@ bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_context
 
     if (sig_len != 64) {
         PRINTF("SIG LEN: %d\n", sig_len);
+        SEND_SW(dc, SW_BAD_STATE);
+        return false;
+    }
+
+    // As recommended in BIP-340, verify the signature before releasing it, refusing to produce
+    // an invalid signature that is the result of an incorrect/faulty computation
+    if (!cx_ecschnorr_verify(&pubkey_tweaked,
+                             CX_ECSCHNORR_BIP0340,
+                             CX_SHA256,
+                             sighash,
+                             32,
+                             sig,
+                             sig_len)) {
         SEND_SW(dc, SW_BAD_STATE);
         return false;
     }
