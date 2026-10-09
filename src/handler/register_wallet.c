@@ -21,6 +21,7 @@
 /* SDK headers */
 #include "bip32.h"
 #include "cx.h"
+#include "ledger_assert.h"
 #include "os.h"
 #include "read.h"
 #include "write.h"
@@ -45,6 +46,10 @@
 
 static bool is_policy_acceptable(const policy_node_t *policy);
 static bool is_policy_name_acceptable(const char *name, size_t name_len);
+static bool check_policy_is_signable(
+    dispatcher_context_t *dc,
+    const policy_node_t *policy,
+    const key_type_e keys_type[static MAX_N_KEYS_IN_WALLET_POLICY]);
 
 static const uint8_t BIP0341_NUMS_PUBKEY[] = {0x02, 0x50, 0x92, 0x9b, 0x74, 0xc1, 0xa0, 0x49, 0x54,
                                               0xb7, 0x8b, 0x4b, 0x60, 0x35, 0xe9, 0x7a, 0x5e, 0x07,
@@ -166,6 +171,11 @@ __attribute__((noinline)) static void confirm_and_register_wallet(
         // for legacy policies, we keep the restriction to exactly 1 internal key
         PRINTF("V1 policies must have exactly 1 internal key\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
+
+    // Make sure not to register policies that we would later be unable to sign for
+    if (!check_policy_is_signable(dc, policy, keys_type)) {
         return;
     }
 
@@ -332,5 +342,67 @@ static bool is_policy_name_acceptable(const char *name, size_t name_len) {
     for (unsigned int i = 0; i < name_len; i++)
         if (name[i] < 0x20 || name[i] > 0x7E) return false;
 
+    return true;
+}
+
+/**
+ * Performs the checks needed to make sure that the device will later be able to sign for the
+ * policy, beyond its validity. Rejects the policy if:
+ * - a musig() key expression has more than one internal key: MuSig2 signing produces at most one
+ *   partial signature per key expression, so such a musig() would be tricky to spend (and it is
+ *   not useful anyway);
+ * - there are more than MAX_INTERNAL_KEY_EXPRESSIONS key expressions with internal keys; signing
+ *   only supports up to that number,
+ *
+ * Returns true on success, false if at least one condition is violated.
+ * It will send the error status before returning.
+ */
+static bool check_policy_is_signable(
+    dispatcher_context_t *dc,
+    const policy_node_t *policy,
+    const key_type_e keys_type[static MAX_N_KEYS_IN_WALLET_POLICY]) {
+    int n_key_expressions = get_keyexpr_by_index(policy, 0, NULL, NULL);
+    LEDGER_ASSERT(n_key_expressions >= 0, "Unexpected error retrieving key expression");
+
+    size_t n_internal_key_expressions = 0;
+    for (int i = 0; i < n_key_expressions; i++) {
+        policy_node_keyexpr_t *key_expr;
+        int ret = get_keyexpr_by_index(policy, i, NULL, &key_expr);
+        LEDGER_ASSERT(ret >= 0, "Unexpected error retrieving key expression");
+
+        int n_internal_keys = 0;
+        if (key_expr->type == KEY_EXPRESSION_NORMAL) {
+            if (keys_type[key_expr->k.key_index] == PUBKEY_TYPE_INTERNAL) {
+                ++n_internal_keys;
+            }
+        } else if (key_expr->type == KEY_EXPRESSION_MUSIG) {
+            const musig_aggr_key_info_t *musig_info = key_expr->m.musig_info;
+            for (int j = 0; j < musig_info->n; j++) {
+                if (keys_type[musig_info->key_indexes[j]] == PUBKEY_TYPE_INTERNAL) {
+                    ++n_internal_keys;
+                }
+            }
+            if (n_internal_keys > 1) {
+                PRINTF("A musig() key expression has more than one internal key\n");
+                SEND_SW_EC(dc,
+                           SW_NOT_SUPPORTED,
+                           EC_REGISTER_WALLET_MUSIG_WITH_MULTIPLE_INTERNAL_KEYS);
+                return false;
+            }
+        } else {
+            LEDGER_ASSERT(false, "Unexpected key expression type");
+        }
+
+        if (n_internal_keys > 0) {
+            ++n_internal_key_expressions;
+        }
+    }
+
+    if (n_internal_key_expressions > MAX_INTERNAL_KEY_EXPRESSIONS) {
+        PRINTF("Too many internal key expressions. The maximum supported is %d\n",
+               MAX_INTERNAL_KEY_EXPRESSIONS);
+        SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_REGISTER_WALLET_TOO_MANY_INTERNAL_KEY_EXPRESSIONS);
+        return false;
+    }
     return true;
 }
