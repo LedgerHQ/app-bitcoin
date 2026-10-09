@@ -13,6 +13,11 @@ Dates are in `dd-mm-yyyy` format.
 
 - Support for [BIP-0322](https://github.com/bitcoin/bips/blob/master/bip-0322.mediawiki) (v2.0.0) generic signed messages: a PSBT carrying the `PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE` global field (0x09) is now verified to have the exact BIP-322 *to_sign* structure and reviewed on-screen as a message signature (account, address and message), instead of being shown as a transaction with an `OP_RETURN` output and no fees. Proof-of-funds requests (additional inputs spending real coins of the account) are supported, with the total proven amount shown in the review. Works with any supported wallet policy, including multisig and miniscript.
 
+### Changed
+
+- MuSig2: the pubnonces no longer depend on the transaction, so they can be pre-generated before the transaction is known. See [doc/musig.md](doc/musig.md).
+- MuSig2 (breaking): as a consequence, at most one signing session can be pending for a given wallet policy; executing round 1 again for the same wallet policy discards the previous session, and round 2 with the old pubnonces fails.
+
 ### Fixed
 
 - The transaction lock time is now determined as BIP-370 prescribes, from each input's `PSBT_IN_REQUIRED_TIME_LOCKTIME` / `PSBT_IN_REQUIRED_HEIGHT_LOCKTIME` together with `PSBT_GLOBAL_FALLBACK_LOCKTIME`, instead of always using the fallback verbatim. PSBTs not using the individual preferred locktime fields are unaffected, as they will keep depending on `PSBT_GLOBAL_FALLBACK_LOCKTIME` alone.
