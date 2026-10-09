@@ -1,9 +1,11 @@
-name: Cleartext codegen check
+name: Codegen check
 
-# Ensures the generated BIP388 cleartext files committed to the repo are in sync
-# with the TOML specs they are derived from. If someone edits
-# specs/bip388/*.toml without re-running specs/bip388/gen.py, this
-# job fails and points at the drifted files.
+# Ensures the generated files committed to the repo are in sync with the specs
+# they are derived from:
+#  - the BIP388 cleartext files, generated from specs/bip388/*.toml
+#  - the BIP-322 unit-test vectors, generated from specs/bip322/basic-test-vectors.json
+# If someone edits a spec without re-running the corresponding gen.py, this job
+# fails and points at the drifted files.
 
 on:
   workflow_dispatch:
@@ -30,3 +32,6 @@ jobs:
 
       - name: Check codegen is in sync with the TOML specs
         run: python3 specs/bip388/gen.py --check
+
+      - name: Check the BIP-322 unit-test vectors are in sync with the pinned JSON
+        run: python3 specs/bip322/gen.py --check

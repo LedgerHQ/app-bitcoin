@@ -20,6 +20,30 @@ def message_instruction_approve(model: Firmware, save_screenshot=True) -> Instru
     return instructions
 
 
+def bip322_instruction_approve(model: Firmware, save_screenshot=True, *,
+                               has_unverifiedwarning: bool = False) -> Instructions:
+    # Navigation for the BIP-322 message review (account/address/message pairs, then sign),
+    # optionally preceded by the warning for segwitv0 inputs missing the non-witness utxo.
+    # The message is streamed from the client between the warning and the review, so they are
+    # in separate request groups.
+    instructions = Instructions(model)
+
+    if model.name.startswith("nano"):
+        if has_unverifiedwarning:
+            instructions.new_request("Continue anyway", save_screenshot=save_screenshot)
+        instructions.nano_skip_screen("Address", save_screenshot=save_screenshot)
+        instructions.same_request("Sign message", save_screenshot=save_screenshot)
+    else:
+        if has_unverifiedwarning:
+            instructions.new_request("Continue anyway", NavInsID.USE_CASE_REVIEW_TAP,
+                                     NavInsID.USE_CASE_CHOICE_REJECT,
+                                     save_screenshot=save_screenshot)
+        instructions.review_message(save_screenshot=save_screenshot)
+        instructions.confirm_message(save_screenshot=save_screenshot)
+
+    return instructions
+
+
 def message_instruction_approve_long(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 

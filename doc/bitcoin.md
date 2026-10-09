@@ -256,6 +256,28 @@ In both cases, the `tapleaf_hash` is only present for a Script path spend.
 
 Other values of the `<tag>` are undefined and reserved for future use.
 
+#### BIP-322 message signing
+
+If the PSBT contains the `PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE` global field (`0x09`, defined in [BIP-0322](https://github.com/bitcoin/bips/blob/master/bip-0322.mediawiki), version 2.0.0), the PSBT is treated as a request to sign the BIP-322 *to_sign* virtual transaction for the message contained in the field, and is reviewed on-screen as a **message signature** (account, address whose ownership is being proven, and the message), never as a transaction. If the message is too long (more than 640 bytes) or not printable ASCII (which includes any UTF-8 text with non-ASCII characters), its plain sha256 hash is shown instead, matching the behavior of the legacy `SIGN_MESSAGE` command (note that this display hash is *not* the BIP-322 tagged hash that the signature commits to).
+
+Before showing the message, the app enforces the exact structure mandated by BIP-322, and refuses to sign otherwise:
+
+- exactly one output, with zero value and a script equal to a single `OP_RETURN` byte;
+- transaction version 0 or 2; locktime 0; the first input with an explicit sequence of 0 (BIP-322 gives its sequence, together with the locktime, the meaning of a timelock, and timelocked signatures are not supported yet);
+- all signatures use `SIGHASH_ALL` (or `SIGHASH_DEFAULT` for taproot inputs);
+- the first input's prevout must reference output 0 of the *to_spend* transaction that the app independently recomputes from the message (as per BIP-322, using the tagged hash with tag `BIP0322-signed-message`) and the input's own scriptPubKey; the *to_spend* output has zero value.
+
+The last rule is the security anchor of the flow: it guarantees that the message shown on-screen is exactly the message committed to by the produced signature, and that the signed transaction is provably unspendable (the *to_spend* transaction's input references the null outpoint).
+
+**Proof of funds**: any input beyond the first makes the request a BIP-322 *proof of funds*. The first input must still be the *message_challenge* input spending the recomputed *to_spend* transaction (as clarified in BIP-322 v2.0.0, it is not optional); a request made only of real UTXOs is rejected. The additional inputs spend real UTXOs; each one must belong to the wallet policy (external inputs are rejected) and have a sequence that is either 0 or has the [BIP-68](https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki) relative-timelock disable flag set (which includes the final sequence `0xFFFFFFFF`, explicit or implied by an omitted `PSBT_IN_SEQUENCE`). Any other sequence is rejected: with version 2 it would be a relative timelock on *to_sign* (not supported yet); with version 0 it is meaningless. The total amount of the proven coins is shown in the review as an additional "Proving funds" line. The usual UTXO authentication rules apply to these inputs, including the warning for segwitv0 inputs missing the non-witness UTXO. The first input is exempt from that warning, even in a proof of funds: the *to_spend* transaction it spends is entirely recomputed by the app, so its non-witness UTXO is not needed.
+
+A structurally invalid PSBT carrying the field fails with `SW_INCORRECT_DATA`; valid BIP-322 requests using features that are not yet supported (timelocks, i.e. a non-zero locktime, a non-zero sequence on the first input, or a relative timelock on a proof-of-funds input) fail with `SW_NOT_SUPPORTED`. See `error_codes.h` for the specific error codes.
+
+The signatures are yielded exactly as for a regular transaction; the client is responsible for finalizing the transaction and encoding the signature in one of the formats defined by BIP-322 (`smp`/`ful`/`pof` prefixes). This command is not allowed when the app is started from the Exchange app (swap).
+
+##### Deviation from BIP-322: no shared non-witness UTXOs
+
+As an optimization for proofs of funds, BIP-322 allows omitting the non-witness UTXO of an input that spends an output of the same transaction as an earlier input. This optimization is **not supported**: each input is authenticated on its own, exactly as in a regular `SIGN_PSBT`, so a legacy input without its non-witness UTXO is rejected, and a segwitv0 input without it triggers the missing non-witness UTXO warning. Clients should therefore include the non-witness UTXO in every input, even when it repeats the one of an earlier input.
 
 #### Client commands
 

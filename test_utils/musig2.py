@@ -19,12 +19,10 @@ The main objects and methods exported in this class are:
 import hashlib
 import hmac
 from io import BytesIO
-import re
-from re import Match
 
 import secrets
 import struct
-from typing import Dict, Iterable, Iterator, List, Optional, Set, Tuple, Union
+from typing import Dict, Iterator, List, Optional, Tuple, Union
 from abc import ABC, abstractmethod
 
 import sys
@@ -34,8 +32,6 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-import base58
-
 from test_utils.taproot_sighash import SIGHASH_DEFAULT, TaprootSignatureHash
 from test_utils import bip0327, bip0340, hash160, sha256
 from test_utils import taproot
@@ -44,6 +40,13 @@ from test_utils.wallet_policy import (
     MuSig2KeyPlaceholder,
     KeyPlaceholder,
     extract_placeholders,
+    # the musig() helpers below are also re-exported from this module
+    aggregate_musig_pubkey,
+    derive_from_key_info,
+    derive_plain_descriptor,
+    musig,
+    tapleaf_hash,
+    unsorted_musig,
 )
 
 from bitcoin_client.ledger_bitcoin._embit.descriptor.miniscript import Miniscript
@@ -53,122 +56,6 @@ from bitcoin_client.ledger_bitcoin.wallet import WalletPolicy
 
 
 HARDENED_INDEX = 0x80000000
-
-
-def tapleaf_hash(script: Optional[bytes], leaf_version=b'\xC0') -> Optional[bytes]:
-    if script is None:
-        return None
-    return taproot.tagged_hash(
-        "TapLeaf",
-        leaf_version + taproot.ser_script(script)
-    )
-
-
-
-
-def unsorted_musig(pubkeys: Iterable[bytes], version_bytes: bytes) -> Tuple[str, bip0327.KeyAggContext]:
-    """
-    Constructs the musig2 aggregated extended public key from an unsorted list of
-    compressed public keys, and the version bytes.
-    """
-
-    assert all(len(pk) == 33 for pk in pubkeys)
-    assert len(version_bytes) == 4
-
-    depth = b'\x00'
-    fingerprint = b'\x00\x00\x00\x00'
-    child_number = b'\x00\x00\x00\x00'
-
-    key_agg_ctx = bip0327.key_agg(pubkeys)
-    Q = key_agg_ctx.Q
-    compressed_pubkey = (
-        b'\x02' if Q[1] % 2 == 0 else b'\x03') + bip0327.get_xonly_pk(key_agg_ctx)
-    chaincode = bytes.fromhex(
-        "868087ca02a6f974c4598924c36b57762d32cb45717167e300622c7167e38965")
-    ext_pubkey = version_bytes + depth + fingerprint + \
-        child_number + chaincode + compressed_pubkey
-    return base58.b58encode_check(ext_pubkey).decode(), key_agg_ctx
-
-
-def musig(pubkeys: Iterable[bytes], version_bytes: bytes) -> Tuple[str, bip0327.KeyAggContext]:
-    """
-    Constructs the musig2 aggregated extended public key from a list of compressed public keys,
-    and the version bytes. The keys are sorted, as required by the `the musig()` key expression
-    in descriptors.
-    """
-    return unsorted_musig(sorted(pubkeys), version_bytes)
-
-
-def aggregate_musig_pubkey(keys_info: Iterable[str]) -> Tuple[str, bip0327.KeyAggContext]:
-    """
-    Constructs the musig2 aggregated extended public key from the list of keys info
-    of the participating keys.
-    """
-
-    pubkeys: list[bytes] = []
-    versions: Set[str] = set()
-    for ki in keys_info:
-        start = ki.find(']')
-        xpub = ki[start + 1:]
-        xpub_bytes = base58.b58decode_check(xpub)
-        versions.add(xpub_bytes[:4])
-        pubkeys.append(xpub_bytes[-33:])
-
-    if len(versions) > 1:
-        raise ValueError(
-            "All the extended public keys should be from the same network")
-
-    return musig(pubkeys, versions.pop())
-
-
-def derive_from_key_info(key_info: str, steps: List[int]) -> str:
-    start = key_info.find(']')
-    pk = ExtendedKey.deserialize(key_info[start + 1:])
-    return pk.derive_pub_path(steps).to_string()
-
-
-def derive_plain_descriptor(desc_tmpl: str, keys_info: List[str], is_change: bool, address_index: int):
-    """
-    Given a wallet policy, and the change/address_index combination, computes the corresponding descriptor.
-    It replaces /** with /<0;1>/*
-    It also replaces each musig() key expression with the corresponding xpub.
-    The resulting descriptor can be used with descriptor libraries that do not support musig or wallet policies.
-    """
-
-    desc_tmpl = desc_tmpl.replace("/**", "/<0;1>/*")
-    desc_tmpl = desc_tmpl.replace("*", str(address_index))
-
-    # Replace each <M;N> with M if is_change is False, otherwise with N
-    def replace_m_n(match: Match[str]):
-        m, n = match.groups()
-        return m if not is_change else n
-
-    desc_tmpl = re.sub(r'<([^;]+);([^>]+)>', replace_m_n, desc_tmpl)
-
-    # Replace musig(...) expressions
-    def replace_musig(match: Match[str]):
-        musig_content = match.group(1)
-        steps = [int(x) for x in match.group(2).split("/")]
-
-        assert len(steps) == 2
-
-        key_indexes = [int(i.strip('@')) for i in musig_content.split(',')]
-        key_infos = [keys_info[i] for i in key_indexes]
-        agg_xpub = aggregate_musig_pubkey(key_infos)[0]
-
-        return derive_from_key_info(agg_xpub, steps)
-
-    desc_tmpl = re.sub(r'musig\(([^)]+)\)/(\d+/\d+)', replace_musig, desc_tmpl)
-
-    # Replace @i/a/b with the i-th element in keys_info, deriving the key appropriately
-    # to get a plain xpub
-    def replace_key_index(match):
-        index, step1, step2 = [int(x) for x in match.group(1).split('/')]
-        return derive_from_key_info(keys_info[index], [step1, step2])
-
-    desc_tmpl = re.sub(r'@(\d+/\d+/\d+)', replace_key_index, desc_tmpl)
-
-    return desc_tmpl
 
 
 class Tree:
