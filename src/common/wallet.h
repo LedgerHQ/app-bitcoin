@@ -18,6 +18,12 @@
 // bitcoin-core supports up to 20, but we limit to 16 as bigger pushes require special handling.
 #define MAX_PUBKEYS_PER_MULTISIG 16
 
+// The maximum number of keys for multi/sortedmulti in legacy P2SH: the redeem script
+// (3 + 34*n bytes) must not exceed the 520-byte consensus limit for stack elements.
+#define MAX_PUBKEYS_PER_P2SH_MULTISIG 15
+_Static_assert(3 + 34 * MAX_PUBKEYS_PER_P2SH_MULTISIG <= 520,
+               "P2SH multisig redeem script exceeds 520 bytes");
+
 // The maximum number of keys supported in a musig() key expression
 // It is basically unlimited in theory, but we need to set a practical limit.
 // The implementation of MuSig2 requires quite a few large arrays (for example, the pubnonces are
