@@ -1796,6 +1796,13 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "Invalid k and/or n");
             }
 
+            // In legacy P2SH, the redeem script must not exceed the 520-byte consensus limit
+            if ((context_flags & CONTEXT_WITHIN_SH) != 0 &&
+                (context_flags & CONTEXT_WITHIN_WSH) == 0 &&
+                node->n > MAX_PUBKEYS_PER_P2SH_MULTISIG) {
+                return WITH_ERROR(-1, "Too many keys for multisig in legacy P2SH");
+            }
+
             if (token == TOKEN_SORTEDMULTI || token == TOKEN_SORTEDMULTI_A) {
                 node->base.flags.is_miniscript = 0;
             } else if (token == TOKEN_MULTI) {

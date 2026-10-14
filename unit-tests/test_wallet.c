@@ -523,6 +523,33 @@ static void test_failures(void **state) {
                                  "@17/**))",
                                  out,
                                  sizeof(out)));
+
+    // legacy P2SH multisig is limited to 15 keys, as the redeem script can't exceed 520 bytes
+    assert_true(0 > parse_policy("sh(multi(2,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,"
+                                 "@8/**,@9/**,@10/**,@11/**,@12/**,@13/**,@14/**,@15/**))",
+                                 out,
+                                 sizeof(out)));
+    assert_true(0 > parse_policy("sh(sortedmulti(2,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,"
+                                 "@8/**,@9/**,@10/**,@11/**,@12/**,@13/**,@14/**,@15/**))",
+                                 out,
+                                 sizeof(out)));
+    assert_true(0 <= parse_policy("sh(multi(2,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,"
+                                  "@8/**,@9/**,@10/**,@11/**,@12/**,@13/**,@14/**))",
+                                  out,
+                                  sizeof(out)));
+    assert_true(0 <= parse_policy("sh(sortedmulti(2,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,"
+                                  "@7/**,@8/**,@9/**,@10/**,@11/**,@12/**,@13/**,@14/**))",
+                                  out,
+                                  sizeof(out)));
+    // no such limit for segwit
+    assert_true(0 <= parse_policy("wsh(multi(2,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,"
+                                  "@8/**,@9/**,@10/**,@11/**,@12/**,@13/**,@14/**,@15/**))",
+                                  out,
+                                  sizeof(out)));
+    assert_true(0 <= parse_policy("sh(wsh(sortedmulti(2,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,"
+                                  "@7/**,@8/**,@9/**,@10/**,@11/**,@12/**,@13/**,@14/**,@15/**)))",
+                                  out,
+                                  sizeof(out)));
 }
 
 enum TestMode {
