@@ -763,6 +763,30 @@ static void test_crypto_tr_lift_x_not_on_curve(void **state) {
     (void) x_invalid;
 }
 
+static void test_crypto_tr_lift_x_not_in_field(void **state) {
+    (void) state;
+    /* x must be strictly smaller than the field size p. x = p + 1 is
+     * congruent to 1, which is the x-coordinate of a point on the curve
+     * (1^3 + 7 = 8 is a quadratic residue mod p), so this checks that the
+     * input is not silently reduced modulo p. */
+    static const uint8_t p[32] = {
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xfc, 0x2f,
+    };
+    uint8_t x[32], out[65];
+
+    uint8_t one[32] = {0};
+    one[31] = 1;
+    assert_int_equal(crypto_tr_lift_x(one, out), 0);  // x = 1 is valid
+
+    memcpy(x, p, 32);  // x == p
+    assert_int_equal(crypto_tr_lift_x(x, out), -1);
+
+    x[31] = 0x30;  // x == p + 1
+    assert_int_equal(crypto_tr_lift_x(x, out), -1);
+}
+
 static void test_crypto_tr_tagged_hash_single_data(void **state) {
     (void) state;
     /* tagged_hash("TapTweak", G_x) */
@@ -983,6 +1007,7 @@ int main(void) {
         cmocka_unit_test(test_crypto_tr_tapleaf_hash_init),
         cmocka_unit_test(test_crypto_tr_lift_x_secp256k1_generator),
         cmocka_unit_test(test_crypto_tr_lift_x_not_on_curve),
+        cmocka_unit_test(test_crypto_tr_lift_x_not_in_field),
         cmocka_unit_test(test_crypto_tr_tagged_hash_single_data),
         cmocka_unit_test(test_crypto_tr_tagged_hash_two_parts),
         cmocka_unit_test(test_crypto_tr_combine_taptree_hashes_sorted),
