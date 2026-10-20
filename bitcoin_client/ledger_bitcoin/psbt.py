@@ -775,6 +775,9 @@ class PSBT(object):
     PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE = 0x09
     PSBT_GLOBAL_VERSION = 0xFB
 
+    # Proprietary key (BIP-174) with identifier "MUSIG2_SESSION_ID", subtype 0 and no keydata
+    PSBT_GLOBAL_MUSIG2_SESSION_ID_KEY = b"\xfc" + ser_compact_size(17) + b"MUSIG2_SESSION_ID" + ser_compact_size(0)
+
     def __init__(self, tx: Optional[CTransaction] = None) -> None:
         """
         :param tx: A Bitcoin transaction that specifies the inputs and outputs to use
@@ -792,6 +795,11 @@ class PSBT(object):
         self.tx_modifiable: Optional[int] = None
         # BIP-322: the message of a generic signed message request (allowed in any PSBT version)
         self.generic_signed_message: Optional[bytes] = None
+        # MuSig2: the session id chosen by the software wallet (allowed in any PSBT version).
+        # A signer identifies its pending MuSig2 session by it, so the PSBT given to a signer in
+        # round 2 must have the value used for that signer in round 1. It is not part of the
+        # transaction: each signer can use its own value, in its own copy of the PSBT.
+        self.musig2_session_id: Optional[bytes] = None
 
         # Assume version 0 PSBT
         self.version = 0
@@ -907,6 +915,10 @@ class PSBT(object):
                     raise PSBTSerializationError("Global PSBT version is not 1 bytes")
                 self.version = struct.unpack("<I", v)[0]
                 self.explicit_version = True
+            elif key == PSBT.PSBT_GLOBAL_MUSIG2_SESSION_ID_KEY:
+                if key in key_lookup:
+                    raise PSBTSerializationError("Duplicate key, global MuSig2 session id is already provided")
+                self.musig2_session_id = deser_string(f)
             else:
                 if key in self.unknown:
                     raise PSBTSerializationError("Duplicate key, key for unknown value already provided")
@@ -1034,6 +1046,10 @@ class PSBT(object):
         if self.version > 0 or self.explicit_version:
             r += ser_string(ser_compact_size(PSBT.PSBT_GLOBAL_VERSION))
             r += ser_string(struct.pack("<I", self.version))
+
+        if self.musig2_session_id is not None:
+            r += ser_string(PSBT.PSBT_GLOBAL_MUSIG2_SESSION_ID_KEY)
+            r += ser_string(self.musig2_session_id)
 
         # unknowns
         for key, value in sorted(self.unknown.items()):
