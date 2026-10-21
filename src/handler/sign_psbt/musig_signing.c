@@ -36,15 +36,18 @@
  * The id identifies the session during both rounds of the protocol; it is the same for all the
  * musig key expressions of the policy (if more than one), and for all the inputs of the psbt.
  *
- * It deliberately depends only on the wallet policy, and _not_ on the transaction being signed.
- * That, together with the transaction-independent nonce derivation of musig_derive_nonce(), allows
- * a client to execute round 1 before knowing the transaction, storing the pubnonces for later use.
+ * It deliberately depends only on the wallet policy and on the optional MUSIG2_SESSION_ID field
+ * chosen by the software wallet, and _not_ on the transaction being signed. That, together with
+ * the transaction-independent nonce derivation of musig_derive_nonce(), allows a client to execute
+ * round 1 before knowing the transaction, storing the pubnonces for later use.
  *
  * The id commits to both the descriptor template and the keys of the policy, making sure that
  * collisions are not possible for different wallet accounts.
- * However, this implies that at most one session can be pending for a wallet policy:
- * starting a new round 1 deletes the previous session, attempting to complete round 2 for a
- * deleted session results in failure, as the generated pubnonces do not match.
+ * Without a MUSIG2_SESSION_ID field, this implies that at most one session can be pending for a
+ * wallet policy: starting a new round 1 deletes the previous session, attempting to complete
+ * round 2 for a deleted session results in failure, as the generated pubnonces do not match.
+ * Software wallets that need multiple sessions in flight for the same wallet policy use a
+ * different MUSIG2_SESSION_ID for each of them.
  *
  * Software wallets are responsible for managing the state correctly.
  */
@@ -54,14 +57,20 @@ static void musig_compute_session_id(const sign_psbt_state_t *st, uint8_t out[st
     LEDGER_ASSERT(st->account.wallet_header.version == WALLET_POLICY_VERSION_V2,
                   "MuSig2 requires a V2 wallet policy");
 
-    crypto_tr_tagged_hash(
+    cx_sha256_t hash_context;
+    crypto_tr_tagged_hash_init(
+        &hash_context,
         (uint8_t[]) {'P', 's', 'b', 't', 'S', 'e', 's', 's', 'i', 'o', 'n', 'I', 'd'},
-        13,
-        st->account.wallet_header.descriptor_template_sha256,
-        32,
-        st->account.wallet_header.keys_info_merkle_root,
-        32,
-        out);
+        13);
+    crypto_hash_update(&hash_context.header,
+                       st->account.wallet_header.descriptor_template_sha256,
+                       32);
+    crypto_hash_update(&hash_context.header, st->account.wallet_header.keys_info_merkle_root, 32);
+    crypto_hash_update_u8(&hash_context.header, (uint8_t) st->musig2_session_id_len);
+    if (st->musig2_session_id_len > 0) {
+        crypto_hash_update(&hash_context.header, st->musig2_session_id, st->musig2_session_id_len);
+    }
+    crypto_hash_digest(&hash_context.header, out, 32);
 }
 
 bool compute_musig_per_input_info(dispatcher_context_t *dc,
