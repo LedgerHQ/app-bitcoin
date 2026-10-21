@@ -10,7 +10,8 @@ MuSig2 is a 2-round multi-signature scheme compatible with the public keys and s
 
 - At most 5 keys are allowed in the musig expression; performance limitations, however, might apply in practice.
 - `musig(...)` is allowed among the key expressions of `multi_a`, but not of `sortedmulti_a`.
-- At most 8 MuSig2 signing sessions can be pending at the same time, due to the need to persist state in the device's memory; moreover, at most one session can be pending for each wallet policy (see [below](#generalization-to-multiple-psbt-signing-sessions)).
+- At most 8 MuSig2 signing sessions can be pending at the same time, due to the need to persist state in the device's memory; when the storage is full, starting a new session evicts the oldest one.
+- By default, at most one session can be pending for each wallet policy. Software wallets that need multiple transactions in flight for the same wallet policy can identify each session with the [`MUSIG2_SESSION_ID`](#the-musig2_session_id-psbt-field) PSBT field (see [below](#generalization-to-multiple-psbt-signing-sessions)).
 - The pubnonces can be generated before the transaction is known, and then used for a different transaction than the one given to the device in round 1 (see [below](#pre-generating-the-pubnonces)).
 - Only `musig(...)/**` or `musig(...)/<M;N>/*` key expressions are supported; the public keys must be xpubs aggregated without any further derivation. Schemes where each pubkey is derived prior to aggregation (for example descriptors similar to `musig(xpub1/<0;1>/*,xpub2/<0;1>/*,...)`) are not supported.
 
@@ -95,18 +96,39 @@ The approach described above assumes that no attempt to sign a PSBT for a wallet
 
 In order to generalize this to multiple parallel signing sessions, each signing session is identified by a `psbt_session_id`, which must be identical between Round 1 and Round 2 of the protocol. The device computes it as:
 
-$\qquad psbt\_session\_id = H_{PsbtSessionId}(descriptor\_template\_hash \| keys\_info\_merkle\_root)$
+$\qquad psbt\_session\_id = H_{PsbtSessionId}(descriptor\_template\_hash \| keys\_info\_merkle\_root \| len(session\_id) \| session\_id)$
 
-where $H_{tag}$ is the BIP-0340 tagged hash, and the two arguments are the hash of the descriptor template and the root of the Merkle tree of the keys information of the wallet policy. The name of the wallet policy is not committed to, as it plays no role in signing.
+where $H_{tag}$ is the BIP-0340 tagged hash, the first two arguments are the hash of the descriptor template and the root of the Merkle tree of the keys information of the wallet policy, $session\_id$ is the value of the [`MUSIG2_SESSION_ID`](#the-musig2_session_id-psbt-field) field (empty if the PSBT does not contain the field), and $len(session\_id)$ is its length as a single byte (`0x00` if the field is absent). The name of the wallet policy is not committed to, as it plays no role in signing.
 
-The `psbt_session_id` deliberately depends only on the wallet policy, and not on the transaction; together with the transaction-independent arguments of _NonceGen_, this is what allows [pre-generating the pubnonces](#pre-generating-the-pubnonces). The tradeoff is that at most one session can be pending for each wallet policy; the device can store up to 8 sessions, each for a different wallet policy.
+The `psbt_session_id` deliberately depends only on the wallet policy and on the `MUSIG2_SESSION_ID`, and not on the transaction; together with the transaction-independent arguments of _NonceGen_, this is what allows [pre-generating the pubnonces](#pre-generating-the-pubnonces). The tradeoff is that, without a `MUSIG2_SESSION_ID`, at most one session can be pending for each wallet policy.
+
+The device can store up to 8 sessions.
 
 Collisions of the `psbt_session_id` do not constitute a security risk: they only cause the previous session to be deleted, and the following Phase 2 to fail.
+
+### The `MUSIG2_SESSION_ID` PSBT field
+
+`MUSIG2_SESSION_ID` is an optional global PSBT field that lets a software wallet keep multiple MuSig2 signing sessions in flight for the same wallet policy. It is a [BIP-0174](https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki) proprietary field.
+
+| Key | Value |
+|-----|-------|
+| `0xFC` &#124; `0x11` &#124; `"MUSIG2_SESSION_ID"` &#124; `0x00` (proprietary type, identifier length, identifier, subtype 0; no keydata) | The session id: between 1 and 32 bytes |
+
+- The field is optional. If it is absent, the behavior is the same as in the versions of the app that do not support it: wallets that do not need multiple sessions for the same wallet policy can ignore it.
+- The `psbt_session_id` commits to its value, so that sessions with different values are independent. The value must be the same in Phase 1 and Phase 2; otherwise, the device does not find the session in Phase 2.
+- Executing Phase 1 again with the same value replaces the pending session for that value.
+- A present but empty value, or a value longer than 32 bytes, is rejected (error code `EC_SIGN_PSBT_INVALID_MUSIG2_SESSION_ID`).
+- Wallets should use a unique value for each session. The value is not secret.
+- The value is only meaningful to the device that receives the PSBT, and it is not part of the transaction: each signer's software wallet sets it, in its own copy of the PSBT, to the value it used in its own Phase 1. Different signers do not need to agree on a value, and the value does not need to be shared with the other signers.
 
 ### Pre-generating the pubnonces
 
 Since neither the pubnonces nor the `psbt_session_id` depend on the transaction, a software wallet can execute Phase 1 before the transaction is known, for example while the device happens to be connected. It can then use the pubnonces returned by the device for a different transaction, provided that:
-- the transaction is for the same wallet policy, and no other Phase 1 or Phase 2 for that wallet policy was executed in the meantime;
+- the transaction is for the same wallet policy and has the same `MUSIG2_SESSION_ID` (or none), no other Phase 1 or Phase 2 for that wallet policy and `MUSIG2_SESSION_ID` was executed in the meantime, and the session was not evicted because the storage was full (see [above](#specs));
 - all inputs are internal, and the PSBT used in Phase 1 has at least as many inputs as the PSBT used in Phase 2, and each pubnonce is put in the Phase 2 PSBT under the key (of the `PSBT_IN_MUSIG2_PUB_NONCE` field) computed for the new transaction. This key contains the aggregate public key _after_ the tweaks, and, for script path spends, the tapleaf hash; therefore, it depends on the transaction, not merely on the input's position.
 
 More generally, this can also work when some inputs are not internal, as long as for each internal input of the PSBT used in Phase 2, there is a corresponding internal input in the PSBT used in Phase 1.
+
+Phase 1 does not require any user interaction, while Phase 2 requires the user to review the transaction. Therefore, with pubnonces generated in advance, signing a transaction only takes a single interaction per signer, like for a non-MuSig2 multisig.
+
+If the wallet policy also contains keys of the device outside of `musig()` key expressions (for example, in `tr(musig(@0,@1)/**,pk(@2/**))`, where `@0` and `@2` are keys of the device), the device also signs for those keys, and therefore asks the user to review the transaction, whenever the PSBT contains their key derivations (`PSBT_IN_BIP32_DERIVATION` or `PSBT_IN_TAP_BIP32_DERIVATION`). The PSBT used to pre-generate the pubnonces should therefore only contain the key derivations of the `musig()` key expressions.
