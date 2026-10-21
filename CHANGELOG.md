@@ -17,6 +17,7 @@ Dates are in `dd-mm-yyyy` format.
 
 - MuSig2: the pubnonces no longer depend on the transaction, so they can be pre-generated before the transaction is known. See [doc/musig.md](doc/musig.md).
 - MuSig2 (breaking): as a consequence, at most one signing session can be pending for a given wallet policy; executing round 1 again for the same wallet policy discards the previous session, and round 2 with the old pubnonces fails. In order to allow software wallets to manage multiple simultaneous sessions for the same wallet policy, this version adds support for a `MUSIG2_SESSION_ID` proprietary PSBT field. See [doc/musig.md](doc/musig.md) for more info.
+- MuSig2: up to 32 signing sessions can be pending (previously 8); when the storage is full, the oldest one is evicted.
 
 ### Fixed
 

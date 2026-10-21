@@ -12,7 +12,7 @@
 
 // the maximum number of musig sessions that are stored in permanent memory; when the storage is
 // full, storing a new session evicts the oldest one
-#define MAX_N_MUSIG_SESSIONS 8
+#define MAX_N_MUSIG_SESSIONS 32
 
 // state of a musig_psbt_session. Members are private and must not be accessed directly by any
 // code outside of musig_sessions.c.

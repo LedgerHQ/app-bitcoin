@@ -10,7 +10,7 @@ MuSig2 is a 2-round multi-signature scheme compatible with the public keys and s
 
 - At most 5 keys are allowed in the musig expression; performance limitations, however, might apply in practice.
 - `musig(...)` is allowed among the key expressions of `multi_a`, but not of `sortedmulti_a`.
-- At most 8 MuSig2 signing sessions can be pending at the same time, due to the need to persist state in the device's memory; when the storage is full, starting a new session evicts the oldest one.
+- At most 32 MuSig2 signing sessions can be pending at the same time, due to the need to persist state in the device's memory; when the storage is full, starting a new session evicts the oldest one.
 - By default, at most one session can be pending for each wallet policy. Software wallets that need multiple transactions in flight for the same wallet policy can identify each session with the [`MUSIG2_SESSION_ID`](#the-musig2_session_id-psbt-field) PSBT field (see [below](#generalization-to-multiple-psbt-signing-sessions)).
 - The pubnonces can be generated before the transaction is known, and then used for a different transaction than the one given to the device in round 1 (see [below](#pre-generating-the-pubnonces)).
 - Only `musig(...)/**` or `musig(...)/<M;N>/*` key expressions are supported; the public keys must be xpubs aggregated without any further derivation. Schemes where each pubkey is derived prior to aggregation (for example descriptors similar to `musig(xpub1/<0;1>/*,xpub2/<0;1>/*,...)`) are not supported.
@@ -102,7 +102,7 @@ where $H_{tag}$ is the BIP-0340 tagged hash, the first two arguments are the has
 
 The `psbt_session_id` deliberately depends only on the wallet policy and on the `MUSIG2_SESSION_ID`, and not on the transaction; together with the transaction-independent arguments of _NonceGen_, this is what allows [pre-generating the pubnonces](#pre-generating-the-pubnonces). The tradeoff is that, without a `MUSIG2_SESSION_ID`, at most one session can be pending for each wallet policy.
 
-The device can store up to 8 sessions.
+The device can store up to 32 sessions.
 
 Collisions of the `psbt_session_id` do not constitute a security risk: they only cause the previous session to be deleted, and the following Phase 2 to fail.
 

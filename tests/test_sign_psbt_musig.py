@@ -667,12 +667,18 @@ def test_sign_psbt_musig2_missing_session_fails_before_review(navigator: Navigat
                     [Round2OnlyCosigner(signer_1_with_review), Round2OnlyCosigner(signer_2)], KEYPATH_SIGHASHES)
 
 
-MAX_N_MUSIG_SESSIONS = 8
+MAX_N_MUSIG_SESSIONS = 32
 
 
-def test_sign_psbt_musig2_evicts_oldest_session(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals):
+def test_sign_psbt_musig2_evicts_oldest_session(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals, enable_slow_tests: int):
     # The device stores at most MAX_N_MUSIG_SESSIONS sessions; when the storage is full, round 1
     # evicts the oldest session, regardless of the slot it occupies.
+
+    # slow test (it fills the whole storage), only run it if --enable_slow_tests is set to a value
+    # greater than 0
+    if enable_slow_tests < 1:
+        pytest.skip()
+
     wallet_policy, wallet_hmac = keypath_wallet_policy(speculos_globals)
 
     signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac,
