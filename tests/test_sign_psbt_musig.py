@@ -629,3 +629,43 @@ def test_sign_psbt_musig2_invalid_session_id(navigator: Navigator, firmware: Fir
                          testname=test_name)
     assert DeviceException.exc.get(e.value.status) == IncorrectDataError
     assert int.from_bytes(e.value.data, byteorder='big') == EC_SIGN_PSBT_INVALID_MUSIG2_SESSION_ID
+
+
+MAX_N_MUSIG_SESSIONS = 8
+
+
+def test_sign_psbt_musig2_evicts_oldest_session(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals):
+    # The device stores at most MAX_N_MUSIG_SESSIONS sessions; when the storage is full, round 1
+    # evicts the oldest session, regardless of the slot it occupies.
+    wallet_policy, wallet_hmac = keypath_wallet_policy(speculos_globals)
+
+    signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac,
+                                    navigator=navigator, instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False, has_spend_from_wallet=True, has_feewarning=True), testname=test_name)
+
+    # Execute round 1 for MAX_N_MUSIG_SESSIONS + 2 sessions, that only differ in the
+    # MUSIG2_SESSION_ID. Any session left in storage by previous tests is older, hence evicted first.
+    n_sessions = MAX_N_MUSIG_SESSIONS + 2
+    psbts: List[PSBT] = []
+    hot_signers: List[HotMusig2Cosigner] = []
+    for i in range(n_sessions):
+        psbt = PSBT()
+        psbt.deserialize(KEYPATH_PSBT_B64)
+        psbt.musig2_session_id = bytes([i + 1])
+        # the hot cosigner identifies its sessions by the transaction, so each psbt needs its own
+        hot_signer = HotMusig2Cosigner(wallet_policy, KEYPATH_COSIGNER_2_XPRIV)
+        signer_1.generate_public_nonces(psbt)
+        hot_signer.generate_public_nonces(psbt)
+        psbts.append(psbt)
+        hot_signers.append(hot_signer)
+
+    # The two oldest sessions were evicted
+    for psbt in psbts[:2]:
+        with pytest.raises(ExceptionRAPDU) as e:
+            signer_1.generate_partial_signatures(psbt)
+        assert DeviceException.exc.get(e.value.status) == BadStateError
+
+    # The others are still there. Storing the second to last session must not have evicted the one
+    # stored right before it, nor the last one the second to last.
+    for i in [2, n_sessions - 3, n_sessions - 2, n_sessions - 1]:
+        run_musig2_test(wallet_policy, psbts[i],
+                        [Round2OnlyCosigner(signer_1), Round2OnlyCosigner(hot_signers[i])], KEYPATH_SIGHASHES)
