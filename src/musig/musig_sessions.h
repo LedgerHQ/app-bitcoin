@@ -100,6 +100,17 @@ __attribute__((warn_unused_result)) const musig_psbt_session_t *musigsession_rou
     musig_signing_state_t *musig_signing_state);
 
 /**
+ * Checks whether a session with the given id is in the persistent memory, without deleting it and
+ * without accessing its content.
+ *
+ * @param[in]  psbt_session_id
+ *   Pointer to the musig psbt session id.
+ *
+ * @return true if the session exists, false otherwise.
+ */
+bool musigsession_exists(const uint8_t psbt_session_id[static 32]);
+
+/**
  * If a session produced in round 1 is active in volatile memory, it is stored in the persistent
  * memory. The signing state is then zeroed out, as the signing flow is over.
  * This must be called at the end of a successful signing flow, after all the public nonces have

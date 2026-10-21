@@ -21,6 +21,7 @@
 #include "sign_psbt.h"
 #include "sign_psbt/bip322_validation.h"
 #include "sign_psbt/init_global_state.h"
+#include "sign_psbt/musig_signing.h"
 #include "sign_psbt/preprocess_inputs.h"
 #include "sign_psbt/preprocess_outputs.h"
 #include "sign_psbt/sign_input.h"
@@ -96,11 +97,18 @@ static void sign_psbt(dispatcher_context_t *dc,
     if (st->bip322.is_message_signing && !validate_bip322_request(dc, st)) return;
 
     // check if we're only executing the MuSig2 Round 1
+    // true at the end of the loop if all key expressions we're signing for are MuSig2
     bool only_signing_for_musig = true;
+    // true if any of the key expressions we're signing for is MuSig2
+    bool signing_for_musig = false;
     for (size_t i = 0; i < st->account.n_internal_key_expressions; i++) {
-        if (st->account.internal_key_expressions[i].to_sign &&
-            st->account.internal_key_expressions[i].key_expression_ptr->type !=
-                KEY_EXPRESSION_MUSIG) {
+        if (!st->account.internal_key_expressions[i].to_sign) {
+            continue;
+        }
+        if (st->account.internal_key_expressions[i].key_expression_ptr->type ==
+            KEY_EXPRESSION_MUSIG) {
+            signing_for_musig = true;
+        } else {
             // at least one of the key expressions we're signing for is not a MuSig
             only_signing_for_musig = false;
         }
@@ -124,6 +132,12 @@ static void sign_psbt(dispatcher_context_t *dc,
     // we execute the signing flow only if we're expected to produce any signature
     // (including, possibly, any MuSig2 partial signature from Round 2 of MuSig2)
     if (!only_signing_for_musig || st->has_musig2_pub_nonces) {
+        // If MuSig2 Round 2 is going to be executed, make sure that the session exists before
+        // proceeding, so we can fail early if missing.
+        if (signing_for_musig && st->has_musig2_pub_nonces && !musig_check_round2_session(dc, st)) {
+            return;
+        }
+
 #ifdef HAVE_SWAP
         if (G_called_from_swap) {
             /** SWAP CHECKS

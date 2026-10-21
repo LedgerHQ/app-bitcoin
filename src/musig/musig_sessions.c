@@ -39,7 +39,8 @@ static bool is_slot_free(int i) {
                               sizeof(musig_stored_session_t));
 }
 
-static bool musigsession_pop(const uint8_t psbt_session_id[static 32], musig_psbt_session_t *out) {
+// Returns the index of the slot storing the session with the given id, or -1 if there is none.
+static int find_slot(const uint8_t psbt_session_id[static 32]) {
     for (int i = 0; i < MAX_N_MUSIG_SESSIONS; i++) {
         if (is_slot_free(i)) {
             continue;
@@ -47,21 +48,33 @@ static bool musigsession_pop(const uint8_t psbt_session_id[static 32], musig_psb
         if (memcmp(psbt_session_id,
                    (const void *) N_musig_storage.sessions[i].id_prefix,
                    STORED_ID_PREFIX_LEN) == 0) {
-            if (out != NULL) {
-                memcpy(out->_id, psbt_session_id, sizeof(out->_id));
-                memcpy(out->_rand_root,
-                       (const void *) N_musig_storage.sessions[i].rand_root,
-                       sizeof(out->_rand_root));
-            }
-            uint8_t zeros[sizeof(musig_stored_session_t)] = {0};
-            nvm_write((void *) &N_musig_storage.sessions[i],
-                      (void *) zeros,
-                      sizeof(musig_stored_session_t));
-
-            return true;
+            return i;
         }
     }
-    return false;
+    return -1;
+}
+
+static bool musigsession_pop(const uint8_t psbt_session_id[static 32], musig_psbt_session_t *out) {
+    int i = find_slot(psbt_session_id);
+    if (i < 0) {
+        return false;
+    }
+    if (out != NULL) {
+        memcpy(out->_id, psbt_session_id, sizeof(out->_id));
+        memcpy(out->_rand_root,
+               (const void *) N_musig_storage.sessions[i].rand_root,
+               sizeof(out->_rand_root));
+    }
+    uint8_t zeros[sizeof(musig_stored_session_t)] = {0};
+    nvm_write((void *) &N_musig_storage.sessions[i],
+              (void *) zeros,
+              sizeof(musig_stored_session_t));
+
+    return true;
+}
+
+bool musigsession_exists(const uint8_t psbt_session_id[static 32]) {
+    return find_slot(psbt_session_id) >= 0;
 }
 
 __attribute__((warn_unused_result)) static bool musigsession_init_randomness(

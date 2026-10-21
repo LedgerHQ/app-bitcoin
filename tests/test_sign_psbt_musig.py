@@ -28,6 +28,7 @@ tests_root: Path = Path(__file__).parent
 
 # error codes, see src/error_codes.h
 EC_SIGN_PSBT_INVALID_MUSIG2_SESSION_ID = 0x0016
+EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND = 0x0017
 
 
 # for now, we assume that there's a single internal musig placeholder, with a single internal key
@@ -498,6 +499,7 @@ def test_sign_psbt_musig2_session_is_single_use(navigator: Navigator, firmware: 
     with pytest.raises(ExceptionRAPDU) as e:
         signer_1.generate_partial_signatures(replayed_psbt)
     assert DeviceException.exc.get(e.value.status) == BadStateError
+    assert int.from_bytes(e.value.data, byteorder='big') == EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND
     assert len(replayed_psbt.inputs[0].musig2_partial_sigs) == 0
 
     # 2) A failed round 2 consumes the session as well: after a round 2 that is rejected because of
@@ -517,6 +519,7 @@ def test_sign_psbt_musig2_session_is_single_use(navigator: Navigator, firmware: 
     with pytest.raises(ExceptionRAPDU) as e:
         signer_1.generate_partial_signatures(psbt)
     assert DeviceException.exc.get(e.value.status) == BadStateError
+    assert int.from_bytes(e.value.data, byteorder='big') == EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND
     assert len(psbt.inputs[0].musig2_partial_sigs) == 0
 
 
@@ -611,6 +614,7 @@ def test_sign_psbt_musig2_session_id_must_not_change(navigator: Navigator, firmw
     with pytest.raises(ExceptionRAPDU) as e:
         signer_1.generate_partial_signatures(psbt)
     assert DeviceException.exc.get(e.value.status) == BadStateError
+    assert int.from_bytes(e.value.data, byteorder='big') == EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND
     assert len(psbt.inputs[0].musig2_partial_sigs) == 0
 
 
@@ -629,6 +633,38 @@ def test_sign_psbt_musig2_invalid_session_id(navigator: Navigator, firmware: Fir
                          testname=test_name)
     assert DeviceException.exc.get(e.value.status) == IncorrectDataError
     assert int.from_bytes(e.value.data, byteorder='big') == EC_SIGN_PSBT_INVALID_MUSIG2_SESSION_ID
+
+
+def test_sign_psbt_musig2_missing_session_fails_before_review(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals):
+    # If the session for round 2 is missing, the device fails before asking the user to review the
+    # transaction, rather than after the approval.
+    wallet_policy, wallet_hmac = keypath_wallet_policy(speculos_globals)
+
+    # No navigator: round 1 has no UI, and round 2 must fail without showing any screen
+    signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac)
+    signer_2 = HotMusig2Cosigner(wallet_policy, KEYPATH_COSIGNER_2_XPRIV)
+
+    psbt = PSBT()
+    psbt.deserialize(KEYPATH_PSBT_B64)
+    psbt.musig2_session_id = b"\x01" * 32
+    signer_1.generate_public_nonces(psbt)
+    signer_2.generate_public_nonces(psbt)
+
+    # round 2 with a MUSIG2_SESSION_ID for which round 1 was never executed
+    other_psbt = PSBT()
+    other_psbt.deserialize(psbt.serialize())
+    other_psbt.musig2_session_id = b"\x02" * 32
+    with pytest.raises(ExceptionRAPDU) as e:
+        signer_1.generate_partial_signatures(other_psbt)
+    assert DeviceException.exc.get(e.value.status) == BadStateError
+    assert int.from_bytes(e.value.data, byteorder='big') == EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND
+    assert len(other_psbt.inputs[0].musig2_partial_sigs) == 0
+
+    # the session of the first psbt is unaffected, and round 2 completes after the review
+    signer_1_with_review = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac,
+                                                navigator=navigator, instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False, has_spend_from_wallet=True, has_feewarning=True), testname=test_name)
+    run_musig2_test(wallet_policy, psbt,
+                    [Round2OnlyCosigner(signer_1_with_review), Round2OnlyCosigner(signer_2)], KEYPATH_SIGHASHES)
 
 
 MAX_N_MUSIG_SESSIONS = 8
@@ -663,6 +699,7 @@ def test_sign_psbt_musig2_evicts_oldest_session(navigator: Navigator, firmware: 
         with pytest.raises(ExceptionRAPDU) as e:
             signer_1.generate_partial_signatures(psbt)
         assert DeviceException.exc.get(e.value.status) == BadStateError
+        assert int.from_bytes(e.value.data, byteorder='big') == EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND
 
     # The others are still there. Storing the second to last session must not have evicted the one
     # stored right before it, nor the last one the second to last.

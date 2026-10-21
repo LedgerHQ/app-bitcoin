@@ -25,6 +25,7 @@
 /* Local headers */
 #include "client_commands.h"
 #include "commands.h"
+#include "error_codes.h"
 #include "get_merkleized_map_value.h"
 #include "policy.h"
 #include "psbt.h"
@@ -71,6 +72,18 @@ static void musig_compute_session_id(const sign_psbt_state_t *st, uint8_t out[st
         crypto_hash_update(&hash_context.header, st->musig2_session_id, st->musig2_session_id_len);
     }
     crypto_hash_digest(&hash_context.header, out, 32);
+}
+
+bool musig_check_round2_session(dispatcher_context_t *dc, const sign_psbt_state_t *st) {
+    uint8_t psbt_session_id[32];
+    musig_compute_session_id(st, psbt_session_id);
+
+    if (!musigsession_exists(psbt_session_id)) {
+        PRINTF("Missing MuSig2 session\n");
+        SEND_SW_EC(dc, SW_BAD_STATE, EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND);
+        return false;
+    }
+    return true;
 }
 
 bool compute_musig_per_input_info(dispatcher_context_t *dc,
@@ -443,7 +456,7 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
         // session in storage. Either it was deleted, or the pubnonces were not real. Either
         // way, we cannot continue.
         PRINTF("Missing MuSig2 session\n");
-        SEND_SW(dc, SW_BAD_STATE);
+        SEND_SW_EC(dc, SW_BAD_STATE, EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND);
         return false;
     }
 
