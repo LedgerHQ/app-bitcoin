@@ -184,6 +184,13 @@ async fn test_register_wallet() {
 
         let wallet = wallet::WalletPolicy::new(name, version, policy, keys);
 
+        #[cfg(feature = "paranoid_client")]
+        let exchanges = {
+            let mut exchanges = exchanges;
+            exchanges.extend(serde_json::from_value::<Vec<String>>(case["address_exchanges"].clone()).unwrap());
+            exchanges
+        };
+
         let store = utils::RecordStore::new(&exchanges);
         let (_id, hmac) = client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
             .register_wallet(&wallet)
@@ -526,5 +533,38 @@ async fn empty_message_signature_is_an_unexpected_result() {
         let result = async_client::BitcoinClient::new(utils::TransportReplayer::new(store))
             .sign_message(b"hello", &path).await;
         assert!(matches!(result, Err(BitcoinClientError::UnexpectedResult { command: 0x10, data }) if data.is_empty()));
+    }
+}
+
+#[cfg(feature = "paranoid_client")]
+#[tokio::test]
+async fn registration_followup_failures_do_not_return_a_hmac() {
+    use ledger_bitcoin_client::{error::BitcoinClientError, interpreter::InterpreterError};
+    let case = &test_cases("./tests/data/register_wallet.json")[1];
+    let keys: Vec<_> = case["keys"].as_array().unwrap().iter().map(|key| wallet::WalletPubKey::from_str(key.as_str().unwrap()).unwrap()).collect();
+    let wallet = wallet::WalletPolicy::new(case["name"].as_str().unwrap().into(), wallet::Version::V2, case["policy"].as_str().unwrap().into(), keys);
+    let wrong_address = "tb1pws8wvnj99ca6acf8kq7pjk7vyxknah0d9mexckh5s0vu2ccy68js9am6u7";
+    let responses = [
+        format!("<= {}9000", hex::encode(wrong_address.as_bytes())),
+        "<= 9000".into(),
+        "<= 6985".into(),
+        format!("<= 4000{}e000", "00".repeat(32)),
+    ];
+    for (index, response) in responses.iter().enumerate() {
+        let mut exchanges: Vec<String> = serde_json::from_value(case["exchanges"].clone()).unwrap();
+        exchanges.extend(serde_json::from_value::<Vec<String>>(case["address_exchanges"].clone()).unwrap());
+        *exchanges.last_mut().unwrap() = response.clone();
+        let store = utils::RecordStore::new(&exchanges);
+        let check = |result: Result<([u8; 32], [u8; 32]), BitcoinClientError<utils::MockError>>| {
+            match index {
+                0 => assert!(matches!(result, Err(BitcoinClientError::InvalidResponse(_)))),
+                1 => assert!(matches!(result, Err(BitcoinClientError::UnexpectedResult { command: 3, .. }))),
+                2 => assert!(matches!(result, Err(BitcoinClientError::Device { command: 3, status: ledger_bitcoin_client::apdu::StatusWord::Deny }))),
+                _ => assert!(matches!(result, Err(BitcoinClientError::Interpreter(InterpreterError::UnknownHash)))),
+            }
+        };
+        check(client::BitcoinClient::new(utils::TransportReplayer::new(store.clone())).register_wallet(&wallet));
+        #[cfg(feature = "async")]
+        check(async_client::BitcoinClient::new(utils::TransportReplayer::new(store)).register_wallet(&wallet).await);
     }
 }

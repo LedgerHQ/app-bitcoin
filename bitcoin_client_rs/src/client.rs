@@ -1,5 +1,4 @@
 use core::fmt::Debug;
-use core::str::FromStr;
 
 use bitcoin::{
     address,
@@ -8,8 +7,6 @@ use bitcoin::{
     secp256k1::ecdsa,
 };
 
-#[cfg(feature = "paranoid_client")]
-use miniscript::{Descriptor, DescriptorPublicKey};
 
 use crate::{
     apdu::{APDUCommand, StatusWord},
@@ -62,43 +59,6 @@ impl<T: Transport> BitcoinClient<T> {
         }
     }
 
-    // Verifies that the address that the application returns matches the one independently
-    // computed on the client
-    #[cfg(feature = "paranoid_client")]
-    fn check_address(
-        &self,
-        wallet: &WalletPolicy,
-        change: bool,
-        address_index: u32,
-        expected_address: &bitcoin::Address<address::NetworkUnchecked>,
-    ) -> Result<(), BitcoinClientError<T::Error>> {
-        let desc_str = wallet
-            .get_descriptor(change)
-            .map_err(|_| BitcoinClientError::ClientError("Failed to get descriptor".to_string()))?;
-
-        // Replace musig() expressions with their aggregate xpub, since rust-miniscript
-        // currently does not support musig().
-        let desc_str = crate::bip327::replace_musigs(&desc_str).map_err(|e| {
-            BitcoinClientError::ClientError(format!("Failed to process musig keys: {}", e))
-        })?;
-
-        let descriptor = Descriptor::<DescriptorPublicKey>::from_str(&desc_str).map_err(|_| {
-            BitcoinClientError::ClientError("Failed to parse descriptor".to_string())
-        })?;
-
-        if descriptor
-            .at_derivation_index(address_index)
-            .map_err(|_| {
-                BitcoinClientError::ClientError("Failed to derive descriptor".to_string())
-            })?
-            .script_pubkey()
-            != expected_address.assume_checked_ref().script_pubkey()
-        {
-            return Err(BitcoinClientError::InvalidResponse("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin".to_string()));
-        }
-
-        Ok(())
-    }
 
     /// Returns the currently running app's name, version and state flags
     pub fn get_version(&self) -> Result<(String, String, Vec<u8>), BitcoinClientError<T::Error>> {
@@ -151,8 +111,7 @@ impl<T: Transport> BitcoinClient<T> {
 
         #[cfg(feature = "paranoid_client")]
         {
-            let device_addr = self.get_wallet_address(wallet, Some(&hmac), false, 0, false)?;
-            self.check_address(wallet, false, 0, &device_addr)?;
+            self.get_wallet_address(wallet, Some(&hmac), false, 0, false)?;
         }
 
         Ok((id, hmac))
@@ -178,7 +137,8 @@ impl<T: Transport> BitcoinClient<T> {
 
         #[cfg(feature = "paranoid_client")]
         {
-            self.check_address(wallet, change, address_index, &address)?;
+            check_address(wallet, change, address_index, &address)
+                .map_err(BitcoinClientError::from)?;
         }
 
         Ok(address)

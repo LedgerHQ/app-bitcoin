@@ -420,3 +420,35 @@ fn signature_application_validates_before_mutation_and_overwrites() {
         assert!(ledger_bitcoin_client::protocol::parse_sign_psbt_yielded(&payload).is_err());
     }
 }
+
+#[cfg(feature = "paranoid_client")]
+#[test]
+fn independent_address_verification_and_error_categories() {
+    use ledger_bitcoin_client::protocol::{check_address, AddressCheckError};
+    let policy = wallet(Version::V2);
+    let address = bitcoin::Address::from_str("tb1pws8wvnj99ca6acf8kq7pjk7vyxknah0d9mexckh5s0vu2ccy68js9am6u7").unwrap();
+    assert_eq!(check_address(&policy, false, 0, &address), Ok(()));
+    assert_eq!(check_address(&policy, true, 0, &address), Err(AddressCheckError::Mismatch));
+    assert_eq!(check_address(&policy, false, 1, &address), Err(AddressCheckError::Mismatch));
+    let other_network = bitcoin::Address::from_script(&address.assume_checked_ref().script_pubkey(), bitcoin::Network::Bitcoin).unwrap().into_unchecked();
+    assert_eq!(check_address(&policy, false, 0, &other_network), Ok(()));
+    assert_eq!(check_address(&policy, false, 1 << 31, &address), Err(AddressCheckError::Derivation));
+    let mut invalid = wallet(Version::V2);
+    invalid.descriptor_template = "tr(@0/<0;1;2>/*)".into();
+    assert_eq!(check_address(&invalid, false, 0, &address), Err(AddressCheckError::Policy));
+    invalid.descriptor_template = "invalid(@0/**)".into();
+    assert_eq!(check_address(&invalid, false, 0, &address), Err(AddressCheckError::Descriptor));
+    invalid.descriptor_template = "tr(musig(@0)/**)".into();
+    assert!(matches!(check_address(&invalid, false, 0, &address), Err(AddressCheckError::Musig(_))));
+
+    let keys = [
+        "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+        "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+    ];
+    let musig = WalletPolicy::new("".into(), Version::V2, "tr(musig(@0,@1)/**)".into(), keys.iter().map(|key| WalletPubKey::from_str(key).unwrap()));
+    let aggregate = "tr(tpubD6NzVbkrYhZ4XgHkCEtfpuZPJDLaLPxu5ZBEtAbub9GcUX1mTS2t3eCnBaQqFP72F6Sdr6LkYSK7RSHasFxRSq6Vfa4Cn1g47oASGeLixXb/0/*)";
+    let aggregate = miniscript::Descriptor::<miniscript::DescriptorPublicKey>::from_str(aggregate).unwrap();
+    let expected = aggregate.at_derivation_index(9).unwrap().address(bitcoin::Network::Testnet).unwrap().into_unchecked();
+    assert_eq!(check_address(&musig, false, 9, &expected), Ok(()));
+    assert_eq!(check_address(&musig, true, 9, &expected), Err(AddressCheckError::Mismatch));
+}

@@ -13,6 +13,53 @@ use bitcoin::{
 
 use crate::psbt::{PartialSignature, PartialSignatureError};
 
+/// An independent wallet-address verification failure.
+#[cfg(feature = "paranoid_client")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AddressCheckError {
+    Policy,
+    Musig(String),
+    Descriptor,
+    Derivation,
+    Mismatch,
+}
+
+#[cfg(feature = "paranoid_client")]
+impl fmt::Display for AddressCheckError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Policy => f.write_str("Failed to get descriptor"),
+            Self::Musig(error) => write!(f, "Failed to process musig keys: {}", error),
+            Self::Descriptor => f.write_str("Failed to parse descriptor"),
+            Self::Derivation => f.write_str("Failed to derive descriptor"),
+            Self::Mismatch => f.write_str("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin"),
+        }
+    }
+}
+
+/// Independently derives the policy's scriptPubKey, including BIP-327 MuSig substitution.
+#[cfg(feature = "paranoid_client")]
+pub fn check_address(
+    wallet: &crate::wallet::WalletPolicy,
+    change: bool,
+    address_index: u32,
+    address: &bitcoin::Address<bitcoin::address::NetworkUnchecked>,
+) -> Result<(), AddressCheckError> {
+    use miniscript::{Descriptor, DescriptorPublicKey};
+    let descriptor = wallet.get_descriptor(change).map_err(|_| AddressCheckError::Policy)?;
+    // rust-miniscript does not yet support musig() expressions.
+    let descriptor = crate::bip327::replace_musigs(&descriptor).map_err(AddressCheckError::Musig)?;
+    let descriptor = Descriptor::<DescriptorPublicKey>::from_str(&descriptor)
+        .map_err(|_| AddressCheckError::Descriptor)?;
+    if descriptor.at_derivation_index(address_index)
+        .map_err(|_| AddressCheckError::Derivation)?.script_pubkey()
+        != address.assume_checked_ref().script_pubkey()
+    {
+        return Err(AddressCheckError::Mismatch);
+    }
+    Ok(())
+}
+
 /// Lowers a PSBT to v2 maps and prepares their delegated Merkle commitments.
 pub fn prepare_sign_psbt(
     psbt: &bitcoin::psbt::Psbt,
