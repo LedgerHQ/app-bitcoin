@@ -2917,7 +2917,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = x.script_size + 4;
 
-            out->ops = (miniscript_ops_t) {3 + x.ops.count, x.ops.sat, x.ops.dsat};
+            out->ops = (miniscript_ops_t) {3 + x.ops.count, x.ops.sat, maxcheck(0, x.ops.dsat)};
             out->ss = (miniscript_stacksize_t) {sumcheck(x.ss.sat, 1),
                                                 maxcheck(1, sumcheck(x.ss.dsat, 1))};
 

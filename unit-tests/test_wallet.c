@@ -794,6 +794,14 @@ static void test_miniscript_types(void **state) {
     // or_b(sha256,a:sha256) has e=1 but m=0 (children lack 's'), so thresh must NOT be NONMAL.
     Test("thresh(1,or_b(sha256(e38990d0c7fc009880a9c07c23842e886c6bbdc964ce6bdd5817ad357335ee6f),a:sha256(d1ec675902ef1633427ca360b290b0b3045a0d9058ddb5e648b4c3c3224c5c68)),a:0)", "?", TESTMODE_VALID, -1, -1);
 
+    // Regression tests: 'l:' and 'u:' can always be dissatisfied via the constant 0 branch, even if
+    // the child can't. The or_d must account for the ops of the multi executed after dissatisfying
+    // the first branch.
+    Test("or_d(utv:pk(@0/**),multi(1,@1/**,@2/**,@3/**))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_TAPSCRIPT_INVALID, 11, 4);
+    Test("or_d(ltv:pk(@0/**),multi(1,@1/**,@2/**,@3/**))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_TAPSCRIPT_INVALID, 11, 4);
+    // Only the right branch of the or_d exceeds the 201 ops limit
+    Test("or_d(utv:or_i(jjjjjjjjjj:pk(@10/**),jjjjjjjjjj:pk(@11/**)),or_i(jjjjjjjjjjjjj:multi(1,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,@8/**,@9/**),jjjjjjjjjjjjj:pk(@12/**)))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_TAPSCRIPT_INVALID, 211, -1);
+
     // clang-format on
 }
 
