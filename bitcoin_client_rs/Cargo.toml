@@ -9,8 +9,9 @@ license = "Apache-2.0"
 documentation = "https://docs.rs/ledger_bitcoin_client/"
 
 [features]
-default = ["async", "paranoid_client"]
-async = ["async-trait"]
+default = ["client", "async", "paranoid_client"]
+client = []
+async = ["client", "async-trait"]
 
 # The paranoid_client feature makes sure that the client independently derives wallet
 # policy addresses using rust-miniscript, returning an error if they do not match.

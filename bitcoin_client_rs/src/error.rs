@@ -1,3 +1,5 @@
+#![cfg(feature = "client")]
+
 use core::fmt::Debug;
 
 use crate::{apdu::StatusWord, interpreter::InterpreterError};
