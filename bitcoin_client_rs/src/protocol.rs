@@ -13,6 +13,36 @@ use bitcoin::{
 
 use crate::psbt::{PartialSignature, PartialSignatureError};
 
+/// Lowers a PSBT to v2 maps and prepares their delegated Merkle commitments.
+pub fn prepare_sign_psbt(
+    psbt: &bitcoin::psbt::Psbt,
+    wallet: &crate::wallet::WalletPolicy,
+    hmac: Option<&[u8; 32]>,
+) -> Result<(crate::apdu::APDUCommand, crate::interpreter::ClientCommandInterpreter), crate::psbt::PsbtV2Error> {
+    use crate::interpreter::{get_merkleized_map_commitment, ClientCommandInterpreter};
+    let mut interpreter = ClientCommandInterpreter::for_wallet(wallet);
+    let maps = crate::psbt::get_v2_maps(psbt)?;
+    interpreter.add_known_mapping(&maps.global);
+    let global_commitment = get_merkleized_map_commitment(&maps.global);
+    let mut input_commitments = Vec::with_capacity(maps.inputs.len());
+    for map in &maps.inputs {
+        interpreter.add_known_mapping(map);
+        input_commitments.push(get_merkleized_map_commitment(map));
+    }
+    let input_root = interpreter.add_known_list(&input_commitments);
+    let mut output_commitments = Vec::with_capacity(maps.outputs.len());
+    for map in &maps.outputs {
+        interpreter.add_known_mapping(map);
+        output_commitments.push(get_merkleized_map_commitment(map));
+    }
+    let output_root = interpreter.add_known_list(&output_commitments);
+    let command = crate::command::sign_psbt(
+        &global_commitment, psbt.inputs.len(), &input_root,
+        psbt.outputs.len(), &output_root, wallet, hmac,
+    );
+    Ok((command, interpreter))
+}
+
 /// Prepares a message command and the delegated state for its 64-byte chunks.
 pub fn prepare_sign_message(message: &[u8], path: &bitcoin::bip32::DerivationPath)
     -> (crate::apdu::APDUCommand, crate::interpreter::ClientCommandInterpreter)

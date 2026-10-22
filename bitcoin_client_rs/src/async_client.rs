@@ -17,9 +17,8 @@ use crate::{
     apdu::{APDUCommand, StatusWord},
     command,
     error::BitcoinClientError,
-    interpreter::{get_merkleized_map_commitment, ClientCommandInterpreter},
+    interpreter::ClientCommandInterpreter,
     protocol::*,
-    psbt::*,
     wallet::WalletPolicy,
 };
 
@@ -210,36 +209,8 @@ impl<T: Transport> BitcoinClient<T> {
         wallet: &WalletPolicy,
         wallet_hmac: Option<&[u8; 32]>,
     ) -> Result<Vec<(usize, SignPsbtYieldedObject)>, BitcoinClientError<T::Error>> {
-        let mut intpr = ClientCommandInterpreter::for_wallet(wallet);
-
-        let maps = get_v2_maps(psbt).map_err(|_| BitcoinClientError::InvalidPsbt)?;
-
-        intpr.add_known_mapping(&maps.global);
-        let global_mapping_commitment = get_merkleized_map_commitment(&maps.global);
-
-        let mut input_commitments: Vec<Vec<u8>> = Vec::with_capacity(maps.inputs.len());
-        for input_map in &maps.inputs {
-            intpr.add_known_mapping(input_map);
-            input_commitments.push(get_merkleized_map_commitment(input_map));
-        }
-        let input_commitments_root = intpr.add_known_list(&input_commitments);
-
-        let mut output_commitments: Vec<Vec<u8>> = Vec::with_capacity(maps.outputs.len());
-        for output_map in &maps.outputs {
-            intpr.add_known_mapping(output_map);
-            output_commitments.push(get_merkleized_map_commitment(output_map));
-        }
-        let output_commitments_root = intpr.add_known_list(&output_commitments);
-
-        let cmd = command::sign_psbt(
-            &global_mapping_commitment,
-            psbt.inputs.len(),
-            &input_commitments_root,
-            psbt.outputs.len(),
-            &output_commitments_root,
-            wallet,
-            wallet_hmac,
-        );
+        let (cmd, mut intpr) = prepare_sign_psbt(psbt, wallet, wallet_hmac)
+            .map_err(|_| BitcoinClientError::InvalidPsbt)?;
 
         self.make_request(&cmd, Some(&mut intpr)).await?;
 
@@ -259,7 +230,7 @@ impl<T: Transport> BitcoinClient<T> {
             let (input_index, obj) = parse_sign_psbt_yielded(&result).map_err(|_| {
                 BitcoinClientError::UnexpectedResult {
                     command: cmd.ins,
-                    data: result.clone(),
+                    data: result,
                 }
             })?;
             yielded_objects.push((input_index, obj));

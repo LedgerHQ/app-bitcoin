@@ -199,6 +199,34 @@ pub enum PartialSignature {
     TapScriptSig(XOnlyPublicKey, Option<TapLeafHash>, taproot::Signature),
 }
 
+/// A yielded signature referred to an input that is not present in the PSBT.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InputIndexError {
+    pub input_index: usize,
+}
+
+/// Applies a regular signature, replacing any signature already stored for that key.
+/// An invalid input index leaves the PSBT unchanged.
+pub fn apply_partial_signature(
+    psbt: &mut Psbt,
+    input_index: usize,
+    signature: PartialSignature,
+) -> Result<(), InputIndexError> {
+    let input = psbt.inputs.get_mut(input_index).ok_or(InputIndexError { input_index })?;
+    match signature {
+        PartialSignature::Sig(key, signature) => {
+            input.partial_sigs.insert(key, signature);
+        }
+        PartialSignature::TapScriptSig(key, Some(leaf), signature) => {
+            input.tap_script_sigs.insert((key, leaf), signature);
+        }
+        PartialSignature::TapScriptSig(_, None, signature) => {
+            input.tap_key_sig = Some(signature);
+        }
+    }
+    Ok(())
+}
+
 impl PartialSignature {
     pub fn from_slice(slice: &[u8]) -> Result<Self, PartialSignatureError> {
         let key_augment_byte = slice
