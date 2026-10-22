@@ -295,9 +295,29 @@ jobs:
       package_directory: "bitcoin_client_js"
 
   job_test_rust_client:
-    name: Tests for rust client library
+    name: Rust client (${{ matrix.name }})
     needs: job_build
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: pure
+            command: cargo test -p ledger_bitcoin_client --no-default-features --lib --test protocol
+          - name: client
+            command: cargo test -p ledger_bitcoin_client --no-default-features --features client
+          - name: async
+            command: cargo test -p ledger_bitcoin_client --no-default-features --features async
+          - name: default
+            command: cargo test -p ledger_bitcoin_client
+          - name: pure-paranoid
+            command: cargo test -p ledger_bitcoin_client --no-default-features --features paranoid_client --lib --test protocol
+          - name: wasm-pure
+            target: wasm32-unknown-unknown
+            command: cargo check -p ledger_bitcoin_client --no-default-features --target wasm32-unknown-unknown
+          - name: wasm-paranoid
+            target: wasm32-unknown-unknown
+            command: cargo check -p ledger_bitcoin_client --no-default-features --features paranoid_client --target wasm32-unknown-unknown
 
     container:
       image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
@@ -306,10 +326,18 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
-      - name: Run tests
-        run: |
-          cd bitcoin_client_rs/
-          cargo test --no-default-features --features="async"
+      - name: Install WASM target
+        if: matrix.target == 'wasm32-unknown-unknown'
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Run feature checks
+        working-directory: bitcoin_client_rs
+        run: ${{ matrix.command }}
+
+      - name: Check formatting
+        if: matrix.name == 'default'
+        working-directory: bitcoin_client_rs
+        run: cargo fmt -p ledger_bitcoin_client -- --check
 
   deploy_rust_client:
     name: Deploy rust client library
