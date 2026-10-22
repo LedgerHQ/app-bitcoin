@@ -90,3 +90,70 @@ fn public_merkle_and_interpreter() {
     assert_eq!(interpreter.execute(vec![0x10, 1, 2]).unwrap(), Vec::<u8>::new());
     assert_eq!(interpreter.yielded(), vec![vec![1, 2]]);
 }
+
+#[test]
+fn missing_leaves_and_unknown_roots_are_distinct() {
+    use ledger_bitcoin_client::interpreter::InterpreterError;
+    let mut interpreter = ClientCommandInterpreter::new();
+    let root = interpreter.add_known_list(&[b"hello"]);
+    let mut index = vec![0x42];
+    index.extend(root);
+    index.extend([9; 32]);
+    assert_eq!(interpreter.execute(index.clone()).unwrap(), [0, 0]);
+    index[33..].copy_from_slice(&root);
+    assert_eq!(interpreter.execute(index.clone()).unwrap(), [1, 0]);
+    index[1..33].fill(8);
+    assert!(matches!(interpreter.execute(index), Err(InterpreterError::UnknownMerkleRoot)));
+    let mut proof = vec![0x41];
+    proof.extend([8; 32]);
+    proof.extend([1, 0]);
+    assert!(matches!(interpreter.execute(proof), Err(InterpreterError::UnknownMerkleRoot)));
+    let mut preimage = vec![0x40, 0];
+    preimage.extend([9; 32]);
+    assert!(matches!(interpreter.execute(preimage), Err(InterpreterError::UnknownHash)));
+}
+
+#[test]
+fn preimage_and_proof_fragmentation_and_queue_transitions() {
+    use ledger_bitcoin_client::interpreter::InterpreterError;
+    let mut interpreter = ClientCommandInterpreter::new();
+    let preimage = vec![0x55; 600];
+    interpreter.add_known_preimage(preimage.clone());
+    let mut request = vec![0x40, 0];
+    request.extend(hash(&preimage));
+    let first = interpreter.execute(request).unwrap();
+    assert_eq!(&first[..4], &[0xfd, 0x58, 2, 251]);
+    let mut reconstructed = first[4..].to_vec();
+    assert!(matches!(interpreter.execute(vec![0x41]), Err(InterpreterError::UnexpectedQueue)));
+    for expected_count in [253, 96] {
+        let next = interpreter.execute(vec![0xa0]).unwrap();
+        assert_eq!(&next[..2], &[expected_count, 1]);
+        reconstructed.extend(&next[2..]);
+    }
+    assert_eq!(reconstructed, preimage);
+    assert!(matches!(interpreter.execute(vec![0xa0]), Err(InterpreterError::UnexpectedQueue)));
+
+    let elements: Vec<Vec<u8>> = (0u16..256).map(|i| i.to_le_bytes().to_vec()).collect();
+    let leaves: Vec<_> = elements.iter().map(|e| hash(&[&[0][..], e].concat())).collect();
+    let tree = MerkleTree::new(leaves);
+    let root = interpreter.add_known_list(&elements);
+    let mut request = vec![0x41];
+    request.extend(root);
+    request.extend([0xfd, 0, 1, 0]);
+    let first = interpreter.execute(request.clone()).unwrap();
+    assert_eq!(&first[..32], tree.get_leaf(0).unwrap());
+    assert_eq!(&first[32..34], &[8, 6]);
+    assert!(matches!(interpreter.execute(request.clone()), Err(InterpreterError::UnexpectedQueue)));
+    let rest = interpreter.execute(vec![0xa0]).unwrap();
+    assert_eq!(&rest[..2], &[2, 32]);
+    let mut proof = first[34..].to_vec();
+    proof.extend(&rest[2..]);
+    assert_eq!(proof, tree.get_leaf_proof(0).unwrap().concat());
+    assert!(matches!(interpreter.execute(vec![0xa0]), Err(InterpreterError::UnexpectedQueue)));
+    request.pop();
+    request.push(1);
+    assert!(interpreter.execute(request).is_ok());
+    assert!(matches!(interpreter.execute(vec![]), Err(InterpreterError::EmptyInput)));
+    assert!(matches!(interpreter.execute(vec![0xff]), Err(InterpreterError::UnknownCommand(0xff))));
+    assert!(matches!(interpreter.execute(vec![0x40]), Err(InterpreterError::UnsupportedRequest(0x40))));
+}

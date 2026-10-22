@@ -190,7 +190,7 @@ fn get_merkle_leaf_proof(
     let tree = trees
         .iter()
         .find(|tree| tree.root_hash() == root)
-        .ok_or(InterpreterError::UnknownHash)?;
+        .ok_or(InterpreterError::UnknownMerkleRoot)?;
 
     if leaf_index >= tree_size || tree_size.0 != tree.size() as u64 {
         return Err(InterpreterError::InvalidIndexOrSize);
@@ -237,11 +237,12 @@ fn get_merkle_leaf_index(
     let tree = trees
         .iter()
         .find(|tree| tree.root_hash() == root)
-        .ok_or(InterpreterError::UnknownHash)?;
+        .ok_or(InterpreterError::UnknownMerkleRoot)?;
 
-    let leaf_index = tree
-        .get_leaf_index(hash)
-        .ok_or(InterpreterError::UnknownHash)?;
+    let leaf_index = match tree.get_leaf_index(hash) {
+        Some(index) => index,
+        None => return Ok(vec![0, 0]),
+    };
 
     let mut response = 1_u8.to_be_bytes().to_vec();
     response.extend(encode::serialize(&UncheckedVarInt(leaf_index as u64)));
