@@ -143,12 +143,7 @@ impl<T: Transport> BitcoinClient<T> {
         wallet: &WalletPolicy,
     ) -> Result<([u8; 32], [u8; 32]), BitcoinClientError<T::Error>> {
         let cmd = command::register_wallet(wallet);
-        let mut intpr = ClientCommandInterpreter::new();
-        intpr.add_known_preimage(wallet.serialize());
-        let keys: Vec<String> = wallet.keys.iter().map(|k| k.to_string()).collect();
-        intpr.add_known_list(&keys);
-        // necessary for version 1 of the protocol (introduced in version 2.1.0)
-        intpr.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
+        let mut intpr = ClientCommandInterpreter::for_wallet(wallet);
         let data = self.make_request(&cmd, Some(&mut intpr))?;
         let (id, hmac) = parse_wallet_registration(&data).map_err(|_| BitcoinClientError::UnexpectedResult {
             command: cmd.ins,
@@ -174,12 +169,7 @@ impl<T: Transport> BitcoinClient<T> {
         address_index: u32,
         display: bool,
     ) -> Result<bitcoin::Address<address::NetworkUnchecked>, BitcoinClientError<T::Error>> {
-        let mut intpr = ClientCommandInterpreter::new();
-        intpr.add_known_preimage(wallet.serialize());
-        let keys: Vec<String> = wallet.keys.iter().map(|k| k.to_string()).collect();
-        intpr.add_known_list(&keys);
-        // necessary for version 1 of the protocol (introduced in version 2.1.0)
-        intpr.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
+        let mut intpr = ClientCommandInterpreter::for_wallet(wallet);
         let cmd = command::get_wallet_address(wallet, wallet_hmac, change, address_index, display);
         let data = self.make_request(&cmd, Some(&mut intpr))?;
         let address = parse_wallet_address(&data).map_err(|_| BitcoinClientError::UnexpectedResult {
@@ -208,12 +198,7 @@ impl<T: Transport> BitcoinClient<T> {
         wallet: &WalletPolicy,
         wallet_hmac: Option<&[u8; 32]>,
     ) -> Result<Vec<(usize, SignPsbtYieldedObject)>, BitcoinClientError<T::Error>> {
-        let mut intpr = ClientCommandInterpreter::new();
-        intpr.add_known_preimage(wallet.serialize());
-        let keys: Vec<String> = wallet.keys.iter().map(|k| k.to_string()).collect();
-        intpr.add_known_list(&keys);
-        // necessary for version 1 of the protocol (introduced in version 2.1.0)
-        intpr.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
+        let mut intpr = ClientCommandInterpreter::for_wallet(wallet);
 
         let maps = get_v2_maps(psbt).map_err(|_| BitcoinClientError::InvalidPsbt)?;
 
@@ -278,10 +263,7 @@ impl<T: Transport> BitcoinClient<T> {
         message: &[u8],
         path: &DerivationPath,
     ) -> Result<(u8, ecdsa::Signature), BitcoinClientError<T::Error>> {
-        let chunks: Vec<&[u8]> = message.chunks(64).collect();
-        let mut intpr = ClientCommandInterpreter::new();
-        let message_commitment_root = intpr.add_known_list(&chunks);
-        let cmd = command::sign_message(message.len(), &message_commitment_root, path);
+        let (cmd, mut intpr) = prepare_sign_message(message, path);
         let data = self.make_request(&cmd, Some(&mut intpr))?;
         parse_message_signature(&data).map_err(|_| BitcoinClientError::UnexpectedResult {
             command: cmd.ins,

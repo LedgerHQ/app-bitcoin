@@ -8,7 +8,7 @@ use bitcoin::{
 
 use crate::protocol::UncheckedVarInt;
 
-use crate::{apdu::ClientCommandCode, merkle::MerkleTree};
+use crate::{apdu::ClientCommandCode, merkle::MerkleTree, wallet::WalletPolicy};
 
 /// Interpreter for the client-side commands.
 /// This struct keeps has methods to keep track of:
@@ -37,6 +37,17 @@ impl ClientCommandInterpreter {
             known_preimages: Vec::new(),
             trees: Vec::new(),
         }
+    }
+
+    /// Prepares wallet serialization, keys and descriptor-template preimages.
+    pub fn for_wallet(wallet: &WalletPolicy) -> Self {
+        let mut interpreter = Self::new();
+        interpreter.add_known_preimage(wallet.serialize());
+        let keys: Vec<String> = wallet.keys.iter().map(|key| key.to_string()).collect();
+        interpreter.add_known_list(&keys);
+        // Necessary for protocol version 1 (introduced in app version 2.1.0).
+        interpreter.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
+        interpreter
     }
 
     /// Adds a preimage to the list of known preimages.

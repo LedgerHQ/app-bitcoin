@@ -13,6 +13,16 @@ use bitcoin::{
 
 use crate::psbt::{PartialSignature, PartialSignatureError};
 
+/// Prepares a message command and the delegated state for its 64-byte chunks.
+pub fn prepare_sign_message(message: &[u8], path: &bitcoin::bip32::DerivationPath)
+    -> (crate::apdu::APDUCommand, crate::interpreter::ClientCommandInterpreter)
+{
+    let chunks: Vec<&[u8]> = message.chunks(64).collect();
+    let mut interpreter = crate::interpreter::ClientCommandInterpreter::new();
+    let root = interpreter.add_known_list(&chunks);
+    (crate::command::sign_message(message.len(), &root, path), interpreter)
+}
+
 /// An encoding error in an ordinary device response; no response bytes are retained.
 #[derive(Debug)]
 pub enum ResponseError {

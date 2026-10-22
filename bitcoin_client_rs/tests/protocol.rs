@@ -266,3 +266,35 @@ fn response_parsers_preserve_wire_contracts() {
     }
     assert!(matches!(parse_message_signature(&[255; 65]), Err(ResponseError::InvalidFormat { .. })));
 }
+
+#[test]
+fn wallet_and_message_preparation_supply_delegated_preimages() {
+    use ledger_bitcoin_client::protocol::prepare_sign_message;
+    for version in [Version::V1, Version::V2] {
+        let wallet = wallet(version);
+        let mut interpreter = ClientCommandInterpreter::for_wallet(&wallet);
+        for preimage in [wallet.serialize(), wallet.descriptor_template.as_bytes().to_vec(), [&[0][..], KEY.as_bytes()].concat()] {
+            let mut request = vec![0x40, 0];
+            request.extend(hash(&preimage));
+            let mut expected = vec![preimage.len() as u8, preimage.len() as u8];
+            expected.extend(preimage);
+            assert_eq!(interpreter.execute(request).unwrap(), expected);
+        }
+    }
+    let path = DerivationPath::from_str("m/44'/1'/0'/0").unwrap();
+    for length in [1, 64, 65, 128, 129] {
+        let message = vec![0x55; length];
+        let (command, mut interpreter) = prepare_sign_message(&message, &path);
+        let chunks: Vec<_> = message.chunks(64).collect();
+        let leaves = chunks.iter().map(|chunk| hash(&[&[0][..], chunk].concat())).collect();
+        let root = *MerkleTree::new(leaves).root_hash();
+        assert_eq!(command.encode(), command::sign_message(length, &root, &path).encode());
+        for chunk in chunks {
+            let preimage = [&[0][..], chunk].concat();
+            let mut request = vec![0x40, 0];
+            request.extend(hash(&preimage));
+            let response = interpreter.execute(request).unwrap();
+            assert_eq!(&response[2..], preimage);
+        }
+    }
+}
