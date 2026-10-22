@@ -7,7 +7,6 @@ use bitcoin::{
     secp256k1::ecdsa,
 };
 
-
 use crate::{
     apdu::{APDUCommand, StatusWord},
     command,
@@ -59,7 +58,6 @@ impl<T: Transport> BitcoinClient<T> {
         }
     }
 
-
     /// Returns the currently running app's name, version and state flags
     pub fn get_version(&self) -> Result<(String, String, Vec<u8>), BitcoinClientError<T::Error>> {
         let cmd = command::get_version();
@@ -104,10 +102,11 @@ impl<T: Transport> BitcoinClient<T> {
         let cmd = command::register_wallet(wallet);
         let mut intpr = ClientCommandInterpreter::for_wallet(wallet);
         let data = self.make_request(&cmd, Some(&mut intpr))?;
-        let (id, hmac) = parse_wallet_registration(&data).map_err(|_| BitcoinClientError::UnexpectedResult {
-            command: cmd.ins,
-            data,
-        })?;
+        let (id, hmac) =
+            parse_wallet_registration(&data).map_err(|_| BitcoinClientError::UnexpectedResult {
+                command: cmd.ins,
+                data,
+            })?;
 
         #[cfg(feature = "paranoid_client")]
         {
@@ -130,10 +129,11 @@ impl<T: Transport> BitcoinClient<T> {
         let mut intpr = ClientCommandInterpreter::for_wallet(wallet);
         let cmd = command::get_wallet_address(wallet, wallet_hmac, change, address_index, display);
         let data = self.make_request(&cmd, Some(&mut intpr))?;
-        let address = parse_wallet_address(&data).map_err(|_| BitcoinClientError::UnexpectedResult {
-            command: cmd.ins,
-            data,
-        })?;
+        let address =
+            parse_wallet_address(&data).map_err(|_| BitcoinClientError::UnexpectedResult {
+                command: cmd.ins,
+                data,
+            })?;
 
         #[cfg(feature = "paranoid_client")]
         {

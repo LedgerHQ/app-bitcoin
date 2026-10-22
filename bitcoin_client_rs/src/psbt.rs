@@ -212,7 +212,10 @@ pub fn apply_partial_signature(
     input_index: usize,
     signature: PartialSignature,
 ) -> Result<(), InputIndexError> {
-    let input = psbt.inputs.get_mut(input_index).ok_or(InputIndexError { input_index })?;
+    let input = psbt
+        .inputs
+        .get_mut(input_index)
+        .ok_or(InputIndexError { input_index })?;
     match signature {
         PartialSignature::Sig(key, signature) => {
             input.partial_sigs.insert(key, signature);

@@ -46,13 +46,18 @@ pub fn check_address(
     address: &bitcoin::Address<bitcoin::address::NetworkUnchecked>,
 ) -> Result<(), AddressCheckError> {
     use miniscript::{Descriptor, DescriptorPublicKey};
-    let descriptor = wallet.get_descriptor(change).map_err(|_| AddressCheckError::Policy)?;
+    let descriptor = wallet
+        .get_descriptor(change)
+        .map_err(|_| AddressCheckError::Policy)?;
     // rust-miniscript does not yet support musig() expressions.
-    let descriptor = crate::bip327::replace_musigs(&descriptor).map_err(AddressCheckError::Musig)?;
+    let descriptor =
+        crate::bip327::replace_musigs(&descriptor).map_err(AddressCheckError::Musig)?;
     let descriptor = Descriptor::<DescriptorPublicKey>::from_str(&descriptor)
         .map_err(|_| AddressCheckError::Descriptor)?;
-    if descriptor.at_derivation_index(address_index)
-        .map_err(|_| AddressCheckError::Derivation)?.script_pubkey()
+    if descriptor
+        .at_derivation_index(address_index)
+        .map_err(|_| AddressCheckError::Derivation)?
+        .script_pubkey()
         != address.assume_checked_ref().script_pubkey()
     {
         return Err(AddressCheckError::Mismatch);
@@ -65,7 +70,13 @@ pub fn prepare_sign_psbt(
     psbt: &bitcoin::psbt::Psbt,
     wallet: &crate::wallet::WalletPolicy,
     hmac: Option<&[u8; 32]>,
-) -> Result<(crate::apdu::APDUCommand, crate::interpreter::ClientCommandInterpreter), crate::psbt::PsbtV2Error> {
+) -> Result<
+    (
+        crate::apdu::APDUCommand,
+        crate::interpreter::ClientCommandInterpreter,
+    ),
+    crate::psbt::PsbtV2Error,
+> {
     use crate::interpreter::{get_merkleized_map_commitment, ClientCommandInterpreter};
     let mut interpreter = ClientCommandInterpreter::for_wallet(wallet);
     let maps = crate::psbt::get_v2_maps(psbt)?;
@@ -84,29 +95,52 @@ pub fn prepare_sign_psbt(
     }
     let output_root = interpreter.add_known_list(&output_commitments);
     let command = crate::command::sign_psbt(
-        &global_commitment, psbt.inputs.len(), &input_root,
-        psbt.outputs.len(), &output_root, wallet, hmac,
+        &global_commitment,
+        psbt.inputs.len(),
+        &input_root,
+        psbt.outputs.len(),
+        &output_root,
+        wallet,
+        hmac,
     );
     Ok((command, interpreter))
 }
 
 /// Prepares a message command and the delegated state for its 64-byte chunks.
-pub fn prepare_sign_message(message: &[u8], path: &bitcoin::bip32::DerivationPath)
-    -> (crate::apdu::APDUCommand, crate::interpreter::ClientCommandInterpreter)
-{
+pub fn prepare_sign_message(
+    message: &[u8],
+    path: &bitcoin::bip32::DerivationPath,
+) -> (
+    crate::apdu::APDUCommand,
+    crate::interpreter::ClientCommandInterpreter,
+) {
     let chunks: Vec<&[u8]> = message.chunks(64).collect();
     let mut interpreter = crate::interpreter::ClientCommandInterpreter::new();
     let root = interpreter.add_known_list(&chunks);
-    (crate::command::sign_message(message.len(), &root, path), interpreter)
+    (
+        crate::command::sign_message(message.len(), &root, path),
+        interpreter,
+    )
 }
 
 /// An encoding error in an ordinary device response; no response bytes are retained.
 #[derive(Debug)]
 pub enum ResponseError {
-    Truncated { field: &'static str },
-    InvalidFormat { field: &'static str },
-    InvalidLength { field: &'static str, expected: usize, actual: usize },
-    Decode { field: &'static str, source: EncodeError },
+    Truncated {
+        field: &'static str,
+    },
+    InvalidFormat {
+        field: &'static str,
+    },
+    InvalidLength {
+        field: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    Decode {
+        field: &'static str,
+        source: EncodeError,
+    },
 }
 
 impl fmt::Display for ResponseError {
@@ -114,8 +148,15 @@ impl fmt::Display for ResponseError {
         match self {
             Self::Truncated { field } => write!(f, "Truncated {}", field),
             Self::InvalidFormat { field } => write!(f, "Invalid {} format", field),
-            Self::InvalidLength { field, expected, actual } =>
-                write!(f, "Invalid {} length: expected {}, got {}", field, expected, actual),
+            Self::InvalidLength {
+                field,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "Invalid {} length: expected {}, got {}",
+                field, expected, actual
+            ),
             Self::Decode { field, source } => write!(f, "Failed to decode {}: {}", field, source),
         }
     }
@@ -128,19 +169,30 @@ pub fn parse_version(data: &[u8]) -> Result<(String, String, Vec<u8>), ResponseE
         Some(1) => (),
         Some(_) => return Err(ResponseError::InvalidFormat { field: "format" }),
     }
-    let (name, i): (String, usize) = deserialize_partial(&data[1..])
-        .map_err(|source| ResponseError::Decode { field: "name", source })?;
-    let (version, j): (String, usize) = deserialize_partial(&data[1 + i..])
-        .map_err(|source| ResponseError::Decode { field: "version", source })?;
-    let (flags, _): (Vec<u8>, usize) = deserialize_partial(&data[1 + i + j..])
-        .map_err(|source| ResponseError::Decode { field: "flags", source })?;
+    let (name, i): (String, usize) =
+        deserialize_partial(&data[1..]).map_err(|source| ResponseError::Decode {
+            field: "name",
+            source,
+        })?;
+    let (version, j): (String, usize) =
+        deserialize_partial(&data[1 + i..]).map_err(|source| ResponseError::Decode {
+            field: "version",
+            source,
+        })?;
+    let (flags, _): (Vec<u8>, usize) =
+        deserialize_partial(&data[1 + i + j..]).map_err(|source| ResponseError::Decode {
+            field: "flags",
+            source,
+        })?;
     Ok((name, version, flags))
 }
 
 /// Uses the first four bytes, accepting trailing bytes.
 pub fn parse_master_fingerprint(data: &[u8]) -> Result<bitcoin::bip32::Fingerprint, ResponseError> {
     let bytes = data.get(..4).ok_or(ResponseError::InvalidLength {
-        field: "fingerprint", expected: 4, actual: data.len(),
+        field: "fingerprint",
+        expected: 4,
+        actual: data.len(),
     })?;
     let mut fingerprint = [0; 4];
     fingerprint.copy_from_slice(bytes);
@@ -149,20 +201,30 @@ pub fn parse_master_fingerprint(data: &[u8]) -> Result<bitcoin::bip32::Fingerpri
 
 /// Parses the full lossy-UTF8 response, without trimming.
 pub fn parse_extended_pubkey(data: &[u8]) -> Result<bitcoin::bip32::Xpub, ResponseError> {
-    bitcoin::bip32::Xpub::from_str(&String::from_utf8_lossy(data))
-        .map_err(|_| ResponseError::InvalidFormat { field: "extended pubkey" })
+    bitcoin::bip32::Xpub::from_str(&String::from_utf8_lossy(data)).map_err(|_| {
+        ResponseError::InvalidFormat {
+            field: "extended pubkey",
+        }
+    })
 }
 
 /// Parses the full lossy-UTF8 response, without trimming or checking its network.
-pub fn parse_wallet_address(data: &[u8]) -> Result<bitcoin::Address<bitcoin::address::NetworkUnchecked>, ResponseError> {
-    bitcoin::Address::from_str(&String::from_utf8_lossy(data))
-        .map_err(|_| ResponseError::InvalidFormat { field: "wallet address" })
+pub fn parse_wallet_address(
+    data: &[u8],
+) -> Result<bitcoin::Address<bitcoin::address::NetworkUnchecked>, ResponseError> {
+    bitcoin::Address::from_str(&String::from_utf8_lossy(data)).map_err(|_| {
+        ResponseError::InvalidFormat {
+            field: "wallet address",
+        }
+    })
 }
 
 /// Uses the first 64 bytes for the wallet ID and HMAC, accepting trailing bytes.
 pub fn parse_wallet_registration(data: &[u8]) -> Result<([u8; 32], [u8; 32]), ResponseError> {
     let bytes = data.get(..64).ok_or(ResponseError::InvalidLength {
-        field: "wallet registration", expected: 64, actual: data.len(),
+        field: "wallet registration",
+        expected: 64,
+        actual: data.len(),
     })?;
     let mut id = [0; 32];
     id.copy_from_slice(&bytes[..32]);
@@ -173,14 +235,22 @@ pub fn parse_wallet_registration(data: &[u8]) -> Result<([u8; 32], [u8; 32]), Re
 
 /// Parses a compact ECDSA signature and returns its header unchanged.
 /// This checks the encoding, not the signed digest.
-pub fn parse_message_signature(data: &[u8]) -> Result<(u8, bitcoin::secp256k1::ecdsa::Signature), ResponseError> {
+pub fn parse_message_signature(
+    data: &[u8],
+) -> Result<(u8, bitcoin::secp256k1::ecdsa::Signature), ResponseError> {
     if data.len() != 65 {
         return Err(ResponseError::InvalidLength {
-            field: "message signature", expected: 65, actual: data.len(),
+            field: "message signature",
+            expected: 65,
+            actual: data.len(),
         });
     }
-    let signature = bitcoin::secp256k1::ecdsa::Signature::from_compact(&data[1..])
-        .map_err(|_| ResponseError::InvalidFormat { field: "message signature" })?;
+    let signature =
+        bitcoin::secp256k1::ecdsa::Signature::from_compact(&data[1..]).map_err(|_| {
+            ResponseError::InvalidFormat {
+                field: "message signature",
+            }
+        })?;
     Ok((data[0], signature))
 }
 

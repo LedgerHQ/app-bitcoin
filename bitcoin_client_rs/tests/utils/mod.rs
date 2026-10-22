@@ -5,12 +5,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use async_trait::async_trait;
 use bitcoin::hashes::hex::FromHex;
 
+#[cfg(feature = "async")]
+use ledger_bitcoin_client::async_client;
 use ledger_bitcoin_client::{
     apdu::{APDUCommand, StatusWord},
     client,
 };
-#[cfg(feature = "async")]
-use ledger_bitcoin_client::async_client;
 
 #[derive(Default, Clone)]
 pub struct RecordStore {
