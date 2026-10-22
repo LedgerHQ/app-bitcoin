@@ -133,8 +133,8 @@ static int get_merkle_leaf_hash(dispatcher_context_t *dc,
                 return -1;
             }
 
-            if (cur_step + n_proof_elements > proof_size) {
-                // Receiving more data then expected
+            if (n_proof_elements == 0 || cur_step + n_proof_elements > proof_size) {
+                // Receiving no data (no progress), or more data then expected
                 return -1;
             }
         }
