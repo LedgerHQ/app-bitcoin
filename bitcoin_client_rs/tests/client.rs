@@ -508,3 +508,23 @@ async fn test_sign_psbt() {
         }
     }
 }
+
+#[tokio::test]
+async fn empty_message_signature_is_an_unexpected_result() {
+    use ledger_bitcoin_client::error::BitcoinClientError;
+    let path = DerivationPath::from_str("m/44'/1'/0'/0").unwrap();
+    let exchanges = vec![
+        "=> e110000132048000002c800000018000000000000000058a2a5c9b768827de5a9552c38a044c66959c68f6d2f21b5260af54d2f87db827".into(),
+        "<= 9000".into(),
+    ];
+    let store = utils::RecordStore::new(&exchanges);
+    let result = client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+        .sign_message(b"hello", &path);
+    assert!(matches!(result, Err(BitcoinClientError::UnexpectedResult { command: 0x10, data }) if data.is_empty()));
+    #[cfg(feature = "async")]
+    {
+        let result = async_client::BitcoinClient::new(utils::TransportReplayer::new(store))
+            .sign_message(b"hello", &path).await;
+        assert!(matches!(result, Err(BitcoinClientError::UnexpectedResult { command: 0x10, data }) if data.is_empty()));
+    }
+}

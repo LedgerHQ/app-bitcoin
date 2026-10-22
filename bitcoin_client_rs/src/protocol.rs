@@ -1,6 +1,7 @@
 //! This module contains types that are specific to the Ledger Bitcoin application protocol.
 
 use core::convert::TryFrom;
+use core::{fmt, str::FromStr};
 
 use bitcoin::{
     consensus::encode::{deserialize_partial, Decodable, Encodable, Error as EncodeError},
@@ -11,6 +12,90 @@ use bitcoin::{
 };
 
 use crate::psbt::{PartialSignature, PartialSignatureError};
+
+/// An encoding error in an ordinary device response; no response bytes are retained.
+#[derive(Debug)]
+pub enum ResponseError {
+    Truncated { field: &'static str },
+    InvalidFormat { field: &'static str },
+    InvalidLength { field: &'static str, expected: usize, actual: usize },
+    Decode { field: &'static str, source: EncodeError },
+}
+
+impl fmt::Display for ResponseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Truncated { field } => write!(f, "Truncated {}", field),
+            Self::InvalidFormat { field } => write!(f, "Invalid {} format", field),
+            Self::InvalidLength { field, expected, actual } =>
+                write!(f, "Invalid {} length: expected {}, got {}", field, expected, actual),
+            Self::Decode { field, source } => write!(f, "Failed to decode {}: {}", field, source),
+        }
+    }
+}
+
+/// Parses app name, version and flags. Trailing bytes are accepted.
+pub fn parse_version(data: &[u8]) -> Result<(String, String, Vec<u8>), ResponseError> {
+    match data.first() {
+        None => return Err(ResponseError::Truncated { field: "format" }),
+        Some(1) => (),
+        Some(_) => return Err(ResponseError::InvalidFormat { field: "format" }),
+    }
+    let (name, i): (String, usize) = deserialize_partial(&data[1..])
+        .map_err(|source| ResponseError::Decode { field: "name", source })?;
+    let (version, j): (String, usize) = deserialize_partial(&data[1 + i..])
+        .map_err(|source| ResponseError::Decode { field: "version", source })?;
+    let (flags, _): (Vec<u8>, usize) = deserialize_partial(&data[1 + i + j..])
+        .map_err(|source| ResponseError::Decode { field: "flags", source })?;
+    Ok((name, version, flags))
+}
+
+/// Uses the first four bytes, accepting trailing bytes.
+pub fn parse_master_fingerprint(data: &[u8]) -> Result<bitcoin::bip32::Fingerprint, ResponseError> {
+    let bytes = data.get(..4).ok_or(ResponseError::InvalidLength {
+        field: "fingerprint", expected: 4, actual: data.len(),
+    })?;
+    let mut fingerprint = [0; 4];
+    fingerprint.copy_from_slice(bytes);
+    Ok(fingerprint.into())
+}
+
+/// Parses the full lossy-UTF8 response, without trimming.
+pub fn parse_extended_pubkey(data: &[u8]) -> Result<bitcoin::bip32::Xpub, ResponseError> {
+    bitcoin::bip32::Xpub::from_str(&String::from_utf8_lossy(data))
+        .map_err(|_| ResponseError::InvalidFormat { field: "extended pubkey" })
+}
+
+/// Parses the full lossy-UTF8 response, without trimming or checking its network.
+pub fn parse_wallet_address(data: &[u8]) -> Result<bitcoin::Address<bitcoin::address::NetworkUnchecked>, ResponseError> {
+    bitcoin::Address::from_str(&String::from_utf8_lossy(data))
+        .map_err(|_| ResponseError::InvalidFormat { field: "wallet address" })
+}
+
+/// Uses the first 64 bytes for the wallet ID and HMAC, accepting trailing bytes.
+pub fn parse_wallet_registration(data: &[u8]) -> Result<([u8; 32], [u8; 32]), ResponseError> {
+    let bytes = data.get(..64).ok_or(ResponseError::InvalidLength {
+        field: "wallet registration", expected: 64, actual: data.len(),
+    })?;
+    let mut id = [0; 32];
+    id.copy_from_slice(&bytes[..32]);
+    let mut hmac = [0; 32];
+    hmac.copy_from_slice(&bytes[32..]);
+    Ok((id, hmac))
+}
+
+/// Parses a compact ECDSA signature and returns its header unchanged.
+/// This checks the encoding, not the signed digest.
+pub fn parse_message_signature(data: &[u8]) -> Result<(u8, bitcoin::secp256k1::ecdsa::Signature), ResponseError> {
+    if data.len() != 65 {
+        return Err(ResponseError::InvalidLength {
+            field: "message signature", expected: 65, actual: data.len(),
+        });
+    }
+    let signature = bitcoin::secp256k1::ecdsa::Signature::from_compact(&data[1..])
+        .map_err(|_| ResponseError::InvalidFormat { field: "message signature" })?;
+    Ok((data[0], signature))
+}
 
 /// A variable-length unsigned integer using the same wire encoding as
 /// Bitcoin's `CompactSize`, but without the upper-bound limit enforced by the

@@ -6,7 +6,6 @@ use async_trait::async_trait;
 use bitcoin::{
     address,
     bip32::{DerivationPath, Fingerprint, Xpub},
-    consensus::encode::deserialize_partial,
     secp256k1::ecdsa::Signature,
     Psbt,
 };
@@ -113,35 +112,10 @@ impl<T: Transport> BitcoinClient<T> {
     ) -> Result<(String, String, Vec<u8>), BitcoinClientError<T::Error>> {
         let cmd = command::get_version();
         let data = self.make_request(&cmd, None).await?;
-        if data.is_empty() || data[0] != 0x01 {
-            return Err(BitcoinClientError::UnexpectedResult {
-                command: cmd.ins,
-                data,
-            });
-        }
-
-        let (name, i): (String, usize) =
-            deserialize_partial(&data[1..]).map_err(|_| BitcoinClientError::UnexpectedResult {
-                command: cmd.ins,
-                data: data.clone(),
-            })?;
-
-        let (version, j): (String, usize) = deserialize_partial(&data[i + 1..]).map_err(|_| {
-            BitcoinClientError::UnexpectedResult {
-                command: cmd.ins,
-                data: data.clone(),
-            }
-        })?;
-
-        let (flags, _): (Vec<u8>, usize) =
-            deserialize_partial(&data[i + j + 1..]).map_err(|_| {
-                BitcoinClientError::UnexpectedResult {
-                    command: cmd.ins,
-                    data: data.clone(),
-                }
-            })?;
-
-        Ok((name, version, flags))
+        parse_version(&data).map_err(|_| BitcoinClientError::UnexpectedResult {
+            command: cmd.ins,
+            data,
+        })
     }
 
     /// Retrieve the master fingerprint.
@@ -149,17 +123,10 @@ impl<T: Transport> BitcoinClient<T> {
         &self,
     ) -> Result<Fingerprint, BitcoinClientError<T::Error>> {
         let cmd = command::get_master_fingerprint();
-        self.make_request(&cmd, None).await.and_then(|data| {
-            if data.len() < 4 {
-                Err(BitcoinClientError::UnexpectedResult {
-                    command: cmd.ins,
-                    data,
-                })
-            } else {
-                let mut fg = [0x00; 4];
-                fg.copy_from_slice(&data[0..4]);
-                Ok(Fingerprint::from(fg))
-            }
+        let data = self.make_request(&cmd, None).await?;
+        parse_master_fingerprint(&data).map_err(|_| BitcoinClientError::UnexpectedResult {
+            command: cmd.ins,
+            data,
         })
     }
 
@@ -171,13 +138,10 @@ impl<T: Transport> BitcoinClient<T> {
         display: bool,
     ) -> Result<Xpub, BitcoinClientError<T::Error>> {
         let cmd = command::get_extended_pubkey(path, display);
-        self.make_request(&cmd, None).await.and_then(|data| {
-            Xpub::from_str(&String::from_utf8_lossy(&data)).map_err(|_| {
-                BitcoinClientError::UnexpectedResult {
-                    command: cmd.ins,
-                    data,
-                }
-            })
+        let data = self.make_request(&cmd, None).await?;
+        parse_extended_pubkey(&data).map_err(|_| BitcoinClientError::UnexpectedResult {
+            command: cmd.ins,
+            data,
         })
     }
 
@@ -193,23 +157,11 @@ impl<T: Transport> BitcoinClient<T> {
         intpr.add_known_list(&keys);
         //necessary for version 1 of the protocol (introduced in version 2.1.0)
         intpr.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
-        let (id, hmac) = self
-            .make_request(&cmd, Some(&mut intpr))
-            .await
-            .and_then(|data| {
-                if data.len() < 64 {
-                    Err(BitcoinClientError::UnexpectedResult {
-                        command: cmd.ins,
-                        data,
-                    })
-                } else {
-                    let mut id = [0x00; 32];
-                    id.copy_from_slice(&data[0..32]);
-                    let mut hmac = [0x00; 32];
-                    hmac.copy_from_slice(&data[32..64]);
-                    Ok((id, hmac))
-                }
-            })?;
+        let data = self.make_request(&cmd, Some(&mut intpr)).await?;
+        let (id, hmac) = parse_wallet_registration(&data).map_err(|_| BitcoinClientError::UnexpectedResult {
+            command: cmd.ins,
+            data,
+        })?;
 
         #[cfg(feature = "paranoid_client")]
         {
@@ -240,17 +192,11 @@ impl<T: Transport> BitcoinClient<T> {
         // necessary for version 1 of the protocol (introduced in version 2.1.0)
         intpr.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
         let cmd = command::get_wallet_address(wallet, wallet_hmac, change, address_index, display);
-        let address = self
-            .make_request(&cmd, Some(&mut intpr))
-            .await
-            .and_then(|data| {
-                bitcoin::Address::from_str(&String::from_utf8_lossy(&data)).map_err(|_| {
-                    BitcoinClientError::UnexpectedResult {
-                        command: cmd.ins,
-                        data,
-                    }
-                })
-            })?;
+        let data = self.make_request(&cmd, Some(&mut intpr)).await?;
+        let address = parse_wallet_address(&data).map_err(|_| BitcoinClientError::UnexpectedResult {
+            command: cmd.ins,
+            data,
+        })?;
 
         #[cfg(feature = "paranoid_client")]
         {
@@ -348,19 +294,11 @@ impl<T: Transport> BitcoinClient<T> {
         let mut intpr = ClientCommandInterpreter::new();
         let message_commitment_root = intpr.add_known_list(&chunks);
         let cmd = command::sign_message(message.len(), &message_commitment_root, path);
-        self.make_request(&cmd, Some(&mut intpr))
-            .await
-            .and_then(|data| {
-                Ok((
-                    data[0],
-                    Signature::from_compact(&data[1..]).map_err(|_| {
-                        BitcoinClientError::UnexpectedResult {
-                            command: cmd.ins,
-                            data: data.to_vec(),
-                        }
-                    })?,
-                ))
-            })
+        let data = self.make_request(&cmd, Some(&mut intpr)).await?;
+        parse_message_signature(&data).map_err(|_| BitcoinClientError::UnexpectedResult {
+            command: cmd.ins,
+            data,
+        })
     }
 }
 
