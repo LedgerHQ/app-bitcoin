@@ -157,3 +157,71 @@ fn preimage_and_proof_fragmentation_and_queue_transitions() {
     assert!(matches!(interpreter.execute(vec![0xff]), Err(InterpreterError::UnknownCommand(0xff))));
     assert!(matches!(interpreter.execute(vec![0x40]), Err(InterpreterError::UnsupportedRequest(0x40))));
 }
+
+fn compact_size(value: u64) -> Vec<u8> {
+    match value {
+        0..=0xfc => vec![value as u8],
+        0xfd..=0xffff => [&[0xfd][..], &value.to_le_bytes()[..2]].concat(),
+        0x10000..=0xffff_ffff => [&[0xfe][..], &value.to_le_bytes()[..4]].concat(),
+        _ => [&[0xff][..], &value.to_le_bytes()].concat(),
+    }
+}
+
+const PUBKEY: &str = "034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa";
+
+fn musig_yield(tag: u64, index: u64, tapleaf: bool) -> Vec<u8> {
+    let mut payload = compact_size(tag);
+    payload.extend(compact_size(index));
+    payload.extend(vec![0xaa; if tag == 0xffff_ffff { 66 } else { 32 }]);
+    payload.extend(hex::decode(PUBKEY).unwrap());
+    payload.extend(hex::decode(PUBKEY).unwrap());
+    if tapleaf {
+        payload.extend([1; 32]);
+    }
+    payload
+}
+
+#[test]
+fn yielded_indices_and_malformed_payloads() {
+    use ledger_bitcoin_client::{protocol::{parse_sign_psbt_yielded, SignPsbtYieldedObject}, PartialSignatureError};
+    for tag in [0xffff_ffff, 0xffff_fffe, 0x8000_0000] {
+        let payload = if tag == 0x8000_0000 {
+            [compact_size(tag), compact_size(0x1_0000_0000)].concat()
+        } else {
+            musig_yield(tag, 0x1_0000_0000, false)
+        };
+        let parsed = parse_sign_psbt_yielded(&payload);
+        #[cfg(target_pointer_width = "32")]
+        assert!(matches!(parsed, Err(PartialSignatureError::InvalidLength)));
+        #[cfg(target_pointer_width = "64")]
+        assert_eq!(parsed.ok().expect("representable index").0, 0x1_0000_0000);
+    }
+    let mut regular = compact_size(0x7fff_ffff);
+    regular.push(32);
+    regular.extend(&hex::decode(PUBKEY).unwrap()[1..]);
+    regular.extend([0xaa; 64]);
+    assert_eq!(parse_sign_psbt_yielded(&regular).ok().unwrap().0, 0x7fff_ffff);
+    for malformed in [vec![], vec![0xfd], vec![0xfd, 1, 0], vec![0xfe, 0, 1, 0, 0], vec![0xff, 0, 0, 0, 0, 0, 0, 0, 0]] {
+        assert!(matches!(parse_sign_psbt_yielded(&malformed), Err(PartialSignatureError::InvalidLength)));
+    }
+    for tag in [0xffff_ffff, 0xffff_fffe] {
+        for tapleaf in [false, true] {
+            let valid = musig_yield(tag, 2, tapleaf);
+            assert_eq!(parse_sign_psbt_yielded(&valid).ok().unwrap().0, 2);
+            assert!(parse_sign_psbt_yielded(&valid[..valid.len() - 1]).is_err());
+            let mut bad_key = valid;
+            let offset = 6 + if tag == 0xffff_ffff { 66 } else { 32 };
+            bad_key[offset] = 0xff;
+            assert!(parse_sign_psbt_yielded(&bad_key).is_err());
+        }
+    }
+    let mut unknown = compact_size(0x8000_0000);
+    unknown.extend([3, 7, 8]);
+    assert!(matches!(parse_sign_psbt_yielded(&unknown), Ok((3, SignPsbtYieldedObject::Unknown(bytes))) if bytes == [7, 8]));
+    for malformed in [vec![0], vec![0, 64, 1], vec![0, 32], vec![0, 33, 0, 0]] {
+        assert!(parse_sign_psbt_yielded(&malformed).is_err());
+    }
+    let mut bad_schnorr = regular;
+    bad_schnorr.pop();
+    assert!(parse_sign_psbt_yielded(&bad_schnorr).is_err());
+}

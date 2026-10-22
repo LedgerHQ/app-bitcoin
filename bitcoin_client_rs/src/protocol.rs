@@ -1,5 +1,7 @@
 //! This module contains types that are specific to the Ledger Bitcoin application protocol.
 
+use core::convert::TryFrom;
+
 use bitcoin::{
     consensus::encode::{deserialize_partial, Decodable, Encodable, Error as EncodeError},
     hashes::Hash,
@@ -169,7 +171,7 @@ pub fn parse_sign_psbt_yielded(
                 None
             };
             Ok((
-                input_index as usize,
+                usize::try_from(input_index).map_err(|_| PartialSignatureError::InvalidLength)?,
                 SignPsbtYieldedObject::MusigPubNonce(MusigPubNonce {
                     participant_pubkey,
                     aggregate_pubkey,
@@ -203,7 +205,7 @@ pub fn parse_sign_psbt_yielded(
                 None
             };
             Ok((
-                input_index as usize,
+                usize::try_from(input_index).map_err(|_| PartialSignatureError::InvalidLength)?,
                 SignPsbtYieldedObject::MusigPartialSignature(MusigPartialSignature {
                     participant_pubkey,
                     aggregate_pubkey,
@@ -222,14 +224,15 @@ pub fn parse_sign_psbt_yielded(
                     .map_err(|_| PartialSignatureError::InvalidLength)?;
             let rest = &data[i + j..];
             Ok((
-                input_index as usize,
+                usize::try_from(input_index).map_err(|_| PartialSignatureError::InvalidLength)?,
                 SignPsbtYieldedObject::Unknown(rest.to_vec()),
             ))
         }
         // Otherwise the leading varint is the input index and the remainder is a regular partial signature.
         // These are the only payloads that were used in protocol versions prior to the introduction of the tags.
         _ => {
-            let input_index = tag as usize;
+            let input_index =
+                usize::try_from(tag).map_err(|_| PartialSignatureError::InvalidLength)?;
             let ps = PartialSignature::from_slice(&data[i..])?;
             Ok((input_index, SignPsbtYieldedObject::Partial(ps)))
         }
