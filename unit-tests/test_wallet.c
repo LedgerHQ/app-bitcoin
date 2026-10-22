@@ -802,6 +802,14 @@ static void test_miniscript_types(void **state) {
     // Only the right branch of the or_d exceeds the 201 ops limit
     Test("or_d(utv:or_i(jjjjjjjjjj:pk(@10/**),jjjjjjjjjj:pk(@11/**)),or_i(jjjjjjjjjjjjj:multi(1,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,@8/**,@9/**),jjjjjjjjjjjjj:pk(@12/**)))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_TAPSCRIPT_INVALID, 211, -1);
 
+    // Regression tests: the satisfaction of andor(X,Y,Z) via Z executes the dissatisfaction of X,
+    // not of Y. With a 'V' Y (no dissatisfaction), the ops of the multi in Z must still be counted.
+    Test("t:andor(pk(@0/**),v:pk(@1/**),v:multi(1,@2/**,@3/**,@4/**))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_TAPSCRIPT_INVALID, 9, 4);
+    // Asymmetric costs: dissatisfying X is more expensive than dissatisfying Y
+    Test("andor(multi(1,@0/**,@1/**),pk(@2/**),multi(1,@3/**,@4/**,@5/**))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_TAPSCRIPT_INVALID, 11, 5);
+    // Only the Z branch of the andor exceeds the 201 ops limit
+    Test("t:andor(pk(@10/**),v:or_i(jjjjjjjjjjj:pk(@11/**),jjjjjjjjjjj:pk(@12/**)),v:or_i(jjjjjjjjjjj:multi(1,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,@8/**,@9/**),jjjjjjjjjjj:pk(@13/**)))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_TAPSCRIPT_INVALID, 202, -1);
+
     // clang-format on
 }
 
