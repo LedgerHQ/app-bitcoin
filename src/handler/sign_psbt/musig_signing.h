@@ -35,6 +35,15 @@ typedef struct {
 } musig_per_input_info_t;
 
 /**
+ * Checks that the MuSig2 session needed for Round 2 is in the persistent storage, without deleting
+ * it and without accessing its content.
+ *
+ * Returns true if the session exists, false otherwise. In case of failure, it already sends an
+ * error status word.
+ */
+bool musig_check_round2_session(dispatcher_context_t *dc, const sign_psbt_state_t *st);
+
+/**
  * Computes the MuSig2 per-input, per-key-expression information.
  *
  * This function calculates the necessary information for each input in the MuSig protocol.

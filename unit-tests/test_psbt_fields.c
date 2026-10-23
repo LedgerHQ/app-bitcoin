@@ -633,6 +633,104 @@ static void test_witness_utxo_amount_too_short_is_error(void **state) {
     assert_int_equal(got, 0xCAFEBABEu);
 }
 
+/* ---------- MUSIG2_SESSION_ID (optional, proprietary key) ---------- */
+
+static const uint8_t MUSIG2_SESSION_ID_KEY[] = {0xFC, 0x11, 'M', 'U', 'S', 'I', 'G',
+                                                '2',  '_',  'S', 'E', 'S', 'S', 'I',
+                                                'O',  'N',  '_', 'I', 'D', 0x00};
+
+/** Registers a map holding a single MUSIG2_SESSION_ID field and returns its commitment. */
+static void map_with_musig2_session_id(mock_dispatcher_t *mock,
+                                       const uint8_t *value,
+                                       size_t value_len,
+                                       merkleized_map_commitment_t *out) {
+    const uint8_t *keys[] = {MUSIG2_SESSION_ID_KEY};
+    const size_t key_lens[] = {sizeof(MUSIG2_SESSION_ID_KEY)};
+    const uint8_t *values[] = {value};
+    const size_t value_lens[] = {value_len};
+
+    mock_dispatcher_add_map(mock, keys, key_lens, values, value_lens, 1, out);
+}
+
+static void test_musig2_session_id_key(void **state) {
+    (void) state;
+
+    assert_true(
+        psbt_is_global_musig2_session_id_key(MUSIG2_SESSION_ID_KEY, sizeof(MUSIG2_SESSION_ID_KEY)));
+
+    /* keydata, a different subtype, or a truncated key are not the MUSIG2_SESSION_ID key */
+    uint8_t key[sizeof(MUSIG2_SESSION_ID_KEY) + 1];
+    memcpy(key, MUSIG2_SESSION_ID_KEY, sizeof(MUSIG2_SESSION_ID_KEY));
+    key[sizeof(MUSIG2_SESSION_ID_KEY)] = 0x00;
+    assert_false(psbt_is_global_musig2_session_id_key(key, sizeof(key)));
+    key[sizeof(MUSIG2_SESSION_ID_KEY) - 1] = 0x01;
+    assert_false(psbt_is_global_musig2_session_id_key(key, sizeof(MUSIG2_SESSION_ID_KEY)));
+    assert_false(psbt_is_global_musig2_session_id_key(MUSIG2_SESSION_ID_KEY,
+                                                      sizeof(MUSIG2_SESSION_ID_KEY) - 1));
+}
+
+static void test_musig2_session_id_present(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    for (size_t len = 1; len <= MAX_MUSIG2_SESSION_ID_LEN; len += MAX_MUSIG2_SESSION_ID_LEN - 1) {
+        merkleized_map_commitment_t map;
+        uint8_t value[MAX_MUSIG2_SESSION_ID_LEN];
+        memset(value, 0x42, sizeof(value));
+        map_with_musig2_session_id(mock, value, len, &map);
+
+        uint8_t got[MAX_MUSIG2_SESSION_ID_LEN];
+        size_t got_len = 0;
+        psbt_field_status_t status =
+            psbt_get_global_musig2_session_id(mock_dispatcher_get_dc(mock), &map, got, &got_len);
+        assert_int_equal(status, PSBT_FIELD_PRESENT);
+        assert_int_equal(got_len, len);
+        assert_memory_equal(got, value, len);
+    }
+}
+
+static void test_musig2_session_id_absent(void **state) {
+    mock_dispatcher_t *mock = *state;
+    merkleized_map_commitment_t map;
+    map_without_field(mock, &map);
+
+    uint8_t got[MAX_MUSIG2_SESSION_ID_LEN];
+    size_t got_len = 0;
+    psbt_field_status_t status =
+        psbt_get_global_musig2_session_id(mock_dispatcher_get_dc(mock), &map, got, &got_len);
+    assert_int_equal(status, PSBT_FIELD_ABSENT);
+    assert_int_equal(got_len, 0);
+}
+
+static void test_musig2_session_id_empty_is_error(void **state) {
+    mock_dispatcher_t *mock = *state;
+    merkleized_map_commitment_t map;
+    map_with_musig2_session_id(mock, (const uint8_t *) "", 0, &map);
+
+    uint8_t got[MAX_MUSIG2_SESSION_ID_LEN];
+    size_t got_len = 0;
+    psbt_field_status_t status =
+        psbt_get_global_musig2_session_id(mock_dispatcher_get_dc(mock), &map, got, &got_len);
+    assert_int_equal(status, PSBT_FIELD_ERROR);
+    assert_int_equal(got_len, 0);
+}
+
+static void test_musig2_session_id_too_long_is_error(void **state) {
+    mock_dispatcher_t *mock = *state;
+    merkleized_map_commitment_t map;
+    uint8_t too_long[MAX_MUSIG2_SESSION_ID_LEN + 1];
+    memset(too_long, 0x42, sizeof(too_long));
+    map_with_musig2_session_id(mock, too_long, sizeof(too_long), &map);
+
+    uint8_t got[MAX_MUSIG2_SESSION_ID_LEN];
+    memset(got, 0xAA, sizeof(got));
+    size_t got_len = 0;
+    psbt_field_status_t status =
+        psbt_get_global_musig2_session_id(mock_dispatcher_get_dc(mock), &map, got, &got_len);
+    assert_int_equal(status, PSBT_FIELD_ERROR);
+    assert_int_equal(got_len, 0);
+    assert_cleared(got, sizeof(got));
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -670,6 +768,11 @@ int main(void) {
         T(test_witness_utxo_amount_present),
         T(test_witness_utxo_amount_absent),
         T(test_witness_utxo_amount_too_short_is_error),
+        T(test_musig2_session_id_key),
+        T(test_musig2_session_id_present),
+        T(test_musig2_session_id_absent),
+        T(test_musig2_session_id_empty_is_error),
+        T(test_musig2_session_id_too_long_is_error),
     };
 #undef T
 

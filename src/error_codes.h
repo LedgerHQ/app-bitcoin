@@ -109,6 +109,12 @@
 // proven amount shown to the user must be trustworthy, and external inputs cannot be signed.
 #define EC_SIGN_PSBT_BIP322_EXTERNAL_INPUTS 0x0015
 
+// The MUSIG2_SESSION_ID global field is present, but its value is empty or longer than 32 bytes.
+#define EC_SIGN_PSBT_INVALID_MUSIG2_SESSION_ID 0x0016
+
+// The PSBT contains MuSig2 pubnonces, but the device has no corresponding MuSig2 session for it
+#define EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND 0x0017
+
 /**
  * Swap
  */

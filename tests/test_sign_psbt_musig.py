@@ -3,7 +3,7 @@ from pathlib import Path
 
 from hashlib import sha256
 import hmac
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import pytest
 
@@ -25,6 +25,10 @@ from test_utils.taproot import taproot_output_script
 from .instructions import *
 
 tests_root: Path = Path(__file__).parent
+
+# error codes, see src/error_codes.h
+EC_SIGN_PSBT_INVALID_MUSIG2_SESSION_ID = 0x0016
+EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND = 0x0017
 
 
 # for now, we assume that there's a single internal musig placeholder, with a single internal key
@@ -313,10 +317,11 @@ def test_sign_psbt_musig2_scriptpath_round1_on_another_transaction(navigator: Na
     run_musig2_test(wallet_policy, psbt, [signer_1, signer_2], SCRIPTPATH_SIGHASHES)
 
 
-def test_sign_psbt_musig2_round1_twice_replaces_session(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals):
+@pytest.mark.parametrize("musig2_session_id", [None, b"\x42" * 32])
+def test_sign_psbt_musig2_round1_twice_replaces_session(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals, musig2_session_id: Optional[bytes]):
     # Since the psbt_session_id does not depend on the transaction, a second round 1 for the same
-    # wallet policy (on any transaction) replaces the pending session: round 2 with the pubnonces
-    # of the first round 1 must then fail.
+    # wallet policy (on any transaction) and the same MUSIG2_SESSION_ID (or none) replaces the
+    # pending session: round 2 with the pubnonces of the first round 1 must then fail.
     wallet_policy, wallet_hmac = keypath_wallet_policy(speculos_globals)
 
     signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac,
@@ -325,11 +330,13 @@ def test_sign_psbt_musig2_round1_twice_replaces_session(navigator: Navigator, fi
 
     psbt = PSBT()
     psbt.deserialize(KEYPATH_PSBT_B64)
+    psbt.musig2_session_id = musig2_session_id
     signer_1.generate_public_nonces(psbt)
     signer_2.generate_public_nonces(psbt)
 
     other_psbt = PSBT()
     other_psbt.deserialize(KEYPATH_PSBT_B64)
+    other_psbt.musig2_session_id = musig2_session_id
     other_psbt.tx.vout[0].nValue += 1000
     other_psbt.tx.rehash()
     signer_1.generate_public_nonces(other_psbt)
@@ -492,6 +499,7 @@ def test_sign_psbt_musig2_session_is_single_use(navigator: Navigator, firmware: 
     with pytest.raises(ExceptionRAPDU) as e:
         signer_1.generate_partial_signatures(replayed_psbt)
     assert DeviceException.exc.get(e.value.status) == BadStateError
+    assert int.from_bytes(e.value.data, byteorder='big') == EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND
     assert len(replayed_psbt.inputs[0].musig2_partial_sigs) == 0
 
     # 2) A failed round 2 consumes the session as well: after a round 2 that is rejected because of
@@ -511,4 +519,196 @@ def test_sign_psbt_musig2_session_is_single_use(navigator: Navigator, firmware: 
     with pytest.raises(ExceptionRAPDU) as e:
         signer_1.generate_partial_signatures(psbt)
     assert DeviceException.exc.get(e.value.status) == BadStateError
+    assert int.from_bytes(e.value.data, byteorder='big') == EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND
     assert len(psbt.inputs[0].musig2_partial_sigs) == 0
+
+
+class Round2OnlyCosigner(PsbtMusig2Cosigner):
+    """
+    Wraps a cosigner that already added its pubnonces to the psbt: only round 2 is executed.
+    """
+
+    def __init__(self, cosigner: PsbtMusig2Cosigner) -> None:
+        super().__init__()
+        self.cosigner = cosigner
+
+    def get_participant_pubkey(self) -> bip0327.Point:
+        return self.cosigner.get_participant_pubkey()
+
+    def generate_public_nonces(self, psbt: PSBT) -> None:
+        pass
+
+    def generate_partial_signatures(self, psbt: PSBT) -> None:
+        self.cosigner.generate_partial_signatures(psbt)
+
+
+class Round1OnOtherPsbtCosigner(PsbtMusig2Cosigner):
+    """
+    Not a real cosigner: when asked for its pubnonces, it makes the given cosigners execute round 1
+    on a different psbt instead. Used to interleave the rounds of different signing sessions.
+    """
+
+    def __init__(self, other_psbt: PSBT, cosigners: List[PsbtMusig2Cosigner]) -> None:
+        super().__init__()
+        self.other_psbt = other_psbt
+        self.cosigners = cosigners
+
+    def get_participant_pubkey(self) -> bip0327.Point:
+        return self.cosigners[0].get_participant_pubkey()
+
+    def generate_public_nonces(self, psbt: PSBT) -> None:
+        for cosigner in self.cosigners:
+            cosigner.generate_public_nonces(self.other_psbt)
+
+    def generate_partial_signatures(self, psbt: PSBT) -> None:
+        pass
+
+
+def test_sign_psbt_musig2_parallel_sessions(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals):
+    # With different MUSIG2_SESSION_IDs, multiple sessions can be pending for the same wallet
+    # policy: round 1 for one of them does not replace the other, and each of them completes.
+    wallet_policy, wallet_hmac = keypath_wallet_policy(speculos_globals)
+
+    signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac,
+                                    navigator=navigator, instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False, has_spend_from_wallet=True, has_feewarning=True), testname=test_name)
+
+    # The two psbts only differ in the MUSIG2_SESSION_ID, therefore they have the same sighashes.
+    # The hot cosigner identifies its sessions by the transaction, so each psbt needs its own.
+    psbt_a = PSBT()
+    psbt_a.deserialize(KEYPATH_PSBT_B64)
+    psbt_a.musig2_session_id = b"\x01" * 32
+    signer_2_a = HotMusig2Cosigner(wallet_policy, KEYPATH_COSIGNER_2_XPRIV)
+
+    psbt_b = PSBT()
+    psbt_b.deserialize(KEYPATH_PSBT_B64)
+    psbt_b.musig2_session_id = b"\x02"
+    signer_2_b = HotMusig2Cosigner(wallet_policy, KEYPATH_COSIGNER_2_XPRIV)
+
+    # Round 1 for psbt_a, then round 1 for psbt_b, then round 2 for psbt_a
+    interloper = Round1OnOtherPsbtCosigner(psbt_b, [signer_1, signer_2_b])
+    run_musig2_test(wallet_policy, psbt_a, [signer_1, interloper, signer_2_a], KEYPATH_SIGHASHES)
+
+    # Round 2 for psbt_b
+    assert psbt_b.inputs[0].musig2_pub_nonces != psbt_a.inputs[0].musig2_pub_nonces
+    run_musig2_test(wallet_policy, psbt_b,
+                    [Round2OnlyCosigner(signer_1), Round2OnlyCosigner(signer_2_b)], KEYPATH_SIGHASHES)
+
+
+@pytest.mark.parametrize("round2_session_id", [None, b"\x01" * 31, b"\x02" * 32])
+def test_sign_psbt_musig2_session_id_must_not_change(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals, round2_session_id: Optional[bytes]):
+    # The MUSIG2_SESSION_ID identifies the session: if it changes between round 1 and round 2
+    # (including if it is removed), the device finds no pending session for round 2.
+    wallet_policy, wallet_hmac = keypath_wallet_policy(speculos_globals)
+
+    signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac,
+                                    navigator=navigator, instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False, has_spend_from_wallet=True, has_feewarning=True), testname=test_name)
+    signer_2 = HotMusig2Cosigner(wallet_policy, KEYPATH_COSIGNER_2_XPRIV)
+
+    psbt = PSBT()
+    psbt.deserialize(KEYPATH_PSBT_B64)
+    psbt.musig2_session_id = b"\x01" * 32
+    signer_1.generate_public_nonces(psbt)
+    signer_2.generate_public_nonces(psbt)
+
+    psbt.musig2_session_id = round2_session_id
+    with pytest.raises(ExceptionRAPDU) as e:
+        signer_1.generate_partial_signatures(psbt)
+    assert DeviceException.exc.get(e.value.status) == BadStateError
+    assert int.from_bytes(e.value.data, byteorder='big') == EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND
+    assert len(psbt.inputs[0].musig2_partial_sigs) == 0
+
+
+@pytest.mark.parametrize("musig2_session_id", [b"", b"\x01" * 33])
+def test_sign_psbt_musig2_invalid_session_id(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals, musig2_session_id: bytes):
+    # An empty or too long MUSIG2_SESSION_ID is rejected, rather than ignored
+    wallet_policy, wallet_hmac = keypath_wallet_policy(speculos_globals)
+
+    psbt = PSBT()
+    psbt.deserialize(KEYPATH_PSBT_B64)
+    psbt.musig2_session_id = musig2_session_id
+
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.sign_psbt(psbt, wallet_policy, wallet_hmac, navigator,
+                         instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False, has_spend_from_wallet=True, has_feewarning=True),
+                         testname=test_name)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert int.from_bytes(e.value.data, byteorder='big') == EC_SIGN_PSBT_INVALID_MUSIG2_SESSION_ID
+
+
+def test_sign_psbt_musig2_missing_session_fails_before_review(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals):
+    # If the session for round 2 is missing, the device fails before asking the user to review the
+    # transaction, rather than after the approval.
+    wallet_policy, wallet_hmac = keypath_wallet_policy(speculos_globals)
+
+    # No navigator: round 1 has no UI, and round 2 must fail without showing any screen
+    signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac)
+    signer_2 = HotMusig2Cosigner(wallet_policy, KEYPATH_COSIGNER_2_XPRIV)
+
+    psbt = PSBT()
+    psbt.deserialize(KEYPATH_PSBT_B64)
+    psbt.musig2_session_id = b"\x01" * 32
+    signer_1.generate_public_nonces(psbt)
+    signer_2.generate_public_nonces(psbt)
+
+    # round 2 with a MUSIG2_SESSION_ID for which round 1 was never executed
+    other_psbt = PSBT()
+    other_psbt.deserialize(psbt.serialize())
+    other_psbt.musig2_session_id = b"\x02" * 32
+    with pytest.raises(ExceptionRAPDU) as e:
+        signer_1.generate_partial_signatures(other_psbt)
+    assert DeviceException.exc.get(e.value.status) == BadStateError
+    assert int.from_bytes(e.value.data, byteorder='big') == EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND
+    assert len(other_psbt.inputs[0].musig2_partial_sigs) == 0
+
+    # the session of the first psbt is unaffected, and round 2 completes after the review
+    signer_1_with_review = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac,
+                                                navigator=navigator, instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False, has_spend_from_wallet=True, has_feewarning=True), testname=test_name)
+    run_musig2_test(wallet_policy, psbt,
+                    [Round2OnlyCosigner(signer_1_with_review), Round2OnlyCosigner(signer_2)], KEYPATH_SIGHASHES)
+
+
+MAX_N_MUSIG_SESSIONS = 32
+
+
+def test_sign_psbt_musig2_evicts_oldest_session(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals, enable_slow_tests: int):
+    # The device stores at most MAX_N_MUSIG_SESSIONS sessions; when the storage is full, round 1
+    # evicts the oldest session, regardless of the slot it occupies.
+
+    # slow test (it fills the whole storage), only run it if --enable_slow_tests is set to a value
+    # greater than 0
+    if enable_slow_tests < 1:
+        pytest.skip()
+
+    wallet_policy, wallet_hmac = keypath_wallet_policy(speculos_globals)
+
+    signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac,
+                                    navigator=navigator, instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False, has_spend_from_wallet=True, has_feewarning=True), testname=test_name)
+
+    # Execute round 1 for MAX_N_MUSIG_SESSIONS + 2 sessions, that only differ in the
+    # MUSIG2_SESSION_ID. Any session left in storage by previous tests is older, hence evicted first.
+    n_sessions = MAX_N_MUSIG_SESSIONS + 2
+    psbts: List[PSBT] = []
+    hot_signers: List[HotMusig2Cosigner] = []
+    for i in range(n_sessions):
+        psbt = PSBT()
+        psbt.deserialize(KEYPATH_PSBT_B64)
+        psbt.musig2_session_id = bytes([i + 1])
+        # the hot cosigner identifies its sessions by the transaction, so each psbt needs its own
+        hot_signer = HotMusig2Cosigner(wallet_policy, KEYPATH_COSIGNER_2_XPRIV)
+        signer_1.generate_public_nonces(psbt)
+        hot_signer.generate_public_nonces(psbt)
+        psbts.append(psbt)
+        hot_signers.append(hot_signer)
+
+    # The two oldest sessions were evicted
+    for psbt in psbts[:2]:
+        with pytest.raises(ExceptionRAPDU) as e:
+            signer_1.generate_partial_signatures(psbt)
+        assert DeviceException.exc.get(e.value.status) == BadStateError
+        assert int.from_bytes(e.value.data, byteorder='big') == EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND
+
+    # The others are still there. Storing the second to last session must not have evicted the one
+    # stored right before it, nor the last one the second to last.
+    for i in [2, n_sessions - 3, n_sessions - 2, n_sessions - 1]:
+        run_musig2_test(wallet_policy, psbts[i],
+                        [Round2OnlyCosigner(signer_1), Round2OnlyCosigner(hot_signers[i])], KEYPATH_SIGHASHES)

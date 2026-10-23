@@ -10,8 +10,9 @@
  * documentation in docs/musig.md for more information.
  */
 
-// the maximum number of musig sessions that are stored in permanent memory
-#define MAX_N_MUSIG_SESSIONS 8
+// the maximum number of musig sessions that are stored in permanent memory; when the storage is
+// full, storing a new session evicts the oldest one
+#define MAX_N_MUSIG_SESSIONS 32
 
 // state of a musig_psbt_session. Members are private and must not be accessed directly by any
 // code outside of musig_sessions.c.
@@ -97,6 +98,17 @@ __attribute__((warn_unused_result)) const musig_psbt_session_t *musigsession_rou
 __attribute__((warn_unused_result)) const musig_psbt_session_t *musigsession_round2_initialize(
     uint8_t psbt_session_id[static 32],
     musig_signing_state_t *musig_signing_state);
+
+/**
+ * Checks whether a session with the given id is in the persistent memory, without deleting it and
+ * without accessing its content.
+ *
+ * @param[in]  psbt_session_id
+ *   Pointer to the musig psbt session id.
+ *
+ * @return true if the session exists, false otherwise.
+ */
+bool musigsession_exists(const uint8_t psbt_session_id[static 32]);
 
 /**
  * If a session produced in round 1 is active in volatile memory, it is stored in the persistent

@@ -21,6 +21,7 @@
 #include "display.h"
 #include "merkle.h"
 #include "musig_sessions.h"
+#include "psbt_fields.h"
 
 // common info that applies to either the current input or the current output
 typedef struct {
@@ -209,6 +210,14 @@ typedef struct {
 
     // set to true if at least a PSBT_IN_MUSIG2_PUB_NONCE field is present in the PSBT
     bool has_musig2_pub_nonces;
+
+    // set to true if the MUSIG2_SESSION_ID global field is present in the PSBT
+    bool has_musig2_session_id;
+
+    // The value of the MUSIG2_SESSION_ID global field in the PSBT
+    // musig2_session_id_len is 0 if absent.
+    uint8_t musig2_session_id[MAX_MUSIG2_SESSION_ID_LEN];
+    size_t musig2_session_id_len;
 
     // aggregate info on outputs
     struct {

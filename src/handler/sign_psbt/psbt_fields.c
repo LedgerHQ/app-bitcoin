@@ -32,14 +32,40 @@
 /* -------------------------------------------------------------------------- */
 
 /*
- * Every PSBT key handled here is a single key-type byte, and every field has a length policy (an
- * exact size, or a maximum). These helpers apply that policy on top of the raw map reader and
- * translate its outcome into a psbt_field_status_t, so the accessors below only have to name the
- * key type and the expected shape.
+ * Every PSBT key handled here is a single key-type byte (except proprietary keys, which are read
+ * with read_var_key), and every field has a length policy (an exact size, or a maximum). These
+ * helpers apply that policy on top of the raw map reader and translate its outcome into a
+ * psbt_field_status_t, so the accessors below only have to name the key type and the expected
+ * shape.
  *
  * The length policy is a PSBT-level concern, which is why these live here rather than alongside
  * call_get_merkleized_map_value: the map layer has no opinion on how long a value ought to be.
  */
+
+/**
+ * Reads the value of the (possibly multi-byte) key `key` into `out`, up to `out_cap` bytes, writing
+ * its length to `*out_len`. A value longer than `out_cap` is reported as PSBT_FIELD_ERROR.
+ *
+ * On any non-PRESENT outcome `out` is left zeroed and `*out_len` is 0.
+ */
+static psbt_field_status_t read_var_key(dispatcher_context_t *dc,
+                                        const merkleized_map_commitment_t *map,
+                                        const uint8_t *key,
+                                        size_t key_len,
+                                        uint8_t *out,
+                                        size_t out_cap,
+                                        size_t *out_len) {
+    int res = call_get_merkleized_map_value(dc, map, key, key_len, out, out_cap);
+    if (res < 0) {
+        // on absent or error, zero out the output buffer and length,
+        // preventing the caller from possibly using uninitialized data
+        explicit_bzero(out, out_cap);
+        *out_len = 0;
+        return res == MAP_VALUE_ABSENT ? PSBT_FIELD_ABSENT : PSBT_FIELD_ERROR;
+    }
+    *out_len = (size_t) res;
+    return PSBT_FIELD_PRESENT;
+}
 
 /**
  * Reads a value of variable length (up to `out_cap` bytes) into `out`, writing its length to
@@ -53,16 +79,7 @@ static psbt_field_status_t read_var(dispatcher_context_t *dc,
                                     uint8_t *out,
                                     size_t out_cap,
                                     size_t *out_len) {
-    int res = call_get_merkleized_map_value(dc, map, &key_type, 1, out, out_cap);
-    if (res < 0) {
-        // on absent or error, zero out the output buffer and length,
-        // preventing the caller from possibly using uninitialized data
-        explicit_bzero(out, out_cap);
-        *out_len = 0;
-        return res == MAP_VALUE_ABSENT ? PSBT_FIELD_ABSENT : PSBT_FIELD_ERROR;
-    }
-    *out_len = (size_t) res;
-    return PSBT_FIELD_PRESENT;
+    return read_var_key(dc, map, &key_type, 1, out, out_cap, out_len);
 }
 
 /**
@@ -130,6 +147,38 @@ psbt_field_status_t psbt_get_global_fallback_locktime(dispatcher_context_t *dc,
                                                       const merkleized_map_commitment_t *global_map,
                                                       uint32_t *out) {
     return read_u32_le_field(dc, global_map, PSBT_GLOBAL_FALLBACK_LOCKTIME, out);
+}
+
+// Proprietary key with identifier "MUSIG2_SESSION_ID", subtype 0 and no keydata
+// clang-format off
+static const uint8_t PSBT_GLOBAL_MUSIG2_SESSION_ID_KEY[] = {
+    PSBT_GLOBAL_PROPRIETARY,
+    17,  // length of the identifier
+    'M', 'U', 'S', 'I', 'G', '2', '_', 'S', 'E', 'S', 'S', 'I', 'O', 'N', '_', 'I', 'D',
+    0x00  // subtype
+};
+// clang-format on
+
+bool psbt_is_global_musig2_session_id_key(const uint8_t *key, size_t key_len) {
+    return key_len == sizeof(PSBT_GLOBAL_MUSIG2_SESSION_ID_KEY) &&
+           memcmp(key, PSBT_GLOBAL_MUSIG2_SESSION_ID_KEY, key_len) == 0;
+}
+
+psbt_field_status_t psbt_get_global_musig2_session_id(dispatcher_context_t *dc,
+                                                      const merkleized_map_commitment_t *global_map,
+                                                      uint8_t out[static MAX_MUSIG2_SESSION_ID_LEN],
+                                                      size_t *out_len) {
+    psbt_field_status_t status = read_var_key(dc,
+                                              global_map,
+                                              PSBT_GLOBAL_MUSIG2_SESSION_ID_KEY,
+                                              sizeof(PSBT_GLOBAL_MUSIG2_SESSION_ID_KEY),
+                                              out,
+                                              MAX_MUSIG2_SESSION_ID_LEN,
+                                              out_len);
+    if (status == PSBT_FIELD_PRESENT && *out_len == 0) {
+        return PSBT_FIELD_ERROR;
+    }
+    return status;
 }
 
 /* -------------------------------------------------------------------------- */

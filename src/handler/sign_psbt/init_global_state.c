@@ -130,13 +130,16 @@ static void global_map_keys_callback(dispatcher_context_t *dc,
     if (data->size - data->offset == 1 &&
         data->ptr[data->offset] == PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE) {
         st->bip322.is_message_signing = true;
+    } else if (psbt_is_global_musig2_session_id_key(data->ptr + data->offset,
+                                                    data->size - data->offset)) {
+        st->has_musig2_session_id = true;
     }
 }
 
 /**
  * Verifies the integrity of the PSBT global map (already committed to by
  * st->global_map) and extracts the transaction-wide fields from it
- * (tx_version, fallback_locktime).
+ * (tx_version, fallback_locktime, musig2_session_id).
  *
  * Returns true on success; on failure, an error status word has already been
  * sent.
@@ -146,8 +149,9 @@ static bool __attribute__((noinline)) process_global_map(dispatcher_context_t *d
     // Check integrity of the global map (this also marks it as validated, so that its values may
     // be read by key below).
     // This also walks over all keys in the global map, keeping track of any fields
-    // we care about tracking (currently, only the presence of a BIP-322 signature request)
+    // we care about tracking (the presence of a BIP-322 signature request, and a MuSig2 session id)
     st->bip322.is_message_signing = false;
+    st->has_musig2_session_id = false;
     if (call_check_merkleized_map_sorted_with_callback(dc,
                                                        &st->global_map,
                                                        st,
@@ -176,6 +180,19 @@ static bool __attribute__((noinline)) process_global_map(dispatcher_context_t *d
         default:  // PSBT_FIELD_ERROR: present but malformed
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
+    }
+
+    // Read the MuSig2 session id, if present.
+    // A malformed value is an error rather than being ignored.
+    st->musig2_session_id_len = 0;
+    if (st->has_musig2_session_id &&
+        PSBT_FIELD_PRESENT != psbt_get_global_musig2_session_id(dc,
+                                                                &st->global_map,
+                                                                st->musig2_session_id,
+                                                                &st->musig2_session_id_len)) {
+        PRINTF("Invalid MUSIG2_SESSION_ID field\n");
+        SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_INVALID_MUSIG2_SESSION_ID);
+        return false;
     }
 
     return true;
