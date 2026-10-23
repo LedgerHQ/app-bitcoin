@@ -8,7 +8,7 @@ use bitcoin::{
 
 use crate::protocol::UncheckedVarInt;
 
-use crate::{apdu::ClientCommandCode, merkle::MerkleTree};
+use crate::{apdu::ClientCommandCode, merkle::MerkleTree, wallet::WalletPolicy};
 
 /// Interpreter for the client-side commands.
 /// This struct keeps has methods to keep track of:
@@ -37,6 +37,17 @@ impl ClientCommandInterpreter {
             known_preimages: Vec::new(),
             trees: Vec::new(),
         }
+    }
+
+    /// Prepares wallet serialization, keys and descriptor-template preimages.
+    pub fn for_wallet(wallet: &WalletPolicy) -> Self {
+        let mut interpreter = Self::new();
+        interpreter.add_known_preimage(wallet.serialize());
+        let keys: Vec<String> = wallet.keys.iter().map(|key| key.to_string()).collect();
+        interpreter.add_known_list(&keys);
+        // Necessary for protocol version 1 (introduced in app version 2.1.0).
+        interpreter.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
+        interpreter
     }
 
     /// Adds a preimage to the list of known preimages.
@@ -190,7 +201,7 @@ fn get_merkle_leaf_proof(
     let tree = trees
         .iter()
         .find(|tree| tree.root_hash() == root)
-        .ok_or(InterpreterError::UnknownHash)?;
+        .ok_or(InterpreterError::UnknownMerkleRoot)?;
 
     if leaf_index >= tree_size || tree_size.0 != tree.size() as u64 {
         return Err(InterpreterError::InvalidIndexOrSize);
@@ -237,11 +248,12 @@ fn get_merkle_leaf_index(
     let tree = trees
         .iter()
         .find(|tree| tree.root_hash() == root)
-        .ok_or(InterpreterError::UnknownHash)?;
+        .ok_or(InterpreterError::UnknownMerkleRoot)?;
 
-    let leaf_index = tree
-        .get_leaf_index(hash)
-        .ok_or(InterpreterError::UnknownHash)?;
+    let leaf_index = match tree.get_leaf_index(hash) {
+        Some(index) => index,
+        None => return Ok(vec![0, 0]),
+    };
 
     let mut response = 1_u8.to_be_bytes().to_vec();
     response.extend(encode::serialize(&UncheckedVarInt(leaf_index as u64)));

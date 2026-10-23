@@ -1,5 +1,8 @@
 //! This module contains types that are specific to the Ledger Bitcoin application protocol.
 
+use core::convert::TryFrom;
+use core::{fmt, str::FromStr};
+
 use bitcoin::{
     consensus::encode::{deserialize_partial, Decodable, Encodable, Error as EncodeError},
     hashes::Hash,
@@ -9,6 +12,247 @@ use bitcoin::{
 };
 
 use crate::psbt::{PartialSignature, PartialSignatureError};
+
+/// An independent wallet-address verification failure.
+#[cfg(feature = "paranoid_client")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AddressCheckError {
+    Policy,
+    Musig(String),
+    Descriptor,
+    Derivation,
+    Mismatch,
+}
+
+#[cfg(feature = "paranoid_client")]
+impl fmt::Display for AddressCheckError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Policy => f.write_str("Failed to get descriptor"),
+            Self::Musig(error) => write!(f, "Failed to process musig keys: {}", error),
+            Self::Descriptor => f.write_str("Failed to parse descriptor"),
+            Self::Derivation => f.write_str("Failed to derive descriptor"),
+            Self::Mismatch => f.write_str("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin"),
+        }
+    }
+}
+
+/// Independently derives the policy's scriptPubKey, including BIP-327 MuSig substitution.
+#[cfg(feature = "paranoid_client")]
+pub fn check_address(
+    wallet: &crate::wallet::WalletPolicy,
+    change: bool,
+    address_index: u32,
+    address: &bitcoin::Address<bitcoin::address::NetworkUnchecked>,
+) -> Result<(), AddressCheckError> {
+    use miniscript::{Descriptor, DescriptorPublicKey};
+    let descriptor = wallet
+        .get_descriptor(change)
+        .map_err(|_| AddressCheckError::Policy)?;
+    // rust-miniscript does not yet support musig() expressions.
+    let descriptor =
+        crate::bip327::replace_musigs(&descriptor).map_err(AddressCheckError::Musig)?;
+    let descriptor = Descriptor::<DescriptorPublicKey>::from_str(&descriptor)
+        .map_err(|_| AddressCheckError::Descriptor)?;
+    if descriptor
+        .at_derivation_index(address_index)
+        .map_err(|_| AddressCheckError::Derivation)?
+        .script_pubkey()
+        != address.assume_checked_ref().script_pubkey()
+    {
+        return Err(AddressCheckError::Mismatch);
+    }
+    Ok(())
+}
+
+/// Lowers a PSBT to v2 maps and prepares their delegated Merkle commitments.
+pub fn prepare_sign_psbt(
+    psbt: &bitcoin::psbt::Psbt,
+    wallet: &crate::wallet::WalletPolicy,
+    hmac: Option<&[u8; 32]>,
+) -> Result<
+    (
+        crate::apdu::APDUCommand,
+        crate::interpreter::ClientCommandInterpreter,
+    ),
+    crate::psbt::PsbtV2Error,
+> {
+    use crate::interpreter::{get_merkleized_map_commitment, ClientCommandInterpreter};
+    let mut interpreter = ClientCommandInterpreter::for_wallet(wallet);
+    let maps = crate::psbt::get_v2_maps(psbt)?;
+    interpreter.add_known_mapping(&maps.global);
+    let global_commitment = get_merkleized_map_commitment(&maps.global);
+    let mut input_commitments = Vec::with_capacity(maps.inputs.len());
+    for map in &maps.inputs {
+        interpreter.add_known_mapping(map);
+        input_commitments.push(get_merkleized_map_commitment(map));
+    }
+    let input_root = interpreter.add_known_list(&input_commitments);
+    let mut output_commitments = Vec::with_capacity(maps.outputs.len());
+    for map in &maps.outputs {
+        interpreter.add_known_mapping(map);
+        output_commitments.push(get_merkleized_map_commitment(map));
+    }
+    let output_root = interpreter.add_known_list(&output_commitments);
+    let command = crate::command::sign_psbt(
+        &global_commitment,
+        psbt.inputs.len(),
+        &input_root,
+        psbt.outputs.len(),
+        &output_root,
+        wallet,
+        hmac,
+    );
+    Ok((command, interpreter))
+}
+
+/// Prepares a message command and the delegated state for its 64-byte chunks.
+pub fn prepare_sign_message(
+    message: &[u8],
+    path: &bitcoin::bip32::DerivationPath,
+) -> (
+    crate::apdu::APDUCommand,
+    crate::interpreter::ClientCommandInterpreter,
+) {
+    let chunks: Vec<&[u8]> = message.chunks(64).collect();
+    let mut interpreter = crate::interpreter::ClientCommandInterpreter::new();
+    let root = interpreter.add_known_list(&chunks);
+    (
+        crate::command::sign_message(message.len(), &root, path),
+        interpreter,
+    )
+}
+
+/// An encoding error in an ordinary device response; no response bytes are retained.
+#[derive(Debug)]
+pub enum ResponseError {
+    Truncated {
+        field: &'static str,
+    },
+    InvalidFormat {
+        field: &'static str,
+    },
+    InvalidLength {
+        field: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    Decode {
+        field: &'static str,
+        source: EncodeError,
+    },
+}
+
+impl fmt::Display for ResponseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Truncated { field } => write!(f, "Truncated {}", field),
+            Self::InvalidFormat { field } => write!(f, "Invalid {} format", field),
+            Self::InvalidLength {
+                field,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "Invalid {} length: expected {}, got {}",
+                field, expected, actual
+            ),
+            Self::Decode { field, source } => write!(f, "Failed to decode {}: {}", field, source),
+        }
+    }
+}
+
+/// Parses app name, version and flags. Trailing bytes are accepted.
+pub fn parse_version(data: &[u8]) -> Result<(String, String, Vec<u8>), ResponseError> {
+    match data.first() {
+        None => return Err(ResponseError::Truncated { field: "format" }),
+        Some(1) => (),
+        Some(_) => return Err(ResponseError::InvalidFormat { field: "format" }),
+    }
+    let (name, i): (String, usize) =
+        deserialize_partial(&data[1..]).map_err(|source| ResponseError::Decode {
+            field: "name",
+            source,
+        })?;
+    let (version, j): (String, usize) =
+        deserialize_partial(&data[1 + i..]).map_err(|source| ResponseError::Decode {
+            field: "version",
+            source,
+        })?;
+    let (flags, _): (Vec<u8>, usize) =
+        deserialize_partial(&data[1 + i + j..]).map_err(|source| ResponseError::Decode {
+            field: "flags",
+            source,
+        })?;
+    Ok((name, version, flags))
+}
+
+/// Uses the first four bytes, accepting trailing bytes.
+pub fn parse_master_fingerprint(data: &[u8]) -> Result<bitcoin::bip32::Fingerprint, ResponseError> {
+    let bytes = data.get(..4).ok_or(ResponseError::InvalidLength {
+        field: "fingerprint",
+        expected: 4,
+        actual: data.len(),
+    })?;
+    let mut fingerprint = [0; 4];
+    fingerprint.copy_from_slice(bytes);
+    Ok(fingerprint.into())
+}
+
+/// Parses the full lossy-UTF8 response, without trimming.
+pub fn parse_extended_pubkey(data: &[u8]) -> Result<bitcoin::bip32::Xpub, ResponseError> {
+    bitcoin::bip32::Xpub::from_str(&String::from_utf8_lossy(data)).map_err(|_| {
+        ResponseError::InvalidFormat {
+            field: "extended pubkey",
+        }
+    })
+}
+
+/// Parses the full lossy-UTF8 response, without trimming or checking its network.
+pub fn parse_wallet_address(
+    data: &[u8],
+) -> Result<bitcoin::Address<bitcoin::address::NetworkUnchecked>, ResponseError> {
+    bitcoin::Address::from_str(&String::from_utf8_lossy(data)).map_err(|_| {
+        ResponseError::InvalidFormat {
+            field: "wallet address",
+        }
+    })
+}
+
+/// Uses the first 64 bytes for the wallet ID and HMAC, accepting trailing bytes.
+pub fn parse_wallet_registration(data: &[u8]) -> Result<([u8; 32], [u8; 32]), ResponseError> {
+    let bytes = data.get(..64).ok_or(ResponseError::InvalidLength {
+        field: "wallet registration",
+        expected: 64,
+        actual: data.len(),
+    })?;
+    let mut id = [0; 32];
+    id.copy_from_slice(&bytes[..32]);
+    let mut hmac = [0; 32];
+    hmac.copy_from_slice(&bytes[32..]);
+    Ok((id, hmac))
+}
+
+/// Parses a compact ECDSA signature and returns its header unchanged.
+/// This checks the encoding, not the signed digest.
+pub fn parse_message_signature(
+    data: &[u8],
+) -> Result<(u8, bitcoin::secp256k1::ecdsa::Signature), ResponseError> {
+    if data.len() != 65 {
+        return Err(ResponseError::InvalidLength {
+            field: "message signature",
+            expected: 65,
+            actual: data.len(),
+        });
+    }
+    let signature =
+        bitcoin::secp256k1::ecdsa::Signature::from_compact(&data[1..]).map_err(|_| {
+            ResponseError::InvalidFormat {
+                field: "message signature",
+            }
+        })?;
+    Ok((data[0], signature))
+}
 
 /// A variable-length unsigned integer using the same wire encoding as
 /// Bitcoin's `CompactSize`, but without the upper-bound limit enforced by the
@@ -169,7 +413,7 @@ pub fn parse_sign_psbt_yielded(
                 None
             };
             Ok((
-                input_index as usize,
+                usize::try_from(input_index).map_err(|_| PartialSignatureError::InvalidLength)?,
                 SignPsbtYieldedObject::MusigPubNonce(MusigPubNonce {
                     participant_pubkey,
                     aggregate_pubkey,
@@ -203,7 +447,7 @@ pub fn parse_sign_psbt_yielded(
                 None
             };
             Ok((
-                input_index as usize,
+                usize::try_from(input_index).map_err(|_| PartialSignatureError::InvalidLength)?,
                 SignPsbtYieldedObject::MusigPartialSignature(MusigPartialSignature {
                     participant_pubkey,
                     aggregate_pubkey,
@@ -222,14 +466,15 @@ pub fn parse_sign_psbt_yielded(
                     .map_err(|_| PartialSignatureError::InvalidLength)?;
             let rest = &data[i + j..];
             Ok((
-                input_index as usize,
+                usize::try_from(input_index).map_err(|_| PartialSignatureError::InvalidLength)?,
                 SignPsbtYieldedObject::Unknown(rest.to_vec()),
             ))
         }
         // Otherwise the leading varint is the input index and the remainder is a regular partial signature.
         // These are the only payloads that were used in protocol versions prior to the introduction of the tags.
         _ => {
-            let input_index = tag as usize;
+            let input_index =
+                usize::try_from(tag).map_err(|_| PartialSignatureError::InvalidLength)?;
             let ps = PartialSignature::from_slice(&data[i..])?;
             Ok((input_index, SignPsbtYieldedObject::Partial(ps)))
         }

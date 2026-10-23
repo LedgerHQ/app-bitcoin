@@ -1,3 +1,5 @@
+#![cfg(feature = "client")]
+
 mod utils;
 use std::str::FromStr;
 
@@ -6,8 +8,10 @@ use bitcoin::{
     hashes::{hex::FromHex, Hash},
     psbt::Psbt,
 };
+#[cfg(feature = "async")]
+use ledger_bitcoin_client::async_client;
 use ledger_bitcoin_client::{
-    async_client, client, psbt::PartialSignature, wallet, MusigPartialSignature, MusigPubNonce,
+    client, psbt::PartialSignature, wallet, MusigPartialSignature, MusigPubNonce,
     SignPsbtYieldedObject,
 };
 
@@ -33,15 +37,18 @@ async fn test_get_version() {
     assert_eq!(version, "2.1.0".to_string());
     assert_eq!(flags, vec![0x00]);
 
-    let (name, version, flags) =
-        async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-            .get_version()
-            .await
-            .unwrap();
+    #[cfg(feature = "async")]
+    {
+        let (name, version, flags) =
+            async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                .get_version()
+                .await
+                .unwrap();
 
-    assert_eq!(name, "Bitcoin Test".to_string());
-    assert_eq!(version, "2.1.0".to_string());
-    assert_eq!(flags, vec![0x00]);
+        assert_eq!(name, "Bitcoin Test".to_string());
+        assert_eq!(version, "2.1.0".to_string());
+        assert_eq!(flags, vec![0x00]);
+    }
 }
 
 #[tokio::test]
@@ -70,19 +77,22 @@ async fn test_sign_message() {
         base64::encode(sig)
     );
 
-    let (header, ecdsa_sig) =
-        async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-            .sign_message("hello".as_bytes(), &path)
-            .await
-            .unwrap();
+    #[cfg(feature = "async")]
+    {
+        let (header, ecdsa_sig) =
+            async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                .sign_message("hello".as_bytes(), &path)
+                .await
+                .unwrap();
 
-    assert_eq!(header, 0x20);
-    let mut sig = vec![header];
-    sig.extend(ecdsa_sig.serialize_compact());
-    assert_eq!(
+        assert_eq!(header, 0x20);
+        let mut sig = vec![header];
+        sig.extend(ecdsa_sig.serialize_compact());
+        assert_eq!(
         "IL3u9GLAzgG5BdtSBqUe0Fo2Zx0UlKwSsYx2TbuVX0VULFgZYRBQCW0W7QOlsB/JgGwWNhl3eYYjXtdfyR7pM+Y=",
         base64::encode(sig)
     );
+    }
 }
 
 #[tokio::test]
@@ -116,12 +126,16 @@ async fn test_get_extended_pubkey() {
 
         assert_eq!(key.to_string(), xpk_str);
 
-        let key = async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-            .get_extended_pubkey(&derivation_path, display)
-            .await
-            .unwrap();
+        #[cfg(feature = "async")]
+        {
+            let key =
+                async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                    .get_extended_pubkey(&derivation_path, display)
+                    .await
+                    .unwrap();
 
-        assert_eq!(key.to_string(), xpk_str);
+            assert_eq!(key.to_string(), xpk_str);
+        }
     }
 }
 
@@ -171,6 +185,15 @@ async fn test_register_wallet() {
 
         let wallet = wallet::WalletPolicy::new(name, version, policy, keys);
 
+        #[cfg(feature = "paranoid_client")]
+        let exchanges = {
+            let mut exchanges = exchanges;
+            exchanges.extend(
+                serde_json::from_value::<Vec<String>>(case["address_exchanges"].clone()).unwrap(),
+            );
+            exchanges
+        };
+
         let store = utils::RecordStore::new(&exchanges);
         let (_id, hmac) = client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
             .register_wallet(&wallet)
@@ -178,13 +201,16 @@ async fn test_register_wallet() {
 
         assert_eq!(hmac, <[u8; 32]>::from_hex(&hmac_result).unwrap());
 
-        let (_id, hmac) =
-            async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-                .register_wallet(&wallet)
-                .await
-                .unwrap();
+        #[cfg(feature = "async")]
+        {
+            let (_id, hmac) =
+                async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                    .register_wallet(&wallet)
+                    .await
+                    .unwrap();
 
-        assert_eq!(hmac, <[u8; 32]>::from_hex(&hmac_result).unwrap());
+            assert_eq!(hmac, <[u8; 32]>::from_hex(&hmac_result).unwrap());
+        }
     }
 }
 
@@ -255,13 +281,16 @@ async fn test_get_wallet_address() {
 
         assert_eq!(address.assume_checked().to_string(), address_result);
 
-        let address =
-            async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-                .get_wallet_address(&wallet, hmac.as_ref(), change, address_index, display)
-                .await
-                .unwrap();
+        #[cfg(feature = "async")]
+        {
+            let address =
+                async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                    .get_wallet_address(&wallet, hmac.as_ref(), change, address_index, display)
+                    .await
+                    .unwrap();
 
-        assert_eq!(address.assume_checked().to_string(), address_result);
+            assert_eq!(address.assume_checked().to_string(), address_result);
+        }
     }
 }
 
@@ -478,11 +507,109 @@ async fn test_sign_psbt() {
 
         check_results(&sigs, &musig_pub_nonces, &musig_partial_signatures, &res);
 
-        let res = async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-            .sign_psbt(&psbt, &wallet, hmac.as_ref())
-            .await
-            .unwrap();
+        #[cfg(feature = "async")]
+        {
+            let res =
+                async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                    .sign_psbt(&psbt, &wallet, hmac.as_ref())
+                    .await
+                    .unwrap();
 
-        check_results(&sigs, &musig_pub_nonces, &musig_partial_signatures, &res);
+            check_results(&sigs, &musig_pub_nonces, &musig_partial_signatures, &res);
+        }
+    }
+}
+
+#[tokio::test]
+async fn empty_message_signature_is_an_unexpected_result() {
+    use ledger_bitcoin_client::error::BitcoinClientError;
+    let path = DerivationPath::from_str("m/44'/1'/0'/0").unwrap();
+    let exchanges = vec![
+        "=> e110000132048000002c800000018000000000000000058a2a5c9b768827de5a9552c38a044c66959c68f6d2f21b5260af54d2f87db827".into(),
+        "<= 9000".into(),
+    ];
+    let store = utils::RecordStore::new(&exchanges);
+    let result = client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+        .sign_message(b"hello", &path);
+    assert!(
+        matches!(result, Err(BitcoinClientError::UnexpectedResult { command: 0x10, data }) if data.is_empty())
+    );
+    #[cfg(feature = "async")]
+    {
+        let result = async_client::BitcoinClient::new(utils::TransportReplayer::new(store))
+            .sign_message(b"hello", &path)
+            .await;
+        assert!(
+            matches!(result, Err(BitcoinClientError::UnexpectedResult { command: 0x10, data }) if data.is_empty())
+        );
+    }
+}
+
+#[cfg(feature = "paranoid_client")]
+#[tokio::test]
+async fn registration_followup_failures_do_not_return_a_hmac() {
+    use ledger_bitcoin_client::{error::BitcoinClientError, interpreter::InterpreterError};
+    let case = &test_cases("./tests/data/register_wallet.json")[1];
+    let keys: Vec<_> = case["keys"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|key| wallet::WalletPubKey::from_str(key.as_str().unwrap()).unwrap())
+        .collect();
+    let wallet = wallet::WalletPolicy::new(
+        case["name"].as_str().unwrap().into(),
+        wallet::Version::V2,
+        case["policy"].as_str().unwrap().into(),
+        keys,
+    );
+    let wrong_address = "tb1pws8wvnj99ca6acf8kq7pjk7vyxknah0d9mexckh5s0vu2ccy68js9am6u7";
+    let responses = [
+        format!("<= {}9000", hex::encode(wrong_address.as_bytes())),
+        "<= 9000".into(),
+        "<= 6985".into(),
+        format!("<= 4000{}e000", "00".repeat(32)),
+    ];
+    for (index, response) in responses.iter().enumerate() {
+        let mut exchanges: Vec<String> = serde_json::from_value(case["exchanges"].clone()).unwrap();
+        exchanges.extend(
+            serde_json::from_value::<Vec<String>>(case["address_exchanges"].clone()).unwrap(),
+        );
+        *exchanges.last_mut().unwrap() = response.clone();
+        let store = utils::RecordStore::new(&exchanges);
+        let check = |result: Result<([u8; 32], [u8; 32]), BitcoinClientError<utils::MockError>>| {
+            match index {
+                0 => assert!(matches!(
+                    result,
+                    Err(BitcoinClientError::InvalidResponse(_))
+                )),
+                1 => assert!(matches!(
+                    result,
+                    Err(BitcoinClientError::UnexpectedResult { command: 3, .. })
+                )),
+                2 => assert!(matches!(
+                    result,
+                    Err(BitcoinClientError::Device {
+                        command: 3,
+                        status: ledger_bitcoin_client::apdu::StatusWord::Deny
+                    })
+                )),
+                _ => assert!(matches!(
+                    result,
+                    Err(BitcoinClientError::Interpreter(
+                        InterpreterError::UnknownHash
+                    ))
+                )),
+            }
+        };
+        check(
+            client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                .register_wallet(&wallet),
+        );
+        #[cfg(feature = "async")]
+        check(
+            async_client::BitcoinClient::new(utils::TransportReplayer::new(store))
+                .register_wallet(&wallet)
+                .await,
+        );
     }
 }
