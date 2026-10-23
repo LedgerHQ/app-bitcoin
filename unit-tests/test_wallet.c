@@ -791,8 +791,34 @@ static void test_miniscript_types(void **state) {
     Test("thresh(2,dv:older(42),s:pk(@0/**),s:pk(@1/**))", "7663012ab269687c205cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac937c20d30199d74fb5a22d47b6e054e2f378cedacffcb89904a61d75d0dbd407143e65ac935287", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_P2WSH_INVALID, 12, 4);
 
     // Regression test: thresh 'm' (non-malleable) must require all children to have 'm'.
-    // or_b(sha256,a:sha256) has e=1 but m=0 (children lack 's'), so thresh must NOT be NONMAL.
-    Test("thresh(1,or_b(sha256(e38990d0c7fc009880a9c07c23842e886c6bbdc964ce6bdd5817ad357335ee6f),a:sha256(d1ec675902ef1633427ca360b290b0b3045a0d9058ddb5e648b4c3c3224c5c68)),a:0)", "?", TESTMODE_VALID, -1, -1);
+    // ltv:or_b(sha256,a:sha256) has e=1 (l: has e = f of t:) but m=0 (the children of or_b lack
+    // 's'), so thresh must NOT be NONMAL.
+    Test("thresh(1,ltv:or_b(sha256(e38990d0c7fc009880a9c07c23842e886c6bbdc964ce6bdd5817ad357335ee6f),a:sha256(d1ec675902ef1633427ca360b290b0b3045a0d9058ddb5e648b4c3c3224c5c68)),a:0)", "?", TESTMODE_VALID, -1, -1);
+
+    // Regression tests: 'l:' and 'u:' can always be dissatisfied via the constant 0 branch, even if
+    // the child can't. The or_d must account for the ops of the multi executed after dissatisfying
+    // the first branch.
+    Test("or_d(utv:pk(@0/**),multi(1,@1/**,@2/**,@3/**))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_TAPSCRIPT_INVALID, 11, 4);
+    Test("or_d(ltv:pk(@0/**),multi(1,@1/**,@2/**,@3/**))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_TAPSCRIPT_INVALID, 11, 4);
+    // Only the right branch of the or_d exceeds the 201 ops limit
+    Test("or_d(utv:or_i(jjjjjjjjjj:pk(@10/**),jjjjjjjjjj:pk(@11/**)),or_i(jjjjjjjjjjjjj:multi(1,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,@8/**,@9/**),jjjjjjjjjjjjj:pk(@12/**)))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_TAPSCRIPT_INVALID, 211, -1);
+
+    // Regression tests: the satisfaction of andor(X,Y,Z) via Z executes the dissatisfaction of X,
+    // not of Y. With a 'V' Y (no dissatisfaction), the ops of the multi in Z must still be counted.
+    Test("t:andor(pk(@0/**),v:pk(@1/**),v:multi(1,@2/**,@3/**,@4/**))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_TAPSCRIPT_INVALID, 9, 4);
+    // Asymmetric costs: dissatisfying X is more expensive than dissatisfying Y
+    Test("andor(multi(1,@0/**,@1/**),pk(@2/**),multi(1,@3/**,@4/**,@5/**))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_TAPSCRIPT_INVALID, 11, 5);
+    // Only the Z branch of the andor exceeds the 201 ops limit
+    Test("t:andor(pk(@10/**),v:or_i(jjjjjjjjjjj:pk(@11/**),jjjjjjjjjjj:pk(@12/**)),v:or_i(jjjjjjjjjjj:multi(1,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,@8/**,@9/**),jjjjjjjjjjj:pk(@13/**)))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_TAPSCRIPT_INVALID, 202, -1);
+
+    // Regression tests: and_n(X,Y) is andor(X,Y,0). Since 0 has the 's' property, non-malleability
+    // does not require a signature in X or Y; and the dissatisfaction of Y is never executed.
+    Test("and_v(v:pk(@0/**),and_n(un:older(144),sha256(e38990d0c7fc009880a9c07c23842e886c6bbdc964ce6bdd5817ad357335ee6f)))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG, 13, 4);
+    Test("and_n(pk(@0/**),or_i(pk(@1/**),and_b(multi(1,@2/**,@3/**,@4/**,@5/**,@6/**),a:0)))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_TAPSCRIPT_INVALID, 12, 4);
+
+    // Regression test: a thresh child containing different kinds of timelocks in separate branches
+    // is not mixing timelocks with itself.
+    Test("thresh(2,pk(@0/**),s:pk(@1/**),anl:or_i(and_v(v:pk(@2/**),older(4194305)),and_v(v:pk(@3/**),older(144))))", "?", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG, 19, 6);
 
     // clang-format on
 }

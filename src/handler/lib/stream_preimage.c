@@ -99,8 +99,9 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
             return -7;
         }
 
-        if (n_bytes > bytes_remaining) {
-            PRINTF("Received more bytes than expected.\n");
+        if (n_bytes == 0 || n_bytes > bytes_remaining) {
+            // n_bytes == 0 would not make progress, allowing the host to keep the loop going
+            PRINTF("Received an invalid number of bytes.\n");
             return -8;
         }
 
