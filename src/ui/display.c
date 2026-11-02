@@ -283,7 +283,9 @@ void ui_warn_nondefault_sighash_disabled(dispatcher_context_t *context) {
     return;
 #endif
 
-    // Fire-and-forget terminal status; set the UI as dirty, since something is shown on screen
+    // Fire-and-forget terminal status; set the UI as dirty, since something is shown on screen.
+    // The status replaces the spinner, so later commands must not treat the spinner as shown.
+    G_was_processing_screen_shown = false;
     context->set_ui_dirty();
     ui_display_nondefault_sighash_disabled_flow();
 }
