@@ -2158,8 +2158,8 @@ static int16_t maxcheck(int16_t a, int16_t b) {
 __attribute__((noinline)) static int compute_thresh_ops(const policy_node_thresh_t *node,
                                                         miniscript_ops_t *out,
                                                         MiniscriptContext ctx) {
-    uint16_t sats[MAX_N_IN_THRESH + 1 + 1] = {0};
-    uint16_t next_sats[MAX_N_IN_THRESH + 1 + 1] = {0};  // it temporarily uses an extra element
+    int16_t sats[MAX_N_IN_THRESH + 1 + 1] = {0};
+    int16_t next_sats[MAX_N_IN_THRESH + 1 + 1] = {0};  // it temporarily uses an extra element
 
     if (node->n > MAX_N_IN_THRESH) return -1;
 
@@ -2197,8 +2197,8 @@ __attribute__((noinline)) static int compute_thresh_ops(const policy_node_thresh
 __attribute__((noinline)) static int compute_thresh_stacksize(const policy_node_thresh_t *node,
                                                               miniscript_stacksize_t *out,
                                                               MiniscriptContext ctx) {
-    uint16_t sats[MAX_N_IN_THRESH + 1 + 1] = {0};
-    uint16_t next_sats[MAX_N_IN_THRESH + 1 + 1] = {0};  // it temporarily uses an extra element
+    int16_t sats[MAX_N_IN_THRESH + 1 + 1] = {0};
+    int16_t next_sats[MAX_N_IN_THRESH + 1 + 1] = {0};  // it temporarily uses an extra element
 
     if (node->n > MAX_N_IN_THRESH) return -1;
 
@@ -2427,7 +2427,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->ops = (miniscript_ops_t) {
                 3 + x.ops.count + y.ops.count + z.ops.count,
-                maxcheck(sumcheck(y.ops.sat, x.ops.sat), sumcheck(y.ops.dsat, z.ops.sat)),
+                maxcheck(sumcheck(y.ops.sat, x.ops.sat), sumcheck(x.ops.dsat, z.ops.sat)),
                 sumcheck(x.ops.dsat, z.ops.dsat)};
             out->ss = (miniscript_stacksize_t) {
                 maxcheck(sumcheck(x.ss.sat, y.ss.sat), sumcheck(x.ss.dsat, z.ss.sat)),
@@ -2513,7 +2513,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->s = x.s | y.s;
             out->e = x.s | y.f;
 
-            out->m = x.m & y.m & x.e & (x.s | y.s);
+            // andor(X,Y,0) requires s_X + s_Y + s_0, but s_0 = 1
+            out->m = x.m & y.m & x.e;
 
             out->g = x.g | y.g;
             out->h = x.h | y.h;
@@ -2527,7 +2528,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->script_size = 4 + x.script_size + y.script_size;
 
             out->ops = (miniscript_ops_t) {3 + x.ops.count + y.ops.count,
-                                           maxcheck(sumcheck(y.ops.sat, x.ops.sat), y.ops.dsat),
+                                           sumcheck(x.ops.sat, y.ops.sat),
                                            x.ops.dsat};
             out->ss = (miniscript_stacksize_t) {sumcheck(x.ss.sat, y.ss.sat), x.ss.dsat};
             return 0;
@@ -2542,7 +2543,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             if (0 > compute_miniscript_policy_ext_info(node->scripts[1], &z, ctx)) return -1;
 
             out->s = x.s & z.s;
-            out->e = 1;
+            out->e = x.e & z.e;
 
             out->m = x.m & z.m & x.e & z.e & (x.s | z.s);
 
@@ -2685,18 +2686,20 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
                 }
                 cur = cur->next;
 
-                out->g |= t.g;
-                out->h |= t.h;
-                out->i |= t.i;
-                out->j |= t.j;
-
                 out->k &= t.k;  // if any child doesn't have k, thresh doesn't have k
 
-                // if any two children have mixed timelocks, thresh doesn't have k
+                // if any two children have mixed timelocks, thresh doesn't have k.
+                // This must be checked before accumulating the timelocks of the current child,
+                // as a child is not mixing timelocks with itself.
                 if (node->k >= 2 &&
                     ((t.g & out->h) || (t.h & out->g) || (t.i & out->j) || (t.j & out->i))) {
                     out->k = 0;
                 }
+
+                out->g |= t.g;
+                out->h |= t.h;
+                out->i |= t.i;
+                out->j |= t.j;
 
                 children_scriptsize += t.script_size;
             }
@@ -2704,7 +2707,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             int count_not_s = node->n - count_s;
 
             out->s = count_not_s <= node->k - 1 ? 1 : 0;
-            out->e = count_s == node->n ? 1 : 0;
+            out->e = (count_e == node->n && count_s == node->n) ? 1 : 0;
 
             out->m = (count_e == node->n && count_m == node->n && count_not_s <= node->k) ? 1 : 0;
 
@@ -2806,7 +2809,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             if (0 > compute_miniscript_policy_ext_info(node->script, &x, ctx)) return -1;
 
             out->s = x.s;
-            out->e = 1;
+            out->e = x.f;
 
             out->m = x.m;
 
@@ -2917,7 +2920,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->script_size = x.script_size + 4;
 
-            out->ops = (miniscript_ops_t) {3 + x.ops.count, x.ops.sat, x.ops.dsat};
+            out->ops = (miniscript_ops_t) {3 + x.ops.count, x.ops.sat, maxcheck(0, x.ops.dsat)};
             out->ss = (miniscript_stacksize_t) {sumcheck(x.ss.sat, 1),
                                                 maxcheck(1, sumcheck(x.ss.dsat, 1))};
 

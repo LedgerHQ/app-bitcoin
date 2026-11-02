@@ -741,6 +741,64 @@ static void test_stream_preimage_bad_prefix(void **state) {
     assert_int_equal(acc.offset, 0);
 }
 
+/**
+ * Adversarial: every GET_MORE_ELEMENTS response carries zero elements, so it makes no progress.
+ * This must be rejected immediately, otherwise the host could keep the command alive forever.
+ * The response is forged, as the honest handler would fail once its queue is drained; from the
+ * second request on, the hook simulates a communication failure, so that a regression makes the
+ * test fail rather than hang.
+ */
+typedef struct {
+    uint8_t elements_len;
+    int n_empty_responses;
+} empty_more_elements_t;
+
+static int forge_empty_more_elements(const uint8_t *request_buf,
+                                     size_t request_len,
+                                     uint8_t *response_buf,
+                                     size_t *response_len,
+                                     void *user_data) {
+    (void) request_len;
+    empty_more_elements_t *s = user_data;
+
+    if (request_buf[0] != CCMD_GET_MORE_ELEMENTS) {
+        return 0; /* anything else is answered honestly */
+    }
+
+    if (++s->n_empty_responses > 1) {
+        return -1;
+    }
+
+    response_buf[0] = 0; /* n_elements */
+    response_buf[1] = s->elements_len;
+    *response_len = 2;
+    return 1;
+}
+
+static void test_stream_preimage_empty_more_elements(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    uint8_t element[253]; /* spill = 3 bytes */
+    for (size_t i = 0; i < sizeof(element); i++) {
+        element[i] = (uint8_t) (i * 7);
+    }
+
+    uint8_t hash[32];
+    add_merkle_preimage(mock, element, sizeof(element), hash);
+
+    empty_more_elements_t forge_state = {.elements_len = 1, .n_empty_responses = 0};
+    mock_dispatcher_set_forge_hook(mock, forge_empty_more_elements, &forge_state);
+
+    stream_accumulator_t acc;
+    memset(&acc, 0, sizeof(acc));
+
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+    int result = call_stream_preimage(dc, hash, acc_len_callback, acc_data_callback, &acc);
+
+    assert_int_equal(result, -8);
+    assert_int_equal(forge_state.n_empty_responses, 1);
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -762,6 +820,7 @@ int main(void) {
         T(test_stream_preimage_truncated_more_elements),
         T(test_stream_preimage_bad_element_size),
         T(test_stream_preimage_more_bytes_than_remaining),
+        T(test_stream_preimage_empty_more_elements),
         T(test_stream_preimage_communication_failure),
         T(test_stream_preimage_internal_node_preimage),
         T(test_stream_preimage_bad_prefix),
