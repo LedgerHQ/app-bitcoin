@@ -180,7 +180,7 @@ class PartiallySignedInput:
             try:
                 key = deser_string(f)
             except Exception:
-                break
+                raise PSBTSerializationError("Truncated PSBT map")
 
             # Check for separator
             if len(key) == 0:
@@ -599,7 +599,7 @@ class PartiallySignedOutput:
             try:
                 key = deser_string(f)
             except Exception:
-                break
+                raise PSBTSerializationError("Truncated PSBT map")
 
             # Check for separator
             if len(key) == 0:
@@ -831,7 +831,7 @@ class PSBT(object):
             try:
                 key = deser_string(f)
             except Exception:
-                break
+                raise PSBTSerializationError("Truncated PSBT map")
 
             # Check for separator
             if len(key) == 0:
@@ -994,6 +994,9 @@ class PSBT(object):
 
         if len(self.outputs) != output_count:
             raise PSBTSerializationError("Outputs provided does not match the number of outputs in transaction")
+
+        if f.tell() != end:
+            raise PSBTSerializationError("Unexpected trailing data after the PSBT")
 
         self.cache_unsigned_tx_pieces()
 
