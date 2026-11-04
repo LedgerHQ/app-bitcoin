@@ -33,6 +33,8 @@ export enum psbtIn {
   PREVIOUS_TXID = 0x0e,
   OUTPUT_INDEX = 0x0f,
   SEQUENCE = 0x10,
+  REQUIRED_TIME_LOCKTIME = 0x11,
+  REQUIRED_HEIGHT_LOCKTIME = 0x12,
   TAP_KEY_SIG = 0x13,
   TAP_BIP32_DERIVATION = 0x16,
 }
@@ -47,7 +49,7 @@ export enum psbtOut {
 
 const PSBT_MAGIC_BYTES = Buffer.from([0x70, 0x73, 0x62, 0x74, 0xff]);
 
-export class NoSuchEntry extends Error {}
+export class NoSuchEntry extends Error { }
 
 /**
  * Implements Partially Signed Bitcoin Transaction version 2, BIP370, as
@@ -414,6 +416,31 @@ export class PsbtV2 {
       throw new Error('Invalid or unsupported value for PSBT_GLOBAL_VERSION');
     }
 
+    // Fail if fields only allowed in PsbtV2 are present in a PsbtV0
+    const hasKeyType = (map: ReadonlyMap<string, Buffer>, keyTypes: readonly KeyType[]) =>
+      Array.from(map.keys()).some((k) => this.isKeyType(k, keyTypes));
+    if (
+      hasKeyType(this.globalMap, [
+        psbtGlobal.TX_VERSION,
+        psbtGlobal.FALLBACK_LOCKTIME,
+        psbtGlobal.INPUT_COUNT,
+        psbtGlobal.OUTPUT_COUNT,
+        psbtGlobal.TX_MODIFIABLE,
+      ]) ||
+      this.inputMaps.some((m) =>
+        hasKeyType(m, [
+          psbtIn.PREVIOUS_TXID,
+          psbtIn.OUTPUT_INDEX,
+          psbtIn.SEQUENCE,
+          psbtIn.REQUIRED_TIME_LOCKTIME,
+          psbtIn.REQUIRED_HEIGHT_LOCKTIME,
+        ])
+      ) ||
+      this.outputMaps.some((m) => hasKeyType(m, [psbtOut.AMOUNT, psbtOut.SCRIPT]))
+    ) {
+      throw new Error('PsbtV0 contains fields that are only allowed in PsbtV2');
+    }
+
     // Convert PsbtV0 to PsbtV2 by parsing the PSBT_GLOBAL_UNSIGNED_TX field
     // and filling in the corresponding fields.
     const txRaw = this.getGlobal(psbtGlobal.UNSIGNED_TX);
@@ -450,7 +477,7 @@ export class PsbtV2 {
    * Note: This method supports all the policies that the Ledger is able to
    * sign, with the exception of taproot: tr(@0).
    */
-  fromBitcoinJS(psbtBJS: bjs.Psbt) : PsbtV2 {
+  fromBitcoinJS(psbtBJS: bjs.Psbt): PsbtV2 {
     function isTaprootInput(input): boolean {
       let isP2TR;
       try {

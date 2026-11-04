@@ -1,4 +1,24 @@
+import * as bjs from "bitcoinjs-lib";
+
 import { PsbtV2 } from "../lib/psbtv2";
+
+// A PSBTv0 with one input and one output, with the given (raw) input map entries
+function makePsbtV0(locktime: number, inputEntries: Buffer = Buffer.alloc(0)): Buffer {
+  const tx = new bjs.Transaction();
+  tx.version = 2;
+  tx.locktime = locktime;
+  tx.addInput(Buffer.alloc(32, 1), 0, 0xfffffffe);
+  tx.addOutput(Buffer.from("6a", "hex"), BigInt(1000));
+  const txRaw = tx.toBuffer();
+
+  return Buffer.concat([
+    Buffer.from("70736274ff", "hex"),
+    Buffer.from([0x01, 0x00, txRaw.length]), txRaw, // PSBT_GLOBAL_UNSIGNED_TX
+    Buffer.from([0x00]), // end of global map
+    inputEntries, Buffer.from([0x00]), // end of input map
+    Buffer.from([0x00]), // end of output map
+  ]);
+}
 
 describe("PsbtV2", () => {
   it("deserializes a psbtV2 and reserializes it unchanged", async () => {
@@ -29,5 +49,22 @@ describe("PsbtV2", () => {
     psbt.deserialize(psbtV0);
 
     expect(psbt.serialize()).toEqual(psbtV2);
+  });
+
+  it("keeps the unsigned transaction's locktime when converting a psbtV0", async () => {
+    const psbt = new PsbtV2();
+    psbt.deserialize(makePsbtV0(800000));
+
+    expect(psbt.getGlobalFallbackLocktime()).toEqual(800000);
+  });
+
+  it("rejects a psbtV0 with PSBTv2-only fields", async () => {
+    // PSBT_IN_REQUIRED_HEIGHT_LOCKTIME = 1, which would override the fallback locktime
+    const requiredHeightLocktime = Buffer.from("011204" + "01000000", "hex");
+
+    const psbt = new PsbtV2();
+    expect(() => psbt.deserialize(makePsbtV0(800000, requiredHeightLocktime))).toThrow(
+      "PsbtV0 contains fields that are only allowed in PsbtV2"
+    );
   });
 });
