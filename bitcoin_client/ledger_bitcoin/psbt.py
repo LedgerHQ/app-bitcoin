@@ -416,6 +416,18 @@ class PartiallySignedInput:
 
             key_lookup.add(key)
 
+        # Make sure no PSBTv2-only fields are present in PSBTv0
+        if self.version == 0:
+            for key_type in [
+                PartiallySignedInput.PSBT_IN_PREVIOUS_TXID,
+                PartiallySignedInput.PSBT_IN_OUTPUT_INDEX,
+                PartiallySignedInput.PSBT_IN_SEQUENCE,
+                PartiallySignedInput.PSBT_IN_REQUIRED_TIME_LOCKTIME,
+                PartiallySignedInput.PSBT_IN_REQUIRED_HEIGHT_LOCKTIME,
+            ]:
+                if ser_compact_size(key_type) in key_lookup:
+                    raise PSBTSerializationError(f"Input field of type {key_type:#04x} is not allowed in PSBTv0")
+
         # Make sure required PSBTv2 fields are present
         if self.version >= 2:
             if len(self.prev_txid) == 0:
@@ -687,6 +699,12 @@ class PartiallySignedOutput:
                 self.unknown[key] = value
 
             key_lookup.add(key)
+
+        # Make sure no PSBTv2-only fields are present in PSBTv0
+        if self.version == 0:
+            for key_type in [PartiallySignedOutput.PSBT_OUT_AMOUNT, PartiallySignedOutput.PSBT_OUT_SCRIPT]:
+                if ser_compact_size(key_type) in key_lookup:
+                    raise PSBTSerializationError(f"Output field of type {key_type:#04x} is not allowed in PSBTv0")
 
         # Make sure required PSBTv2 fields are present
         if self.version >= 2:
@@ -1188,6 +1206,10 @@ class PSBT(object):
         if self.version == 0:
             # make sure fields that PSBT version 0 fields are not present
             self.setup_from_tx(self.tx)
+            # the locktime of a PSBTv0 is the one of the unsigned transaction
+            for psbt_in in self.inputs:
+                psbt_in.time_locktime = None
+                psbt_in.height_locktime = None
 
         self._convert_version(2)
 
