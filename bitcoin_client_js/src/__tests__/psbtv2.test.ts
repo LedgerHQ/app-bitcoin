@@ -67,4 +67,33 @@ describe("PsbtV2", () => {
       "PsbtV0 contains fields that are only allowed in PsbtV2"
     );
   });
+
+  it("rejects a psbt with a duplicate key", async () => {
+    // PSBT_IN_SIGHASH_TYPE = 3, twice with different values
+    const duplicateSighash = Buffer.from("010304" + "01000000" + "010304" + "02000000", "hex");
+
+    const psbt = new PsbtV2();
+    expect(() => psbt.deserialize(makePsbtV0(0, duplicateSighash))).toThrow(
+      "Duplicate key in PSBT map"
+    );
+  });
+
+  it("can deserialize multiple psbts with the same instance", async () => {
+    const psbt = new PsbtV2();
+    psbt.deserialize(makePsbtV0(800000));
+    const first = psbt.serialize();
+
+    psbt.deserialize(makePsbtV0(800000));
+    expect(psbt.serialize()).toEqual(first);
+
+    psbt.deserialize(makePsbtV0(700000));
+    expect(psbt.getGlobalFallbackLocktime()).toEqual(700000);
+  });
+
+  it("rejects a psbt with trailing data", async () => {
+    const psbt = new PsbtV2();
+    expect(() => psbt.deserialize(Buffer.concat([makePsbtV0(0), Buffer.from([0x00])]))).toThrow(
+      "Unexpected trailing data after the PSBT"
+    );
+  });
 });

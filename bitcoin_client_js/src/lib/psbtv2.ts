@@ -371,6 +371,10 @@ export class PsbtV2 {
     if (!buf.readSlice(5).equals(PSBT_MAGIC_BYTES)) {
       throw new Error('Invalid magic bytes');
     }
+    // discard any previous content, so that it does not mix with the new PSBT's
+    this.globalMap = new Map();
+    this.inputMaps = [];
+    this.outputMaps = [];
     while (this.readKeyPair(this.globalMap, buf));
 
     let psbtVersion: number;
@@ -403,6 +407,10 @@ export class PsbtV2 {
     for (let i = 0; i < nOutputs; i++) {
       this.outputMaps[i] = new Map();
       while (this.readKeyPair(this.outputMaps[i], buf));
+    }
+
+    if (buf.offset !== psbt.length) {
+      throw new Error('Unexpected trailing data after the PSBT');
     }
 
     this.normalizeToV2();
@@ -556,6 +564,9 @@ export class PsbtV2 {
     const keyType = buf.readUInt8();
     const keyData = buf.readSlice(keyLen - 1);
     const value = buf.readVarSlice();
+    if (map.has(new Key(keyType, keyData).toString())) {
+      throw new Error('Duplicate key in PSBT map');
+    }
     set(map, keyType, keyData, value);
 
     return true;
