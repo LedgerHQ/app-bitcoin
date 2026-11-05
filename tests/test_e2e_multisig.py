@@ -161,8 +161,7 @@ def test_e2e_multisig_2_of_2(navigator: Navigator, firmware: Firmware, client: R
     )
 
     run_test(navigator, client, wallet_policy, [core_wallet_name], rpc, rpc_test_wallet,
-             speculos_globals, e2e_register_wallet_instruction(
-                 firmware, wallet_policy.n_keys),
+             speculos_globals, e2e_register_wallet_instruction(firmware),
              e2e_sign_psbt_instruction(firmware), test_name)
 
 
@@ -195,7 +194,7 @@ def test_e2e_multisig_multiple_internal_keys(navigator: Navigator, firmware: Fir
 
     run_test(navigator, client, wallet_policy, [core_wallet_name_3],
              rpc, rpc_test_wallet, speculos_globals,
-             e2e_register_wallet_instruction(firmware, wallet_policy.n_keys),
+             e2e_register_wallet_instruction(firmware),
              e2e_sign_psbt_instruction(firmware), test_name)
 
 
@@ -229,5 +228,5 @@ def test_e2e_multisig_15keys(navigator: Navigator, firmware: Firmware, client: R
 
     run_test(navigator, client, wallet_policy, core_wallet_names,
              rpc, rpc_test_wallet, speculos_globals,
-             e2e_register_wallet_instruction(firmware, wallet_policy.n_keys),
+             e2e_register_wallet_instruction(firmware),
              e2e_sign_psbt_instruction(firmware), test_name)

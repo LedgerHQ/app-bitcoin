@@ -77,8 +77,8 @@ class LedgerMusig2Cosigner(PsbtMusig2Cosigner):
 
     def generate_public_nonces(self, psbt: PSBT) -> None:
         print("PSBT before nonce generation:", psbt.serialize())
-        res = self.client.sign_psbt(
-            psbt, self.wallet_policy, self.wallet_hmac, navigator=self.navigator, testname=self.testname, instructions=self.instructions)
+        # Round 1 does not require navigation instructions, since it is silent
+        res = self.client.sign_psbt(psbt, self.wallet_policy, self.wallet_hmac)
         print("Pubnonces:", res)
         for (input_index, yielded) in res:
             if isinstance(yielded, MusigPubNonce):
