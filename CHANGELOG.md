@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
-## [2.X.X] - XX-XX-XXXX
+## [2.6.0] - 05-11-2026
 
 ### Added
 
