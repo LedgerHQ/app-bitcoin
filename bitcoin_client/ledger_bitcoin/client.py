@@ -18,24 +18,35 @@ from .errors import UnknownDeviceError
 from .merkle import get_merkleized_map_commitment
 from .wallet import WalletPolicy, WalletType
 from .psbt import PSBT, normalize_psbt
-from ._serialize import deser_string
+from ._serialize import deser_compact_size
 
 from .bip0327 import key_agg, cbytes
+
+
+def _deser_string_strict(f: BufferedReader) -> bytes:
+    try:
+        length = deser_compact_size(f)
+    except Exception:
+        raise ValueError("Truncated PSBT map")
+    data = f.read(length)
+    if len(data) != length:
+        raise ValueError("Truncated PSBT map")
+    return data
 
 
 def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:
     result = {}
     while True:
-        try:
-            key = deser_string(f)
-        except Exception:
-            break
+        key = _deser_string_strict(f)
 
         # Check for separator
         if len(key) == 0:
             break
 
-        value = deser_string(f)
+        value = _deser_string_strict(f)
+
+        if key in result:
+            raise ValueError(f"Duplicate key in PSBT map: {key.hex()}")
 
         result[key] = value
     return result
@@ -316,6 +327,9 @@ class NewClient(Client):
             output_maps.append(parse_stream_to_map(f))
         for m in output_maps:
             client_intepreter.add_known_mapping(m)
+
+        if f.read() != b"":
+            raise ValueError("Unexpected trailing data after the PSBT maps")
 
         # We also add the Merkle tree of the input (resp. output) map commitments as a known tree
         input_commitments = [get_merkleized_map_commitment(m_in) for m_in in input_maps]

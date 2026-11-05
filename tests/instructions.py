@@ -140,8 +140,6 @@ def register_wallet_instruction_approve(model: Firmware, save_screenshot=True) -
         instructions.new_request("Register account", save_screenshot=save_screenshot)
     else:
         instructions.choice_confirm(save_screenshot=save_screenshot)
-        instructions.choice_confirm(save_screenshot=save_screenshot)
-        instructions.choice_confirm(save_screenshot=save_screenshot)
     return instructions
 
 
@@ -151,8 +149,6 @@ def register_wallet_instruction_approve_no_save(model: Firmware) -> Instructions
     if model.name.startswith("nano"):
         instructions.new_request("Register account", save_screenshot=False)
     else:
-        instructions.choice_confirm(save_screenshot=False)
-        instructions.choice_confirm(save_screenshot=False)
         instructions.choice_confirm(save_screenshot=False)
     return instructions
 
@@ -164,9 +160,6 @@ def register_wallet_instruction_approve_long(model: Firmware, save_screenshot=Tr
         instructions.new_request("Register account", save_screenshot=save_screenshot)
     else:
         instructions.choice_confirm(save_screenshot=save_screenshot)
-        instructions.choice_confirm(save_screenshot=save_screenshot)
-        instructions.choice_confirm(save_screenshot=save_screenshot)
-        instructions.choice_confirm(save_screenshot=save_screenshot)
     return instructions
 
 
@@ -176,7 +169,6 @@ def register_wallet_instruction_approve_unusual(model: Firmware) -> Instructions
     if model.name.startswith("nano"):
         instructions.new_request("Register account")
     else:
-        instructions.choice_confirm()
         instructions.choice_confirm()
     return instructions
 
@@ -334,15 +326,13 @@ def sign_psbt_instruction_approve_generic(model: Firmware, output_count: int, sa
     return instructions
 
 
-def e2e_register_wallet_instruction(model: Firmware, n_keys) -> Instructions:
+def e2e_register_wallet_instruction(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
         instructions.new_request("Register account", save_screenshot=False)
     else:
-        for _ in range(n_keys + 1):
-            instructions.choice_confirm(save_screenshot=False)
-            instructions.choice_confirm(save_screenshot=False)
+        instructions.choice_confirm(save_screenshot=False)
     return instructions
 
 

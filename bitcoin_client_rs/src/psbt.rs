@@ -27,11 +27,14 @@ const PSBT_GLOBAL_TX_VERSION: u8 = 0x02;
 const PSBT_GLOBAL_FALLBACK_LOCKTIME: u8 = 0x03;
 const PSBT_GLOBAL_INPUT_COUNT: u8 = 0x04;
 const PSBT_GLOBAL_OUTPUT_COUNT: u8 = 0x05;
+const PSBT_GLOBAL_TX_MODIFIABLE: u8 = 0x06;
 const PSBT_GLOBAL_VERSION: u8 = 0xFB;
 
 const PSBT_IN_PREVIOUS_TXID: u8 = 0x0E;
 const PSBT_IN_OUTPUT_INDEX: u8 = 0x0F;
 const PSBT_IN_SEQUENCE: u8 = 0x10;
+const PSBT_IN_REQUIRED_TIME_LOCKTIME: u8 = 0x11;
+const PSBT_IN_REQUIRED_HEIGHT_LOCKTIME: u8 = 0x12;
 
 const PSBT_OUT_AMOUNT: u8 = 0x03;
 const PSBT_OUT_SCRIPT: u8 = 0x04;
@@ -80,6 +83,34 @@ pub fn get_v2_maps(psbt: &Psbt) -> Result<PsbtV2Maps, PsbtV2Error> {
     let mut outputs = maps.split_off(1 + n_inputs);
     let mut inputs = maps.split_off(1);
     let mut global = maps.pop().ok_or(PsbtV2Error::MalformedSerialization)?;
+
+    // Fields that BIP-370 excludes from PSBTv0 would acquire meaning after the conversion
+    // (e.g. the required locktimes override the fallback locktime), so they are rejected.
+    reject_v2_fields(
+        &global,
+        &[
+            PSBT_GLOBAL_TX_VERSION,
+            PSBT_GLOBAL_FALLBACK_LOCKTIME,
+            PSBT_GLOBAL_INPUT_COUNT,
+            PSBT_GLOBAL_OUTPUT_COUNT,
+            PSBT_GLOBAL_TX_MODIFIABLE,
+        ],
+    )?;
+    for map in &inputs {
+        reject_v2_fields(
+            map,
+            &[
+                PSBT_IN_PREVIOUS_TXID,
+                PSBT_IN_OUTPUT_INDEX,
+                PSBT_IN_SEQUENCE,
+                PSBT_IN_REQUIRED_TIME_LOCKTIME,
+                PSBT_IN_REQUIRED_HEIGHT_LOCKTIME,
+            ],
+        )?;
+    }
+    for map in &outputs {
+        reject_v2_fields(map, &[PSBT_OUT_AMOUNT, PSBT_OUT_SCRIPT])?;
+    }
 
     global.retain(|(key, _)| key.as_slice() != [PSBT_GLOBAL_UNSIGNED_TX]);
 
@@ -141,6 +172,17 @@ pub fn get_v2_maps(psbt: &Psbt) -> Result<PsbtV2Maps, PsbtV2Error> {
         inputs,
         outputs,
     })
+}
+
+/// Errors if `map` has a key of any of `key_types`, whatever its keydata.
+fn reject_v2_fields(map: &PsbtMap, key_types: &[u8]) -> Result<(), PsbtV2Error> {
+    match map
+        .iter()
+        .find_map(|(key, _)| key.first().filter(|t| key_types.contains(t)))
+    {
+        Some(key_type) => Err(PsbtV2Error::UnexpectedV2Field(*key_type)),
+        None => Ok(()),
+    }
 }
 
 /// Adds a keyless PSBTv2 field synthesized from the v0 unsigned transaction, erroring if the
@@ -341,23 +383,38 @@ mod tests {
         assert_eq!(values_for(&maps.outputs[0], PSBT_OUT_SCRIPT).len(), 1);
     }
 
-    /// A key type rust-bitcoin does not know must still reach the app: this is what lets it read
-    /// the BIP-370 per-input required locktimes.
+    /// A key type rust-bitcoin does not know must still reach the app.
     #[test]
     fn keys_unknown_to_rust_bitcoin_are_forwarded() {
-        const PSBT_IN_REQUIRED_HEIGHT_LOCKTIME: u8 = 0x12;
-        let height = 10_000_u32.to_le_bytes().to_vec();
+        const UNKNOWN_KEY_TYPE: u8 = 0x30;
+        let value = vec![1, 2, 3];
 
         let mut psbt = unsigned_psbt();
         psbt.inputs[0]
             .unknown
-            .insert(keyless(PSBT_IN_REQUIRED_HEIGHT_LOCKTIME), height.clone());
+            .insert(keyless(UNKNOWN_KEY_TYPE), value.clone());
 
         let maps = get_v2_maps(&psbt).unwrap();
-        assert_eq!(
-            values_for(&maps.inputs[0], PSBT_IN_REQUIRED_HEIGHT_LOCKTIME),
-            vec![&height]
-        );
+        assert_eq!(values_for(&maps.inputs[0], UNKNOWN_KEY_TYPE), vec![&value]);
+    }
+
+    /// The BIP-370 per-input required locktimes are excluded from PSBTv0: once converted, they
+    /// would override the locktime of the unsigned transaction.
+    #[test]
+    fn required_locktimes_are_rejected() {
+        for key_type in [
+            PSBT_IN_REQUIRED_TIME_LOCKTIME,
+            PSBT_IN_REQUIRED_HEIGHT_LOCKTIME,
+        ] {
+            let mut psbt = unsigned_psbt();
+            psbt.inputs[0]
+                .unknown
+                .insert(keyless(key_type), 1_u32.to_le_bytes().to_vec());
+            assert_eq!(
+                get_v2_maps(&psbt).err(),
+                Some(PsbtV2Error::UnexpectedV2Field(key_type))
+            );
+        }
     }
 
     /// A v0 PSBT that already re-encodes part of its unsigned transaction as a v2 field is a

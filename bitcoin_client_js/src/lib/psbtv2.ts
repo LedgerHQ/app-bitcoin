@@ -33,6 +33,8 @@ export enum psbtIn {
   PREVIOUS_TXID = 0x0e,
   OUTPUT_INDEX = 0x0f,
   SEQUENCE = 0x10,
+  REQUIRED_TIME_LOCKTIME = 0x11,
+  REQUIRED_HEIGHT_LOCKTIME = 0x12,
   TAP_KEY_SIG = 0x13,
   TAP_BIP32_DERIVATION = 0x16,
 }
@@ -47,7 +49,7 @@ export enum psbtOut {
 
 const PSBT_MAGIC_BYTES = Buffer.from([0x70, 0x73, 0x62, 0x74, 0xff]);
 
-export class NoSuchEntry extends Error {}
+export class NoSuchEntry extends Error { }
 
 /**
  * Implements Partially Signed Bitcoin Transaction version 2, BIP370, as
@@ -369,6 +371,10 @@ export class PsbtV2 {
     if (!buf.readSlice(5).equals(PSBT_MAGIC_BYTES)) {
       throw new Error('Invalid magic bytes');
     }
+    // discard any previous content, so that it does not mix with the new PSBT's
+    this.globalMap = new Map();
+    this.inputMaps = [];
+    this.outputMaps = [];
     while (this.readKeyPair(this.globalMap, buf));
 
     let psbtVersion: number;
@@ -403,6 +409,10 @@ export class PsbtV2 {
       while (this.readKeyPair(this.outputMaps[i], buf));
     }
 
+    if (buf.offset !== psbt.length) {
+      throw new Error('Unexpected trailing data after the PSBT');
+    }
+
     this.normalizeToV2();
   }
   normalizeToV2() {
@@ -412,6 +422,31 @@ export class PsbtV2 {
     if (psbtVersion === 2) return;
     else if (psbtVersion !== undefined) {
       throw new Error('Invalid or unsupported value for PSBT_GLOBAL_VERSION');
+    }
+
+    // Fail if fields only allowed in PsbtV2 are present in a PsbtV0
+    const hasKeyType = (map: ReadonlyMap<string, Buffer>, keyTypes: readonly KeyType[]) =>
+      Array.from(map.keys()).some((k) => this.isKeyType(k, keyTypes));
+    if (
+      hasKeyType(this.globalMap, [
+        psbtGlobal.TX_VERSION,
+        psbtGlobal.FALLBACK_LOCKTIME,
+        psbtGlobal.INPUT_COUNT,
+        psbtGlobal.OUTPUT_COUNT,
+        psbtGlobal.TX_MODIFIABLE,
+      ]) ||
+      this.inputMaps.some((m) =>
+        hasKeyType(m, [
+          psbtIn.PREVIOUS_TXID,
+          psbtIn.OUTPUT_INDEX,
+          psbtIn.SEQUENCE,
+          psbtIn.REQUIRED_TIME_LOCKTIME,
+          psbtIn.REQUIRED_HEIGHT_LOCKTIME,
+        ])
+      ) ||
+      this.outputMaps.some((m) => hasKeyType(m, [psbtOut.AMOUNT, psbtOut.SCRIPT]))
+    ) {
+      throw new Error('PsbtV0 contains fields that are only allowed in PsbtV2');
     }
 
     // Convert PsbtV0 to PsbtV2 by parsing the PSBT_GLOBAL_UNSIGNED_TX field
@@ -450,7 +485,7 @@ export class PsbtV2 {
    * Note: This method supports all the policies that the Ledger is able to
    * sign, with the exception of taproot: tr(@0).
    */
-  fromBitcoinJS(psbtBJS: bjs.Psbt) : PsbtV2 {
+  fromBitcoinJS(psbtBJS: bjs.Psbt): PsbtV2 {
     function isTaprootInput(input): boolean {
       let isP2TR;
       try {
@@ -529,6 +564,9 @@ export class PsbtV2 {
     const keyType = buf.readUInt8();
     const keyData = buf.readSlice(keyLen - 1);
     const value = buf.readVarSlice();
+    if (map.has(new Key(keyType, keyData).toString())) {
+      throw new Error('Duplicate key in PSBT map');
+    }
     set(map, keyType, keyData, value);
 
     return true;

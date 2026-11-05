@@ -174,7 +174,7 @@ def test_e2e_miniscript_one_of_two_1(navigator: Navigator, firmware: Firmware, c
         ])
 
     run_test_e2e(navigator, client, wallet_policy, [], rpc, rpc_test_wallet, speculos_globals,
-                 e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_e2e_miniscript_one_of_two_2(navigator: Navigator, firmware: Firmware, client: RaggerClient,
@@ -194,7 +194,7 @@ def test_e2e_miniscript_one_of_two_2(navigator: Navigator, firmware: Firmware, c
         ])
 
     run_test_e2e(navigator, client, wallet_policy, [_], rpc, rpc_test_wallet, speculos_globals,
-                 e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_e2e_miniscript_2fa(navigator: Navigator, firmware: Firmware, client: RaggerClient,
@@ -214,7 +214,7 @@ def test_e2e_miniscript_2fa(navigator: Navigator, firmware: Firmware, client: Ra
         ])
 
     run_test_e2e(navigator, client, wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, speculos_globals,
-                 e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_e2e_miniscript_decaying_3of3(navigator: Navigator, firmware: Firmware, client:
@@ -236,7 +236,7 @@ def test_e2e_miniscript_decaying_3of3(navigator: Navigator, firmware: Firmware, 
         ])
 
     run_test_e2e(navigator, client, wallet_policy, [core_wallet_name1, core_wallet_name2], rpc, rpc_test_wallet, speculos_globals,
-                 e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_e2e_miniscript_bolt3_offered_htlc(navigator: Navigator, firmware: Firmware, client:
@@ -259,7 +259,7 @@ def test_e2e_miniscript_bolt3_offered_htlc(navigator: Navigator, firmware: Firmw
         ])
 
     run_test_e2e(navigator, client, wallet_policy, [core_wallet_name1, core_wallet_name2], rpc, rpc_test_wallet, speculos_globals,
-                 e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_e2e_miniscript_bolt3_received_htlc(navigator: Navigator, firmware: Firmware, client:
@@ -282,7 +282,7 @@ def test_e2e_miniscript_bolt3_received_htlc(navigator: Navigator, firmware: Firm
         ])
 
     run_test_e2e(navigator, client, wallet_policy, [core_wallet_name1, core_wallet_name2], rpc, rpc_test_wallet, speculos_globals,
-                 e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_e2e_miniscript_me_or_3of5(navigator: Navigator, firmware: Firmware, client:
@@ -309,7 +309,7 @@ def test_e2e_miniscript_me_or_3of5(navigator: Navigator, firmware: Firmware, cli
         ])
 
     run_test_e2e(navigator, client, wallet_policy, [], rpc, rpc_test_wallet, speculos_globals,
-                 e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_e2e_miniscript_me_large_vault(navigator: Navigator, firmware: Firmware, client:
@@ -338,7 +338,7 @@ def test_e2e_miniscript_me_large_vault(navigator: Navigator, firmware: Firmware,
         ])
 
     run_test_e2e(navigator, client, wallet_policy, [], rpc, rpc_test_wallet, speculos_globals,
-                 e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_e2e_miniscript_me_and_bob_or_me_and_carl_1(navigator: Navigator, firmware: Firmware,
@@ -367,7 +367,7 @@ def test_e2e_miniscript_me_and_bob_or_me_and_carl_1(navigator: Navigator, firmwa
         ])
 
     run_test_e2e(navigator, client, wallet_policy, [core_wallet_name1], rpc, rpc_test_wallet, speculos_globals,
-                 e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_e2e_miniscript_policy_with_a(navigator: Navigator, firmware: Firmware, client:
@@ -395,7 +395,7 @@ def test_e2e_miniscript_policy_with_a(navigator: Navigator, firmware: Firmware, 
         ])
 
     run_test_e2e(navigator, client, wallet_policy, [core_wallet_name2], rpc, rpc_test_wallet, speculos_globals,
-                 e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_invalid_miniscript(navigator: Navigator, firmware: Firmware, client: RaggerClient,

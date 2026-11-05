@@ -53,7 +53,8 @@ static int parse_one_map(const uint8_t *data, size_t data_len, size_t *offset, p
             return 0;
         }
 
-        if (*offset + key_len > data_len) return -1;
+        /* Subtraction form: *offset <= data_len holds here, and `*offset + key_len` could wrap */
+        if (key_len > data_len - *offset) return -1;
         if (map->n_entries >= PSBT_MAP_MAX_ENTRIES) return -1;
 
         psbt_kv_t *entry = &map->entries[map->n_entries];
@@ -67,7 +68,7 @@ static int parse_one_map(const uint8_t *data, size_t data_len, size_t *offset, p
         if (n < 0) return -1;
         *offset += (size_t) n;
 
-        if (*offset + value_len > data_len) return -1;
+        if (value_len > data_len - *offset) return -1;
 
         entry->value = data + *offset;
         entry->value_len = (size_t) value_len;
@@ -109,6 +110,9 @@ int psbt_parse(const uint8_t *data,
     for (size_t i = 0; i < n_outputs; i++) {
         if (parse_one_map(data, data_len, &offset, &out->output_maps[i]) < 0) return -1;
     }
+
+    /* Trailing bytes mean the PSBT has more maps than n_inputs/n_outputs say */
+    if (offset != data_len) return -1;
 
     return 0;
 }

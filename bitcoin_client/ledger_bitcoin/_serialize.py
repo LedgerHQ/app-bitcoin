@@ -80,7 +80,10 @@ def deser_string(f: Readable) -> bytes:
     :returns: The byte string that was serialized
     """
     nit = deser_compact_size(f)
-    return f.read(nit)
+    s = f.read(nit)
+    if len(s) != nit:
+        raise ValueError("Unexpected end of data while reading a string")
+    return s
 
 def ser_string(s: bytes) -> bytes:
     """
