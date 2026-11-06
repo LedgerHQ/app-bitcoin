@@ -6,16 +6,18 @@
 //! serialization/deserialization logic to rust-psbt (for known fields), and propagating unknown
 //! fields unchanged.
 
+use core::fmt;
+
 use bitcoin::{
     consensus::encode::{serialize, Decodable},
     ecdsa,
     hashes::Hash,
-    key::FromSliceError as KeyError,
+    key::{FromSliceError as KeyError, TweakedPublicKey},
     psbt::Psbt,
     secp256k1::{self, XOnlyPublicKey},
     taproot,
     taproot::TapLeafHash,
-    PublicKey,
+    PublicKey, ScriptBuf,
 };
 
 use crate::protocol::UncheckedVarInt;
@@ -257,6 +259,78 @@ pub enum PartialSignature {
     Sig(PublicKey, ecdsa::Signature),
     /// signature stored in pbst.tap_script_sigs
     TapScriptSig(XOnlyPublicKey, Option<TapLeafHash>, taproot::Signature),
+}
+
+/// An error applying a signature with [`apply_partial_signature`].
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ApplySignatureError {
+    /// The PSBT has no input with this index.
+    #[non_exhaustive]
+    InputIndexOutOfBounds { input_index: usize },
+    /// For a taproot key-path signature: the input has no `witness_utxo`.
+    MissingWitnessUtxo,
+    /// For a taproot key-path signature: the output spent by the input is not a P2TR output with
+    /// the signature's key as its output key.
+    OutputKeyMismatch,
+}
+
+impl fmt::Display for ApplySignatureError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InputIndexOutOfBounds { input_index } => {
+                write!(f, "PSBT input index {} is out of bounds", input_index)
+            }
+            Self::MissingWitnessUtxo => f.write_str("The input has no witness UTXO"),
+            Self::OutputKeyMismatch => {
+                f.write_str("The key-path signature is not for the output key of the spent output")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ApplySignatureError {}
+
+/// Adds a signature yielded by SIGN_PSBT to the input with index `input_index`, replacing any
+/// signature already stored for the same key. On error, the PSBT is unchanged.
+///
+/// A taproot key-path signature (`TapScriptSig(key, None, _)`) is applied only if the input's
+/// `witness_utxo` is a P2TR output whose output key is `key`: the device signs with the tweaked
+/// key, and yields it. The `non_witness_utxo` is not used: the device requires the
+/// `witness_utxo` of every segwit input, and the taproot sighash commits to it.
+///
+/// MuSig2 nonces and partial signatures are not supported.
+pub fn apply_partial_signature(
+    psbt: &mut Psbt,
+    input_index: usize,
+    signature: PartialSignature,
+) -> Result<(), ApplySignatureError> {
+    if input_index >= psbt.inputs.len() {
+        return Err(ApplySignatureError::InputIndexOutOfBounds { input_index });
+    }
+    if let PartialSignature::TapScriptSig(key, None, _) = &signature {
+        let spent_output = psbt.inputs[input_index]
+            .witness_utxo
+            .as_ref()
+            .ok_or(ApplySignatureError::MissingWitnessUtxo)?;
+        let output_key = TweakedPublicKey::dangerous_assume_tweaked(*key);
+        if spent_output.script_pubkey != ScriptBuf::new_p2tr_tweaked(output_key) {
+            return Err(ApplySignatureError::OutputKeyMismatch);
+        }
+    }
+    let input = &mut psbt.inputs[input_index];
+    match signature {
+        PartialSignature::Sig(key, signature) => {
+            input.partial_sigs.insert(key, signature);
+        }
+        PartialSignature::TapScriptSig(key, Some(leaf), signature) => {
+            input.tap_script_sigs.insert((key, leaf), signature);
+        }
+        PartialSignature::TapScriptSig(_, None, signature) => {
+            input.tap_key_sig = Some(signature);
+        }
+    }
+    Ok(())
 }
 
 impl PartialSignature {

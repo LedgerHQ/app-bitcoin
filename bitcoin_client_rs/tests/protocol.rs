@@ -12,6 +12,7 @@ use ledger_bitcoin_client::{
 };
 
 const KEY: &str = "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U";
+const PUBKEY: &str = "034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa";
 const MERKLE_LEAF_PREFIX: u8 = 0;
 const SHA256_HASH_TYPE: u8 = 0;
 const COMMAND_CODE_LEN: usize = 1;
@@ -1198,6 +1199,166 @@ fn yielded_object_json(
         other => panic!("Unexpected yielded object: {:?}", other),
     };
     (kind, json.into())
+}
+
+#[test]
+fn signature_application_validates_before_mutation_and_overwrites() {
+    use bitcoin::{
+        ecdsa,
+        key::TweakedPublicKey,
+        secp256k1,
+        taproot::{Signature, TapLeafHash},
+        Amount, PublicKey, ScriptBuf, TxOut,
+    };
+    use ledger_bitcoin_client::{
+        psbt::{apply_partial_signature, ApplySignatureError},
+        PartialSignature,
+    };
+    let key = PublicKey::from_str(PUBKEY).unwrap();
+    let xonly = key.inner.x_only_public_key().0;
+    let p2tr = |key| TxOut {
+        value: Amount::from_sat(1000),
+        script_pubkey: ScriptBuf::new_p2tr_tweaked(TweakedPublicKey::dangerous_assume_tweaked(key)),
+    };
+    let leaf = TapLeafHash::from_byte_array([3; 32]);
+    let mut psbt = unsigned_psbt();
+    psbt.inputs[0].witness_utxo = Some(p2tr(xonly));
+    for byte in [1, 2] {
+        let ecdsa = ecdsa::Signature::sighash_all(
+            secp256k1::ecdsa::Signature::from_compact(&[byte; 64]).unwrap(),
+        );
+        let taproot = Signature::from_slice(&[byte; 64]).unwrap();
+        for signature in [
+            PartialSignature::Sig(key, ecdsa),
+            PartialSignature::TapScriptSig(xonly, None, taproot),
+            PartialSignature::TapScriptSig(xonly, Some(leaf), taproot),
+        ] {
+            let before = psbt.clone();
+            for input_index in [1, usize::MAX] {
+                assert!(matches!(
+                    apply_partial_signature(&mut psbt, input_index, signature.clone()),
+                    Err(ApplySignatureError::InputIndexOutOfBounds { input_index: actual, .. })
+                        if actual == input_index
+                ));
+                assert_eq!(psbt, before);
+            }
+            apply_partial_signature(&mut psbt, 0, signature).unwrap();
+        }
+        assert_eq!(psbt.inputs[0].partial_sigs.len(), 1);
+        assert_eq!(psbt.inputs[0].partial_sigs[&key], ecdsa);
+        assert_eq!(psbt.inputs[0].tap_key_sig, Some(taproot));
+        assert_eq!(psbt.inputs[0].tap_script_sigs.len(), 1);
+        assert_eq!(psbt.inputs[0].tap_script_sigs[&(xonly, leaf)], taproot);
+    }
+
+    // A key-path signature must be for the output key of the spent P2TR output.
+    let key_path =
+        PartialSignature::TapScriptSig(xonly, None, Signature::from_slice(&[1; 64]).unwrap());
+    // The generator point.
+    let other_key =
+        PublicKey::from_str("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
+            .unwrap()
+            .inner
+            .x_only_public_key()
+            .0;
+    let p2wpkh = TxOut {
+        value: Amount::from_sat(1000),
+        script_pubkey: ScriptBuf::new_p2wpkh(&key.wpubkey_hash().unwrap()),
+    };
+    // The non-witness UTXO is not used.
+    let p2tr_transaction = bitcoin::Transaction {
+        version: bitcoin::transaction::Version::TWO,
+        lock_time: bitcoin::absolute::LockTime::ZERO,
+        input: vec![],
+        output: vec![p2tr(xonly)],
+    };
+    for (witness_utxo, non_witness_utxo, expected) in [
+        (None, None, ApplySignatureError::MissingWitnessUtxo),
+        (
+            None,
+            Some(p2tr_transaction),
+            ApplySignatureError::MissingWitnessUtxo,
+        ),
+        (
+            Some(p2tr(other_key)),
+            None,
+            ApplySignatureError::OutputKeyMismatch,
+        ),
+        (Some(p2wpkh), None, ApplySignatureError::OutputKeyMismatch),
+    ] {
+        let mut psbt = unsigned_psbt();
+        psbt.inputs[0].witness_utxo = witness_utxo;
+        psbt.inputs[0].non_witness_utxo = non_witness_utxo;
+        let before = psbt.clone();
+        assert_eq!(
+            apply_partial_signature(&mut psbt, 0, key_path.clone()),
+            Err(expected)
+        );
+        assert_eq!(psbt, before);
+    }
+}
+
+#[test]
+fn signatures_are_applied_to_the_given_input() {
+    use bitcoin::{
+        ecdsa, key::TweakedPublicKey, secp256k1, taproot::Signature, Amount, OutPoint, PublicKey,
+        ScriptBuf, TxOut,
+    };
+    use ledger_bitcoin_client::{
+        psbt::{apply_partial_signature, ApplySignatureError},
+        PartialSignature,
+    };
+    let p2tr = |key| TxOut {
+        value: Amount::from_sat(1000),
+        script_pubkey: ScriptBuf::new_p2tr_tweaked(TweakedPublicKey::dangerous_assume_tweaked(key)),
+    };
+    let key = PublicKey::from_str(PUBKEY).unwrap();
+    let xonly = key.inner.x_only_public_key().0;
+    // The generator point.
+    let other_xonly =
+        PublicKey::from_str("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
+            .unwrap()
+            .inner
+            .x_only_public_key()
+            .0;
+    // Two inputs, spending P2TR outputs with different output keys.
+    let mut tx = unsigned_psbt().unsigned_tx;
+    let mut second_input = tx.input[0].clone();
+    second_input.previous_output = OutPoint {
+        vout: 1,
+        ..second_input.previous_output
+    };
+    tx.input.push(second_input);
+    let mut psbt = bitcoin::psbt::Psbt::from_unsigned_tx(tx).unwrap();
+    psbt.inputs[0].witness_utxo = Some(p2tr(other_xonly));
+    psbt.inputs[1].witness_utxo = Some(p2tr(xonly));
+    let untouched_input = psbt.inputs[0].clone();
+
+    let ecdsa =
+        ecdsa::Signature::sighash_all(secp256k1::ecdsa::Signature::from_compact(&[1; 64]).unwrap());
+    let taproot = Signature::from_slice(&[1; 64]).unwrap();
+    apply_partial_signature(&mut psbt, 1, PartialSignature::Sig(key, ecdsa)).unwrap();
+    apply_partial_signature(
+        &mut psbt,
+        1,
+        PartialSignature::TapScriptSig(xonly, None, taproot),
+    )
+    .unwrap();
+    assert_eq!(psbt.inputs[1].partial_sigs[&key], ecdsa);
+    assert_eq!(psbt.inputs[1].tap_key_sig, Some(taproot));
+    assert_eq!(psbt.inputs[0], untouched_input);
+
+    // The key-path signature for the first input's output key does not fit the second input.
+    let before = psbt.clone();
+    assert_eq!(
+        apply_partial_signature(
+            &mut psbt,
+            1,
+            PartialSignature::TapScriptSig(other_xonly, None, taproot)
+        ),
+        Err(ApplySignatureError::OutputKeyMismatch)
+    );
+    assert_eq!(psbt, before);
 }
 
 #[cfg(feature = "paranoid_client")]

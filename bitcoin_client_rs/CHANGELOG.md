@@ -45,6 +45,7 @@ This release exposes the protocol without the transport, for applications that o
 - `protocol::parse_sign_psbt_results`: parses all the values yielded during SIGN_PSBT, with a `SignPsbtResultsError`.
 - `PartialSignatureError` implements `Display` and `std::error::Error`.
 - `WalletPolicy::check_address`, with the `paranoid_client` feature (which does not require either client): derives an address of the wallet policy independently, to verify the one returned by the device. Errors are reported as `wallet::AddressCheckError`, for which `BitcoinClientError` implements `From`.
+- `psbt::apply_partial_signature`: adds an ECDSA or Schnorr signature yielded by `sign_psbt` to a PSBT, with an `ApplySignatureError`. A key-path signature is only added if the input's `witness_utxo` is a P2TR output with the signature's key as output key.
 
 ### Fixed
 
