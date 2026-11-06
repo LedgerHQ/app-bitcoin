@@ -20,11 +20,13 @@ This release exposes the protocol without the transport, for applications that o
 - An unknown Merkle root in the GET_MERKLE_LEAF_PROOF and GET_MERKLE_LEAF_INDEX client commands is reported as `InterpreterError::UnknownMerkleRoot` instead of `UnknownHash`.
 - Client commands with unexpected trailing bytes (GET_MERKLE_LEAF_INDEX, GET_MORE_ELEMENTS) are rejected with `InterpreterError::UnsupportedRequest`, like the other client commands.
 - A GET_PREIMAGE client command is rejected with `InterpreterError::UnexpectedQueue` while elements of a previous answer are still queued, as GET_MERKLE_LEAF_PROOF already was.
+- `PartialSignatureError` has a new variant, `InvalidInputIndex`, and is `#[non_exhaustive]`.
 
 ### Added
 
 - The `command`, `interpreter` and `protocol` modules are public, and can be used without either client. `protocol` includes `parse_sign_psbt_yielded` and the tags of the objects yielded by SIGN_PSBT.
 - `BitcoinClientError`, `InterpreterError` and `WalletError` implement `Display` and `std::error::Error`. `ClientCommandInterpreter` implements `Default` and `Debug`, and `InterpreterError` implements `Clone`, `PartialEq` and `Eq`.
+- `PartialSignatureError` implements `Debug`.
 
 ### Fixed
 
@@ -32,3 +34,4 @@ This release exposes the protocol without the transport, for applications that o
 - Signing an empty message, or a PSBT without inputs or outputs, panicked while building the Merkle tree of an empty list.
 - A GET_MERKLE_LEAF_INDEX client command for a leaf that is not in a known tree is answered as not found, instead of failing.
 - `WalletPolicy::get_descriptor` looped forever on a descriptor template with an unterminated `/<`, and panicked on one with a `>` before a `/<`. The former is now a `WalletError::InvalidPolicy` error, and the latter is expanded like any other template.
+- Input indices yielded by `sign_psbt` must fit in a `u32`; larger well-encoded indices are rejected with `PartialSignatureError::InvalidInputIndex`, instead of being truncated on 32-bit targets and accepted on 64-bit ones. Malformed CompactSize encodings still return `InvalidLength`.
