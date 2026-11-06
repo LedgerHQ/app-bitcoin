@@ -38,6 +38,22 @@ pub struct TransportReplayer {
     current: AtomicUsize,
 }
 
+/// Every recorded exchange must be replayed: a test fails if the client skips some of them.
+impl Drop for TransportReplayer {
+    fn drop(&mut self) {
+        let replayed = self.current.load(Ordering::Relaxed);
+        if !std::thread::panicking() {
+            assert_eq!(
+                replayed,
+                self.store.queue.len(),
+                "Only {} of the {} recorded exchanges were replayed",
+                replayed,
+                self.store.queue.len()
+            );
+        }
+    }
+}
+
 impl TransportReplayer {
     pub fn new(store: RecordStore) -> TransportReplayer {
         TransportReplayer {

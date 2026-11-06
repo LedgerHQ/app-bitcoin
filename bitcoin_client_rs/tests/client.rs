@@ -171,6 +171,18 @@ async fn test_register_wallet() {
 
         let wallet = wallet::WalletPolicy::new(name, version, policy, keys);
 
+        // The paranoid client verifies the registration by requesting an address. These exchanges
+        // are synthetic: a single GET_WALLET_ADDRESS exchange answered with the expected address,
+        // without the client commands that a real device would send.
+        #[cfg(feature = "paranoid_client")]
+        let exchanges = {
+            let mut exchanges = exchanges;
+            exchanges.extend(
+                serde_json::from_value::<Vec<String>>(case["address_exchanges"].clone()).unwrap(),
+            );
+            exchanges
+        };
+
         let store = utils::RecordStore::new(&exchanges);
         let (_id, hmac) = client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
             .register_wallet(&wallet)
