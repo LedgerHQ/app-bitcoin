@@ -1,16 +1,176 @@
 //! This module contains types that are specific to the Ledger Bitcoin application protocol.
 
 use core::convert::TryFrom;
+use core::{fmt, str::FromStr};
 
 use bitcoin::{
+    address::NetworkUnchecked,
+    bip32::{Fingerprint, Xpub},
     consensus::encode::{deserialize_partial, Decodable, Encodable, Error as EncodeError},
     hashes::Hash,
     io::{Read, Write},
+    secp256k1::ecdsa::Signature,
     taproot::TapLeafHash,
-    PublicKey,
+    Address, PublicKey,
 };
 
 use crate::psbt::{PartialSignature, PartialSignatureError};
+
+/// An error parsing the response to a command.
+///
+/// The convenience clients report these errors as `UnexpectedResult`, with the response bytes.
+#[non_exhaustive]
+#[derive(Debug)]
+pub enum ResponseError {
+    /// The response ends before `field`.
+    #[non_exhaustive]
+    Truncated { field: &'static str },
+    /// `field` is not encoded as expected.
+    #[non_exhaustive]
+    InvalidFormat { field: &'static str },
+    /// A fixed-length response has the wrong length.
+    #[non_exhaustive]
+    InvalidLength {
+        field: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    /// `field` could not be decoded.
+    #[non_exhaustive]
+    Decode {
+        field: &'static str,
+        source: EncodeError,
+    },
+    /// The response continues after its last field.
+    #[non_exhaustive]
+    TrailingBytes { count: usize },
+}
+
+impl fmt::Display for ResponseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Truncated { field } => write!(f, "Truncated {}", field),
+            Self::InvalidFormat { field } => write!(f, "Invalid {} format", field),
+            Self::InvalidLength {
+                field,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "Invalid {} length: expected {}, got {}",
+                field, expected, actual
+            ),
+            Self::Decode { field, source } => write!(f, "Failed to decode {}: {}", field, source),
+            Self::TrailingBytes { count } => write!(f, "{} unexpected trailing bytes", count),
+        }
+    }
+}
+
+impl std::error::Error for ResponseError {}
+
+/// Parses the response to GET_VERSION: the app name, version and flags.
+///
+/// The flags are empty if the response has none, as when the dashboard answers instead of an app.
+pub fn parse_version(data: &[u8]) -> Result<(String, String, Vec<u8>), ResponseError> {
+    match data.first() {
+        None => return Err(ResponseError::Truncated { field: "format" }),
+        Some(1) => (),
+        Some(_) => return Err(ResponseError::InvalidFormat { field: "format" }),
+    }
+    let mut offset = 1;
+    let (name, read): (String, usize) =
+        deserialize_partial(&data[offset..]).map_err(|source| ResponseError::Decode {
+            field: "name",
+            source,
+        })?;
+    offset += read;
+    let (version, read): (String, usize) =
+        deserialize_partial(&data[offset..]).map_err(|source| ResponseError::Decode {
+            field: "version",
+            source,
+        })?;
+    offset += read;
+    let flags = if offset == data.len() {
+        Vec::new()
+    } else {
+        let (flags, read): (Vec<u8>, usize) =
+            deserialize_partial(&data[offset..]).map_err(|source| ResponseError::Decode {
+                field: "flags",
+                source,
+            })?;
+        offset += read;
+        flags
+    };
+    check_no_trailing_bytes(data, offset)?;
+    Ok((name, version, flags))
+}
+
+/// Parses the response to GET_MASTER_FINGERPRINT: exactly 4 bytes.
+pub fn parse_master_fingerprint(data: &[u8]) -> Result<Fingerprint, ResponseError> {
+    let fingerprint: [u8; 4] = fixed_length(data, "fingerprint")?;
+    Ok(fingerprint.into())
+}
+
+/// Parses the response to GET_EXTENDED_PUBKEY: a serialized extended public key.
+pub fn parse_extended_pubkey(data: &[u8]) -> Result<Xpub, ResponseError> {
+    let field = "extended pubkey";
+    Xpub::from_str(utf8(data, field)?).map_err(|_| ResponseError::InvalidFormat { field })
+}
+
+/// Parses the response to GET_WALLET_ADDRESS: an address, whose network is not checked.
+pub fn parse_wallet_address(data: &[u8]) -> Result<Address<NetworkUnchecked>, ResponseError> {
+    let field = "wallet address";
+    Address::from_str(utf8(data, field)?).map_err(|_| ResponseError::InvalidFormat { field })
+}
+
+/// Parses the response to REGISTER_WALLET: the 32-byte wallet ID and the 32-byte HMAC.
+pub fn parse_wallet_registration(data: &[u8]) -> Result<([u8; 32], [u8; 32]), ResponseError> {
+    let registration: [u8; 64] = fixed_length(data, "wallet registration")?;
+    let mut id = [0; 32];
+    id.copy_from_slice(&registration[..32]);
+    let mut hmac = [0; 32];
+    hmac.copy_from_slice(&registration[32..]);
+    Ok((id, hmac))
+}
+
+fn fixed_length<const N: usize>(
+    data: &[u8],
+    field: &'static str,
+) -> Result<[u8; N], ResponseError> {
+    <[u8; N]>::try_from(data).map_err(|_| ResponseError::InvalidLength {
+        field,
+        expected: N,
+        actual: data.len(),
+    })
+}
+
+fn utf8<'a>(data: &'a [u8], field: &'static str) -> Result<&'a str, ResponseError> {
+    core::str::from_utf8(data).map_err(|_| ResponseError::InvalidFormat { field })
+}
+
+fn check_no_trailing_bytes(data: &[u8], parsed: usize) -> Result<(), ResponseError> {
+    match data.len() - parsed {
+        0 => Ok(()),
+        count => Err(ResponseError::TrailingBytes { count }),
+    }
+}
+
+/// Parses the response to SIGN_MESSAGE: the header byte and the compact ECDSA signature.
+/// This checks the encoding, not that the signature is valid for the message.
+pub fn parse_message_signature(data: &[u8]) -> Result<(u8, Signature), ResponseError> {
+    if data.len() != 65 {
+        return Err(ResponseError::InvalidLength {
+            field: "message signature",
+            expected: 65,
+            actual: data.len(),
+        });
+    }
+    let signature =
+        Signature::from_compact(&data[1..]).map_err(|_| ResponseError::InvalidFormat {
+            field: "message signature",
+        })?;
+    Ok((data[0], signature))
+}
 
 /// A variable-length unsigned integer using the same wire encoding as
 /// Bitcoin's `CompactSize`, but without the upper-bound limit enforced by the

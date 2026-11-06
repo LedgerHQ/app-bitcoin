@@ -22,12 +22,14 @@ This release exposes the protocol without the transport, for applications that o
 - A GET_PREIMAGE client command is rejected with `InterpreterError::UnexpectedQueue` while elements of a previous answer are still queued, as GET_MERKLE_LEAF_PROOF already was.
 - `PartialSignatureError` has a new variant, `InvalidInputIndex`, and is `#[non_exhaustive]`.
 - `SignPsbtYieldedObject::Unknown` is a non-exhaustive struct variant with the object's `tag`, and the `data` that follows the input index. It previously had only the data, so the tag was lost.
+- Responses are parsed strictly: fixed-length responses (master fingerprint, wallet registration) must have exactly the expected length, GET_VERSION must not have trailing bytes, and the extended pubkey and address must be valid UTF-8. The Bitcoin app always sends such responses; anything else is now an `UnexpectedResult` error.
 
 ### Added
 
 - The `command`, `interpreter` and `protocol` modules are public, and can be used without either client. `protocol` includes `parse_sign_psbt_yielded` and the tags of the objects yielded by SIGN_PSBT.
 - `BitcoinClientError`, `InterpreterError` and `WalletError` implement `Display` and `std::error::Error`. `ClientCommandInterpreter` implements `Default` and `Debug`, and `InterpreterError` implements `Clone`, `PartialEq` and `Eq`.
 - `PartialSignatureError` implements `Debug`.
+- `protocol::parse_*`: parsers for the responses to the commands, with a detailed `ResponseError`. The values yielded by SIGN_PSBT have their own parsers.
 
 ### Fixed
 
@@ -37,3 +39,4 @@ This release exposes the protocol without the transport, for applications that o
 - `WalletPolicy::get_descriptor` looped forever on a descriptor template with an unterminated `/<`, and panicked on one with a `>` before a `/<`. The former is now a `WalletError::InvalidPolicy` error, and the latter is expanded like any other template.
 - Input indices yielded by `sign_psbt` must fit in a `u32`; larger well-encoded indices are rejected with `PartialSignatureError::InvalidInputIndex`, instead of being truncated on 32-bit targets and accepted on 64-bit ones. Malformed CompactSize encodings still return `InvalidLength`.
 - An empty response to SIGN_MESSAGE caused a panic; it is now an `UnexpectedResult` error.
+- `get_version` accepts the dashboard's response, which has no flags.

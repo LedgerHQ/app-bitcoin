@@ -483,3 +483,124 @@ fn interpreter_rejects_trailing_bytes() {
     ));
     assert!(interpreter.execute(vec![get_more_elements]).is_ok());
 }
+
+#[test]
+fn version_response_encoding_and_decode_context() {
+    use ledger_bitcoin_client::protocol::*;
+    const FORMAT: u8 = 1;
+    let mut version = vec![FORMAT];
+    for field in [&b"Bitcoin Test"[..], b"2.1.0", &[0]] {
+        version.extend(varint(field.len() as u64));
+        version.extend(field);
+    }
+    assert_eq!(
+        parse_version(&version).unwrap(),
+        ("Bitcoin Test".into(), "2.1.0".into(), vec![0])
+    );
+    version.extend([9, 8]);
+    assert!(matches!(
+        parse_version(&version),
+        Err(ResponseError::TrailingBytes { count: 2, .. })
+    ));
+    assert!(matches!(
+        parse_version(&[]),
+        Err(ResponseError::Truncated { .. })
+    ));
+    assert!(matches!(
+        parse_version(&[FORMAT + 1]),
+        Err(ResponseError::InvalidFormat { .. })
+    ));
+    // The dashboard's response has no flags.
+    assert_eq!(
+        parse_version(&[FORMAT, 5, b'B', b'O', b'L', b'O', b'S', 1, b'1']).unwrap(),
+        ("BOLOS".into(), "1".into(), vec![])
+    );
+    // Each field is empty, until the response is truncated.
+    for (bytes, field) in [
+        (&[FORMAT][..], "name"),
+        (&[FORMAT, 0][..], "version"),
+        (&[FORMAT, 0, 0, 1][..], "flags"),
+    ] {
+        assert!(
+            matches!(parse_version(bytes), Err(ResponseError::Decode { field: actual, .. }) if actual == field)
+        );
+    }
+    // A name length that runs past the end of the response.
+    let mut truncated_name = vec![FORMAT];
+    truncated_name.extend(varint(256));
+    assert!(parse_version(&truncated_name).is_err());
+}
+
+#[test]
+fn fingerprint_response_has_exactly_four_bytes() {
+    use ledger_bitcoin_client::protocol::{parse_master_fingerprint, ResponseError};
+    assert_eq!(
+        parse_master_fingerprint(&[1, 2, 3, 4]).unwrap().to_string(),
+        "01020304"
+    );
+    for len in [0, 3, 5] {
+        assert!(
+            matches!(parse_master_fingerprint(&vec![0; len]), Err(ResponseError::InvalidLength { expected: 4, actual, .. }) if actual == len)
+        );
+    }
+}
+
+#[test]
+fn registration_response_is_the_wallet_id_and_hmac() {
+    use ledger_bitcoin_client::protocol::{parse_wallet_registration, ResponseError};
+    let registration: Vec<u8> = (0..2 * HASH_LEN as u8).collect();
+    let (id, hmac) = parse_wallet_registration(&registration).unwrap();
+    assert_eq!(&id, &registration[..HASH_LEN]);
+    assert_eq!(&hmac, &registration[HASH_LEN..]);
+    for len in [2 * HASH_LEN - 1, 2 * HASH_LEN + 1] {
+        assert!(
+            matches!(parse_wallet_registration(&vec![0; len]), Err(ResponseError::InvalidLength { expected: 64, actual, .. }) if actual == len)
+        );
+    }
+}
+
+#[test]
+fn pubkey_response_is_untrimmed_utf8() {
+    use ledger_bitcoin_client::protocol::parse_extended_pubkey;
+    let xpub = KEY.split(']').nth(1).unwrap();
+    assert_eq!(
+        parse_extended_pubkey(xpub.as_bytes()).unwrap().to_string(),
+        xpub
+    );
+    assert!(parse_extended_pubkey(format!("{xpub}\n").as_bytes()).is_err());
+    assert!(parse_extended_pubkey(&[0xff]).is_err());
+}
+
+#[test]
+fn address_response_is_untrimmed_utf8() {
+    use ledger_bitcoin_client::protocol::parse_wallet_address;
+    let address = "tb1pws8wvnj99ca6acf8kq7pjk7vyxknah0d9mexckh5s0vu2ccy68js9am6u7";
+    assert_eq!(
+        parse_wallet_address(address.as_bytes())
+            .unwrap()
+            .assume_checked()
+            .to_string(),
+        address
+    );
+    assert!(parse_wallet_address(format!(" {address}").as_bytes()).is_err());
+    assert!(parse_wallet_address(&[0xff]).is_err());
+}
+
+#[test]
+fn message_signature_response_validates_length_and_encoding() {
+    use ledger_bitcoin_client::protocol::{parse_message_signature, ResponseError};
+    let mut signature = vec![255];
+    signature.extend([1; 64]);
+    let (header, sig) = parse_message_signature(&signature).unwrap();
+    assert_eq!(header, 255);
+    assert_eq!(sig.serialize_compact(), [1; 64]);
+    for len in [0, 1, 64, 66] {
+        assert!(
+            matches!(parse_message_signature(&vec![0; len]), Err(ResponseError::InvalidLength { expected: 65, actual, .. }) if actual == len)
+        );
+    }
+    assert!(matches!(
+        parse_message_signature(&[255; 65]),
+        Err(ResponseError::InvalidFormat { .. })
+    ));
+}
