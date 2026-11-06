@@ -52,6 +52,7 @@ pub struct PsbtV2Maps {
     pub outputs: Vec<PsbtMap>,
 }
 
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PsbtV2Error {
     /// The number of inputs or outputs of the unsigned transaction differs from the number of
@@ -413,5 +414,80 @@ mod tests {
         );
         // a key length that runs past the end of the buffer
         assert!(split_maps(b"psbt\xff\x08\x01\x02", 1).is_none());
+    }
+
+    #[test]
+    fn unknown_and_proprietary_fields_survive_in_every_map() {
+        let mut psbt = unsigned_psbt();
+        let unknown = raw::Key {
+            type_value: 0x70,
+            key: vec![9],
+        };
+        let proprietary = raw::ProprietaryKey {
+            prefix: b"hw".to_vec(),
+            subtype: 1,
+            key: vec![9],
+        };
+        psbt.unknown.insert(unknown.clone(), vec![1]);
+        psbt.inputs[0].unknown.insert(unknown.clone(), vec![2]);
+        psbt.outputs[0].unknown.insert(unknown, vec![3]);
+        psbt.proprietary.insert(proprietary.clone(), vec![4]);
+        psbt.inputs[0]
+            .proprietary
+            .insert(proprietary.clone(), vec![5]);
+        psbt.outputs[0].proprietary.insert(proprietary, vec![6]);
+        let maps = get_v2_maps(&psbt).unwrap();
+        for (i, map) in [&maps.global, &maps.inputs[0], &maps.outputs[0]]
+            .iter()
+            .enumerate()
+        {
+            assert!(map.contains(&(vec![0x70, 9], vec![i as u8 + 1])));
+            assert!(map.contains(&(vec![0xfc, 2, b'h', b'w', 1, 9], vec![i as u8 + 4])));
+        }
+    }
+
+    #[test]
+    fn every_synthesized_v2_field_rejects_conflicts() {
+        for (map_index, key_types) in [
+            (
+                0,
+                &[
+                    PSBT_GLOBAL_TX_VERSION,
+                    PSBT_GLOBAL_FALLBACK_LOCKTIME,
+                    PSBT_GLOBAL_INPUT_COUNT,
+                    PSBT_GLOBAL_OUTPUT_COUNT,
+                    PSBT_GLOBAL_VERSION,
+                ][..],
+            ),
+            (
+                1,
+                &[
+                    PSBT_IN_PREVIOUS_TXID,
+                    PSBT_IN_OUTPUT_INDEX,
+                    PSBT_IN_SEQUENCE,
+                ][..],
+            ),
+            (2, &[PSBT_OUT_AMOUNT, PSBT_OUT_SCRIPT][..]),
+        ] {
+            for &key_type in key_types {
+                let mut psbt = unsigned_psbt();
+                let map = match map_index {
+                    0 => &mut psbt.unknown,
+                    1 => &mut psbt.inputs[0].unknown,
+                    _ => &mut psbt.outputs[0].unknown,
+                };
+                map.insert(keyless(key_type), vec![42]);
+                assert_eq!(
+                    get_v2_maps(&psbt).err(),
+                    Some(PsbtV2Error::UnexpectedV2Field(key_type))
+                );
+            }
+        }
+        let mut psbt = unsigned_psbt();
+        psbt.inputs.clear();
+        assert_eq!(
+            get_v2_maps(&psbt).err(),
+            Some(PsbtV2Error::TxMapCountMismatch)
+        );
     }
 }

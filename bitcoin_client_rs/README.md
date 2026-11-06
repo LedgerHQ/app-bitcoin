@@ -48,6 +48,12 @@ defaults to use the public `command`, `interpreter`, `merkle`, `protocol`,
 `psbt`, and `wallet` modules without either convenience client. Set
 `default-features = false` on the dependency in Cargo.toml.
 
+`protocol::prepare_register_wallet`, `prepare_get_wallet_address`,
+`prepare_sign_message`, and `prepare_sign_psbt` each return an APDU command and
+`ClientCommandInterpreter` state for a caller-owned exchange loop. PSBT
+preparation is fallible because it translates the input to PSBTv2 maps.
+The protocol layer performs no transport I/O and selects no runtime.
+
 `protocol` also exposes response parsers with detailed `ResponseError`
 diagnostics. Convenience clients deliberately preserve their existing
 `UnexpectedResult { command, data }` errors instead.
