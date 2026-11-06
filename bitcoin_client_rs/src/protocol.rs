@@ -1,5 +1,7 @@
 //! This module contains types that are specific to the Ledger Bitcoin application protocol.
 
+use core::convert::TryFrom;
+
 use bitcoin::{
     consensus::encode::{deserialize_partial, Decodable, Encodable, Error as EncodeError},
     hashes::Hash,
@@ -134,9 +136,16 @@ pub enum SignPsbtYieldedObject {
     Unknown(Vec<u8>),
 }
 
+fn checked_input_index(index: u64) -> Result<usize, PartialSignatureError> {
+    u32::try_from(index)
+        .map(|index| index as usize)
+        .map_err(|_| PartialSignatureError::InvalidInputIndex)
+}
+
 /// Parses a single payload yielded by the device during `sign_psbt`.
 ///
 /// On success returns the input index together with the decoded object.
+/// Input indices must fit in a `u32`, independently of the host pointer width.
 pub fn parse_sign_psbt_yielded(
     data: &[u8],
 ) -> Result<(usize, SignPsbtYieldedObject), PartialSignatureError> {
@@ -169,7 +178,7 @@ pub fn parse_sign_psbt_yielded(
                 None
             };
             Ok((
-                input_index as usize,
+                checked_input_index(input_index)?,
                 SignPsbtYieldedObject::MusigPubNonce(MusigPubNonce {
                     participant_pubkey,
                     aggregate_pubkey,
@@ -203,7 +212,7 @@ pub fn parse_sign_psbt_yielded(
                 None
             };
             Ok((
-                input_index as usize,
+                checked_input_index(input_index)?,
                 SignPsbtYieldedObject::MusigPartialSignature(MusigPartialSignature {
                     participant_pubkey,
                     aggregate_pubkey,
@@ -222,14 +231,14 @@ pub fn parse_sign_psbt_yielded(
                     .map_err(|_| PartialSignatureError::InvalidLength)?;
             let rest = &data[i + j..];
             Ok((
-                input_index as usize,
+                checked_input_index(input_index)?,
                 SignPsbtYieldedObject::Unknown(rest.to_vec()),
             ))
         }
         // Otherwise the leading varint is the input index and the remainder is a regular partial signature.
         // These are the only payloads that were used in protocol versions prior to the introduction of the tags.
         _ => {
-            let input_index = tag as usize;
+            let input_index = checked_input_index(tag)?;
             let ps = PartialSignature::from_slice(&data[i..])?;
             Ok((input_index, SignPsbtYieldedObject::Partial(ps)))
         }
@@ -429,6 +438,110 @@ mod tests {
         assert!(matches!(
             parse_sign_psbt_yielded(&payload),
             Err(PartialSignatureError::PubKey(_))
+        ));
+    }
+
+    #[test]
+    fn yielded_input_indices_have_platform_independent_u32_bounds() {
+        for tag in [
+            CCMD_YIELD_MUSIG_PUBNONCE_TAG,
+            CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG,
+            0x8000_0000,
+            u64::MAX,
+        ] {
+            for index in [u32::MAX as u64, u32::MAX as u64 + 1, u64::MAX] {
+                let payload = match tag {
+                    CCMD_YIELD_MUSIG_PUBNONCE_TAG => build_musig_pubnonce(index, false),
+                    CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG => build_musig_partial_sig(index, false),
+                    _ => [
+                        serialize(&UncheckedVarInt(tag)),
+                        serialize(&UncheckedVarInt(index)),
+                    ]
+                    .concat(),
+                };
+                let parsed = parse_sign_psbt_yielded(&payload);
+                if index == u32::MAX as u64 {
+                    assert_eq!(parsed.unwrap().0, u32::MAX as usize);
+                } else {
+                    assert!(matches!(
+                        parsed,
+                        Err(PartialSignatureError::InvalidInputIndex)
+                    ));
+                }
+            }
+        }
+        const MAX_UNTAGGED_INPUT_INDEX: u64 = 0x7fff_ffff;
+        let mut regular = serialize(&UncheckedVarInt(MAX_UNTAGGED_INPUT_INDEX));
+        regular.push(32);
+        regular.extend(XONLY);
+        regular.extend([0xaa; 64]);
+        assert_eq!(parse_ok(&regular).0, MAX_UNTAGGED_INPUT_INDEX as usize);
+    }
+
+    #[test]
+    fn malformed_compact_size_is_not_an_out_of_range_index() {
+        for malformed in [
+            vec![],
+            vec![0xfd],
+            vec![0xfd, 1, 0],
+            vec![0xfe, 0, 1, 0, 0],
+            vec![0xff, 0, 0, 0, 0, 0, 0, 0, 0],
+        ] {
+            assert!(matches!(
+                parse_sign_psbt_yielded(&malformed),
+                Err(PartialSignatureError::InvalidLength)
+            ));
+            for tag in [
+                CCMD_YIELD_MUSIG_PUBNONCE_TAG,
+                CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG,
+                u64::MAX,
+            ] {
+                let mut payload = serialize(&UncheckedVarInt(tag));
+                payload.extend(&malformed);
+                assert!(matches!(
+                    parse_sign_psbt_yielded(&payload),
+                    Err(PartialSignatureError::InvalidLength)
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn musig_variants_reject_truncation_and_invalid_keys() {
+        for (builder, value_len) in [
+            (build_musig_pubnonce as fn(u64, bool) -> Vec<u8>, 66),
+            (build_musig_partial_sig as fn(u64, bool) -> Vec<u8>, 32),
+        ] {
+            for tapleaf in [false, true] {
+                let mut payload = builder(2, tapleaf);
+                assert!(matches!(
+                    parse_sign_psbt_yielded(&payload[..payload.len() - 1]),
+                    Err(PartialSignatureError::InvalidLength)
+                ));
+                let tag_and_index_len = serialize(&UncheckedVarInt(CCMD_YIELD_MUSIG_PUBNONCE_TAG))
+                    .len()
+                    + serialize(&UncheckedVarInt(2)).len();
+                let participant_offset = tag_and_index_len + value_len;
+                payload[participant_offset] = 0xff;
+                assert!(matches!(
+                    parse_sign_psbt_yielded(&payload),
+                    Err(PartialSignatureError::PubKey(_))
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn legacy_signature_encodings_reject_malformed_keys_and_signatures() {
+        for malformed in [vec![0], vec![0, 64, 1], vec![0, 32], vec![0, 33, 0, 0]] {
+            assert!(parse_sign_psbt_yielded(&malformed).is_err());
+        }
+        let mut payload = vec![0, 32];
+        payload.extend(XONLY);
+        payload.extend([0xaa; 63]);
+        assert!(matches!(
+            parse_sign_psbt_yielded(&payload),
+            Err(PartialSignatureError::TaprootSig(_))
         ));
     }
 }

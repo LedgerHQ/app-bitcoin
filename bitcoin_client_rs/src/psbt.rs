@@ -232,9 +232,11 @@ impl PartialSignature {
     }
 }
 
+#[derive(Debug)]
 pub enum PartialSignatureError {
     BadKeyAugmentLength,
     InvalidLength,
+    InvalidInputIndex,
     XOnlyPubKey(secp256k1::Error),
     PubKey(KeyError),
     EcdsaSig(ecdsa::Error),
