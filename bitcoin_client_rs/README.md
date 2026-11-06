@@ -48,6 +48,9 @@ defaults to use the public `command`, `interpreter`, `merkle`, `protocol`,
 `psbt`, and `wallet` modules without either convenience client. Set
 `default-features = false` on the dependency in Cargo.toml.
 
+Yielded input indices must fit in a `u32` on every host; tags still support the
+full `u64` range.
+
 Enable `client` for synchronous `BitcoinClient`/`Transport`, or `async` for
 both client modules.
 
@@ -56,6 +59,10 @@ both client modules.
 This is a breaking feature/API release. In 0.7, `default-features = false`
 still exposed the synchronous client. In 0.8, add `features = ["client"]`
 to keep it, or `features = ["async"]` to enable both clients.
+
+Well-encoded yielded indices above `u32::MAX` now return
+`PartialSignatureError::InvalidInputIndex`; malformed CompactSize encodings
+still return `InvalidLength`.
 
 ## The `async` feature
 
