@@ -33,32 +33,22 @@ impl<T: Transport> BitcoinClient<T> {
     fn make_request(
         &self,
         req: &APDUCommand,
-        interpreter: Option<&mut ClientCommandInterpreter>,
+        mut interpreter: Option<&mut ClientCommandInterpreter>,
     ) -> Result<Vec<u8>, BitcoinClientError<T::Error>> {
-        let (mut sw, mut data) = self
+        let mut response = self
             .transport
             .exchange(req)
             .map_err(BitcoinClientError::Transport)?;
-
-        if let Some(interpreter) = interpreter {
-            while sw == StatusWord::InterruptedExecution {
-                let response = interpreter.execute(data)?;
-                let res = self
-                    .transport
-                    .exchange(&command::continue_interrupted(response))
-                    .map_err(BitcoinClientError::Transport)?;
-                sw = res.0;
-                data = res.1;
+        loop {
+            match handle_response(req.ins, response.0, response.1, interpreter.as_deref_mut())? {
+                Step::Continue(command) => {
+                    response = self
+                        .transport
+                        .exchange(&command)
+                        .map_err(BitcoinClientError::Transport)?;
+                }
+                Step::Done(data) => return Ok(data),
             }
-        }
-
-        if sw != StatusWord::OK {
-            Err(BitcoinClientError::Device {
-                status: sw,
-                command: req.ins,
-            })
-        } else {
-            Ok(data)
         }
     }
 

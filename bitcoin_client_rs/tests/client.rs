@@ -544,3 +544,75 @@ async fn empty_message_signature_is_an_unexpected_result() {
         );
     }
 }
+
+#[tokio::test]
+async fn request_step_errors_keep_original_instruction_and_category() {
+    use ledger_bitcoin_client::{
+        apdu::StatusWord, command, error::BitcoinClientError, interpreter::InterpreterError,
+        protocol::prepare_sign_message,
+    };
+    let path = DerivationPath::from_str("m/44'/1'/0'/0").unwrap();
+    let (command, _) = prepare_sign_message(b"hello", &path);
+    let continuation = hex::decode("f801000100").unwrap();
+    for (terminal, interpreter_error) in [(vec![0x69, 0x85], false), (vec![0xff, 0xe0, 0], true)] {
+        let store = utils::RecordStore {
+            queue: vec![
+                (command.encode(), vec![0x10, 1, 2, 0xe0, 0]),
+                (continuation.clone(), vec![0x10, 3, 4, 0xe0, 0]),
+                (continuation.clone(), terminal),
+            ],
+        };
+        let check = |result| {
+            if interpreter_error {
+                assert!(matches!(
+                    result,
+                    Err(BitcoinClientError::Interpreter(
+                        InterpreterError::UnknownCommand(0xff)
+                    ))
+                ));
+            } else {
+                assert!(matches!(
+                    result,
+                    Err(BitcoinClientError::Device {
+                        command: 0x10,
+                        status: StatusWord::Deny
+                    })
+                ));
+            }
+        };
+        check(
+            client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                .sign_message(b"hello", &path),
+        );
+        #[cfg(feature = "async")]
+        check(
+            async_client::BitcoinClient::new(utils::TransportReplayer::new(store))
+                .sign_message(b"hello", &path)
+                .await,
+        );
+    }
+    let store = utils::RecordStore {
+        queue: vec![(
+            command::get_master_fingerprint().encode(),
+            vec![0xff, 0xe0, 0],
+        )],
+    };
+    assert!(matches!(
+        client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+            .get_master_fingerprint(),
+        Err(BitcoinClientError::Device {
+            command: 5,
+            status: StatusWord::InterruptedExecution
+        })
+    ));
+    #[cfg(feature = "async")]
+    assert!(matches!(
+        async_client::BitcoinClient::new(utils::TransportReplayer::new(store))
+            .get_master_fingerprint()
+            .await,
+        Err(BitcoinClientError::Device {
+            command: 5,
+            status: StatusWord::InterruptedExecution
+        })
+    ));
+}
