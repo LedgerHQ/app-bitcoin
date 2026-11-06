@@ -14,7 +14,6 @@ use miniscript::{Descriptor, DescriptorPublicKey};
 
 use crate::{
     apdu::{APDUCommand, StatusWord},
-    command,
     error::BitcoinClientError,
     protocol::*,
     wallet::WalletPolicy,
@@ -31,30 +30,20 @@ impl<T: Transport> BitcoinClient<T> {
     }
 
     fn make_request(&self, request: &mut Request) -> Result<Vec<u8>, BitcoinClientError<T::Error>> {
-        let (mut sw, mut data) = self
+        let mut response = self
             .transport
             .exchange(request.command())
             .map_err(BitcoinClientError::Transport)?;
-
-        if let Some(interpreter) = request.interpreter_mut() {
-            while sw == StatusWord::InterruptedExecution {
-                let response = interpreter.execute(data)?;
-                let res = self
-                    .transport
-                    .exchange(&command::continue_interrupted(response))
-                    .map_err(BitcoinClientError::Transport)?;
-                sw = res.0;
-                data = res.1;
+        loop {
+            match request.step(response.0, response.1)? {
+                Step::Continue(command) => {
+                    response = self
+                        .transport
+                        .exchange(&command)
+                        .map_err(BitcoinClientError::Transport)?;
+                }
+                Step::Done(data) => return Ok(data),
             }
-        }
-
-        if sw != StatusWord::OK {
-            Err(BitcoinClientError::Device {
-                status: sw,
-                command: request.command().ins,
-            })
-        } else {
-            Ok(data)
         }
     }
 

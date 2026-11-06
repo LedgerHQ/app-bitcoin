@@ -1,6 +1,6 @@
 use core::fmt::{self, Debug};
 
-use crate::{apdu::StatusWord, interpreter::InterpreterError};
+use crate::{apdu::StatusWord, interpreter::InterpreterError, protocol::RequestError};
 
 /// An error of the convenience clients.
 #[non_exhaustive]
@@ -12,9 +12,13 @@ pub enum BitcoinClientError<T: Debug> {
     /// error shows it, and [`source`](std::error::Error::source) does not return it.
     Transport(T),
     Interpreter(InterpreterError),
+    /// The device returned an error status. When the app reports an error code, as it does for
+    /// some failures, `data` is that 2-byte code.
+    #[non_exhaustive]
     Device {
         command: u8,
         status: StatusWord,
+        data: Vec<u8>,
     },
     #[non_exhaustive]
     UnexpectedResult {
@@ -32,9 +36,11 @@ impl<T: Debug> fmt::Display for BitcoinClientError<T> {
             Self::InvalidPsbt => f.write_str("Invalid PSBT"),
             Self::Transport(error) => write!(f, "Transport error: {:?}", error),
             Self::Interpreter(error) => fmt::Display::fmt(error, f),
-            Self::Device { command, status } => {
-                write!(f, "Command {:#04x} failed: {:?}", command, status)
-            }
+            Self::Device {
+                command,
+                status,
+                data,
+            } => crate::protocol::write_device_error(f, *command, *status, data),
             Self::UnexpectedResult { command, data } => write!(
                 f,
                 "Unexpected response to command {:#04x} ({} bytes)",
@@ -59,5 +65,23 @@ impl<T: Debug> std::error::Error for BitcoinClientError<T> {
 impl<T: Debug> From<InterpreterError> for BitcoinClientError<T> {
     fn from(e: InterpreterError) -> BitcoinClientError<T> {
         BitcoinClientError::Interpreter(e)
+    }
+}
+
+impl<T: Debug> From<RequestError> for BitcoinClientError<T> {
+    fn from(error: RequestError) -> Self {
+        match error {
+            RequestError::Device {
+                command,
+                status,
+                data,
+            } => Self::Device {
+                command,
+                status,
+                data,
+            },
+            RequestError::Interpreter(error) => Self::Interpreter(error),
+            RequestError::Finished => Self::ClientError(error.to_string()),
+        }
     }
 }

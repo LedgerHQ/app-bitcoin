@@ -685,6 +685,237 @@ fn wallet_and_message_preparation_supply_delegated_preimages() {
     }
 }
 
+#[test]
+fn status_words_keep_their_value() {
+    use ledger_bitcoin_client::apdu::StatusWord;
+    // The statuses sent by the app (src/boilerplate/sw.h) and by the OS.
+    for (status, value, name) in [
+        (StatusWord::DeviceLocked, 0x5515, "DeviceLocked"),
+        (
+            StatusWord::SecurityStatusNotSatisfied,
+            0x6982,
+            "SecurityStatusNotSatisfied",
+        ),
+        (StatusWord::Deny, 0x6985, "Deny"),
+        (StatusWord::IncorrectData, 0x6a80, "IncorrectData"),
+        (StatusWord::NotSupported, 0x6a82, "NotSupported"),
+        (StatusWord::WrongP1P2, 0x6a86, "WrongP1P2"),
+        (StatusWord::WrongDataLength, 0x6a87, "WrongDataLength"),
+        (StatusWord::SwapFail, 0x6b00, "SwapFail"),
+        (StatusWord::InsNotSupported, 0x6d00, "InsNotSupported"),
+        (StatusWord::ClaNotSupported, 0x6e00, "ClaNotSupported"),
+        (
+            StatusWord::WrongResponseLength,
+            0xb000,
+            "WrongResponseLength",
+        ),
+        (StatusWord::BadState, 0xb007, "BadState"),
+        (StatusWord::SignatureFail, 0xb008, "SignatureFail"),
+        (StatusWord::OK, 0x9000, "OK"),
+        (
+            StatusWord::InterruptedExecution,
+            0xe000,
+            "InterruptedExecution",
+        ),
+    ] {
+        assert_eq!(StatusWord::from(value), status);
+        assert_eq!(u16::from(status), value);
+        assert_eq!(status.name(), Some(name));
+        assert_eq!(format!("{:?}", status), name);
+        assert_eq!(status.to_string(), format!("{:#06x} ({})", value, name));
+    }
+    let unnamed = StatusWord::from(0x6e01);
+    assert_eq!(u16::from(unnamed), 0x6e01);
+    assert_eq!(unnamed.name(), None);
+    assert_eq!(format!("{:?}", unnamed), "StatusWord(0x6e01)");
+    assert_eq!(unnamed.to_string(), "0x6e01");
+}
+
+#[test]
+fn device_errors_show_the_status_and_the_response_data() {
+    use ledger_bitcoin_client::{
+        apdu::StatusWord,
+        interpreter::InterpreterError,
+        protocol::{prepare_get_master_fingerprint, RequestError},
+    };
+    let error = prepare_get_master_fingerprint()
+        .step(StatusWord::Deny, vec![0x00, 0x17])
+        .unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "Command 0x05 failed with status 0x6985 (Deny) (response data: 0017)"
+    );
+    let error = prepare_get_master_fingerprint()
+        .step(StatusWord::from(0x6e01), vec![])
+        .unwrap_err();
+    assert_eq!(error.to_string(), "Command 0x05 failed with status 0x6e01");
+
+    // An interpreter error is shown as itself, and is not repeated as the source.
+    let error = RequestError::Interpreter(InterpreterError::UnknownHash);
+    assert_eq!(error.to_string(), "Unknown preimage hash");
+    assert!(std::error::Error::source(&error).is_none());
+}
+
+/// The CONTINUE command carrying `response` to a client command.
+fn continuation(response: &[u8]) -> Vec<u8> {
+    let mut command = vec![
+        EXPECTED_FRAMEWORK_CLA,
+        EXPECTED_CONTINUE_INS,
+        0,
+        EXPECTED_PROTOCOL_VERSION,
+        response.len() as u8,
+    ];
+    command.extend(response);
+    command
+}
+
+#[test]
+fn steps_answer_client_commands_until_the_queue_is_empty() {
+    use ledger_bitcoin_client::{
+        apdu::StatusWord,
+        interpreter::InterpreterError,
+        protocol::{prepare_sign_message, RequestError, Step},
+    };
+    let path = DerivationPath::from_str("m/44'/1'/0'/0").unwrap();
+    let mut request = prepare_sign_message(b"", &path);
+    let preimage = vec![0x55; 256];
+    request
+        .interpreter_mut()
+        .unwrap()
+        .add_known_preimage(preimage.clone());
+    let mut interrupted = |client_command: Vec<u8>| -> Result<Vec<u8>, RequestError> {
+        match request.step(StatusWord::InterruptedExecution, client_command)? {
+            Step::Continue(command) => Ok(command.encode()),
+            Step::Done(_) => panic!("an interrupted execution must continue"),
+        }
+    };
+
+    let mut get_preimage = vec![ClientCommandCode::GetPreimage as u8, SHA256_HASH_TYPE];
+    get_preimage.extend(hash(&preimage));
+    // The preimage length, the length in this response, and as much of the preimage as fits.
+    let mut response = varint(preimage.len() as u64);
+    let first_chunk_len = MAX_RESPONSE_LEN - response.len() - 1;
+    response.push(first_chunk_len as u8);
+    response.extend(&preimage[..first_chunk_len]);
+    assert_eq!(interrupted(get_preimage).unwrap(), continuation(&response));
+
+    // The rest of the preimage is queued as one-byte elements.
+    let rest = &preimage[first_chunk_len..];
+    let mut response = vec![rest.len() as u8, 1];
+    response.extend(rest);
+    let get_more_elements = vec![ClientCommandCode::GetMoreElements as u8];
+    assert_eq!(
+        interrupted(get_more_elements.clone()).unwrap(),
+        continuation(&response)
+    );
+
+    let yielded = vec![1, 2];
+    let mut yield_command = vec![ClientCommandCode::Yield as u8];
+    yield_command.extend(&yielded);
+    assert_eq!(
+        interrupted(yield_command.clone()).unwrap(),
+        continuation(&[])
+    );
+
+    // An error finishes the request.
+    assert!(matches!(
+        interrupted(get_more_elements),
+        Err(RequestError::Interpreter(InterpreterError::UnexpectedQueue))
+    ));
+    assert!(matches!(
+        interrupted(yield_command),
+        Err(RequestError::Finished)
+    ));
+    assert_eq!(request.into_yielded(), vec![yielded]);
+
+    const UNKNOWN_CLIENT_COMMAND: u8 = 0xff;
+    for (client_command, expected) in [
+        (vec![], InterpreterError::EmptyInput),
+        (
+            vec![UNKNOWN_CLIENT_COMMAND],
+            InterpreterError::UnknownCommand(UNKNOWN_CLIENT_COMMAND),
+        ),
+    ] {
+        let mut request = prepare_sign_message(b"", &path);
+        assert_eq!(
+            request.step(StatusWord::InterruptedExecution, client_command),
+            Err(RequestError::Interpreter(expected))
+        );
+    }
+}
+
+#[test]
+fn steps_end_on_success_and_report_errors_for_the_requests_command() {
+    use ledger_bitcoin_client::{
+        apdu::StatusWord,
+        protocol::{
+            prepare_get_master_fingerprint, prepare_sign_message, Request, RequestError, Step,
+        },
+    };
+    const EXPECTED_GET_MASTER_FINGERPRINT_INS: u8 = 0x05;
+
+    // Success finishes the request.
+    let mut request = prepare_get_master_fingerprint();
+    assert!(matches!(
+        request.step(StatusWord::OK, vec![1, 2, 3]),
+        Ok(Step::Done(data)) if data == [1, 2, 3]
+    ));
+    assert!(matches!(
+        request.step(StatusWord::OK, vec![1, 2, 3]),
+        Err(RequestError::Finished)
+    ));
+
+    // Without an interpreter, an interruption is an error.
+    let mut request = prepare_get_master_fingerprint();
+    assert!(matches!(
+        request.step(
+            StatusWord::InterruptedExecution,
+            vec![ClientCommandCode::Yield as u8]
+        ),
+        Err(RequestError::Device {
+            command: EXPECTED_GET_MASTER_FINGERPRINT_INS,
+            status: StatusWord::InterruptedExecution,
+            ..
+        })
+    ));
+
+    let path = DerivationPath::from_str("m/44'/1'/0'/0").unwrap();
+    let yield_command = vec![ClientCommandCode::Yield as u8, 7, 8];
+    let continue_twice = |request: &mut Request| {
+        for _ in 0..2 {
+            assert!(matches!(
+                request.step(StatusWord::InterruptedExecution, yield_command.clone()),
+                Ok(Step::Continue(_))
+            ));
+        }
+    };
+    // A status without a name, sent by the SDK for an unknown default instruction.
+    const UNNAMED_STATUS: StatusWord = StatusWord(0x6e01);
+    // After continuations, errors still refer to the request's command, with the response data
+    // (here, an error code), and finish the request.
+    const ERROR_CODE: [u8; 2] = [0x00, 0x17];
+    for status in [StatusWord::Deny, StatusWord::IncorrectData, UNNAMED_STATUS] {
+        let mut request = prepare_sign_message(b"hello", &path);
+        continue_twice(&mut request);
+        assert!(matches!(
+            request.step(status, ERROR_CODE.to_vec()),
+            Err(RequestError::Device { command: EXPECTED_SIGN_MESSAGE_INS, status: actual, data, .. })
+                if actual == status && data == ERROR_CODE
+        ));
+        assert!(matches!(
+            request.step(StatusWord::OK, vec![]),
+            Err(RequestError::Finished)
+        ));
+    }
+    // The data of a successful response is returned, not interpreted.
+    let mut request = prepare_sign_message(b"hello", &path);
+    continue_twice(&mut request);
+    assert!(matches!(
+        request.step(StatusWord::OK, vec![0xff]),
+        Ok(Step::Done(data)) if data == [0xff]
+    ));
+    assert_eq!(request.into_yielded(), vec![vec![7, 8], vec![7, 8]]);
+}
 fn unsigned_psbt() -> bitcoin::psbt::Psbt {
     use bitcoin::{
         absolute::LockTime, transaction::Version, Amount, OutPoint, ScriptBuf, Sequence,

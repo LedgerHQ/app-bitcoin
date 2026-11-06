@@ -1,4 +1,3 @@
-use std::convert::TryFrom;
 use std::error::Error;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
@@ -38,12 +37,7 @@ impl Transport for TransportHID {
                 p2: cmd.p2,
                 data: cmd.data.clone(),
             })
-            .map(|answer| {
-                (
-                    StatusWord::try_from(answer.retcode()).unwrap_or(StatusWord::Unknown),
-                    answer.data().to_vec(),
-                )
-            })
+            .map(|answer| (StatusWord::from(answer.retcode()), answer.data().to_vec()))
             .map_err(|e| e.into())
     }
 }
@@ -84,10 +78,7 @@ impl Transport for TransportTcp {
         let mut resp = vec![0u8; len as usize + 2];
         stream.read_exact(&mut resp).await?;
         let answer = APDUAnswer::from_answer(resp).map_err(|_| "Invalid Answer")?;
-        Ok((
-            StatusWord::try_from(answer.retcode()).unwrap_or(StatusWord::Unknown),
-            answer.data().to_vec(),
-        ))
+        Ok((StatusWord::from(answer.retcode()), answer.data().to_vec()))
     }
 }
 

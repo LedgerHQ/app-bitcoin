@@ -16,6 +16,7 @@ use ledger_bitcoin_client::{
 };
 
 // Instruction codes of the Bitcoin app, independent of the production constants.
+const GET_MASTER_FINGERPRINT_INS: u8 = 0x05;
 const SIGN_MESSAGE_INS: u8 = 0x10;
 
 fn test_cases(path: &str) -> Vec<serde_json::Value> {
@@ -545,4 +546,100 @@ async fn empty_message_signature_is_an_unexpected_result() {
             matches!(result, Err(BitcoinClientError::UnexpectedResult { command: SIGN_MESSAGE_INS, data, .. }) if data.is_empty())
         );
     }
+}
+
+#[tokio::test]
+async fn request_errors_keep_the_original_instruction_and_category() {
+    use ledger_bitcoin_client::{
+        apdu::StatusWord, command, error::BitcoinClientError, interpreter::InterpreterError,
+        protocol::prepare_sign_message,
+    };
+    const SW_INTERRUPTED: [u8; 2] = [0xe0, 0x00];
+    const SW_DENY: [u8; 2] = [0x69, 0x85];
+    const YIELD: u8 = 0x10;
+    const UNKNOWN_CLIENT_COMMAND: u8 = 0xff;
+    const ERROR_CODE: [u8; 2] = [0x00, 0x17];
+    let with_status = |data: &[u8], status: [u8; 2]| [data, &status[..]].concat();
+
+    let path = DerivationPath::from_str("m/44'/1'/0'/0").unwrap();
+    let message = b"hello";
+    let sign_message = prepare_sign_message(message, &path).command().encode();
+    let continue_after_yield = command::continue_interrupted(vec![]).encode();
+    // Two yields, then either an error status or a client command that is not understood.
+    for (last_response, interpreter_error) in [
+        (with_status(&ERROR_CODE, SW_DENY), false),
+        (with_status(&[UNKNOWN_CLIENT_COMMAND], SW_INTERRUPTED), true),
+    ] {
+        let store = utils::RecordStore {
+            queue: vec![
+                (
+                    sign_message.clone(),
+                    with_status(&[YIELD, 1, 2], SW_INTERRUPTED),
+                ),
+                (
+                    continue_after_yield.clone(),
+                    with_status(&[YIELD, 3, 4], SW_INTERRUPTED),
+                ),
+                (continue_after_yield.clone(), last_response),
+            ],
+        };
+        let check = |result| {
+            if interpreter_error {
+                assert!(matches!(
+                    result,
+                    Err(BitcoinClientError::Interpreter(
+                        InterpreterError::UnknownCommand(UNKNOWN_CLIENT_COMMAND)
+                    ))
+                ));
+            } else {
+                assert!(matches!(
+                    result,
+                    Err(BitcoinClientError::Device {
+                        command: SIGN_MESSAGE_INS,
+                        status: StatusWord::Deny,
+                        data,
+                        ..
+                    }) if data == ERROR_CODE
+                ));
+            }
+        };
+        check(
+            client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                .sign_message(message, &path),
+        );
+        #[cfg(feature = "async")]
+        check(
+            async_client::BitcoinClient::new(utils::TransportReplayer::new(store))
+                .sign_message(message, &path)
+                .await,
+        );
+    }
+
+    // A command that is never interrupted fails on an interruption.
+    let store = utils::RecordStore {
+        queue: vec![(
+            command::get_master_fingerprint().encode(),
+            with_status(&[YIELD], SW_INTERRUPTED),
+        )],
+    };
+    assert!(matches!(
+        client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+            .get_master_fingerprint(),
+        Err(BitcoinClientError::Device {
+            command: GET_MASTER_FINGERPRINT_INS,
+            status: StatusWord::InterruptedExecution,
+            ..
+        })
+    ));
+    #[cfg(feature = "async")]
+    assert!(matches!(
+        async_client::BitcoinClient::new(utils::TransportReplayer::new(store))
+            .get_master_fingerprint()
+            .await,
+        Err(BitcoinClientError::Device {
+            command: GET_MASTER_FINGERPRINT_INS,
+            status: StatusWord::InterruptedExecution,
+            ..
+        })
+    ));
 }

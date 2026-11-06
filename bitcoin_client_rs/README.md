@@ -50,6 +50,12 @@ convenience clients, in the `apdu`, `command`, `interpreter`, `protocol`,
 `psbt` and `wallet` modules. This lets an application that owns the device I/O
 reuse the protocol implementation.
 
+Each command has a `protocol::prepare_*` function returning a `Request` (in a
+`Result` for `prepare_sign_psbt`, as converting the PSBT can fail), which
+answers the client commands of the device in `Request::step`, and most have a
+`protocol::parse_*` function for the final response. The documentation of
+`protocol::Request` shows the exchange loop.
+
 Enable `client` for the synchronous `BitcoinClient`, or `async` for both
 clients.
 

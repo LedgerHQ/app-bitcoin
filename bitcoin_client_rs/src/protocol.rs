@@ -16,9 +16,9 @@ use bitcoin::{
 };
 
 use crate::{
-    apdu::APDUCommand,
+    apdu::{APDUCommand, StatusWord},
     command,
-    interpreter::{get_merkleized_map_commitment, ClientCommandInterpreter},
+    interpreter::{get_merkleized_map_commitment, ClientCommandInterpreter, InterpreterError},
     psbt::{get_v2_maps, PartialSignature, PartialSignatureError, PsbtV2Error},
     wallet::WalletPolicy,
 };
@@ -26,11 +26,39 @@ use crate::{
 /// A command to send to the device, together with the state needed to answer the client
 /// commands that the device may send while executing it.
 ///
-/// The `prepare_*` functions build a request for each command of the Bitcoin app.
+/// The `prepare_*` functions build a request for each command of the Bitcoin app. The caller sends
+/// [`Request::command`] to the device, and passes each response to [`Request::step`] until it
+/// returns [`Step::Done`] or an error.
+///
+/// A request is single-use: once it is done or has failed, [`Request::step`] returns
+/// [`RequestError::Finished`]. To retry, for example after a transport error, prepare a new
+/// request.
+///
+/// ```
+/// use ledger_bitcoin_client::{
+///     apdu::{APDUCommand, StatusWord},
+///     protocol::{Request, RequestError, Step},
+/// };
+///
+/// /// Runs `request`, returning the device's final response.
+/// fn run<E: From<RequestError>>(
+///     request: &mut Request,
+///     mut exchange: impl FnMut(&APDUCommand) -> Result<(StatusWord, Vec<u8>), E>,
+/// ) -> Result<Vec<u8>, E> {
+///     let (mut status, mut data) = exchange(request.command())?;
+///     loop {
+///         match request.step(status, data)? {
+///             Step::Continue(command) => (status, data) = exchange(&command)?,
+///             Step::Done(data) => return Ok(data),
+///         }
+///     }
+/// }
+/// ```
 #[derive(Debug)]
 pub struct Request {
     command: APDUCommand,
     interpreter: Option<ClientCommandInterpreter>,
+    finished: bool,
 }
 
 impl Request {
@@ -39,6 +67,7 @@ impl Request {
         Self {
             command,
             interpreter: None,
+            finished: false,
         }
     }
 
@@ -47,6 +76,7 @@ impl Request {
         Self {
             command,
             interpreter: Some(interpreter),
+            finished: false,
         }
     }
 
@@ -60,12 +90,115 @@ impl Request {
         self.interpreter.as_mut()
     }
 
+    /// Handles a response of the device to the request's command, or to a previous
+    /// [`Step::Continue`] command. `data` excludes the status word.
+    ///
+    /// On success, returns [`Step::Done`] with the response data. If the device interrupted the
+    /// execution with a client command, the interpreter answers it, and the answer must be sent
+    /// with [`Step::Continue`]. Any other status, or an interruption of a request without an
+    /// interpreter, is a [`RequestError::Device`] error for the request's command, with the
+    /// response data.
+    ///
+    /// After [`Step::Done`] or an error, the request is finished, and every further call returns
+    /// [`RequestError::Finished`].
+    pub fn step(&mut self, status: StatusWord, data: Vec<u8>) -> Result<Step, RequestError> {
+        if self.finished {
+            return Err(RequestError::Finished);
+        }
+        let step = match (status, self.interpreter.as_mut()) {
+            (StatusWord::OK, _) => Ok(Step::Done(data)),
+            (StatusWord::InterruptedExecution, Some(interpreter)) => interpreter
+                .execute(data)
+                .map(|response| Step::Continue(command::continue_interrupted(response)))
+                .map_err(RequestError::Interpreter),
+            _ => Err(RequestError::Device {
+                command: self.command.ins,
+                status,
+                data,
+            }),
+        };
+        self.finished = !matches!(step, Ok(Step::Continue(_)));
+        step
+    }
+
     /// Consumes the request and returns the values that the device yielded while executing it.
+    ///
+    /// They are complete only if the request is done: after an error, they are the values
+    /// yielded before it.
     pub fn into_yielded(self) -> Vec<Vec<u8>> {
         self.interpreter
             .map(ClientCommandInterpreter::yielded)
             .unwrap_or_default()
     }
+}
+
+/// What to do after a response of the device; see [`Request::step`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Step {
+    /// Send this command to the device, and pass its response to [`Request::step`].
+    Continue(APDUCommand),
+    /// The request is complete, with this response data.
+    Done(Vec<u8>),
+}
+
+/// An error executing a [`Request`].
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RequestError {
+    /// The device returned an error status for the request's command. When the app reports an
+    /// error code, as it does for some failures, `data` is that 2-byte code.
+    #[non_exhaustive]
+    Device {
+        command: u8,
+        status: StatusWord,
+        data: Vec<u8>,
+    },
+    /// A client command sent by the device could not be answered.
+    Interpreter(InterpreterError),
+    /// The request is already done or has failed.
+    Finished,
+}
+
+impl fmt::Display for RequestError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Device {
+                command,
+                status,
+                data,
+            } => write_device_error(f, *command, *status, data),
+            Self::Interpreter(error) => fmt::Display::fmt(error, f),
+            Self::Finished => f.write_str("The request is already finished"),
+        }
+    }
+}
+
+impl std::error::Error for RequestError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            // Transparent: the interpreter error is the message itself.
+            Self::Interpreter(error) => error.source(),
+            Self::Device { .. } | Self::Finished => None,
+        }
+    }
+}
+
+/// Formats a failure of `command` with `status`, and the response data if any.
+pub(crate) fn write_device_error(
+    f: &mut fmt::Formatter<'_>,
+    command: u8,
+    status: StatusWord,
+    data: &[u8],
+) -> fmt::Result {
+    write!(f, "Command {:#04x} failed with status {}", command, status)?;
+    if !data.is_empty() {
+        f.write_str(" (response data: ")?;
+        for byte in data {
+            write!(f, "{:02x}", byte)?;
+        }
+        f.write_str(")")?;
+    }
+    Ok(())
 }
 
 /// Prepares GET_VERSION.

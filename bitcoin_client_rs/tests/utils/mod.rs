@@ -1,4 +1,3 @@
-use core::convert::TryFrom;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[cfg(feature = "async")]
@@ -80,10 +79,7 @@ impl TransportReplayer {
             buff.copy_from_slice(&res[res.len() - 2..res.len()]);
             let sw = u16::from_be_bytes(buff);
             let answer = &res[0..res.len() - 2];
-            return Ok((
-                StatusWord::try_from(sw).expect("Wrong tests data"),
-                answer.to_vec(),
-            ));
+            return Ok((StatusWord::from(sw), answer.to_vec()));
         }
         Err(MockError::ExchangeNotFound(current, hex::encode(payload)))
     }

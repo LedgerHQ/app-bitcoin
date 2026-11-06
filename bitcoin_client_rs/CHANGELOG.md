@@ -24,6 +24,12 @@ This release exposes the protocol without the transport, for applications that o
 - `SignPsbtYieldedObject::Unknown` is a non-exhaustive struct variant with the object's `tag`, and the `data` that follows the input index. It previously had only the data, so the tag was lost.
 - Responses are parsed strictly: fixed-length responses (master fingerprint, wallet registration) must have exactly the expected length, GET_VERSION must not have trailing bytes, and the extended pubkey and address must be valid UTF-8. The Bitcoin app always sends such responses; anything else is now an `UnexpectedResult` error.
 - `PsbtV2Error` is `#[non_exhaustive]`.
+- `StatusWord` is a newtype over the raw status word, so that statuses without a name are no longer lost. Build it with `StatusWord::from(u16)` instead of `TryFrom`, and read it with `u16::from` or `.0` instead of `as u16`. The named statuses are associated constants with the same names as the former variants (so `StatusWord::Deny` still works, in patterns too), plus `DeviceLocked` (0x5515), `SecurityStatusNotSatisfied` (0x6982), `SwapFail` (0x6B00) and `WrongResponseLength` (0xB000).
+- `BitcoinClientError::Device` contains the response data, which is the app's 2-byte error code when it reports one; the variant is `#[non_exhaustive]`.
+
+### Removed
+
+- `StatusWord::Unknown`: a status without a name keeps its value in a `StatusWord`.
 
 ### Added
 
@@ -33,6 +39,8 @@ This release exposes the protocol without the transport, for applications that o
 - `protocol::parse_*`: parsers for the responses to the commands, with a detailed `ResponseError`. The values yielded by SIGN_PSBT have their own parsers.
 - `protocol::Request`, and a `protocol::prepare_*` function for each command, returning the command to send together with the state needed to answer the client commands of the device. `ClientCommandInterpreter::for_wallet` builds that state for a wallet policy.
 - `PsbtV2Error` implements `Display` and `std::error::Error`, and `PsbtV2Maps` implements `Debug`. `APDUCommand` implements `Debug`, `PartialEq` and `Eq`.
+- `protocol::Request::step`: handles each response of the device, answering its client commands, and returns a `protocol::Step`: the next command to send, or the response data once the request is done. Errors are reported as `protocol::RequestError`, for which `BitcoinClientError` implements `From`. A `Request` is single-use.
+- `StatusWord::name` returns the name of a known status. `StatusWord` implements `Display` (the value, and the name if known) and `Hash`, and its `Debug` shows the name, or `StatusWord(0x…)` for other values.
 
 ### Fixed
 
