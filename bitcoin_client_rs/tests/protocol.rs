@@ -305,6 +305,9 @@ fn interpreter_rejects_malformed_requests() {
         Err(InterpreterError::UnsupportedRequest(code)) if code == ClientCommandCode::GetPreimage as u8
     ));
 }
+
+const PUBKEY: &str = "034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa";
+
 #[test]
 fn version_response_encoding_and_decode_context() {
     use ledger_bitcoin_client::protocol::*;
@@ -850,6 +853,55 @@ fn public_psbt_preparation_replays_recorded_delegated_exchanges() {
             .map(|key| case[*key].as_array().map_or(0, Vec::len))
             .sum();
         assert_eq!(results.len(), expected_count);
+    }
+}
+
+#[test]
+fn signature_application_validates_before_mutation_and_overwrites() {
+    use bitcoin::{
+        ecdsa, secp256k1,
+        taproot::{Signature, TapLeafHash},
+        PublicKey,
+    };
+    use ledger_bitcoin_client::{
+        psbt::{apply_partial_signature, InputIndexError},
+        PartialSignature,
+    };
+    let key = PublicKey::from_str(PUBKEY).unwrap();
+    let xonly = key.inner.x_only_public_key().0;
+    let leaf = TapLeafHash::from_byte_array([3; 32]);
+    let mut psbt = unsigned_psbt();
+    for byte in [1, 2] {
+        let ecdsa = ecdsa::Signature::sighash_all(
+            secp256k1::ecdsa::Signature::from_compact(&[byte; 64]).unwrap(),
+        );
+        let taproot = Signature::from_slice(&[byte; 64]).unwrap();
+        for signature in [
+            PartialSignature::Sig(key, ecdsa),
+            PartialSignature::TapScriptSig(xonly, None, taproot),
+            PartialSignature::TapScriptSig(xonly, Some(leaf), taproot),
+        ] {
+            let before = psbt.clone();
+            for input_index in [1, usize::MAX] {
+                assert_eq!(
+                    apply_partial_signature(&mut psbt, input_index, signature.clone()),
+                    Err(InputIndexError { input_index })
+                );
+                assert_eq!(psbt, before);
+            }
+            apply_partial_signature(&mut psbt, 0, signature).unwrap();
+        }
+        assert_eq!(psbt.inputs[0].partial_sigs.len(), 1);
+        assert_eq!(psbt.inputs[0].partial_sigs[&key], ecdsa);
+        assert_eq!(psbt.inputs[0].tap_key_sig, Some(taproot));
+        assert_eq!(psbt.inputs[0].tap_script_sigs.len(), 1);
+        assert_eq!(psbt.inputs[0].tap_script_sigs[&(xonly, leaf)], taproot);
+        let mut payload = vec![0, 33];
+        payload.extend(key.to_bytes());
+        payload.extend(ecdsa.to_vec());
+        assert!(ledger_bitcoin_client::protocol::parse_sign_psbt_yielded(&payload).is_ok());
+        payload.pop();
+        assert!(ledger_bitcoin_client::protocol::parse_sign_psbt_yielded(&payload).is_err());
     }
 }
 

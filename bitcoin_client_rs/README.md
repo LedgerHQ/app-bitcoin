@@ -69,6 +69,12 @@ The terminal success payload is not a yield and is ignored by the clients.
 Yielded input indices must fit in a `u32` on every host; tags still support the
 full `u64` range. The parsers check encodings, not signed message digests.
 
+`psbt::apply_partial_signature` applies regular signatures separately from
+signing, replacing signatures already stored for the same key. Invalid input
+indices leave the PSBT unchanged. Taproot key-path insertion does not compare
+the supplied key to the input's internal key; MuSig objects are out of scope.
+The clients return yields and the example tool prints them.
+
 Enable `client` for synchronous `BitcoinClient`/`Transport`, or `async` for
 both client modules. The independent `paranoid_client` feature enables
 `WalletPolicy::check_address` and its existing miniscript dependency without

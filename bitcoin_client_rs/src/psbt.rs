@@ -6,6 +6,8 @@
 //! serialization/deserialization logic to rust-psbt (for known fields), and propagating unknown
 //! fields unchanged.
 
+use core::fmt;
+
 use bitcoin::{
     consensus::encode::{serialize, Decodable},
     ecdsa,
@@ -198,6 +200,47 @@ pub enum PartialSignature {
     Sig(PublicKey, ecdsa::Signature),
     /// signature stored in pbst.tap_script_sigs
     TapScriptSig(XOnlyPublicKey, Option<TapLeafHash>, taproot::Signature),
+}
+
+/// A yielded signature referred to an input that is not present in the PSBT.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InputIndexError {
+    pub input_index: usize,
+}
+
+impl fmt::Display for InputIndexError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PSBT input index {} is out of bounds", self.input_index)
+    }
+}
+
+/// Applies a regular signature, replacing any signature already stored for that key.
+/// An invalid input index leaves the PSBT unchanged.
+///
+/// `TapScriptSig(_, None, _)` replaces `tap_key_sig` without checking the supplied
+/// key against the input's internal key. MuSig objects are not regular signatures
+/// and are outside this helper's scope; clients continue to return them as yields.
+pub fn apply_partial_signature(
+    psbt: &mut Psbt,
+    input_index: usize,
+    signature: PartialSignature,
+) -> Result<(), InputIndexError> {
+    let input = psbt
+        .inputs
+        .get_mut(input_index)
+        .ok_or(InputIndexError { input_index })?;
+    match signature {
+        PartialSignature::Sig(key, signature) => {
+            input.partial_sigs.insert(key, signature);
+        }
+        PartialSignature::TapScriptSig(key, Some(leaf), signature) => {
+            input.tap_script_sigs.insert((key, leaf), signature);
+        }
+        PartialSignature::TapScriptSig(_, None, signature) => {
+            input.tap_key_sig = Some(signature);
+        }
+    }
+    Ok(())
 }
 
 impl PartialSignature {
