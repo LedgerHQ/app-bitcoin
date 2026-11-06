@@ -1,3 +1,5 @@
+#![cfg(feature = "client")]
+
 mod utils;
 use std::str::FromStr;
 
@@ -6,8 +8,10 @@ use bitcoin::{
     hashes::{hex::FromHex, Hash},
     psbt::Psbt,
 };
+#[cfg(feature = "async")]
+use ledger_bitcoin_client::async_client;
 use ledger_bitcoin_client::{
-    async_client, client, psbt::PartialSignature, wallet, MusigPartialSignature, MusigPubNonce,
+    client, psbt::PartialSignature, wallet, MusigPartialSignature, MusigPubNonce,
     SignPsbtYieldedObject,
 };
 
@@ -33,15 +37,18 @@ async fn test_get_version() {
     assert_eq!(version, "2.1.0".to_string());
     assert_eq!(flags, vec![0x00]);
 
-    let (name, version, flags) =
-        async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-            .get_version()
-            .await
-            .unwrap();
+    #[cfg(feature = "async")]
+    {
+        let (name, version, flags) =
+            async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                .get_version()
+                .await
+                .unwrap();
 
-    assert_eq!(name, "Bitcoin Test".to_string());
-    assert_eq!(version, "2.1.0".to_string());
-    assert_eq!(flags, vec![0x00]);
+        assert_eq!(name, "Bitcoin Test".to_string());
+        assert_eq!(version, "2.1.0".to_string());
+        assert_eq!(flags, vec![0x00]);
+    }
 }
 
 #[tokio::test]
@@ -70,19 +77,22 @@ async fn test_sign_message() {
         base64::encode(sig)
     );
 
-    let (header, ecdsa_sig) =
-        async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-            .sign_message("hello".as_bytes(), &path)
-            .await
-            .unwrap();
+    #[cfg(feature = "async")]
+    {
+        let (header, ecdsa_sig) =
+            async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                .sign_message("hello".as_bytes(), &path)
+                .await
+                .unwrap();
 
-    assert_eq!(header, 0x20);
-    let mut sig = vec![header];
-    sig.extend(ecdsa_sig.serialize_compact());
-    assert_eq!(
+        assert_eq!(header, 0x20);
+        let mut sig = vec![header];
+        sig.extend(ecdsa_sig.serialize_compact());
+        assert_eq!(
         "IL3u9GLAzgG5BdtSBqUe0Fo2Zx0UlKwSsYx2TbuVX0VULFgZYRBQCW0W7QOlsB/JgGwWNhl3eYYjXtdfyR7pM+Y=",
         base64::encode(sig)
     );
+    }
 }
 
 #[tokio::test]
@@ -116,12 +126,16 @@ async fn test_get_extended_pubkey() {
 
         assert_eq!(key.to_string(), xpk_str);
 
-        let key = async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-            .get_extended_pubkey(&derivation_path, display)
-            .await
-            .unwrap();
+        #[cfg(feature = "async")]
+        {
+            let key =
+                async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                    .get_extended_pubkey(&derivation_path, display)
+                    .await
+                    .unwrap();
 
-        assert_eq!(key.to_string(), xpk_str);
+            assert_eq!(key.to_string(), xpk_str);
+        }
     }
 }
 
@@ -187,13 +201,16 @@ async fn test_register_wallet() {
 
         assert_eq!(hmac, <[u8; 32]>::from_hex(&hmac_result).unwrap());
 
-        let (_id, hmac) =
-            async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-                .register_wallet(&wallet)
-                .await
-                .unwrap();
+        #[cfg(feature = "async")]
+        {
+            let (_id, hmac) =
+                async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                    .register_wallet(&wallet)
+                    .await
+                    .unwrap();
 
-        assert_eq!(hmac, <[u8; 32]>::from_hex(&hmac_result).unwrap());
+            assert_eq!(hmac, <[u8; 32]>::from_hex(&hmac_result).unwrap());
+        }
     }
 }
 
@@ -264,13 +281,16 @@ async fn test_get_wallet_address() {
 
         assert_eq!(address.assume_checked().to_string(), address_result);
 
-        let address =
-            async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-                .get_wallet_address(&wallet, hmac.as_ref(), change, address_index, display)
-                .await
-                .unwrap();
+        #[cfg(feature = "async")]
+        {
+            let address =
+                async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                    .get_wallet_address(&wallet, hmac.as_ref(), change, address_index, display)
+                    .await
+                    .unwrap();
 
-        assert_eq!(address.assume_checked().to_string(), address_result);
+            assert_eq!(address.assume_checked().to_string(), address_result);
+        }
     }
 }
 
@@ -487,11 +507,15 @@ async fn test_sign_psbt() {
 
         check_results(&sigs, &musig_pub_nonces, &musig_partial_signatures, &res);
 
-        let res = async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-            .sign_psbt(&psbt, &wallet, hmac.as_ref())
-            .await
-            .unwrap();
+        #[cfg(feature = "async")]
+        {
+            let res =
+                async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                    .sign_psbt(&psbt, &wallet, hmac.as_ref())
+                    .await
+                    .unwrap();
 
-        check_results(&sigs, &musig_pub_nonces, &musig_partial_signatures, &res);
+            check_results(&sigs, &musig_pub_nonces, &musig_partial_signatures, &res);
+        }
     }
 }
