@@ -10,6 +10,7 @@
 use bitcoin::hashes::{sha256, Hash, HashEngine};
 
 /// MerkleTree is containing a merkle tree generated from a list of items.
+#[derive(Debug)]
 pub struct MerkleTree {
     root: Tree,
     leaves: Vec<[u8; 32]>,
@@ -57,6 +58,7 @@ impl MerkleTree {
 }
 
 /// Tree is either a Node with children trees or a Leaf with only a given value.
+#[derive(Debug)]
 enum Tree {
     Node {
         value: [u8; 32],

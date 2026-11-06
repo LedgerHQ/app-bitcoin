@@ -1,5 +1,9 @@
+//! The interpreter of the client commands: the requests that the device sends to the client while
+//! it processes a command, to get the data that the command refers to (preimages, elements of
+//! Merkle trees), and to yield values.
+
 use core::convert::TryFrom;
-use core::fmt::Debug;
+use core::fmt::{self, Debug};
 
 use bitcoin::{
     consensus::encode::{self},
@@ -10,20 +14,20 @@ use crate::protocol::UncheckedVarInt;
 
 use crate::{apdu::ClientCommandCode, merkle::MerkleTree};
 
-/// Interpreter for the client-side commands.
-/// This struct keeps has methods to keep track of:
-///   - known preimages
-///   - known Merkle trees from lists of elements
+/// Interpreter for the client commands.
 ///
-/// Moreover, it containes the state that is relevant for the interpreted client side commands:
-///   - a queue of bytes that contains any bytes that could not fit in a response from the
-///     GET_PREIMAGE client command (when a preimage is too long to fit in a single message) or the
-///     GET_MERKLE_LEAF_PROOF command (which returns a Merkle proof, which might be too long to fit
-///     in a single message). The data in the queue is returned in one (or more) successive
-///     GET_MORE_ELEMENTS commands from the hardware wallet.
+/// It keeps track of:
+///   - the known preimages;
+///   - the known Merkle trees of lists of elements.
 ///
-/// Finally, it keeps track of the yielded values (that is, the values sent from the hardware
-/// wallet with a YIELD client command).
+/// Moreover, it contains the state of the interpreted client commands: a queue of the elements
+/// that did not fit in an answer to GET_PREIMAGE (a preimage too long for a single message) or to
+/// GET_MERKLE_LEAF_PROOF (a Merkle proof too long for a single message). The device gets them with
+/// one or more GET_MORE_ELEMENTS client commands.
+///
+/// Finally, it keeps track of the yielded values (that is, the values that the device sends with a
+/// YIELD client command).
+#[derive(Debug)]
 pub struct ClientCommandInterpreter {
     yielded: Vec<Vec<u8>>,
     queue: Vec<Vec<u8>>,
@@ -31,7 +35,14 @@ pub struct ClientCommandInterpreter {
     trees: Vec<MerkleTree>,
 }
 
+impl Default for ClientCommandInterpreter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ClientCommandInterpreter {
+    /// Creates an interpreter with no known preimages or Merkle trees.
     pub fn new() -> Self {
         Self {
             yielded: Vec::new(),
@@ -51,14 +62,13 @@ impl ClientCommandInterpreter {
         self.known_preimages.push((hash, element));
     }
 
-    /// Adds a known Merkleized list.
-    /// Builds the Merkle tree of `elements`, and adds it to the Merkle trees known to the client
-    /// (mapped by Merkle root `mt_root`).
-    /// Moreover, adds all the leafs (after adding the b'\0' prefix) to the list of known preimages.
-    /// If `el` is one of `elements`, the client must respond with b'\0' + `el` when a GET_PREIMAGE
-    /// client command is sent with `sha256(b'\0' + el)`.
-    /// Moreover, the commands GET_MERKLE_LEAF_INDEX and GET_MERKLE_LEAF_PROOF must correctly answer
-    /// queries relative to the Merkle whose root is `mt_root`.
+    /// Adds a known Merkleized list, and returns its Merkle root.
+    ///
+    /// Builds the Merkle tree of `elements`, and adds it to the Merkle trees known to the client,
+    /// so that the GET_MERKLE_LEAF_INDEX and GET_MERKLE_LEAF_PROOF client commands are answered
+    /// for it. Moreover, adds all the leaves (after adding the `0x00` prefix) to the known
+    /// preimages: if `el` is one of `elements`, the client responds with `0x00 || el` to a
+    /// GET_PREIMAGE client command for `sha256(0x00 || el)`.
     pub fn add_known_list(&mut self, elements: &[impl AsRef<[u8]>]) -> [u8; 32] {
         let mut leaves = Vec::with_capacity(elements.len());
         for element in elements {
@@ -76,10 +86,12 @@ impl ClientCommandInterpreter {
         root_hash
     }
 
-    /// Adds the Merkle trees of keys, and the Merkle tree of values (ordered by key)
-    /// of a mapping of bytes to bytes.
-    /// Adds the Merkle tree of the list of keys, and the Merkle tree of the list of corresponding
-    /// values, with the same semantics as the `add_known_list` applied separately to the two lists.
+    /// Adds a known Merkleized map: the Merkle tree of its keys, sorted, and the Merkle tree of the
+    /// corresponding values, with the same semantics as [`add_known_list`](Self::add_known_list)
+    /// applied separately to the two lists.
+    ///
+    /// Duplicate keys are not rejected, but the device requires the keys of a map to be strictly
+    /// increasing, so it rejects such a map.
     pub fn add_known_mapping(&mut self, mapping: &[(Vec<u8>, Vec<u8>)]) {
         let mut sorted: Vec<&(Vec<u8>, Vec<u8>)> = mapping.iter().collect();
         sorted.sort_by(|(k1, _), (k2, _)| k1.as_slice().cmp(k2));
@@ -94,8 +106,9 @@ impl ClientCommandInterpreter {
         self.add_known_list(&values);
     }
 
-    // Interprets the client command requested by the hardware wallet, returns the appropriate
-    // response to transmit back and updates interpreter internal states.
+    /// Interprets a client command, which is the data of a device response with the
+    /// `InterruptedExecution` status, and returns the data to send back with a CONTINUE command.
+    /// Updates the state of the interpreter.
     pub fn execute(&mut self, command: Vec<u8>) -> Result<Vec<u8>, InterpreterError> {
         if command.is_empty() {
             return Err(InterpreterError::EmptyInput);
@@ -307,13 +320,42 @@ pub fn get_merkleized_map_commitment(mapping: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> 
     commitment
 }
 
-#[derive(Debug)]
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InterpreterError {
+    /// The client command is empty.
     EmptyInput,
+    /// The client command has an unknown code.
     UnknownCommand(u8),
+    /// The request of the client command with this code is malformed or unsupported.
     UnsupportedRequest(u8),
+    /// GET_MERKLE_LEAF_PROOF: the leaf index or the tree size does not match the known tree.
     InvalidIndexOrSize,
+    /// No known preimage, Merkle root or Merkle leaf has the requested hash.
     UnknownHash,
+    /// No known Merkle tree has the requested root.
     UnknownMerkleRoot,
+    /// The client command is not valid in the current state of the queue of elements left from a
+    /// previous answer.
     UnexpectedQueue,
 }
+
+impl fmt::Display for InterpreterError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyInput => f.write_str("Empty interpreter request"),
+            Self::UnknownCommand(command) => {
+                write!(f, "Unknown interpreter command: {:#04x}", command)
+            }
+            Self::UnsupportedRequest(command) => {
+                write!(f, "Unsupported interpreter request: {:#04x}", command)
+            }
+            Self::InvalidIndexOrSize => f.write_str("Invalid index or size"),
+            Self::UnknownHash => f.write_str("Unknown preimage hash"),
+            Self::UnknownMerkleRoot => f.write_str("Unknown Merkle root"),
+            Self::UnexpectedQueue => f.write_str("Unexpected interpreter queue state"),
+        }
+    }
+}
+
+impl std::error::Error for InterpreterError {}

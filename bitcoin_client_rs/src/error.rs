@@ -1,17 +1,59 @@
-use core::fmt::Debug;
+use core::fmt::{self, Debug};
 
 use crate::{apdu::StatusWord, interpreter::InterpreterError};
 
+/// An error of the convenience clients.
+#[non_exhaustive]
 #[derive(Debug)]
 pub enum BitcoinClientError<T: Debug> {
     ClientError(String),
     InvalidPsbt,
+    /// An error of the transport. As `T` only needs to implement `Debug`, the message of this
+    /// error shows it, and [`source`](std::error::Error::source) does not return it.
     Transport(T),
     Interpreter(InterpreterError),
-    Device { command: u8, status: StatusWord },
-    UnexpectedResult { command: u8, data: Vec<u8> },
+    Device {
+        command: u8,
+        status: StatusWord,
+    },
+    #[non_exhaustive]
+    UnexpectedResult {
+        command: u8,
+        data: Vec<u8>,
+    },
     InvalidResponse(String),
     UnsupportedAppVersion,
+}
+
+impl<T: Debug> fmt::Display for BitcoinClientError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ClientError(message) | Self::InvalidResponse(message) => f.write_str(message),
+            Self::InvalidPsbt => f.write_str("Invalid PSBT"),
+            Self::Transport(error) => write!(f, "Transport error: {:?}", error),
+            Self::Interpreter(error) => fmt::Display::fmt(error, f),
+            Self::Device { command, status } => {
+                write!(f, "Command {:#04x} failed: {:?}", command, status)
+            }
+            Self::UnexpectedResult { command, data } => write!(
+                f,
+                "Unexpected response to command {:#04x} ({} bytes)",
+                command,
+                data.len()
+            ),
+            Self::UnsupportedAppVersion => f.write_str("Unsupported app version"),
+        }
+    }
+}
+
+impl<T: Debug> std::error::Error for BitcoinClientError<T> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            // Transparent: the interpreter error is the message itself.
+            Self::Interpreter(error) => error.source(),
+            _ => None,
+        }
+    }
 }
 
 impl<T: Debug> From<InterpreterError> for BitcoinClientError<T> {

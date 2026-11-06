@@ -42,6 +42,17 @@ In order to satisfy this Trait, it is possible to import the
 `ledger-transport-hid` crate from https://github.com/Zondax/ledger-rs.
 Please, read the `examples/ledger_hwi/src/transport.rs` file to find an example.
 
+## Transport-free protocol use
+
+The default features are `client`, `async` and `paranoid_client`. With
+`default-features = false`, the crate exposes the protocol without the
+convenience clients, in the `apdu`, `command`, `interpreter`, `protocol`,
+`psbt` and `wallet` modules. This lets an application that owns the device I/O
+reuse the protocol implementation.
+
+Enable `client` for the synchronous `BitcoinClient`, or `async` for both
+clients.
+
 ## The `async` feature
 
 The optional feature `async` adds the `async_client` module to the crate
@@ -57,9 +68,12 @@ pub trait Transport {
 }
 ```
 
-## The `no-std` support
+## WASM and `no_std`
 
-Work in progress.
+The transport-free build, with or without `paranoid_client`, supports
+`wasm32-unknown-unknown`. It remains **std-based**, as on native targets.
+Disabling the convenience clients does not make this crate `no_std`;
+`no_std` targets are not supported.
 
 ## Example
 

@@ -173,12 +173,25 @@ impl WalletPolicy {
     }
 }
 
+#[non_exhaustive]
 #[derive(Debug)]
 pub enum WalletError {
     InvalidThreshold,
     UnsupportedAddressType,
     InvalidPolicy,
 }
+
+impl core::fmt::Display for WalletError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InvalidThreshold => f.write_str("Invalid threshold"),
+            Self::UnsupportedAddressType => f.write_str("Unsupported address type"),
+            Self::InvalidPolicy => f.write_str("Invalid wallet policy"),
+        }
+    }
+}
+
+impl std::error::Error for WalletError {}
 
 #[derive(PartialEq, Eq)]
 pub struct WalletPubKey {

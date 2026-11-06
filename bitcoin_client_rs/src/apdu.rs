@@ -4,6 +4,7 @@ use core::fmt::Debug;
 // p2 encodes the protocol version implemented
 pub const CURRENT_PROTOCOL_VERSION: u8 = 1;
 
+#[non_exhaustive]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Cla {
@@ -12,6 +13,7 @@ pub enum Cla {
     Framework = 0xF8,
 }
 
+#[non_exhaustive]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum BitcoinCommandCode {
@@ -24,12 +26,14 @@ pub enum BitcoinCommandCode {
     SignMessage = 0x10,
 }
 
+#[non_exhaustive]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum FrameworkCommandCode {
     ContinueInterrupted = 0x01,
 }
 
+#[non_exhaustive]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ClientCommandCode {
