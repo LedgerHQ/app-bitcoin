@@ -60,7 +60,12 @@ The protocol layer performs no transport I/O and selects no runtime.
 
 `protocol` also exposes response parsers with detailed `ResponseError`
 diagnostics. Convenience clients deliberately preserve their existing
-`UnexpectedResult { command, data }` errors instead.
+`UnexpectedResult { command, data }` errors instead. After successful PSBT
+signing, pass `interpreter.yielded()` to `protocol::parse_sign_psbt_results`.
+Empty yield lists succeed; a yield of at most one byte takes precedence over
+other parsing errors and reports all yields concatenated. Other failures own
+only the offending yield, with a typed `PartialSignatureError` reason.
+The terminal success payload is not a yield and is ignored by the clients.
 
 Yielded input indices must fit in a `u32` on every host; tags still support the
 full `u64` range. The parsers check encodings, not signed message digests.

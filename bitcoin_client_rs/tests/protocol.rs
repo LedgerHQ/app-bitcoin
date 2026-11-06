@@ -1,3 +1,4 @@
+use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 
 use bitcoin::{
@@ -629,6 +630,53 @@ fn response_step_moves_success_and_preserves_original_error_context() {
     assert_eq!(interpreter.yielded(), vec![vec![7, 8], vec![7, 8]]);
 }
 
+#[test]
+fn psbt_result_batch_preserves_empty_order_and_error_precedence() {
+    use ledger_bitcoin_client::{
+        protocol::{parse_sign_psbt_results, SignPsbtYieldedObject},
+        PartialSignatureError,
+    };
+    assert!(parse_sign_psbt_results(vec![]).unwrap().is_empty());
+    let unknown = |index| vec![0xfe, 0, 0, 0, 0x80, index, 0xde, 0xad];
+    let parsed = parse_sign_psbt_results(vec![unknown(2), unknown(1)]).unwrap();
+    assert_eq!(
+        parsed.iter().map(|(index, _)| *index).collect::<Vec<_>>(),
+        [2, 1]
+    );
+    assert!(matches!(&parsed[0].1, SignPsbtYieldedObject::Unknown(data) if data == &[0xde, 0xad]));
+
+    let malformed = [vec![0, 33], vec![0; 33], vec![1; 8]].concat();
+    for short in [vec![], vec![1]] {
+        let all = vec![malformed.clone(), short, unknown(3)];
+        let expected = all.concat();
+        let error = parse_sign_psbt_results(all).unwrap_err();
+        assert!(matches!(error.source, PartialSignatureError::InvalidLength));
+        assert_eq!(error.data, expected);
+    }
+
+    let allocation = malformed.as_ptr();
+    let malformed_bytes = malformed.clone();
+    let error = parse_sign_psbt_results(vec![unknown(0), malformed, unknown(1)]).unwrap_err();
+    assert_eq!(error.data, malformed_bytes);
+    assert_eq!(error.data.as_ptr(), allocation);
+    assert!(matches!(error.source, PartialSignatureError::PubKey(_)));
+
+    let mut oversized = bitcoin::consensus::serialize(&bitcoin::VarInt(u64::MAX));
+    oversized.extend(bitcoin::consensus::serialize(&bitcoin::VarInt(
+        u32::MAX as u64 + 1,
+    )));
+    oversized.extend([0xde, 0xad]);
+    let error = parse_sign_psbt_results(vec![oversized]).unwrap_err();
+    assert!(matches!(
+        error.source,
+        PartialSignatureError::InvalidInputIndex
+    ));
+    let debug = format!("{error:?}");
+    assert!(debug.contains("data_len"));
+    assert!(!debug.contains("222, 173"));
+    assert_eq!(error.to_string(), "Invalid SIGN_PSBT yielded response");
+}
+
 fn unsigned_psbt() -> bitcoin::psbt::Psbt {
     use bitcoin::{
         absolute::LockTime, transaction::Version, Amount, OutPoint, ScriptBuf, Sequence,
@@ -737,4 +785,70 @@ fn psbt_preparation_delegates_custom_values_and_propagates_map_errors() {
         prepare_sign_psbt(&psbt, &wallet(Version::V2), None).err(),
         Some(PsbtV2Error::TxMapCountMismatch)
     );
+}
+
+#[test]
+fn public_psbt_preparation_replays_recorded_delegated_exchanges() {
+    use ledger_bitcoin_client::{
+        apdu::StatusWord,
+        protocol::{handle_response, parse_sign_psbt_results, prepare_sign_psbt, Step},
+    };
+    let cases: Vec<serde_json::Value> =
+        serde_json::from_str(include_str!("data/sign_psbt.json")).unwrap();
+    for case in cases {
+        let psbt = bitcoin::psbt::Psbt::deserialize(
+            &base64::decode(case["psbt"].as_str().unwrap()).unwrap(),
+        )
+        .unwrap();
+        let keys: Vec<_> = case["keys"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|key| WalletPubKey::from_str(key.as_str().unwrap()).unwrap())
+            .collect();
+        let wallet = WalletPolicy::new(
+            case["name"].as_str().unwrap().into(),
+            Version::V2,
+            case["policy"].as_str().unwrap().into(),
+            keys,
+        );
+        let hmac = case["hmac"].as_str().map(|value| {
+            let mut bytes = [0; 32];
+            bytes.copy_from_slice(&hex::decode(value).unwrap());
+            bytes
+        });
+        let (mut command, mut interpreter) =
+            prepare_sign_psbt(&psbt, &wallet, hmac.as_ref()).unwrap();
+        let original_instruction = command.ins;
+        for pair in case["exchanges"].as_array().unwrap().chunks_exact(2) {
+            let expected =
+                hex::decode(pair[0].as_str().unwrap().trim_start_matches("=> ")).unwrap();
+            assert_eq!(command.encode(), expected);
+            let mut response =
+                hex::decode(pair[1].as_str().unwrap().trim_start_matches("<= ")).unwrap();
+            let status_offset = response.len() - 2;
+            let status = StatusWord::try_from(u16::from_be_bytes(
+                response[status_offset..].try_into().unwrap(),
+            ))
+            .unwrap();
+            response.truncate(status_offset);
+            match handle_response(
+                original_instruction,
+                status,
+                response,
+                Some(&mut interpreter),
+            )
+            .unwrap()
+            {
+                Step::Continue(next) => command = next,
+                Step::Done(_) => assert_eq!(status, StatusWord::OK),
+            }
+        }
+        let results = parse_sign_psbt_results(interpreter.yielded()).unwrap();
+        let expected_count: usize = ["sigs", "musig_pub_nonces", "musig_partial_signatures"]
+            .iter()
+            .map(|key| case[*key].as_array().map_or(0, Vec::len))
+            .sum();
+        assert_eq!(results.len(), expected_count);
+    }
 }

@@ -193,29 +193,12 @@ impl<T: Transport> BitcoinClient<T> {
 
         self.make_request(&cmd, Some(&mut intpr))?;
 
-        let results = intpr.yielded();
-        if results.iter().any(|res| res.len() <= 1) {
-            return Err(BitcoinClientError::UnexpectedResult {
+        parse_sign_psbt_results(intpr.yielded()).map_err(|error| {
+            BitcoinClientError::UnexpectedResult {
                 command: cmd.ins,
-                data: results.into_iter().fold(Vec::new(), |mut acc, res| {
-                    acc.extend(res);
-                    acc
-                }),
-            });
-        }
-
-        let mut yielded_objects = Vec::new();
-        for result in results {
-            let (input_index, obj) = parse_sign_psbt_yielded(&result).map_err(|_| {
-                BitcoinClientError::UnexpectedResult {
-                    command: cmd.ins,
-                    data: result.clone(),
-                }
-            })?;
-            yielded_objects.push((input_index, obj));
-        }
-
-        Ok(yielded_objects)
+                data: error.data,
+            }
+        })
     }
 
     /// Sign a message with the key derived with the given derivation path.
