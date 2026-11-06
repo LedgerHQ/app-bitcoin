@@ -916,6 +916,51 @@ fn steps_end_on_success_and_report_errors_for_the_requests_command() {
     ));
     assert_eq!(request.into_yielded(), vec![vec![7, 8], vec![7, 8]]);
 }
+
+#[test]
+fn psbt_results_are_parsed_in_order_until_the_first_invalid_yield() {
+    use ledger_bitcoin_client::{
+        protocol::{parse_sign_psbt_results, SignPsbtYieldedObject},
+        PartialSignatureError,
+    };
+    // Tags from 0x80000000 that are not known are parsed as unknown objects.
+    const UNKNOWN_TAG: u64 = 0x8000_0000;
+    let unknown = |index: u64| [varint(UNKNOWN_TAG), varint(index), vec![0xde, 0xad]].concat();
+
+    assert!(parse_sign_psbt_results(vec![]).unwrap().is_empty());
+    let parsed = parse_sign_psbt_results(vec![unknown(2), unknown(1)]).unwrap();
+    assert_eq!(
+        parsed.iter().map(|(index, _)| *index).collect::<Vec<_>>(),
+        [2, 1]
+    );
+    assert!(matches!(
+        &parsed[0].1,
+        SignPsbtYieldedObject::Unknown { tag, data, .. } if *tag == UNKNOWN_TAG && data == &[0xde, 0xad]
+    ));
+
+    // Untagged: the input index, then a partial signature whose 33-byte public key is invalid.
+    let invalid_pubkey = [varint(0), vec![33], vec![0; 33], vec![1; 8]].concat();
+    let error =
+        parse_sign_psbt_results(vec![unknown(0), invalid_pubkey.clone(), vec![]]).unwrap_err();
+    assert_eq!(error.data, invalid_pubkey);
+    assert!(matches!(error.source, PartialSignatureError::PubKey(_)));
+    assert_eq!(error.to_string(), "Invalid value yielded by SIGN_PSBT");
+    let source = std::error::Error::source(&error).unwrap();
+    assert!(source.to_string().starts_with("Invalid public key"));
+
+    for short in [vec![], vec![1]] {
+        let error = parse_sign_psbt_results(vec![unknown(0), short.clone()]).unwrap_err();
+        assert_eq!(error.data, short);
+    }
+
+    let oversized_index = [varint(UNKNOWN_TAG), varint(u32::MAX as u64 + 1)].concat();
+    let error = parse_sign_psbt_results(vec![oversized_index]).unwrap_err();
+    assert!(matches!(
+        error.source,
+        PartialSignatureError::InvalidInputIndex
+    ));
+}
+
 fn unsigned_psbt() -> bitcoin::psbt::Psbt {
     use bitcoin::{
         absolute::LockTime, transaction::Version, Amount, OutPoint, ScriptBuf, Sequence,
@@ -1012,4 +1057,145 @@ fn psbt_preparation_delegates_custom_values_and_propagates_map_errors() {
         prepare_sign_psbt(&psbt, &wallet(Version::V2), None).err(),
         Some(PsbtV2Error::TxMapCountMismatch)
     );
+}
+
+#[test]
+fn public_psbt_preparation_replays_recorded_delegated_exchanges() {
+    use ledger_bitcoin_client::{
+        apdu::StatusWord,
+        protocol::{parse_sign_psbt_results, prepare_sign_psbt, Step},
+    };
+    let cases: Vec<serde_json::Value> =
+        serde_json::from_str(include_str!("data/sign_psbt.json")).unwrap();
+    for case in cases {
+        let psbt = bitcoin::psbt::Psbt::deserialize(
+            &base64::decode(case["psbt"].as_str().unwrap()).unwrap(),
+        )
+        .unwrap();
+        let keys: Vec<_> = case["keys"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|key| WalletPubKey::from_str(key.as_str().unwrap()).unwrap())
+            .collect();
+        let wallet = WalletPolicy::new(
+            case["name"].as_str().unwrap().into(),
+            Version::V2,
+            case["policy"].as_str().unwrap().into(),
+            keys,
+        );
+        let hmac = case["hmac"].as_str().map(|value| {
+            let mut bytes = [0; 32];
+            bytes.copy_from_slice(&hex::decode(value).unwrap());
+            bytes
+        });
+        let mut request = prepare_sign_psbt(&psbt, &wallet, hmac.as_ref()).unwrap();
+        let mut command = request.command().clone();
+        let mut exchanges = case["exchanges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|exchange| exchange.as_str().unwrap());
+        let mut done = false;
+        while let Some(sent) = exchanges.next() {
+            assert!(!done, "no exchange is expected after the final response");
+            let received = exchanges.next().expect("every command has a response");
+            let sent = hex::decode(sent.trim_start_matches("=> ")).unwrap();
+            assert_eq!(command.encode(), sent);
+            let mut response = hex::decode(received.trim_start_matches("<= ")).unwrap();
+            let status = response.split_off(response.len() - 2);
+            let status = StatusWord::from(u16::from_be_bytes([status[0], status[1]]));
+            match request.step(status, response).unwrap() {
+                Step::Continue(next) => command = next,
+                Step::Done(_) => done = true,
+            }
+        }
+        assert!(done);
+        let results = parse_sign_psbt_results(request.into_yielded()).unwrap();
+        // Compare with the expected values of each kind, in the test data's format.
+        for kind in ["sigs", "musig_pub_nonces", "musig_partial_signatures"] {
+            let actual: Vec<_> = results
+                .iter()
+                .map(|(_, object)| yielded_object_json(object))
+                .filter(|(object_kind, _)| *object_kind == kind)
+                .map(|(_, object)| object)
+                .collect();
+            let expected: Vec<_> = case[kind]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|mut object| {
+                    // An absent tapleaf hash may be written as null.
+                    object
+                        .as_object_mut()
+                        .unwrap()
+                        .retain(|_, value| !value.is_null());
+                    object
+                })
+                .collect();
+            assert_eq!(actual, expected, "{}", kind);
+        }
+    }
+}
+
+/// A yielded object as in `tests/data/sign_psbt.json`, with the name of its list there.
+fn yielded_object_json(
+    object: &ledger_bitcoin_client::SignPsbtYieldedObject,
+) -> (&'static str, serde_json::Value) {
+    use ledger_bitcoin_client::{PartialSignature, SignPsbtYieldedObject};
+    let leaf = |hash: &Option<bitcoin::taproot::TapLeafHash>| {
+        hash.map(|hash| hex::encode(hash.to_byte_array()))
+    };
+    let mut json = serde_json::Map::new();
+    let kind = match object {
+        SignPsbtYieldedObject::Partial(PartialSignature::Sig(key, sig)) => {
+            json.insert("key".into(), key.to_string().into());
+            json.insert("sig".into(), hex::encode(sig.to_vec()).into());
+            "sigs"
+        }
+        SignPsbtYieldedObject::Partial(PartialSignature::TapScriptSig(key, tapleaf_hash, sig)) => {
+            json.insert("key".into(), key.to_string().into());
+            if let Some(hash) = leaf(tapleaf_hash) {
+                json.insert("tapleaf_hash".into(), hash.into());
+            }
+            json.insert("sig".into(), hex::encode(sig.to_vec()).into());
+            "sigs"
+        }
+        SignPsbtYieldedObject::MusigPubNonce(nonce) => {
+            json.insert(
+                "participant_pubkey".into(),
+                nonce.participant_pubkey.to_string().into(),
+            );
+            json.insert(
+                "aggregate_pubkey".into(),
+                nonce.aggregate_pubkey.to_string().into(),
+            );
+            if let Some(hash) = leaf(&nonce.tapleaf_hash) {
+                json.insert("tapleaf_hash".into(), hash.into());
+            }
+            json.insert("pubnonce".into(), hex::encode(nonce.pubnonce).into());
+            "musig_pub_nonces"
+        }
+        SignPsbtYieldedObject::MusigPartialSignature(signature) => {
+            json.insert(
+                "participant_pubkey".into(),
+                signature.participant_pubkey.to_string().into(),
+            );
+            json.insert(
+                "aggregate_pubkey".into(),
+                signature.aggregate_pubkey.to_string().into(),
+            );
+            if let Some(hash) = leaf(&signature.tapleaf_hash) {
+                json.insert("tapleaf_hash".into(), hash.into());
+            }
+            json.insert(
+                "partial_signature".into(),
+                hex::encode(signature.partial_signature).into(),
+            );
+            "musig_partial_signatures"
+        }
+        other => panic!("Unexpected yielded object: {:?}", other),
+    };
+    (kind, json.into())
 }

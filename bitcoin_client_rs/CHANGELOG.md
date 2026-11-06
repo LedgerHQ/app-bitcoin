@@ -26,6 +26,7 @@ This release exposes the protocol without the transport, for applications that o
 - `PsbtV2Error` is `#[non_exhaustive]`.
 - `StatusWord` is a newtype over the raw status word, so that statuses without a name are no longer lost. Build it with `StatusWord::from(u16)` instead of `TryFrom`, and read it with `u16::from` or `.0` instead of `as u16`. The named statuses are associated constants with the same names as the former variants (so `StatusWord::Deny` still works, in patterns too), plus `DeviceLocked` (0x5515), `SecurityStatusNotSatisfied` (0x6982), `SwapFail` (0x6B00) and `WrongResponseLength` (0xB000).
 - `BitcoinClientError::Device` contains the response data, which is the app's 2-byte error code when it reports one; the variant is `#[non_exhaustive]`.
+- When a value yielded during `sign_psbt` cannot be parsed, the `UnexpectedResult` error contains that value. Previously, if any value had at most one byte, it contained all the yielded values concatenated.
 
 ### Removed
 
@@ -41,6 +42,8 @@ This release exposes the protocol without the transport, for applications that o
 - `PsbtV2Error` implements `Display` and `std::error::Error`, and `PsbtV2Maps` implements `Debug`. `APDUCommand` implements `Debug`, `PartialEq` and `Eq`.
 - `protocol::Request::step`: handles each response of the device, answering its client commands, and returns a `protocol::Step`: the next command to send, or the response data once the request is done. Errors are reported as `protocol::RequestError`, for which `BitcoinClientError` implements `From`. A `Request` is single-use.
 - `StatusWord::name` returns the name of a known status. `StatusWord` implements `Display` (the value, and the name if known) and `Hash`, and its `Debug` shows the name, or `StatusWord(0x…)` for other values.
+- `protocol::parse_sign_psbt_results`: parses all the values yielded during SIGN_PSBT, with a `SignPsbtResultsError`.
+- `PartialSignatureError` implements `Display` and `std::error::Error`.
 
 ### Fixed
 

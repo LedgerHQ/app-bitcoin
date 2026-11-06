@@ -573,6 +573,44 @@ pub enum SignPsbtYieldedObject {
     Unknown { tag: u64, data: Vec<u8> },
 }
 
+/// A value yielded by the device during SIGN_PSBT that could not be parsed.
+#[non_exhaustive]
+#[derive(Debug)]
+pub struct SignPsbtResultsError {
+    /// The yielded value.
+    pub data: Vec<u8>,
+    /// Why it could not be parsed.
+    pub source: PartialSignatureError,
+}
+
+impl fmt::Display for SignPsbtResultsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // The reason is the error's source.
+        f.write_str("Invalid value yielded by SIGN_PSBT")
+    }
+}
+
+impl std::error::Error for SignPsbtResultsError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
+/// Parses the values yielded by the device during SIGN_PSBT, in order; see
+/// [`parse_sign_psbt_yielded`]. Once the request is done, [`Request::into_yielded`] returns them.
+///
+/// Fails on the first value that cannot be parsed.
+pub fn parse_sign_psbt_results(
+    yielded: Vec<Vec<u8>>,
+) -> Result<Vec<(usize, SignPsbtYieldedObject)>, SignPsbtResultsError> {
+    yielded
+        .into_iter()
+        .map(|data| {
+            parse_sign_psbt_yielded(&data).map_err(|source| SignPsbtResultsError { data, source })
+        })
+        .collect()
+}
+
 fn checked_input_index(index: u64) -> Result<usize, PartialSignatureError> {
     u32::try_from(index)
         .map(|index| index as usize)

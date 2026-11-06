@@ -305,6 +305,23 @@ pub enum PartialSignatureError {
     TapLeaf(bitcoin::hashes::FromSliceError),
 }
 
+impl core::fmt::Display for PartialSignatureError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::BadKeyAugmentLength => f.write_str("Invalid key augment length"),
+            Self::InvalidLength => f.write_str("Invalid length"),
+            Self::InvalidInputIndex => f.write_str("Input index out of range"),
+            Self::XOnlyPubKey(e) => write!(f, "Invalid x-only public key: {}", e),
+            Self::PubKey(e) => write!(f, "Invalid public key: {}", e),
+            Self::EcdsaSig(e) => write!(f, "Invalid ECDSA signature: {}", e),
+            Self::TaprootSig(e) => write!(f, "Invalid taproot signature: {}", e),
+            Self::TapLeaf(e) => write!(f, "Invalid tapleaf hash: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for PartialSignatureError {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
