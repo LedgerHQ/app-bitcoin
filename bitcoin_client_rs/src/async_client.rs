@@ -351,6 +351,12 @@ impl<T: Transport> BitcoinClient<T> {
         self.make_request(&cmd, Some(&mut intpr))
             .await
             .and_then(|data| {
+                if data.is_empty() {
+                    return Err(BitcoinClientError::UnexpectedResult {
+                        command: cmd.ins,
+                        data,
+                    });
+                }
                 Ok((
                     data[0],
                     Signature::from_compact(&data[1..]).map_err(|_| {
