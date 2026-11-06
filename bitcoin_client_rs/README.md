@@ -48,8 +48,12 @@ defaults to use the public `command`, `interpreter`, `merkle`, `protocol`,
 `psbt`, and `wallet` modules without either convenience client. Set
 `default-features = false` on the dependency in Cargo.toml.
 
+`protocol` also exposes response parsers with detailed `ResponseError`
+diagnostics. Convenience clients deliberately preserve their existing
+`UnexpectedResult { command, data }` errors instead.
+
 Yielded input indices must fit in a `u32` on every host; tags still support the
-full `u64` range.
+full `u64` range. The parsers check encodings, not signed message digests.
 
 Enable `client` for synchronous `BitcoinClient`/`Transport`, or `async` for
 both client modules.
