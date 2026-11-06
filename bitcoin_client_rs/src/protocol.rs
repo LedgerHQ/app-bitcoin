@@ -391,6 +391,55 @@ pub enum SignPsbtYieldedObject {
     Unknown(Vec<u8>),
 }
 
+/// A SIGN_PSBT yield failure with the bytes used by client compatibility errors.
+pub struct SignPsbtResultsError {
+    pub data: Vec<u8>,
+    pub source: PartialSignatureError,
+}
+
+impl fmt::Debug for SignPsbtResultsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SignPsbtResultsError")
+            .field("data_len", &self.data.len())
+            .field("source", &self.source)
+            .finish()
+    }
+}
+
+impl fmt::Display for SignPsbtResultsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Invalid SIGN_PSBT yielded response")
+    }
+}
+
+/// Parses all SIGN_PSBT yields, preserving their order.
+///
+/// A payload of at most one byte takes precedence over any other parsing failure:
+/// its error contains all yielded bytes concatenated. Otherwise the error owns
+/// only the offending yield and its typed parsing reason. Empty lists succeed.
+/// The terminal successful response is not a yield and must not be included.
+pub fn parse_sign_psbt_results(
+    yielded: Vec<Vec<u8>>,
+) -> Result<Vec<(usize, SignPsbtYieldedObject)>, SignPsbtResultsError> {
+    if yielded.iter().any(|data| data.len() <= 1) {
+        let mut data = Vec::with_capacity(yielded.iter().map(Vec::len).sum());
+        for result in yielded {
+            data.extend(result);
+        }
+        return Err(SignPsbtResultsError {
+            data,
+            source: PartialSignatureError::InvalidLength,
+        });
+    }
+    let mut results = Vec::with_capacity(yielded.len());
+    for data in yielded {
+        let result = parse_sign_psbt_yielded(&data)
+            .map_err(|source| SignPsbtResultsError { data, source })?;
+        results.push(result);
+    }
+    Ok(results)
+}
+
 fn checked_input_index(index: u64) -> Result<usize, PartialSignatureError> {
     u32::try_from(index)
         .map(|index| index as usize)
