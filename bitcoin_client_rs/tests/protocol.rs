@@ -604,3 +604,181 @@ fn message_signature_response_validates_length_and_encoding() {
         Err(ResponseError::InvalidFormat { .. })
     ));
 }
+
+#[test]
+fn wallet_and_message_preparation_supply_delegated_preimages() {
+    use ledger_bitcoin_client::protocol::{
+        prepare_get_wallet_address, prepare_register_wallet, prepare_sign_message,
+    };
+    const MESSAGE_CHUNK_SIZE: usize = 64;
+    for version in [Version::V1, Version::V2] {
+        let wallet = wallet(version);
+        // The commands themselves are tested by the *_command_wire_encoding tests.
+        let registration = prepare_register_wallet(&wallet);
+        assert_eq!(registration.command(), &command::register_wallet(&wallet));
+        let mut requests = vec![registration];
+        let hmac = [7; 32];
+        for (hmac, change, index, display) in
+            [(None, false, 0, false), (Some(&hmac), true, u32::MAX, true)]
+        {
+            let request = prepare_get_wallet_address(&wallet, hmac, change, index, display);
+            assert_eq!(
+                request.command(),
+                &command::get_wallet_address(&wallet, hmac, change, index, display)
+            );
+            requests.push(request);
+        }
+        for mut request in requests {
+            let interpreter = request.interpreter_mut().unwrap();
+            for preimage in [
+                wallet.serialize(),
+                wallet.descriptor_template.as_bytes().to_vec(),
+                [&[MERKLE_LEAF_PREFIX][..], KEY.as_bytes()].concat(),
+            ] {
+                let mut request = vec![ClientCommandCode::GetPreimage as u8, SHA256_HASH_TYPE];
+                request.extend(hash(&preimage));
+                let mut expected = vec![preimage.len() as u8, preimage.len() as u8];
+                expected.extend(preimage);
+                assert_eq!(interpreter.execute(request).unwrap(), expected);
+            }
+            let key_leaf = hash(&[&[MERKLE_LEAF_PREFIX][..], KEY.as_bytes()].concat());
+            let mut request = vec![ClientCommandCode::GetMerkleLeafProof as u8];
+            request.extend(key_leaf);
+            request.extend([1, 0]); // One-key tree, leaf zero.
+            let mut expected = key_leaf.to_vec();
+            expected.extend([0, 0]); // No siblings, no queued proof elements.
+            assert_eq!(interpreter.execute(request).unwrap(), expected);
+        }
+    }
+    let path = DerivationPath::from_str("m/44'/1'/0'/0").unwrap();
+    for length in [
+        0,
+        1,
+        MESSAGE_CHUNK_SIZE,
+        MESSAGE_CHUNK_SIZE + 1,
+        2 * MESSAGE_CHUNK_SIZE,
+        2 * MESSAGE_CHUNK_SIZE + 1,
+    ] {
+        let message = vec![0x55; length];
+        let mut request = prepare_sign_message(&message, &path);
+        let chunks: Vec<_> = message.chunks(MESSAGE_CHUNK_SIZE).collect();
+        let leaves: Vec<_> = chunks
+            .iter()
+            .map(|chunk| hash(&[&[MERKLE_LEAF_PREFIX][..], chunk].concat()))
+            .collect();
+        // For the empty message, the root of the empty list: 32 zero bytes.
+        let root = merkle_root(&leaves);
+        assert_eq!(
+            request.command(),
+            &command::sign_message(length, &root, &path)
+        );
+        let interpreter = request.interpreter_mut().unwrap();
+        for chunk in chunks {
+            let preimage = [&[MERKLE_LEAF_PREFIX][..], chunk].concat();
+            let mut get_preimage = vec![ClientCommandCode::GetPreimage as u8, SHA256_HASH_TYPE];
+            get_preimage.extend(hash(&preimage));
+            let response = interpreter.execute(get_preimage).unwrap();
+            // The preimage length, the length in this response, and the preimage.
+            assert_eq!(response[..2], [preimage.len() as u8; 2]);
+            assert_eq!(&response[2..], preimage);
+        }
+    }
+}
+
+fn unsigned_psbt() -> bitcoin::psbt::Psbt {
+    use bitcoin::{
+        absolute::LockTime, transaction::Version, Amount, OutPoint, ScriptBuf, Sequence,
+        Transaction, TxIn, TxOut, Witness,
+    };
+    bitcoin::psbt::Psbt::from_unsigned_tx(Transaction {
+        version: Version::TWO,
+        lock_time: LockTime::ZERO,
+        input: vec![TxIn {
+            previous_output: OutPoint::null(),
+            script_sig: ScriptBuf::new(),
+            sequence: Sequence::MAX,
+            witness: Witness::new(),
+        }],
+        output: vec![TxOut {
+            value: Amount::from_sat(1000),
+            script_pubkey: ScriptBuf::new(),
+        }],
+    })
+    .unwrap()
+}
+
+#[test]
+fn psbt_preparation_delegates_custom_values_and_propagates_map_errors() {
+    use bitcoin::psbt::raw::{Key, ProprietaryKey};
+    use ledger_bitcoin_client::{protocol::prepare_sign_psbt, psbt::PsbtV2Error};
+    const TEST_UNKNOWN_KEY_TYPE: u8 = 0x70;
+    const PSBT_IN_PREVIOUS_TXID: u8 = 0x0e;
+    let mut psbt = unsigned_psbt();
+    let unknown = Key {
+        type_value: TEST_UNKNOWN_KEY_TYPE,
+        key: vec![9],
+    };
+    let proprietary = ProprietaryKey {
+        prefix: b"hw".to_vec(),
+        subtype: 1,
+        key: vec![9],
+    };
+    // Distinct values, which no other field of the PSBT has, so that each one shows that its map
+    // was forwarded.
+    let values: [&[u8]; 6] = [
+        b"global unknown",
+        b"input unknown",
+        b"output unknown",
+        b"global proprietary",
+        b"input proprietary",
+        b"output proprietary",
+    ];
+    psbt.unknown.insert(unknown.clone(), values[0].to_vec());
+    psbt.inputs[0]
+        .unknown
+        .insert(unknown.clone(), values[1].to_vec());
+    psbt.outputs[0].unknown.insert(unknown, values[2].to_vec());
+    psbt.proprietary
+        .insert(proprietary.clone(), values[3].to_vec());
+    psbt.inputs[0]
+        .proprietary
+        .insert(proprietary.clone(), values[4].to_vec());
+    psbt.outputs[0]
+        .proprietary
+        .insert(proprietary, values[5].to_vec());
+    let mut request = prepare_sign_psbt(&psbt, &wallet(Version::V2), None).unwrap();
+    let interpreter = request.interpreter_mut().unwrap();
+    // The keys too: <keytype> || <keydata>, and for the proprietary one, the keydata is the
+    // prefix (with its length), the subtype and the key.
+    let unknown_key: &[u8] = &[TEST_UNKNOWN_KEY_TYPE, 9];
+    let proprietary_key: &[u8] = &[0xfc, 2, b'h', b'w', 1, 9];
+    for element in [unknown_key, proprietary_key].iter().chain(values.iter()) {
+        let mut preimage = vec![MERKLE_LEAF_PREFIX];
+        preimage.extend_from_slice(element);
+        let mut get_preimage = vec![ClientCommandCode::GetPreimage as u8, SHA256_HASH_TYPE];
+        get_preimage.extend(hash(&preimage));
+        // The preimage length, the length in this response, and the preimage.
+        let mut expected = vec![preimage.len() as u8, preimage.len() as u8];
+        expected.extend(&preimage);
+        assert_eq!(interpreter.execute(get_preimage).unwrap(), expected);
+    }
+
+    // Errors converting the PSBT are propagated. The psbt module tests each of them.
+    let mut conflict = unsigned_psbt();
+    conflict.inputs[0].unknown.insert(
+        Key {
+            type_value: PSBT_IN_PREVIOUS_TXID,
+            key: vec![],
+        },
+        vec![42],
+    );
+    assert_eq!(
+        prepare_sign_psbt(&conflict, &wallet(Version::V2), None).err(),
+        Some(PsbtV2Error::UnexpectedV2Field(PSBT_IN_PREVIOUS_TXID))
+    );
+    psbt.inputs.clear();
+    assert_eq!(
+        prepare_sign_psbt(&psbt, &wallet(Version::V2), None).err(),
+        Some(PsbtV2Error::TxMapCountMismatch)
+    );
+}

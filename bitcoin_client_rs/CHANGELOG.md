@@ -23,6 +23,7 @@ This release exposes the protocol without the transport, for applications that o
 - `PartialSignatureError` has a new variant, `InvalidInputIndex`, and is `#[non_exhaustive]`.
 - `SignPsbtYieldedObject::Unknown` is a non-exhaustive struct variant with the object's `tag`, and the `data` that follows the input index. It previously had only the data, so the tag was lost.
 - Responses are parsed strictly: fixed-length responses (master fingerprint, wallet registration) must have exactly the expected length, GET_VERSION must not have trailing bytes, and the extended pubkey and address must be valid UTF-8. The Bitcoin app always sends such responses; anything else is now an `UnexpectedResult` error.
+- `PsbtV2Error` is `#[non_exhaustive]`.
 
 ### Added
 
@@ -30,6 +31,8 @@ This release exposes the protocol without the transport, for applications that o
 - `BitcoinClientError`, `InterpreterError` and `WalletError` implement `Display` and `std::error::Error`. `ClientCommandInterpreter` implements `Default` and `Debug`, and `InterpreterError` implements `Clone`, `PartialEq` and `Eq`.
 - `PartialSignatureError` implements `Debug`.
 - `protocol::parse_*`: parsers for the responses to the commands, with a detailed `ResponseError`. The values yielded by SIGN_PSBT have their own parsers.
+- `protocol::Request`, and a `protocol::prepare_*` function for each command, returning the command to send together with the state needed to answer the client commands of the device. `ClientCommandInterpreter::for_wallet` builds that state for a wallet policy.
+- `PsbtV2Error` implements `Display` and `std::error::Error`, and `PsbtV2Maps` implements `Debug`. `APDUCommand` implements `Debug`, `PartialEq` and `Eq`.
 
 ### Fixed
 

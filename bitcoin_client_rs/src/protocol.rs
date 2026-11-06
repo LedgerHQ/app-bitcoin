@@ -5,16 +5,158 @@ use core::{fmt, str::FromStr};
 
 use bitcoin::{
     address::NetworkUnchecked,
-    bip32::{Fingerprint, Xpub},
+    bip32::{DerivationPath, Fingerprint, Xpub},
     consensus::encode::{deserialize_partial, Decodable, Encodable, Error as EncodeError},
     hashes::Hash,
     io::{Read, Write},
+    psbt::Psbt,
     secp256k1::ecdsa::Signature,
     taproot::TapLeafHash,
     Address, PublicKey,
 };
 
-use crate::psbt::{PartialSignature, PartialSignatureError};
+use crate::{
+    apdu::APDUCommand,
+    command,
+    interpreter::{get_merkleized_map_commitment, ClientCommandInterpreter},
+    psbt::{get_v2_maps, PartialSignature, PartialSignatureError, PsbtV2Error},
+    wallet::WalletPolicy,
+};
+
+/// A command to send to the device, together with the state needed to answer the client
+/// commands that the device may send while executing it.
+///
+/// The `prepare_*` functions build a request for each command of the Bitcoin app.
+#[derive(Debug)]
+pub struct Request {
+    command: APDUCommand,
+    interpreter: Option<ClientCommandInterpreter>,
+}
+
+impl Request {
+    /// A request for a command that the device never interrupts with client commands.
+    pub fn new(command: APDUCommand) -> Self {
+        Self {
+            command,
+            interpreter: None,
+        }
+    }
+
+    /// A request whose client commands are answered by `interpreter`.
+    pub fn with_interpreter(command: APDUCommand, interpreter: ClientCommandInterpreter) -> Self {
+        Self {
+            command,
+            interpreter: Some(interpreter),
+        }
+    }
+
+    /// The command to send to the device first.
+    pub fn command(&self) -> &APDUCommand {
+        &self.command
+    }
+
+    /// The interpreter answering the client commands, if the command can be interrupted.
+    pub fn interpreter_mut(&mut self) -> Option<&mut ClientCommandInterpreter> {
+        self.interpreter.as_mut()
+    }
+
+    /// Consumes the request and returns the values that the device yielded while executing it.
+    pub fn into_yielded(self) -> Vec<Vec<u8>> {
+        self.interpreter
+            .map(ClientCommandInterpreter::yielded)
+            .unwrap_or_default()
+    }
+}
+
+/// Prepares GET_VERSION.
+pub fn prepare_get_version() -> Request {
+    Request::new(command::get_version())
+}
+
+/// Prepares GET_MASTER_FINGERPRINT.
+pub fn prepare_get_master_fingerprint() -> Request {
+    Request::new(command::get_master_fingerprint())
+}
+
+/// Prepares GET_EXTENDED_PUBKEY.
+pub fn prepare_get_extended_pubkey(path: &DerivationPath, display: bool) -> Request {
+    Request::new(command::get_extended_pubkey(path, display))
+}
+
+/// Prepares REGISTER_WALLET, with the wallet policy and its keys known to the interpreter.
+pub fn prepare_register_wallet(wallet: &WalletPolicy) -> Request {
+    Request::with_interpreter(
+        command::register_wallet(wallet),
+        ClientCommandInterpreter::for_wallet(wallet),
+    )
+}
+
+/// Prepares GET_WALLET_ADDRESS, with the wallet policy and its keys known to the interpreter.
+///
+/// This does not verify the address that the device returns.
+pub fn prepare_get_wallet_address(
+    wallet: &WalletPolicy,
+    hmac: Option<&[u8; 32]>,
+    change: bool,
+    address_index: u32,
+    display: bool,
+) -> Request {
+    Request::with_interpreter(
+        command::get_wallet_address(wallet, hmac, change, address_index, display),
+        ClientCommandInterpreter::for_wallet(wallet),
+    )
+}
+
+/// Prepares SIGN_PSBT, with the wallet policy, its keys and the PSBT maps known to the
+/// interpreter.
+///
+/// Fails if the PSBT cannot be converted to the PSBTv2 maps that the device expects.
+pub fn prepare_sign_psbt(
+    psbt: &Psbt,
+    wallet: &WalletPolicy,
+    hmac: Option<&[u8; 32]>,
+) -> Result<Request, PsbtV2Error> {
+    let mut interpreter = ClientCommandInterpreter::for_wallet(wallet);
+    let maps = get_v2_maps(psbt)?;
+    interpreter.add_known_mapping(&maps.global);
+    let global_commitment = get_merkleized_map_commitment(&maps.global);
+    let mut input_commitments = Vec::with_capacity(maps.inputs.len());
+    for map in &maps.inputs {
+        interpreter.add_known_mapping(map);
+        input_commitments.push(get_merkleized_map_commitment(map));
+    }
+    let input_root = interpreter.add_known_list(&input_commitments);
+    let mut output_commitments = Vec::with_capacity(maps.outputs.len());
+    for map in &maps.outputs {
+        interpreter.add_known_mapping(map);
+        output_commitments.push(get_merkleized_map_commitment(map));
+    }
+    let output_root = interpreter.add_known_list(&output_commitments);
+    let command = command::sign_psbt(
+        &global_commitment,
+        maps.inputs.len(),
+        &input_root,
+        maps.outputs.len(),
+        &output_root,
+        wallet,
+        hmac,
+    );
+    Ok(Request::with_interpreter(command, interpreter))
+}
+
+/// Prepares SIGN_MESSAGE, with the message chunks known to the interpreter.
+pub fn prepare_sign_message(message: &[u8], path: &DerivationPath) -> Request {
+    let chunks: Vec<&[u8]> = message.chunks(MESSAGE_CHUNK_SIZE).collect();
+    let mut interpreter = ClientCommandInterpreter::new();
+    let root = interpreter.add_known_list(&chunks);
+    Request::with_interpreter(
+        command::sign_message(message.len(), &root, path),
+        interpreter,
+    )
+}
+
+/// The size of the chunks of the message in SIGN_MESSAGE; the last one can be shorter.
+const MESSAGE_CHUNK_SIZE: usize = 64;
 
 /// An error parsing the response to a command.
 ///

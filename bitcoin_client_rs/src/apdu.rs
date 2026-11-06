@@ -109,7 +109,7 @@ impl TryFrom<u16> for StatusWord {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct APDUCommand {
     pub cla: u8,
     pub ins: u8,

@@ -47,6 +47,7 @@ const PSBT_MAGIC_LEN: usize = 5;
 pub type PsbtMap = Vec<(Vec<u8>, Vec<u8>)>;
 
 /// The key-value maps of a PSBT, translated to PSBTv2.
+#[derive(Debug)]
 pub struct PsbtV2Maps {
     pub global: PsbtMap,
     /// One map per PSBT input, in order.
@@ -55,6 +56,7 @@ pub struct PsbtV2Maps {
     pub outputs: Vec<PsbtMap>,
 }
 
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PsbtV2Error {
     /// The number of inputs or outputs of the unsigned transaction differs from the number of
@@ -66,6 +68,22 @@ pub enum PsbtV2Error {
     /// An unexpected PSBTv2 field was encountered in a Psbtv0.
     UnexpectedV2Field(u8),
 }
+
+impl core::fmt::Display for PsbtV2Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::TxMapCountMismatch => {
+                f.write_str("The number of input or output maps differs from the transaction")
+            }
+            Self::MalformedSerialization => f.write_str("Malformed PSBT serialization"),
+            Self::UnexpectedV2Field(key_type) => {
+                write!(f, "Unexpected PSBTv2 field {:#04x} in a PSBTv0", key_type)
+            }
+        }
+    }
+}
+
+impl std::error::Error for PsbtV2Error {}
 
 /// Returns the PSBTv2 maps for `psbt`: the global map, then one map per input, then one per
 /// output.
