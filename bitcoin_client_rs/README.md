@@ -52,6 +52,10 @@ defaults to use the public `command`, `interpreter`, `merkle`, `protocol`,
 `prepare_sign_message`, and `prepare_sign_psbt` each return an APDU command and
 `ClientCommandInterpreter` state for a caller-owned exchange loop. PSBT
 preparation is fallible because it translates the input to PSBTv2 maps.
+Pass each response's typed `StatusWord` and owned payload (without status bytes)
+to `protocol::handle_response`, always using the **original request instruction**.
+Exchange `Step::Continue(command)` and repeat; `Step::Done(data)` is terminal.
+`RequestError` distinguishes device-status errors from interpreter errors.
 The protocol layer performs no transport I/O and selects no runtime.
 
 `protocol` also exposes response parsers with detailed `ResponseError`
@@ -69,6 +73,10 @@ both client modules.
 This is a breaking feature/API release. In 0.7, `default-features = false`
 still exposed the synchronous client. In 0.8, add `features = ["client"]`
 to keep it, or `features = ["async"]` to enable both clients.
+
+The public protocol `continue_interrupted` helper is replaced by the full
+`handle_response` step above; the low-level `command::continue_interrupted`
+builder remains available.
 
 Well-encoded yielded indices above `u32::MAX` now return
 `PartialSignatureError::InvalidInputIndex`; malformed CompactSize encodings
