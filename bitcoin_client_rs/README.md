@@ -66,26 +66,85 @@ Empty yield lists succeed; a yield of at most one byte takes precedence over
 other parsing errors and reports all yields concatenated. Other failures own
 only the offending yield, with a typed `PartialSignatureError` reason.
 The terminal success payload is not a yield and is ignored by the clients.
-
 Yielded input indices must fit in a `u32` on every host; tags still support the
 full `u64` range. The parsers check encodings, not signed message digests.
 
 Enable `client` for synchronous `BitcoinClient`/`Transport`, or `async` for
-both client modules.
+both client modules. The independent `paranoid_client` feature enables
+`WalletPolicy::check_address` and its existing miniscript dependency without
+enabling either client. This compares scriptPubKeys, accepting equivalent
+scripts represented on different networks, and handles MuSig policy keys.
+When driving exchanges yourself, verify returned addresses and complete the
+authenticated address follow-up before releasing registration credentials.
+Default convenience clients already perform these checks, once per address.
 
 ### Migrating to 0.8
 
 This is a breaking feature/API release. In 0.7, `default-features = false`
 still exposed the synchronous client. In 0.8, add `features = ["client"]`
-to keep it, or `features = ["async"]` to enable both clients.
+to keep it, or `features = ["async"]` to enable both clients. Leave defaults
+disabled for transport-free use; add `paranoid_client` for independent checks.
 
 The public protocol `continue_interrupted` helper is replaced by the full
 `handle_response` step above; the low-level `command::continue_interrupted`
-builder remains available.
-
-Well-encoded yielded indices above `u32::MAX` now return
+builder remains available. Move `protocol::check_address(wallet, ...)` calls
+to `wallet.check_address(...)` and import `wallet::AddressCheckError`; its
+`Policy` variant is now `GetDescriptor`. `ResponseError`, `AddressCheckError`,
+`InterpreterError`, and `PsbtV2Error` are non-exhaustive: downstream matches
+need a wildcard arm. Well-encoded yielded indices above `u32::MAX` now return
 `PartialSignatureError::InvalidInputIndex`; malformed CompactSize encodings
 still return `InvalidLength`.
+
+### Authenticated registration with caller-owned exchanges
+
+Enable `paranoid_client` (it does not require either client). This complete
+function accepts the caller's exchange function and returns the registration
+ID/HMAC only after a silent, HMAC-authenticated address request, parsing, and
+independent verification all succeed:
+
+```rust
+use ledger_bitcoin_client::{
+    apdu::{APDUCommand, StatusWord},
+    interpreter::ClientCommandInterpreter,
+    protocol::{
+        handle_response, parse_wallet_address, parse_wallet_registration,
+        prepare_get_wallet_address, prepare_register_wallet, Step,
+    },
+    wallet::WalletPolicy,
+};
+
+fn register_wallet_authenticated<E: std::fmt::Display>(
+    wallet: &WalletPolicy,
+    mut exchange: impl FnMut(&APDUCommand) -> Result<(StatusWord, Vec<u8>), E>,
+) -> Result<([u8; 32], [u8; 32]), String> {
+    let mut request = |mut command: APDUCommand,
+                       mut interpreter: ClientCommandInterpreter|
+     -> Result<Vec<u8>, String> {
+        let original_instruction = command.ins;
+        loop {
+            let (status, data) = exchange(&command).map_err(|error| error.to_string())?;
+            match handle_response(
+                original_instruction, status, data, Some(&mut interpreter),
+            ).map_err(|error| error.to_string())? {
+                Step::Continue(next) => command = next,
+                Step::Done(data) => return Ok(data),
+            }
+        }
+    };
+
+    let (command, interpreter) = prepare_register_wallet(wallet);
+    let data = request(command, interpreter)?;
+    let (id, hmac) = parse_wallet_registration(&data).map_err(|error| error.to_string())?;
+
+    // Authenticate the follow-up, without displaying the address.
+    let (command, interpreter) =
+        prepare_get_wallet_address(wallet, Some(&hmac), false, 0, false);
+    let data = request(command, interpreter)?;
+    let address = parse_wallet_address(&data).map_err(|error| error.to_string())?;
+    wallet.check_address(false, 0, &address).map_err(|error| error.to_string())?;
+    Ok((id, hmac))
+}
+```
 
 ## The `async` feature
 
