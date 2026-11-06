@@ -5,16 +5,93 @@ use core::{fmt, str::FromStr};
 
 use bitcoin::{
     address::NetworkUnchecked,
-    bip32::{Fingerprint, Xpub},
+    bip32::{DerivationPath, Fingerprint, Xpub},
     consensus::encode::{deserialize_partial, Decodable, Encodable, Error as EncodeError},
     hashes::Hash,
     io::{Read, Write},
+    psbt::Psbt,
     secp256k1::ecdsa::Signature,
     taproot::TapLeafHash,
     Address, PublicKey,
 };
 
-use crate::psbt::{PartialSignature, PartialSignatureError};
+use crate::{
+    apdu::APDUCommand,
+    command,
+    interpreter::{get_merkleized_map_commitment, ClientCommandInterpreter},
+    psbt::{get_v2_maps, PartialSignature, PartialSignatureError, PsbtV2Error},
+    wallet::WalletPolicy,
+};
+
+/// Prepares wallet registration and its delegated wallet preimages and key tree.
+pub fn prepare_register_wallet(wallet: &WalletPolicy) -> (APDUCommand, ClientCommandInterpreter) {
+    (
+        command::register_wallet(wallet),
+        ClientCommandInterpreter::for_wallet(wallet),
+    )
+}
+
+/// Prepares an address request and its delegated wallet preimages and key tree.
+pub fn prepare_get_wallet_address(
+    wallet: &WalletPolicy,
+    hmac: Option<&[u8; 32]>,
+    change: bool,
+    address_index: u32,
+    display: bool,
+) -> (APDUCommand, ClientCommandInterpreter) {
+    (
+        command::get_wallet_address(wallet, hmac, change, address_index, display),
+        ClientCommandInterpreter::for_wallet(wallet),
+    )
+}
+
+/// Lowers a PSBT to v2 maps and prepares their delegated Merkle commitments.
+pub fn prepare_sign_psbt(
+    psbt: &Psbt,
+    wallet: &WalletPolicy,
+    hmac: Option<&[u8; 32]>,
+) -> Result<(APDUCommand, ClientCommandInterpreter), PsbtV2Error> {
+    let mut interpreter = ClientCommandInterpreter::for_wallet(wallet);
+    let maps = get_v2_maps(psbt)?;
+    interpreter.add_known_mapping(&maps.global);
+    let global_commitment = get_merkleized_map_commitment(&maps.global);
+    let mut input_commitments = Vec::with_capacity(maps.inputs.len());
+    for map in &maps.inputs {
+        interpreter.add_known_mapping(map);
+        input_commitments.push(get_merkleized_map_commitment(map));
+    }
+    let input_root = interpreter.add_known_list(&input_commitments);
+    let mut output_commitments = Vec::with_capacity(maps.outputs.len());
+    for map in &maps.outputs {
+        interpreter.add_known_mapping(map);
+        output_commitments.push(get_merkleized_map_commitment(map));
+    }
+    let output_root = interpreter.add_known_list(&output_commitments);
+    let command = command::sign_psbt(
+        &global_commitment,
+        psbt.inputs.len(),
+        &input_root,
+        psbt.outputs.len(),
+        &output_root,
+        wallet,
+        hmac,
+    );
+    Ok((command, interpreter))
+}
+
+/// Prepares a message command and the delegated state for its 64-byte chunks.
+pub fn prepare_sign_message(
+    message: &[u8],
+    path: &DerivationPath,
+) -> (APDUCommand, ClientCommandInterpreter) {
+    let chunks: Vec<&[u8]> = message.chunks(64).collect();
+    let mut interpreter = ClientCommandInterpreter::new();
+    let root = interpreter.add_known_list(&chunks);
+    (
+        command::sign_message(message.len(), &root, path),
+        interpreter,
+    )
+}
 
 /// An encoding error in an ordinary device response; no response bytes are retained.
 /// Pure consumers retain detailed field/decoding diagnostics. Convenience clients

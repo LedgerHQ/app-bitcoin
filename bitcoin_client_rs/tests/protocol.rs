@@ -405,3 +405,214 @@ fn message_signature_response_validates_length_and_encoding() {
         Err(ResponseError::InvalidFormat { .. })
     ));
 }
+
+#[test]
+fn wallet_and_message_preparation_supply_delegated_preimages() {
+    use ledger_bitcoin_client::protocol::{
+        prepare_get_wallet_address, prepare_register_wallet, prepare_sign_message,
+    };
+    const MESSAGE_CHUNK_SIZE: usize = 64;
+    for version in [Version::V1, Version::V2] {
+        let wallet = wallet(version);
+        let (registration, interpreter) = prepare_register_wallet(&wallet);
+        assert_eq!(
+            (
+                registration.cla,
+                registration.ins,
+                registration.p1,
+                registration.p2
+            ),
+            (
+                EXPECTED_BITCOIN_CLA,
+                EXPECTED_REGISTER_WALLET_INS,
+                0,
+                EXPECTED_PROTOCOL_VERSION
+            )
+        );
+        let mut expected = vec![wallet.serialize().len() as u8];
+        expected.extend(wallet.serialize());
+        assert_eq!(registration.data, expected);
+        let mut interpreters = vec![interpreter];
+        let hmac = [7; 32];
+        for (hmac, change, index, display) in
+            [(None, false, 0, false), (Some(&hmac), true, u32::MAX, true)]
+        {
+            let (address, interpreter) =
+                prepare_get_wallet_address(&wallet, hmac, change, index, display);
+            assert_eq!(
+                (address.cla, address.ins, address.p1, address.p2),
+                (
+                    EXPECTED_BITCOIN_CLA,
+                    EXPECTED_GET_WALLET_ADDRESS_INS,
+                    0,
+                    EXPECTED_PROTOCOL_VERSION
+                )
+            );
+            let mut expected = vec![u8::from(display)];
+            expected.extend(wallet.id());
+            expected.extend(hmac.unwrap_or(&[0; 32]));
+            expected.push(u8::from(change));
+            expected.extend(index.to_be_bytes());
+            assert_eq!(address.data, expected);
+            interpreters.push(interpreter);
+        }
+        for mut interpreter in interpreters {
+            for preimage in [
+                wallet.serialize(),
+                wallet.descriptor_template.as_bytes().to_vec(),
+                [&[MERKLE_LEAF_PREFIX][..], KEY.as_bytes()].concat(),
+            ] {
+                let mut request = vec![ClientCommandCode::GetPreimage as u8, SHA256_HASH_TYPE];
+                request.extend(hash(&preimage));
+                let mut expected = vec![preimage.len() as u8, preimage.len() as u8];
+                expected.extend(preimage);
+                assert_eq!(interpreter.execute(request).unwrap(), expected);
+            }
+            let key_leaf = hash(&[&[MERKLE_LEAF_PREFIX][..], KEY.as_bytes()].concat());
+            let mut request = vec![ClientCommandCode::GetMerkleLeafProof as u8];
+            request.extend(key_leaf);
+            request.extend([1, 0]); // One-key tree, leaf zero.
+            let mut expected = key_leaf.to_vec();
+            expected.extend([0, 0]); // No siblings, no queued proof elements.
+            assert_eq!(interpreter.execute(request).unwrap(), expected);
+        }
+    }
+    let path = DerivationPath::from_str("m/44'/1'/0'/0").unwrap();
+    for length in [
+        1,
+        MESSAGE_CHUNK_SIZE,
+        MESSAGE_CHUNK_SIZE + 1,
+        2 * MESSAGE_CHUNK_SIZE,
+        2 * MESSAGE_CHUNK_SIZE + 1,
+    ] {
+        let message = vec![0x55; length];
+        let (command, mut interpreter) = prepare_sign_message(&message, &path);
+        let chunks: Vec<_> = message.chunks(MESSAGE_CHUNK_SIZE).collect();
+        let leaves = chunks
+            .iter()
+            .map(|chunk| hash(&[&[MERKLE_LEAF_PREFIX][..], chunk].concat()))
+            .collect();
+        let root = *MerkleTree::new(leaves).root_hash();
+        assert_eq!(
+            command.encode(),
+            command::sign_message(length, &root, &path).encode()
+        );
+        for chunk in chunks {
+            let preimage = [&[MERKLE_LEAF_PREFIX][..], chunk].concat();
+            let mut request = vec![ClientCommandCode::GetPreimage as u8, SHA256_HASH_TYPE];
+            request.extend(hash(&preimage));
+            let response = interpreter.execute(request).unwrap();
+            assert_eq!(&response[2..], preimage);
+        }
+    }
+}
+
+fn unsigned_psbt() -> bitcoin::psbt::Psbt {
+    use bitcoin::{
+        absolute::LockTime, transaction::Version, Amount, OutPoint, ScriptBuf, Sequence,
+        Transaction, TxIn, TxOut, Witness,
+    };
+    bitcoin::psbt::Psbt::from_unsigned_tx(Transaction {
+        version: Version::TWO,
+        lock_time: LockTime::ZERO,
+        input: vec![TxIn {
+            previous_output: OutPoint::null(),
+            script_sig: ScriptBuf::new(),
+            sequence: Sequence::MAX,
+            witness: Witness::new(),
+        }],
+        output: vec![TxOut {
+            value: Amount::from_sat(1000),
+            script_pubkey: ScriptBuf::new(),
+        }],
+    })
+    .unwrap()
+}
+
+#[test]
+fn psbt_preparation_delegates_custom_values_and_propagates_map_errors() {
+    use bitcoin::psbt::raw::{Key, ProprietaryKey};
+    use ledger_bitcoin_client::{protocol::prepare_sign_psbt, psbt::PsbtV2Error};
+    const TEST_UNKNOWN_KEY_TYPE: u8 = 0x70;
+    const PSBT_GLOBAL_TX_VERSION: u8 = 0x02;
+    const PSBT_GLOBAL_FALLBACK_LOCKTIME: u8 = 0x03;
+    const PSBT_GLOBAL_INPUT_COUNT: u8 = 0x04;
+    const PSBT_GLOBAL_OUTPUT_COUNT: u8 = 0x05;
+    const PSBT_GLOBAL_VERSION: u8 = 0xfb;
+    const PSBT_IN_PREVIOUS_TXID: u8 = 0x0e;
+    const PSBT_IN_OUTPUT_INDEX: u8 = 0x0f;
+    const PSBT_IN_SEQUENCE: u8 = 0x10;
+    const PSBT_OUT_AMOUNT: u8 = 0x03;
+    const PSBT_OUT_SCRIPT: u8 = 0x04;
+    let mut psbt = unsigned_psbt();
+    let unknown = Key {
+        type_value: TEST_UNKNOWN_KEY_TYPE,
+        key: vec![9],
+    };
+    let proprietary = ProprietaryKey {
+        prefix: b"hw".to_vec(),
+        subtype: 1,
+        key: vec![9],
+    };
+    psbt.unknown.insert(unknown.clone(), vec![1]);
+    psbt.inputs[0].unknown.insert(unknown.clone(), vec![2]);
+    psbt.outputs[0].unknown.insert(unknown, vec![3]);
+    psbt.proprietary.insert(proprietary.clone(), vec![4]);
+    psbt.inputs[0]
+        .proprietary
+        .insert(proprietary.clone(), vec![5]);
+    psbt.outputs[0].proprietary.insert(proprietary, vec![6]);
+    let (_, mut interpreter) = prepare_sign_psbt(&psbt, &wallet(Version::V2), None).unwrap();
+    for value in 1..=6 {
+        let preimage = [MERKLE_LEAF_PREFIX, value];
+        let mut request = vec![ClientCommandCode::GetPreimage as u8, SHA256_HASH_TYPE];
+        request.extend(hash(&preimage));
+        assert_eq!(interpreter.execute(request).unwrap(), [2, 2, 0, value]);
+    }
+    for (map_index, key_types) in [
+        (
+            0,
+            &[
+                PSBT_GLOBAL_TX_VERSION,
+                PSBT_GLOBAL_FALLBACK_LOCKTIME,
+                PSBT_GLOBAL_INPUT_COUNT,
+                PSBT_GLOBAL_OUTPUT_COUNT,
+                PSBT_GLOBAL_VERSION,
+            ][..],
+        ),
+        (
+            1,
+            &[
+                PSBT_IN_PREVIOUS_TXID,
+                PSBT_IN_OUTPUT_INDEX,
+                PSBT_IN_SEQUENCE,
+            ][..],
+        ),
+        (2, &[PSBT_OUT_AMOUNT, PSBT_OUT_SCRIPT][..]),
+    ] {
+        for &key_type in key_types {
+            let mut conflict = unsigned_psbt();
+            let map = match map_index {
+                0 => &mut conflict.unknown,
+                1 => &mut conflict.inputs[0].unknown,
+                _ => &mut conflict.outputs[0].unknown,
+            };
+            map.insert(
+                Key {
+                    type_value: key_type,
+                    key: vec![],
+                },
+                vec![42],
+            );
+            assert_eq!(
+                prepare_sign_psbt(&conflict, &wallet(Version::V2), None).err(),
+                Some(PsbtV2Error::UnexpectedV2Field(key_type))
+            );
+        }
+    }
+    psbt.inputs.clear();
+    assert_eq!(
+        prepare_sign_psbt(&psbt, &wallet(Version::V2), None).err(),
+        Some(PsbtV2Error::TxMapCountMismatch)
+    );
+}
