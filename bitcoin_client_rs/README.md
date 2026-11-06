@@ -21,9 +21,9 @@ pub struct BitcoinClient<T: Transport> {...}
 impl<T: Transport> BitcoinClient<T> {
     pub fn get_extended_pubkey(
         &self,
-        path: &bitcoin::util::bip32::DerivationPath,
+        path: &bitcoin::bip32::DerivationPath,
         display: bool,
-    ) -> Result<bitcoin::util::bip32::ExtendedPubKey, BitcoinClientError<T::Error>>;
+    ) -> Result<bitcoin::bip32::Xpub, BitcoinClientError<T::Error>>;
 }
 ```
 
@@ -41,6 +41,22 @@ In order to satisfy this Trait, it is possible to import the
 `ledger-transport-hid` crate from https://github.com/Zondax/ledger-rs.
 Please, read the `examples/ledger_hwi/src/transport.rs` file to find an example.
 
+## Transport-free protocol use
+
+The default features are `client`, `async`, and `paranoid_client`. Disable
+defaults to use the public `command`, `interpreter`, `merkle`, `protocol`,
+`psbt`, and `wallet` modules without either convenience client. Set
+`default-features = false` on the dependency in Cargo.toml.
+
+Enable `client` for synchronous `BitcoinClient`/`Transport`, or `async` for
+both client modules.
+
+### Migrating to 0.8
+
+This is a breaking feature/API release. In 0.7, `default-features = false`
+still exposed the synchronous client. In 0.8, add `features = ["client"]`
+to keep it, or `features = ["async"]` to enable both clients.
+
 ## The `async` feature
 
 The optional feature `async` adds the `async_client` module to the crate
@@ -56,9 +72,12 @@ pub trait Transport {
 }
 ```
 
-## The `no-std` support
+## WASM and `no_std`
 
-Work in progress.
+The transport-free build, with or without `paranoid_client`, supports
+`wasm32-unknown-unknown`. It remains **std-based**, as on native targets.
+Disabling the convenience clients does not make this crate `no_std`;
+`no_std` targets are not supported.
 
 ## Example
 

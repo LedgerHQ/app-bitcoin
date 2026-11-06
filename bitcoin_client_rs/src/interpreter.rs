@@ -1,5 +1,5 @@
 use core::convert::TryFrom;
-use core::fmt::Debug;
+use core::fmt::{self, Debug};
 
 use bitcoin::{
     consensus::encode::{self},
@@ -27,6 +27,12 @@ pub struct ClientCommandInterpreter {
     queue: Vec<Vec<u8>>,
     known_preimages: Vec<([u8; 32], Vec<u8>)>,
     trees: Vec<MerkleTree>,
+}
+
+impl Default for ClientCommandInterpreter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ClientCommandInterpreter {
@@ -305,6 +311,7 @@ pub fn get_merkleized_map_commitment(mapping: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> 
     commitment
 }
 
+#[non_exhaustive]
 #[derive(Debug)]
 pub enum InterpreterError {
     EmptyInput,
@@ -314,4 +321,22 @@ pub enum InterpreterError {
     UnknownHash,
     UnknownMerkleRoot,
     UnexpectedQueue,
+}
+
+impl fmt::Display for InterpreterError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyInput => f.write_str("Empty interpreter request"),
+            Self::UnknownCommand(command) => {
+                write!(f, "Unknown interpreter command: {:#04x}", command)
+            }
+            Self::UnsupportedRequest(command) => {
+                write!(f, "Unsupported interpreter request: {:#04x}", command)
+            }
+            Self::InvalidIndexOrSize => f.write_str("Invalid index or size"),
+            Self::UnknownHash => f.write_str("Unknown preimage hash"),
+            Self::UnknownMerkleRoot => f.write_str("Unknown Merkle root"),
+            Self::UnexpectedQueue => f.write_str("Unexpected interpreter queue state"),
+        }
+    }
 }
