@@ -15,6 +15,7 @@ use ledger_bitcoin_client::{
 const KEY: &str = "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U";
 const MERKLE_LEAF_PREFIX: u8 = 0;
 const SHA256_HASH_TYPE: u8 = 0;
+const COMMAND_CODE_LEN: usize = 1;
 const HASH_LEN: usize = 32;
 const MORE_ELEMENTS_HEADER_LEN: usize = 2;
 
@@ -180,6 +181,38 @@ fn public_merkle_and_interpreter() {
         Vec::<u8>::new()
     );
     assert_eq!(interpreter.yielded(), vec![vec![1, 2]]);
+}
+
+#[test]
+fn missing_leaves_and_unknown_roots_are_distinct() {
+    use ledger_bitcoin_client::interpreter::InterpreterError;
+    let mut interpreter = ClientCommandInterpreter::new();
+    let root = interpreter.add_known_list(&[b"hello"]);
+    let mut index = vec![ClientCommandCode::GetMerkleLeafIndex as u8];
+    index.extend(root);
+    index.extend([9; 32]);
+    assert_eq!(interpreter.execute(index.clone()).unwrap(), [0, 0]);
+    let leaf_hash_offset = COMMAND_CODE_LEN + HASH_LEN;
+    index[leaf_hash_offset..].copy_from_slice(&root);
+    assert_eq!(interpreter.execute(index.clone()).unwrap(), [1, 0]);
+    index[COMMAND_CODE_LEN..leaf_hash_offset].fill(8);
+    assert!(matches!(
+        interpreter.execute(index),
+        Err(InterpreterError::UnknownMerkleRoot)
+    ));
+    let mut proof = vec![ClientCommandCode::GetMerkleLeafProof as u8];
+    proof.extend([8; 32]);
+    proof.extend([1, 0]);
+    assert!(matches!(
+        interpreter.execute(proof),
+        Err(InterpreterError::UnknownMerkleRoot)
+    ));
+    let mut preimage = vec![ClientCommandCode::GetPreimage as u8, SHA256_HASH_TYPE];
+    preimage.extend([9; 32]);
+    assert!(matches!(
+        interpreter.execute(preimage),
+        Err(InterpreterError::UnknownHash)
+    ));
 }
 
 #[test]
