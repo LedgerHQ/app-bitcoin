@@ -14,6 +14,7 @@ use ledger_bitcoin_client::{
 const KEY: &str = "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U";
 const MERKLE_LEAF_PREFIX: u8 = 0;
 const SHA256_HASH_TYPE: u8 = 0;
+const COMMAND_CODE_LEN: usize = 1;
 const HASH_LEN: usize = 32;
 const MORE_ELEMENTS_HEADER_LEN: usize = 2;
 // A client command response, including its headers, is at most this long.
@@ -255,6 +256,48 @@ fn interpreter_answers_preimages_and_yields() {
         Vec::<u8>::new()
     );
     assert_eq!(interpreter.yielded(), vec![vec![1, 2]]);
+}
+
+#[test]
+fn missing_leaves_and_unknown_roots_are_distinct() {
+    use ledger_bitcoin_client::interpreter::InterpreterError;
+    let mut interpreter = ClientCommandInterpreter::new();
+    // The response is a "found" byte, followed by the leaf index.
+    const NOT_FOUND: [u8; 2] = [0, 0];
+    const FOUND_AT_INDEX_0: [u8; 2] = [1, 0];
+    let unknown_hash = [9; 32];
+    let unknown_root = [8; 32];
+    let root = interpreter.add_known_list(&[b"hello"]);
+    let mut index = vec![ClientCommandCode::GetMerkleLeafIndex as u8];
+    index.extend(root);
+    index.extend(unknown_hash);
+    assert_eq!(interpreter.execute(index.clone()).unwrap(), NOT_FOUND);
+    // In a tree with a single leaf, the root is the leaf hash.
+    let leaf_hash_offset = COMMAND_CODE_LEN + HASH_LEN;
+    index[leaf_hash_offset..].copy_from_slice(&root);
+    assert_eq!(
+        interpreter.execute(index.clone()).unwrap(),
+        FOUND_AT_INDEX_0
+    );
+    index[COMMAND_CODE_LEN..leaf_hash_offset].copy_from_slice(&unknown_root);
+    assert!(matches!(
+        interpreter.execute(index),
+        Err(InterpreterError::UnknownMerkleRoot)
+    ));
+    let mut proof = vec![ClientCommandCode::GetMerkleLeafProof as u8];
+    proof.extend(unknown_root);
+    proof.extend(varint(1)); // Tree size.
+    proof.extend(varint(0)); // Leaf index.
+    assert!(matches!(
+        interpreter.execute(proof),
+        Err(InterpreterError::UnknownMerkleRoot)
+    ));
+    let mut preimage = vec![ClientCommandCode::GetPreimage as u8, SHA256_HASH_TYPE];
+    preimage.extend(unknown_hash);
+    assert!(matches!(
+        interpreter.execute(preimage),
+        Err(InterpreterError::UnknownHash)
+    ));
 }
 
 #[test]

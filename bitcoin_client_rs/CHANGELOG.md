@@ -17,6 +17,7 @@ This release exposes the protocol without the transport, for applications that o
 - `BitcoinClientError`, `InterpreterError` and `WalletError` are `#[non_exhaustive]`, and so is the `BitcoinClientError::UnexpectedResult` variant.
 - `apdu::Cla`, `BitcoinCommandCode`, `FrameworkCommandCode` and `ClientCommandCode` are `#[non_exhaustive]`, as the app and its client commands can gain new codes.
 - The minimum supported Rust version is 1.78, declared as `rust-version` in Cargo.toml. The README claimed 1.60, which the dependencies no longer support.
+- An unknown Merkle root in the GET_MERKLE_LEAF_PROOF and GET_MERKLE_LEAF_INDEX client commands is reported as `InterpreterError::UnknownMerkleRoot` instead of `UnknownHash`.
 
 ### Added
 
@@ -27,3 +28,4 @@ This release exposes the protocol without the transport, for applications that o
 
 - PSBTv2-only fields in a PSBTv0 are rejected when converting it for `sign_psbt`, as they would acquire meaning after the conversion.
 - Signing an empty message, or a PSBT without inputs or outputs, panicked while building the Merkle tree of an empty list.
+- A GET_MERKLE_LEAF_INDEX client command for a leaf that is not in a known tree is answered as not found, instead of failing.
