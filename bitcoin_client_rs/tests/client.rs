@@ -616,3 +616,76 @@ async fn request_step_errors_keep_original_instruction_and_category() {
         })
     ));
 }
+
+#[cfg(feature = "paranoid_client")]
+#[tokio::test]
+async fn registration_followup_failures_do_not_return_a_hmac() {
+    use ledger_bitcoin_client::{error::BitcoinClientError, interpreter::InterpreterError};
+    let cases = test_cases("./tests/data/register_wallet.json");
+    let case = cases
+        .iter()
+        .find(|case| case["version"].as_u64() == Some(wallet::Version::V2 as u64))
+        .unwrap();
+    let keys: Vec<_> = case["keys"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|key| wallet::WalletPubKey::from_str(key.as_str().unwrap()).unwrap())
+        .collect();
+    let wallet = wallet::WalletPolicy::new(
+        case["name"].as_str().unwrap().into(),
+        wallet::Version::V2,
+        case["policy"].as_str().unwrap().into(),
+        keys,
+    );
+    let wrong_address = "tb1pws8wvnj99ca6acf8kq7pjk7vyxknah0d9mexckh5s0vu2ccy68js9am6u7";
+    type RegistrationResult = Result<([u8; 32], [u8; 32]), BitcoinClientError<utils::MockError>>;
+    let responses: [(String, fn(RegistrationResult) -> bool); 4] = [
+        (
+            format!("<= {}9000", hex::encode(wrong_address.as_bytes())),
+            |result| matches!(result, Err(BitcoinClientError::InvalidResponse(_))),
+        ),
+        ("<= 9000".into(), |result| {
+            matches!(
+                result,
+                Err(BitcoinClientError::UnexpectedResult { command: 3, .. })
+            )
+        }),
+        ("<= 6985".into(), |result| {
+            matches!(
+                result,
+                Err(BitcoinClientError::Device {
+                    command: 3,
+                    status: ledger_bitcoin_client::apdu::StatusWord::Deny
+                })
+            )
+        }),
+        (format!("<= 4000{}e000", "00".repeat(32)), |result| {
+            matches!(
+                result,
+                Err(BitcoinClientError::Interpreter(
+                    InterpreterError::UnknownHash
+                ))
+            )
+        }),
+    ];
+    for (response, expected) in &responses {
+        let mut exchanges: Vec<String> = serde_json::from_value(case["exchanges"].clone()).unwrap();
+        exchanges.extend(
+            serde_json::from_value::<Vec<String>>(case["address_exchanges"].clone()).unwrap(),
+        );
+        *exchanges.last_mut().unwrap() = response.clone();
+        let store = utils::RecordStore::new(&exchanges);
+        let check = |result: RegistrationResult| assert!(expected(result));
+        check(
+            client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                .register_wallet(&wallet),
+        );
+        #[cfg(feature = "async")]
+        check(
+            async_client::BitcoinClient::new(utils::TransportReplayer::new(store))
+                .register_wallet(&wallet)
+                .await,
+        );
+    }
+}

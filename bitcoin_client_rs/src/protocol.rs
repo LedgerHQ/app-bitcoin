@@ -32,6 +32,8 @@ pub fn prepare_register_wallet(wallet: &WalletPolicy) -> (APDUCommand, ClientCom
 }
 
 /// Prepares an address request and its delegated wallet preimages and key tree.
+/// This does not independently verify the returned address; call `WalletPolicy::check_address`
+/// when the `paranoid_client` feature is enabled.
 pub fn prepare_get_wallet_address(
     wallet: &WalletPolicy,
     hmac: Option<&[u8; 32]>,
