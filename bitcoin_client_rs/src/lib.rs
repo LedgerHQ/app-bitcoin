@@ -2,7 +2,7 @@ pub mod command;
 pub mod interpreter;
 mod merkle;
 
-#[cfg(all(feature = "client", feature = "paranoid_client"))]
+#[cfg(feature = "paranoid_client")]
 mod bip327;
 
 pub mod apdu;

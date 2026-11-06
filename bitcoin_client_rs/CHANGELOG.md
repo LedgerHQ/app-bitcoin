@@ -44,6 +44,7 @@ This release exposes the protocol without the transport, for applications that o
 - `StatusWord::name` returns the name of a known status. `StatusWord` implements `Display` (the value, and the name if known) and `Hash`, and its `Debug` shows the name, or `StatusWord(0x…)` for other values.
 - `protocol::parse_sign_psbt_results`: parses all the values yielded during SIGN_PSBT, with a `SignPsbtResultsError`.
 - `PartialSignatureError` implements `Display` and `std::error::Error`.
+- `WalletPolicy::check_address`, with the `paranoid_client` feature (which does not require either client): derives an address of the wallet policy independently, to verify the one returned by the device. Errors are reported as `wallet::AddressCheckError`, for which `BitcoinClientError` implements `From`.
 
 ### Fixed
 

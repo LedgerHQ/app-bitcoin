@@ -57,6 +57,12 @@ answers the client commands of the device in `Request::step`, and a
 SIGN_PSBT, the values yielded during the request. The documentation of
 `protocol::Request` shows the exchange loop.
 
+The `paranoid_client` feature, which does not require either client, adds
+`WalletPolicy::check_address`: it derives a wallet policy's address
+independently, to verify the one returned by the device. The documentation of
+`protocol::prepare_register_wallet` shows how the clients use it to verify a
+newly registered wallet policy.
+
 Enable `client` for the synchronous `BitcoinClient`, or `async` for both
 clients.
 

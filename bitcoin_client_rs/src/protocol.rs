@@ -217,6 +217,32 @@ pub fn prepare_get_extended_pubkey(path: &DerivationPath, display: bool) -> Requ
 }
 
 /// Prepares REGISTER_WALLET, with the wallet policy and its keys known to the interpreter.
+///
+/// To make sure that the device registered the intended wallet policy, the convenience clients
+/// with the `paranoid_client` feature request an address with the returned HMAC, without
+/// displaying it, and verify it with `WalletPolicy::check_address` before returning the HMAC.
+/// With `run` being the exchange loop shown in [`Request`]:
+///
+/// ```
+/// # #[cfg(feature = "paranoid_client")]
+/// # mod example {
+/// use ledger_bitcoin_client::{protocol::*, wallet::{AddressCheckError, WalletPolicy}};
+///
+/// fn register_wallet<E>(
+///     wallet: &WalletPolicy,
+///     mut run: impl FnMut(&mut Request) -> Result<Vec<u8>, E>,
+/// ) -> Result<([u8; 32], [u8; 32]), E>
+/// where
+///     E: From<ResponseError> + From<AddressCheckError>,
+/// {
+///     let data = run(&mut prepare_register_wallet(wallet))?;
+///     let (id, hmac) = parse_wallet_registration(&data)?;
+///     let data = run(&mut prepare_get_wallet_address(wallet, Some(&hmac), false, 0, false))?;
+///     wallet.check_address(false, 0, &parse_wallet_address(&data)?)?;
+///     Ok((id, hmac))
+/// }
+/// # }
+/// ```
 pub fn prepare_register_wallet(wallet: &WalletPolicy) -> Request {
     Request::with_interpreter(
         command::register_wallet(wallet),
@@ -226,7 +252,8 @@ pub fn prepare_register_wallet(wallet: &WalletPolicy) -> Request {
 
 /// Prepares GET_WALLET_ADDRESS, with the wallet policy and its keys known to the interpreter.
 ///
-/// This does not verify the address that the device returns.
+/// This does not verify the address that the device returns; with the `paranoid_client`
+/// feature, `WalletPolicy::check_address` does.
 pub fn prepare_get_wallet_address(
     wallet: &WalletPolicy,
     hmac: Option<&[u8; 32]>,
