@@ -19,7 +19,10 @@ use crate::{
     apdu::{APDUCommand, StatusWord},
     command,
     interpreter::{get_merkleized_map_commitment, ClientCommandInterpreter, InterpreterError},
-    psbt::{get_v2_maps, PartialSignature, PartialSignatureError, PsbtV2Error},
+    psbt::{
+        get_v2_maps, get_v2_maps_from_bytes, PartialSignature, PartialSignatureError, PsbtV2Error,
+        PsbtV2Maps,
+    },
     wallet::WalletPolicy,
 };
 
@@ -102,8 +105,32 @@ pub fn prepare_sign_psbt(
     wallet: &WalletPolicy,
     hmac: Option<&[u8; 32]>,
 ) -> Result<(APDUCommand, ClientCommandInterpreter), PsbtV2Error> {
+    Ok(prepare_sign_psbt_maps(&get_v2_maps(psbt)?, wallet, hmac))
+}
+
+/// Like [`prepare_sign_psbt`], for a serialized PSBT of version 0 or 2.
+///
+/// The PSBT's key-value pairs are sent to the device unchanged, see [`get_v2_maps_from_bytes`].
+pub fn prepare_sign_psbt_bytes(
+    psbt: &[u8],
+    wallet: &WalletPolicy,
+    hmac: Option<&[u8; 32]>,
+) -> Result<(APDUCommand, ClientCommandInterpreter), PsbtV2Error> {
+    Ok(prepare_sign_psbt_maps(
+        &get_v2_maps_from_bytes(psbt)?,
+        wallet,
+        hmac,
+    ))
+}
+
+/// Prepares a SIGN_PSBT command for PSBTv2 maps, and the delegated state for their Merkle
+/// commitments.
+pub fn prepare_sign_psbt_maps(
+    maps: &PsbtV2Maps,
+    wallet: &WalletPolicy,
+    hmac: Option<&[u8; 32]>,
+) -> (APDUCommand, ClientCommandInterpreter) {
     let mut interpreter = ClientCommandInterpreter::for_wallet(wallet);
-    let maps = get_v2_maps(psbt)?;
     interpreter.add_known_mapping(&maps.global);
     let global_commitment = get_merkleized_map_commitment(&maps.global);
     let mut input_commitments = Vec::with_capacity(maps.inputs.len());
@@ -120,14 +147,14 @@ pub fn prepare_sign_psbt(
     let output_root = interpreter.add_known_list(&output_commitments);
     let command = command::sign_psbt(
         &global_commitment,
-        psbt.inputs.len(),
+        maps.inputs.len(),
         &input_root,
-        psbt.outputs.len(),
+        maps.outputs.len(),
         &output_root,
         wallet,
         hmac,
     );
-    Ok((command, interpreter))
+    (command, interpreter)
 }
 
 /// Prepares a message command and the delegated state for its 64-byte chunks.
