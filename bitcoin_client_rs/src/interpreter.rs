@@ -138,6 +138,11 @@ impl ClientCommandInterpreter {
     pub fn yielded(self) -> Vec<Vec<u8>> {
         self.yielded
     }
+
+    /// The number of values yielded so far, e.g. to report signing progress.
+    pub fn yielded_count(&self) -> usize {
+        self.yielded.len()
+    }
 }
 
 fn get_preimage_command(

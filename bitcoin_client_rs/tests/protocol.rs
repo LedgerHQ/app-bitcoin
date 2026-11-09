@@ -567,12 +567,14 @@ fn continuation_preserves_fragment_queue_yields_and_errors() {
         )))
     ));
     let yielded = vec![ClientCommandCode::Yield as u8, 1, 2];
+    assert_eq!(interpreter.yielded_count(), 0);
     assert_eq!(
         continue_interrupted(&mut interpreter, yielded)
             .unwrap()
             .encode(),
         hex::decode("f801000100").unwrap()
     );
+    assert_eq!(interpreter.yielded_count(), 1);
     assert_eq!(interpreter.yielded(), vec![vec![1, 2]]);
 }
 
