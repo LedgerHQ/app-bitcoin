@@ -794,15 +794,16 @@ fn psbt_preparation_delegates_custom_values_and_propagates_map_errors() {
 fn public_psbt_preparation_replays_recorded_delegated_exchanges() {
     use ledger_bitcoin_client::{
         apdu::StatusWord,
-        protocol::{handle_response, parse_sign_psbt_results, prepare_sign_psbt, Step},
+        protocol::{
+            handle_response, parse_sign_psbt_results, prepare_sign_psbt, prepare_sign_psbt_bytes,
+            Step,
+        },
     };
     let cases: Vec<serde_json::Value> =
         serde_json::from_str(include_str!("data/sign_psbt.json")).unwrap();
     for case in cases {
-        let psbt = bitcoin::psbt::Psbt::deserialize(
-            &base64::decode(case["psbt"].as_str().unwrap()).unwrap(),
-        )
-        .unwrap();
+        let psbt_bytes = base64::decode(case["psbt"].as_str().unwrap()).unwrap();
+        let psbt = bitcoin::psbt::Psbt::deserialize(&psbt_bytes).unwrap();
         let keys: Vec<_> = case["keys"]
             .as_array()
             .unwrap()
@@ -820,39 +821,43 @@ fn public_psbt_preparation_replays_recorded_delegated_exchanges() {
             bytes.copy_from_slice(&hex::decode(value).unwrap());
             bytes
         });
-        let (mut command, mut interpreter) =
-            prepare_sign_psbt(&psbt, &wallet, hmac.as_ref()).unwrap();
-        let original_instruction = command.ins;
-        for pair in case["exchanges"].as_array().unwrap().chunks_exact(2) {
-            let expected =
-                hex::decode(pair[0].as_str().unwrap().trim_start_matches("=> ")).unwrap();
-            assert_eq!(command.encode(), expected);
-            let mut response =
-                hex::decode(pair[1].as_str().unwrap().trim_start_matches("<= ")).unwrap();
-            let status_offset = response.len() - 2;
-            let status = StatusWord::try_from(u16::from_be_bytes(
-                response[status_offset..].try_into().unwrap(),
-            ))
-            .unwrap();
-            response.truncate(status_offset);
-            match handle_response(
-                original_instruction,
-                status,
-                response,
-                Some(&mut interpreter),
-            )
-            .unwrap()
-            {
-                Step::Continue(next) => command = next,
-                Step::Done(_) => assert_eq!(status, StatusWord::OK),
+        // the parsed and the serialized PSBT must produce the same exchanges
+        for (mut command, mut interpreter) in [
+            prepare_sign_psbt(&psbt, &wallet, hmac.as_ref()).unwrap(),
+            prepare_sign_psbt_bytes(&psbt_bytes, &wallet, hmac.as_ref()).unwrap(),
+        ] {
+            let original_instruction = command.ins;
+            for pair in case["exchanges"].as_array().unwrap().chunks_exact(2) {
+                let expected =
+                    hex::decode(pair[0].as_str().unwrap().trim_start_matches("=> ")).unwrap();
+                assert_eq!(command.encode(), expected);
+                let mut response =
+                    hex::decode(pair[1].as_str().unwrap().trim_start_matches("<= ")).unwrap();
+                let status_offset = response.len() - 2;
+                let status = StatusWord::try_from(u16::from_be_bytes(
+                    response[status_offset..].try_into().unwrap(),
+                ))
+                .unwrap();
+                response.truncate(status_offset);
+                match handle_response(
+                    original_instruction,
+                    status,
+                    response,
+                    Some(&mut interpreter),
+                )
+                .unwrap()
+                {
+                    Step::Continue(next) => command = next,
+                    Step::Done(_) => assert_eq!(status, StatusWord::OK),
+                }
             }
+            let results = parse_sign_psbt_results(interpreter.yielded()).unwrap();
+            let expected_count: usize = ["sigs", "musig_pub_nonces", "musig_partial_signatures"]
+                .iter()
+                .map(|key| case[*key].as_array().map_or(0, Vec::len))
+                .sum();
+            assert_eq!(results.len(), expected_count);
         }
-        let results = parse_sign_psbt_results(interpreter.yielded()).unwrap();
-        let expected_count: usize = ["sigs", "musig_pub_nonces", "musig_partial_signatures"]
-            .iter()
-            .map(|key| case[*key].as_array().map_or(0, Vec::len))
-            .sum();
-        assert_eq!(results.len(), expected_count);
     }
 }
 
