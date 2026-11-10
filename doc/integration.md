@@ -2,8 +2,8 @@
 
 This document explains the concepts an integrator needs in order to build on top of the
 Ledger Bitcoin app using one of the existing client libraries
-([Python](../bitcoin_client), [JavaScript](../bitcoin_client_js),
-[Rust](../bitcoin_client_rs)). It complements the feature overview in
+([Rust](../bitcoin_client_rs), and its [Python](../bitcoin_client_rs/bindings/python) and
+[JavaScript](../bitcoin_client_rs/bindings/js) bindings). It complements the feature overview in
 [features.md](features.md) and the protocol-level specifications in
 [bitcoin.md](bitcoin.md) and [wallet.md](wallet.md).
 

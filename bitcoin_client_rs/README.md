@@ -6,6 +6,13 @@ Bitcoin application with minimal dependencies.
 If you wish to contribute to this library, please read
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+This crate is the reference implementation of the client: the
+[Python](bindings/python) (`ledger_bitcoin`) and
+[JavaScript](bindings/js) (`@ledgerhq/ledger-bitcoin`) clients are bindings of
+it. They share the transport-free operations of [bindings/common](bindings/common),
+which runs a whole client call (including the independent address checks) as a
+state machine over APDUs, leaving only the transport to each language.
+
 ## Minimum Supported Rust Version
 
 `bitcoin_client_rs` compiles with **Rust 1.78** or newer, as declared by
@@ -56,6 +63,9 @@ answers the client commands of the device in `Request::step`, and a
 `protocol::parse_*` function for its result: the final response, or for
 SIGN_PSBT, the values yielded during the request. The documentation of
 `protocol::Request` shows the exchange loop.
+`prepare_sign_psbt_bytes` takes a serialized PSBT of version 0 or 2 instead of a
+rust-bitcoin `Psbt`, and sends its key-value pairs to the device exactly as
+serialized.
 
 The `paranoid_client` feature, which does not require either client, adds
 `WalletPolicy::check_address`: it derives a wallet policy's address
