@@ -1,0 +1,17 @@
+[package]
+name = "ledger_bitcoin_python"
+version = "1.0.0"
+authors = ["Ledger"]
+edition = "2021"
+description = "Python bindings of the Ledger Bitcoin application client"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+ledger_bitcoin_client = { path = "../..", default-features = false, features = ["paranoid_client"] }
+ledger_bitcoin_client_bindings = { path = "../common" }
+pyo3 = { version = "0.30", features = ["abi3-py39"] }

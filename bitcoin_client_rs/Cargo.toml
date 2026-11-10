@@ -26,7 +26,7 @@ bitcoin = { version = "0.32", default-features = false }
 miniscript = { version = "12.2", optional = true, default-features = false, features = ["no-std"] }
 
 [workspace]
-members = ["examples/ledger_hwi", "bindings/common"]
+members = ["examples/ledger_hwi", "bindings/common", "bindings/python"]
 
 # Dependencies used for tests and examples only.
 [dev-dependencies]
