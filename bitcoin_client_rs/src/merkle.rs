@@ -9,16 +9,24 @@ use bitcoin::hashes::{sha256, Hash, HashEngine};
 ///!    with index i
 ///!  - get_merkle_leaf_index: provide the index of the leaf with hash.
 
+/// The root of an empty Merkle tree.
+const EMPTY_ROOT: [u8; 32] = [0; 32];
+
 /// MerkleTree is containing a merkle tree generated from a list of items.
 pub struct MerkleTree {
-    root: Tree,
+    /// `None` for an empty tree.
+    root: Option<Tree>,
     leaves: Vec<[u8; 32]>,
 }
 
 impl MerkleTree {
     pub fn new(leaves: Vec<[u8; 32]>) -> Self {
         Self {
-            root: Tree::new(&leaves, 0, leaves.len()),
+            root: if leaves.is_empty() {
+                None
+            } else {
+                Some(Tree::new(&leaves, 0, leaves.len()))
+            },
             leaves,
         }
     }
@@ -27,11 +35,11 @@ impl MerkleTree {
         self.leaves.len()
     }
 
-    /// Returns the root hash of the Merkle tree.
+    /// Returns the root hash of the Merkle tree; 32 zero bytes for an empty tree.
     pub fn root_hash(&self) -> &[u8; 32] {
         match &self.root {
-            Tree::Node { value, .. } => value,
-            Tree::Leaf(idx) => &self.leaves[*idx],
+            None => &EMPTY_ROOT,
+            Some(root) => root.value(&self.leaves),
         }
     }
 
@@ -47,12 +55,9 @@ impl MerkleTree {
 
     // Get Merkle proof of a leaf with the given index.
     pub fn get_leaf_proof(&self, index: usize) -> Option<Vec<Vec<u8>>> {
-        if index >= self.leaves.len() {
-            // Out of bound
-            None
-        } else {
-            Some(self.root.get_proof(&self.leaves, index))
-        }
+        // `None` if out of bounds (which includes any index of an empty tree)
+        let root = self.root.as_ref().filter(|_| index < self.leaves.len())?;
+        Some(root.get_proof(&self.leaves, index))
     }
 }
 
@@ -171,6 +176,14 @@ fn largest_power_of_2_less_than(n: usize) -> usize {
 mod tests {
     use super::*;
     use bitcoin::hashes::{sha256, Hash, HashEngine};
+
+    #[test]
+    fn test_empty_merkle_tree() {
+        let tree = MerkleTree::new(vec![]);
+        assert_eq!(tree.size(), 0);
+        assert_eq!(tree.root_hash(), &[0u8; 32]);
+        assert_eq!(tree.get_leaf_proof(0), None);
+    }
 
     #[test]
     fn test_merkle_tree() {
