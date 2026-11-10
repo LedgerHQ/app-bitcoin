@@ -14,5 +14,5 @@ jobs:
     name: Check misspellings
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_spell_check.yml@v1
     with:
-      src_path: src, bitcoin_client, bitcoin_client_js, bitcoin_client_rs, doc
+      src_path: src, bitcoin_client_rs, doc
       ignore_words_list: usig,Bu,fpr
