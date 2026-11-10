@@ -1,4 +1,4 @@
-from bitcoin_client.ledger_bitcoin.ripemd import ripemd160
+from test_utils.bitcoin.ripemd import ripemd160
 
 
 def test_ripemd160():

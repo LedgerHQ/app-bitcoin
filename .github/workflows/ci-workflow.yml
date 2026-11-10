@@ -234,7 +234,10 @@ jobs:
         run: pip install ./bitcoin_client_rs/bindings/python pytest "mnemonic>=0.20,<0.21" "bip32>=3.4,<4.0"
 
       - name: Run tests
-        run: pytest bitcoin_client_rs/bindings/python/tests
+        run: |
+          pytest bitcoin_client_rs/bindings/python/tests
+          # the Bitcoin primitives of the test suites
+          pytest test_utils/bitcoin/tests
 
   job_build_python_wheels:
     name: Python client wheels (${{ matrix.os }})
