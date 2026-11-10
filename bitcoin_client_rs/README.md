@@ -6,6 +6,13 @@ Bitcoin application with minimal dependencies.
 If you wish to contribute to this library, please read
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+This crate is the reference implementation of the client: the
+[Python](bindings/python) (`ledger_bitcoin`) and
+[JavaScript](bindings/js) (`@ledgerhq/ledger-bitcoin`) clients are bindings of
+it. They share the transport-free operations of [bindings/common](bindings/common),
+which runs a whole client call (including the independent address checks) as a
+state machine over APDUs, leaving only the transport to each language.
+
 ## Minimum Supported Rust Version
 
 `bitcoin_client_rs` should always compile using **Rust 1.60**.
@@ -52,6 +59,8 @@ defaults to use the public `command`, `interpreter`, `merkle`, `protocol`,
 `prepare_sign_message`, and `prepare_sign_psbt` each return an APDU command and
 `ClientCommandInterpreter` state for a caller-owned exchange loop. PSBT
 preparation is fallible because it translates the input to PSBTv2 maps.
+`prepare_sign_psbt_bytes` takes a serialized PSBT of version 0 or 2 instead, and
+sends its key-value pairs to the device exactly as serialized.
 Pass each response's typed `StatusWord` and owned payload (without status bytes)
 to `protocol::handle_response`, always using the **original request instruction**.
 Exchange `Step::Continue(command)` and repeat; `Step::Done(data)` is terminal.
