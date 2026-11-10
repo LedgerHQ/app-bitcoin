@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 from ledger_bitcoin.exception.device_exception import DeviceException
-from ledger_bitcoin.psbt import PSBT
+from test_utils.bitcoin.psbt import PSBT
 from ledger_bitcoin.wallet import WalletPolicy
 
 from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_key_placeholders

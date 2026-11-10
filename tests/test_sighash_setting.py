@@ -13,10 +13,9 @@ Verifies that:
 import pytest
 from pathlib import Path
 from ledger_bitcoin import WalletPolicy
-from ledger_bitcoin.client_command import ClientCommandInterpreter
 from ledger_bitcoin.exception.errors import NotSupportedError, SecurityStatusNotSatisfiedError
 from ledger_bitcoin.exception.device_exception import DeviceException
-from ledger_bitcoin.psbt import PSBT
+from test_utils.bitcoin.psbt import PSBT
 from test_utils import bip0340
 from ragger.backend import BackendInterface
 from ragger.navigator import Navigator, NavInsID, NavIns
@@ -31,6 +30,9 @@ tests_root: Path = Path(__file__).parent
 
 # Error codes from error_codes.h
 EC_SIGN_PSBT_NONDEFAULT_SIGHASH_NOT_ALLOWED = 0x000d
+
+# CLA of the APDUs that respond to client commands
+CLA_FRAMEWORK = 0xF8
 
 # Status words
 SW_SECURITY_STATUS_NOT_SATISFIED = 0x6982
@@ -117,18 +119,19 @@ def test_sighash_rejected_status_not_dismissed_by_next_command(
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-sign.psbt")
 
     # Hold the first client command response until the spinner is shown (the app shows it
-    # after the command has been running for about 1s), so that the rejection happens after it
-    original_execute = ClientCommandInterpreter.execute
+    # after the command has been running for about 1s), so that the rejection happens after it.
+    # Client command responses are the APDUs with the framework's CLA.
+    original_exchange = client._apdu_exchange
     spinner_shown = False
 
-    def execute_after_spinner(self, hw_response: bytes) -> bytes:
+    def exchange_after_spinner(apdu: dict, *args, **kwargs):
         nonlocal spinner_shown
-        if not spinner_shown:
+        if apdu["cla"] == CLA_FRAMEWORK and not spinner_shown:
             backend.wait_for_text_on_screen("Loading")
             spinner_shown = True
-        return original_execute(self, hw_response)
+        return original_exchange(apdu, *args, **kwargs)
 
-    monkeypatch.setattr(ClientCommandInterpreter, "execute", execute_after_spinner)
+    monkeypatch.setattr(client, "_apdu_exchange", exchange_after_spinner)
 
     with pytest.raises(ExceptionRAPDU) as e:
         client.sign_psbt(psbt, tr_wallet, None)

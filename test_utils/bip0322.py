@@ -15,11 +15,11 @@ import struct
 from hashlib import sha256
 from typing import List, Tuple
 
-from bitcoin_client.ledger_bitcoin import WalletPolicy
-from bitcoin_client.ledger_bitcoin.key import ExtendedKey, KeyOriginInfo
-from bitcoin_client.ledger_bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
-from bitcoin_client.ledger_bitcoin.tx import (CTransaction, CTxIn, CTxOut, COutPoint, CTxWitness)
-from bitcoin_client.ledger_bitcoin._serialize import ser_compact_size, ser_string, ser_uint256
+from ledger_bitcoin import WalletPolicy
+from test_utils.bitcoin.key import ExtendedKey, KeyOriginInfo
+from test_utils.bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
+from test_utils.bitcoin.tx import (CTransaction, CTxIn, CTxOut, COutPoint, CTxWitness)
+from test_utils.bitcoin._serialize import ser_compact_size, ser_string, ser_uint256
 
 from test_utils import hash160, hash256
 from test_utils.txmaker import (getScriptPubkeyFromWallet, fill_inout,

@@ -18,10 +18,10 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from bitcoin_client.ledger_bitcoin import WalletPolicy
-from bitcoin_client.ledger_bitcoin.key import ExtendedKey, KeyOriginInfo, taproot_tweak_pubkey
-from bitcoin_client.ledger_bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
-from bitcoin_client.ledger_bitcoin.tx import CScriptWitness, CTransaction, CTxIn, CTxInWitness, CTxOut, COutPoint, CTxWitness, uint256_from_str
+from ledger_bitcoin import WalletPolicy
+from test_utils.bitcoin.key import ExtendedKey, KeyOriginInfo, taproot_tweak_pubkey
+from test_utils.bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
+from test_utils.bitcoin.tx import CScriptWitness, CTransaction, CTxIn, CTxInWitness, CTxOut, COutPoint, CTxWitness, uint256_from_str
 
 from embit.bip32 import HDKey
 from embit.bip39 import mnemonic_to_seed
@@ -29,7 +29,7 @@ from embit.descriptor import Descriptor
 from embit.networks import NETWORKS
 from embit.script import Script
 
-from bitcoin_client.ledger_bitcoin._embit.descriptor.miniscript import Miniscript
+from test_utils.bitcoin._embit.descriptor.miniscript import Miniscript
 from test_utils import bip0340, sha256, hash160
 from test_utils.bip0327 import cbytes, key_agg
 from test_utils.wallet_policy import BIP328_CHAINCODE, DescriptorTemplate, KeyPlaceholder, MuSig2KeyPlaceholder, PlainKeyPlaceholder, ShDescriptorTemplate, ShWpkhDescriptorTemplate, ShWshDescriptorTemplate, TrDescriptorTemplate, WshDescriptorTemplate, WpkhDescriptorTemplate, PkhDescriptorTemplate, derive_plain_descriptor, tapleaf_hash
