@@ -29,3 +29,9 @@ RUN apt install -y libminiupnpc-dev libminiupnpc-dev libnatpmp-dev libevent-dev 
 
 # Add bitcoin binaries to path
 ENV PATH=/usr/local/bin/:$PATH
+
+# install a Rust toolchain: the Python client (ledger_bitcoin) that the tests use is built from the
+# Rust client. Not in $HOME, which GitHub Actions overrides in job containers.
+ENV RUSTUP_HOME=/usr/local/rustup CARGO_HOME=/usr/local/cargo
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --no-modify-path
+ENV PATH=/usr/local/cargo/bin:$PATH

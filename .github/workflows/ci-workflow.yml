@@ -108,36 +108,18 @@ jobs:
           path: bin
 
       - name: Install build dependencies
-        run: apt update && apt install -y build-essential
+        run: apt update && apt install -y build-essential curl
+
+      - name: Install Rust, to build the Python client
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Run tests
         run: |
           pip install -r requirements.txt
           cd tests_mainnet
           PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --timeout=300
-
-  job_test_python_lib_legacyapp:
-    name: Tests with the Python library and legacy Bitcoin app
-    needs: job_build
-    runs-on: ubuntu-latest
-
-    container:
-      # As for the test we use v1.6.5 Nano S BTC binary we freeze the last Speculos version supporting this device
-      image: ghcr.io/ledgerhq/speculos:0.25.5
-      options: --entrypoint /bin/bash
-
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-
-      - name: Install build dependencies
-        run: apt update && apt install -y build-essential
-
-      - name: Run tests
-        run: |
-          pip install -r requirements.txt
-          cd bitcoin_client/tests
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --timeout=300 --model=nanos
 
   job_perftests:
     name: Performance report
@@ -160,7 +142,12 @@ jobs:
           path: bin
 
       - name: Install build dependencies
-        run: apt update && apt install -y build-essential
+        run: apt update && apt install -y build-essential curl
+
+      - name: Install Rust, to build the Python client
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Run tests
         run: |
@@ -198,9 +185,9 @@ jobs:
           tag_version="${BASH_REMATCH[2]}"
           case "$component" in
               pyclient)
-                  package_version=$(grep -m1 -E "^__version__ = " bitcoin_client/ledger_bitcoin/__init__.py | sed -E "s/^__version__ = ['\"](.*)['\"]$/\1/") ;;
+                  package_version=$(grep -m1 -E '^version = ' bitcoin_client_rs/bindings/python/Cargo.toml | sed -E 's/^version = "(.*)"$/\1/') ;;
               jsclient)
-                  package_version=$(node -p "require('./bitcoin_client_js/package.json').version") ;;
+                  package_version=$(node -p "require('./bitcoin_client_rs/bindings/js/package.json').version") ;;
               rsclient)
                   package_version=$(grep -m1 -E '^version = ' bitcoin_client_rs/Cargo.toml | sed -E 's/^version = "(.*)"$/\1/') ;;
           esac
@@ -241,14 +228,84 @@ jobs:
           echo "[ERROR] No completed push run of build_and_functional_tests.yml with successful ragger tests for $GITHUB_SHA"
           exit 1
 
+  job_test_python_client:
+    name: Python client
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.13"]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Build and install the package
+        run: pip install ./bitcoin_client_rs/bindings/python pytest "mnemonic>=0.20,<0.21" "bip32>=3.4,<4.0"
+
+      - name: Run tests
+        run: pytest bitcoin_client_rs/bindings/python/tests
+
+  job_build_python_wheels:
+    name: Python client wheels (${{ matrix.os }})
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Build the abi3 wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: bitcoin_client_rs/bindings/python
+          args: --release --out dist
+          manylinux: auto
+
+      - name: Upload the wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-client-wheel-${{ matrix.os }}
+          path: bitcoin_client_rs/bindings/python/dist
+
+  build_pypi_image:
+    name: Build the environment in which the Python package is built for PyPI
+    needs: [validate_release_tag]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/pyclient-')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Build the image
+        run: |
+          docker build -t ledger-bitcoin-pypi -f .github/workflows/pypi-build.Dockerfile .github/workflows
+          docker save -o /tmp/pypi-build-image.tar ledger-bitcoin-pypi
+
+      - name: Upload the image
+        uses: actions/upload-artifact@v4
+        with:
+          name: pypi-build-image
+          path: /tmp/pypi-build-image.tar
+
   python_package_and_deploy:
     name: Build and deploy the bitcoin client Python package
-    needs: [validate_release_tag, check_ragger_tests]
+    needs: [validate_release_tag, check_ragger_tests, job_test_python_client, build_pypi_image]
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_pypi_deployment.yml@v1
     if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/pyclient-')
     with:
       package_name: ledger_bitcoin
-      package_directory: ./bitcoin_client/
+      # the package is built with maturin from the Rust client, in a manylinux image with a Rust
+      # toolchain (see pypi-build.Dockerfile): the sdist, and a manylinux x86_64 wheel
+      package_directory: ./bitcoin_client_rs/bindings/python/
+      docker_image_artifact: pypi-build-image
       release: false
       publish: true
 
@@ -257,9 +314,9 @@ jobs:
     needs: job_build
     runs-on: ubuntu-latest
 
-    container:
-      image: ghcr.io/ledgerhq/speculos:latest
-      options: --entrypoint /bin/bash
+    defaults:
+      run:
+        working-directory: bitcoin_client_rs/bindings/js
 
     steps:
       - name: Clone
@@ -270,9 +327,15 @@ jobs:
         with:
           node-version: 24
 
-      - name: Install yarn
+      - name: Install the wasm-bindgen CLI
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.105
+
+      - name: Install speculos
         run: |
-          npm install -g yarn
+          sudo apt-get update && sudo apt-get install -y qemu-user-static
+          pip install speculos
 
       - name: Download Bitcoin Testnet app binary
         uses: actions/download-artifact@v4
@@ -280,11 +343,14 @@ jobs:
           name: bitcoin-testnet-app-nanosp
           path: bin
 
-      - name: Run tests
+      - name: Build
         run: |
-          cd bitcoin_client_js
-          yarn install --immutable
-          LOG_SPECULOS=1 LOG_APDUS=1 SPECULOS="/speculos/speculos.py" yarn test
+          npm ci
+          npm run build
+          npm run lint
+
+      - name: Run tests
+        run: LOG_SPECULOS=1 LOG_APDUS=1 SPECULOS=speculos npm test
 
   deploy_js_client:
     name: Deploy
@@ -292,7 +358,8 @@ jobs:
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_npm_deployment.yml@v1
     if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/jsclient-')
     with:
-      package_directory: "bitcoin_client_js"
+      # building the package needs a Rust toolchain, see scripts/build-wasm.sh
+      package_directory: "bitcoin_client_rs/bindings/js"
 
   job_test_rust_client:
     name: Rust client
@@ -331,7 +398,7 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
 
       - name: Check formatting
-        run: cargo fmt -p ledger_bitcoin_client -- --check
+        run: cargo fmt --all -- --check
 
       - name: Test pure protocol including doctests
         run: cargo test -p ledger_bitcoin_client --no-default-features
@@ -356,6 +423,14 @@ jobs:
 
       - name: Clippy
         run: cargo clippy -p ledger_bitcoin_client --all-targets
+
+      - name: Test the operations shared by the bindings
+        run: cargo test -p ledger_bitcoin_client_bindings
+
+      - name: Clippy for the bindings
+        run: |
+          cargo clippy -p ledger_bitcoin_client_bindings -p ledger_bitcoin_python --all-targets
+          cargo clippy -p ledger_bitcoin_wasm --target wasm32-unknown-unknown
 
   deploy_rust_client:
     name: Deploy rust client library
