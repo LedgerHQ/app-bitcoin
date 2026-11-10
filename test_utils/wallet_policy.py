@@ -17,8 +17,8 @@ if _REPO_ROOT not in sys.path:
 
 import base58
 
-from bitcoin_client.ledger_bitcoin._embit.descriptor.miniscript import Miniscript
-from bitcoin_client.ledger_bitcoin.key import ExtendedKey
+from test_utils.bitcoin._embit.descriptor.miniscript import Miniscript
+from test_utils.bitcoin.key import ExtendedKey
 from test_utils.taproot import ser_script, tagged_hash
 from test_utils import bip0327
 

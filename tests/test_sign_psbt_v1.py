@@ -5,7 +5,7 @@ from pathlib import Path
 
 from ledger_bitcoin import WalletPolicy, MultisigWallet, AddressType, WalletType, PartialSignature
 
-from ledger_bitcoin.psbt import PSBT
+from test_utils.bitcoin.psbt import PSBT
 from ledger_bitcoin.wallet import AddressType
 
 from test_utils import bip0340

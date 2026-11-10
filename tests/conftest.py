@@ -8,8 +8,8 @@ from ragger.conftest import configuration
 from ragger.firmware import Firmware
 from ragger.firmware.touch.positions import STAX_X_CENTER, FLEX_X_CENTER, APEX_P_X_CENTER
 from ragger.navigator import Navigator, NavInsID, NavIns
-import ledger_bitcoin._base58 as base58
-from ledger_bitcoin.common import sha256
+import test_utils.bitcoin._base58 as base58
+from test_utils.bitcoin.common import sha256
 from ledger_bitcoin import Chain
 from pathlib import Path
 from decimal import Decimal

@@ -11,4 +11,4 @@ mnemonic>=0.20,<0.21
 bip32>=3.4,<4.0
 speculos>=0.21.2
 ragger[speculos, ledgerwallet]>=1.37.0
--e ./bitcoin_client  # path relative to the current working directory; assume it's the root of the repo
+-e ./bitcoin_client_rs/bindings/python  # path relative to the current working directory; assume it's the root of the repo. Building it requires a Rust toolchain.

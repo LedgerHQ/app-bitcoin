@@ -1,8 +1,8 @@
 # The tests in this file are for the MuSig2 standalone python signer implementation in test_utils.
 
-from bitcoin_client.ledger_bitcoin.key import ExtendedKey
-from bitcoin_client.ledger_bitcoin import WalletPolicy
-from bitcoin_client.ledger_bitcoin.psbt import PSBT
+from test_utils.bitcoin.key import ExtendedKey
+from ledger_bitcoin import WalletPolicy
+from test_utils.bitcoin.psbt import PSBT
 
 from test_utils.musig2 import HotMusig2Cosigner, run_musig2_test
 

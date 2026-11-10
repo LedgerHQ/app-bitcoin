@@ -15,7 +15,7 @@ from pathlib import Path
 from ledger_bitcoin import WalletPolicy
 from ledger_bitcoin.exception.errors import NotSupportedError, SecurityStatusNotSatisfiedError
 from ledger_bitcoin.exception.device_exception import DeviceException
-from ledger_bitcoin.psbt import PSBT
+from test_utils.bitcoin.psbt import PSBT
 from test_utils import bip0340
 from ragger.navigator import Navigator, NavInsID, NavIns
 from ragger.error import ExceptionRAPDU

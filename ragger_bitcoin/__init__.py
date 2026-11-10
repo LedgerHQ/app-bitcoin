@@ -2,4 +2,4 @@
 
 from .ragger_bitcoin import createRaggerClient, RaggerClient
 from .ragger_instructions import Instructions
-__version__ = '0.0.1'
+__version__ = '0.1.0'
