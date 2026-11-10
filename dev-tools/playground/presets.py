@@ -33,8 +33,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from bitcoin_client.ledger_bitcoin import Chain  # noqa: E402
-from bitcoin_client.ledger_bitcoin.psbt import PSBT  # noqa: E402
+from ledger_bitcoin import Chain  # noqa: E402
+from test_utils.bitcoin.psbt import PSBT  # noqa: E402
 
 
 REPO_ROOT: Path = _REPO_ROOT
@@ -80,7 +80,7 @@ def _external_master(chain: Chain, index: int):
 def external_key_info(chain: Chain, index: int, path: str) -> str:
     """Build a BIP-388 key-info string `[fpr/path]xpub` for the external
     cosigner at `index`, derived from EXTERNAL_MNEMONICS[index]."""
-    from bitcoin_client.ledger_bitcoin.common import hash160
+    from test_utils.bitcoin.common import hash160
 
     master = _external_master(chain, index)
     master_fpr = hash160(master.pubkey)[:4].hex()
