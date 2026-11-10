@@ -9,7 +9,7 @@ from ledger_bitcoin import MusigPubNonce, WalletPolicy, MultisigWallet, AddressT
 from ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 from ledger_bitcoin.exception.device_exception import DeviceException
 
-from ledger_bitcoin.psbt import PSBT
+from test_utils.bitcoin.psbt import PSBT
 from ledger_bitcoin.wallet import AddressType
 from ragger.navigator import Navigator
 from ragger.error import ExceptionRAPDU
@@ -778,12 +778,11 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(navigator: Navigator, firmware: F
     wit.rehash()
     psbt.inputs[0].non_witness_utxo = wit
 
-    client._no_clone_psbt = True
+    # the client sends the PSBT as serialized, so the device gets to check the non_witness_utxo
     with pytest.raises(ExceptionRAPDU) as e:
         client.sign_psbt(psbt, wallet, None, navigator,
                          instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False),
                          testname=test_name)
-    client._no_clone_psbt = False
 
     assert DeviceException.exc.get(e.value.status) == IncorrectDataError
 

@@ -6,10 +6,10 @@ import hmac
 from hashlib import sha256
 from decimal import Decimal
 
-from ledger_bitcoin._script import is_p2tr
+from test_utils.bitcoin._script import is_p2tr
 from ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 from ledger_bitcoin.exception.device_exception import DeviceException
-from ledger_bitcoin.psbt import PSBT
+from test_utils.bitcoin.psbt import PSBT
 from ledger_bitcoin.wallet import WalletPolicy
 from ledger_bitcoin import MusigPubNonce, MusigPartialSignature, PartialSignature, SignPsbtYieldedObject
 

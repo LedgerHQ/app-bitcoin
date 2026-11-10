@@ -8,7 +8,7 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from bitcoin_client.ledger_bitcoin.client_base import TransportClient
+from ledger_bitcoin import TransportClient
 from speculos.client import SpeculosClient
 
 

@@ -1,4 +1,4 @@
-from bitcoin_client.ledger_bitcoin import Client, WalletPolicy
+from ledger_bitcoin import Client, WalletPolicy
 
 from test_utils import SpeculosGlobals, mnemonic
 

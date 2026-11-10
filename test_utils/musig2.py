@@ -49,10 +49,10 @@ from test_utils.wallet_policy import (
     unsorted_musig,
 )
 
-from bitcoin_client.ledger_bitcoin._embit.descriptor.miniscript import Miniscript
-from bitcoin_client.ledger_bitcoin.psbt import PSBT, PartiallySignedInput
-from bitcoin_client.ledger_bitcoin.key import G, ExtendedKey, bytes_to_point, point_add, point_mul, point_to_bytes
-from bitcoin_client.ledger_bitcoin.wallet import WalletPolicy
+from test_utils.bitcoin._embit.descriptor.miniscript import Miniscript
+from test_utils.bitcoin.psbt import PSBT, PartiallySignedInput
+from test_utils.bitcoin.key import G, ExtendedKey, bytes_to_point, point_add, point_mul, point_to_bytes
+from ledger_bitcoin.wallet import WalletPolicy
 
 
 HARDENED_INDEX = 0x80000000

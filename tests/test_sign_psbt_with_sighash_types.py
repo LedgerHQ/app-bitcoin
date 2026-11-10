@@ -4,7 +4,7 @@ from pathlib import Path
 from ledger_bitcoin import WalletPolicy, MultisigWallet, AddressType
 from ledger_bitcoin.exception.errors import NotSupportedError, IncorrectDataError
 from ledger_bitcoin.exception.device_exception import DeviceException
-from ledger_bitcoin.psbt import PSBT, PartiallySignedOutput
+from test_utils.bitcoin.psbt import PSBT, PartiallySignedOutput
 from test_utils import bip0340
 from ragger.navigator import Navigator
 from ragger.error import ExceptionRAPDU

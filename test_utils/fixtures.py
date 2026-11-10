@@ -13,7 +13,7 @@ if _REPO_ROOT not in sys.path:
 
 from test_utils import default_settings, SpeculosGlobals
 
-from bitcoin_client.ledger_bitcoin import TransportClient, Client, Chain, createClient
+from ledger_bitcoin import TransportClient, Client, Chain, createClient
 
 from speculos.client import SpeculosClient
 
