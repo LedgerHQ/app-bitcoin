@@ -1,0 +1,4 @@
+# built by maturin (e.g. for an editable install)
+*.so
+*.pyd
+dist/
