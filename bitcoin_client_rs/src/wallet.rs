@@ -171,7 +171,8 @@ impl WalletPolicy {
     }
 
     /// Independently verifies a policy address by scriptPubKey, including BIP-327
-    /// MuSig substitution. Equivalent scripts on different networks are accepted.
+    /// MuSig substitution and `sortedmulti_a()`. Equivalent scripts on different networks are
+    /// accepted.
     #[cfg(feature = "paranoid_client")]
     pub fn check_address(
         &self,
@@ -183,9 +184,10 @@ impl WalletPolicy {
         let descriptor = self
             .get_descriptor(change)
             .map_err(|_| AddressCheckError::GetDescriptor)?;
-        // rust-miniscript does not yet support musig() expressions.
+        // rust-miniscript does not yet support musig() and sortedmulti_a() expressions.
         let descriptor =
             crate::bip327::replace_musigs(&descriptor).map_err(AddressCheckError::Musig)?;
+        let descriptor = crate::sortedmulti_a::replace_sortedmulti_a(&descriptor, address_index)?;
         let descriptor = Descriptor::<DescriptorPublicKey>::from_str(&descriptor)
             .map_err(|_| AddressCheckError::Descriptor)?;
         if descriptor

@@ -1437,4 +1437,32 @@ fn independent_address_verification_and_error_categories() {
         musig.check_address(true, 9, &expected),
         Err(AddressCheckError::Mismatch)
     );
+    // an address derived by the app for a sortedmulti_a() policy, whatever the order of its keys
+    let sortedmulti_a_keys = [
+        "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+        "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+        "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+    ];
+    let address = bitcoin::Address::from_str(
+        "tb1pdzk72dnvz3246474p4m5a97u43h6ykt2qcjrrhk6y0fkg8hx2mvswwgvv7",
+    )
+    .unwrap();
+    for template in [
+        "tr(@0/**,sortedmulti_a(2,@1/**,@2/**))",
+        "tr(@0/**,sortedmulti_a(2,@2/**,@1/**))",
+    ] {
+        let policy = WalletPolicy::new(
+            "".into(),
+            Version::V2,
+            template.into(),
+            sortedmulti_a_keys
+                .iter()
+                .map(|key| WalletPubKey::from_str(key).unwrap()),
+        );
+        assert_eq!(policy.check_address(false, 0, &address), Ok(()));
+        assert_eq!(
+            policy.check_address(false, 1, &address),
+            Err(AddressCheckError::Mismatch)
+        );
+    }
 }

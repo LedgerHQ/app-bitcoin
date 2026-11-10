@@ -61,3 +61,4 @@ This release exposes the protocol without the transport, for applications that o
 - A PSBT with a duplicate key in one of its maps is rejected: `prepare_sign_psbt` returns `PsbtV2Error::DuplicateKey`, and the clients' `sign_psbt` returns `InvalidPsbt`. rust-bitcoin serializes such a PSBT when an `unknown` field has the key of a field that it knows. The device rejected it with an unclear error, except for a duplicate of the unsigned transaction's key, which was silently ignored.
 - An empty response to SIGN_MESSAGE caused a panic; it is now an `UnexpectedResult` error.
 - `get_version` accepts the dashboard's response, which has no flags.
+- The independent address verification of the `paranoid_client` feature (`WalletPolicy::check_address`) supports `sortedmulti_a()`, which rust-miniscript does not parse. Such wallet policies could not be registered, and their addresses could not be requested.
