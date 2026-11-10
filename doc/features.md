@@ -24,8 +24,8 @@ verification — are described in [integration.md](integration.md).
 ## Supported operations
 
 Each operation maps to a method in the client libraries
-([Python](../bitcoin_client), [JavaScript](../bitcoin_client_js),
-[Rust](../bitcoin_client_rs)); see their READMEs for ready-to-run code examples.
+([Rust](../bitcoin_client_rs), and its [Python](../bitcoin_client_rs/bindings/python) and
+[JavaScript](../bitcoin_client_rs/bindings/js) bindings); see their READMEs for ready-to-run code examples.
 
 | Operation | What it does |
 |-----------|--------------|
@@ -125,8 +125,8 @@ specific capability became available.
 ## Where to go next
 
 - **Build something** → the client library READMEs
-  ([Python](../bitcoin_client), [JavaScript](../bitcoin_client_js),
-  [Rust](../bitcoin_client_rs)) contain runnable examples.
+  ([Rust](../bitcoin_client_rs), and its [Python](../bitcoin_client_rs/bindings/python) and
+  [JavaScript](../bitcoin_client_rs/bindings/js) bindings) contain runnable examples.
 - **Understand the model** → [integration.md](integration.md) explains wallet policies,
   registration, and the security model.
 - **Wallet policy language** → [wallet.md](wallet.md) and

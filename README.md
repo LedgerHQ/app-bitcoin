@@ -150,9 +150,9 @@ If you want to understand what the app does or build an integration on top of an
 - [integration.md](doc/integration.md): Concepts and security model for integrators — wallet policies, registration, and on-device verification.
 
 For many use cases, the code examples provided in the following client libraries are enough to get started:
-- [Python client library](bitcoin_client)
-- [JavaScript client library](bitcoin_client_js)
-- [Rust client library](bitcoin_client_rs)
+- [Rust client library](bitcoin_client_rs), the reference implementation of the protocol
+- [Python client library](bitcoin_client_rs/bindings/python) (`ledger_bitcoin` on PyPI), a binding of the Rust client
+- [JavaScript client library](bitcoin_client_rs/bindings/js) (`@ledgerhq/ledger-bitcoin` on npm), a binding of the Rust client compiled to WebAssembly
 
 If you need to go deeper into the rabbit hole 🐇🕳️ (for example to implement a client library or work at the protocol level), refer to the following documents:
 - [bitcoin.md](doc/bitcoin.md): Low-level documentation of the Bitcoin app's communication protocol and commands.
