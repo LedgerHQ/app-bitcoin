@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [1.0.0] - Unreleased
+
+The package is now a binding of the [Rust client](https://github.com/LedgerHQ/app-bitcoin/tree/develop/bitcoin_client_rs), which implements the protocol; the Python code only owns the transport. Its source moved to `bitcoin_client_rs/bindings/python`.
+
+### Added
+
+- Wheels for Python 3.9 and later (abi3); building from the source distribution requires a Rust toolchain.
+- `UnsupportedAppVersionError`, raised by `createClient` for versions of the app before 2.1.0.
+- `sign_psbt` accepts any object whose `serialize()` method returns the PSBT (binary or base64), and sends its fields exactly as serialized.
+
+### Changed
+
+- Addresses returned by `get_wallet_address` and `register_wallet` are verified with rust-miniscript instead of embit.
+- `NewClient` is an alias of `Client`.
+
+### Removed
+
+- Support for the versions of the app before 2.1.0 (`LegacyClient`, and the vendored `btchip` library).
+- The `PSBT`, transaction and key classes, and the vendored copy of embit. Use a PSBT library, like the ones of [HWI](https://github.com/bitcoin-core/HWI) or [embit](https://github.com/diybitcoinhardware/embit).
+
 ## [0.4.3] - 24-11-2026
 
 ### Added

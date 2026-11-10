@@ -1,8 +1,8 @@
 import pytest
 
-from bitcoin_client.ledger_bitcoin.errors import PSBTSerializationError
-from bitcoin_client.ledger_bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
-from bitcoin_client.ledger_bitcoin.tx import CTransaction, CTxIn, CTxOut, COutPoint
+from test_utils.bitcoin.errors import PSBTSerializationError
+from test_utils.bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
+from test_utils.bitcoin.tx import CTransaction, CTxIn, CTxOut, COutPoint
 
 
 MUSIG2_SESSION_ID_KEY = bytes.fromhex("fc11") + b"MUSIG2_SESSION_ID" + b"\x00"
