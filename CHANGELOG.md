@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
-## [2.X.X] - XX-XX-XXXX
+## [2.6.0] - 10-11-2026
 
 ### Added
 
@@ -25,7 +25,7 @@ Dates are in `dd-mm-yyyy` format.
 
 ## [2.5.1] - 09-09-2026
 
-## Fixed
+### Fixed
 
 - Support for musig() key expressions inside multi_a fragments.
 - Various bug fixes and code modernizations.
