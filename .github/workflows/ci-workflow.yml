@@ -94,8 +94,7 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: ghcr.io/ledgerhq/speculos:latest
-      options: --entrypoint /bin/bash
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest
 
     steps:
       - name: Clone
@@ -107,14 +106,13 @@ jobs:
           name: bitcoin-app-${{matrix.model}}
           path: bin
 
-      - name: Install build dependencies
-        run: apt update && apt install -y build-essential
-
       - name: Run tests
         run: |
+          # The image's venv is only activated for interactive bash shells
+          . "$VENV_PATH/bin/activate"
           pip install -r requirements.txt
           cd tests_mainnet
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --timeout=300
+          pytest --headless --model=${{ matrix.model }} --timeout=300
 
   job_test_python_lib_legacyapp:
     name: Tests with the Python library and legacy Bitcoin app
@@ -146,8 +144,7 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: ghcr.io/ledgerhq/speculos:latest
-      options: --entrypoint /bin/bash
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest
 
     steps:
       - name: Clone
@@ -159,14 +156,13 @@ jobs:
           name: bitcoin-testnet-perftest-app-nanosp
           path: bin
 
-      - name: Install build dependencies
-        run: apt update && apt install -y build-essential
-
       - name: Run tests
         run: |
+          # The image's venv is only activated for interactive bash shells
+          . "$VENV_PATH/bin/activate"
           pip install -r requirements.txt
           cd tests_perf
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=nanosp --benchmark-json=benchmarks.json
+          pytest --headless --model=nanosp --benchmark-json=benchmarks.json
       - name: Upload benchmarks summary
         uses: actions/upload-artifact@v4
         with:
@@ -258,8 +254,7 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: ghcr.io/ledgerhq/speculos:latest
-      options: --entrypoint /bin/bash
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest
 
     steps:
       - name: Clone
@@ -284,7 +279,7 @@ jobs:
         run: |
           cd bitcoin_client_js
           yarn install --immutable
-          LOG_SPECULOS=1 LOG_APDUS=1 SPECULOS="/speculos/speculos.py" yarn test
+          LOG_SPECULOS=1 LOG_APDUS=1 SPECULOS="speculos" yarn test
 
   deploy_js_client:
     name: Deploy
