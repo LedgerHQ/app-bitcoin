@@ -29,11 +29,11 @@ Building requires a Rust toolchain with the `wasm32-unknown-unknown` target, and
 ```bash
 $ rustup target add wasm32-unknown-unknown
 $ cargo install wasm-bindgen-cli --version 0.2.105
-$ yarn install
-$ yarn build
+$ npm install
+$ npm run build
 ```
 
-`yarn test:replay` runs the tests that replay recorded device transcripts; `yarn test` also runs the tests against the app in the [Speculos](https://github.com/LedgerHQ/speculos) emulator (set `SPECULOS` to the path of `speculos.py`; the app must be built in `bin/app.elf` at the root of the repository).
+`npm run test:replay` runs the tests that replay recorded device transcripts; `npm test` also runs the tests against the app in the [Speculos](https://github.com/LedgerHQ/speculos) emulator (set `SPECULOS` to the path of `speculos.py`; the app must be built in `bin/app.elf` at the root of the repository).
 
 ## Getting started
 
