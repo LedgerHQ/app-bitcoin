@@ -38,7 +38,7 @@ for p in (_REPO_ROOT, _HERE):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from bitcoin_client.ledger_bitcoin import (  # noqa: E402
+from ledger_bitcoin import (  # noqa: E402
     Chain,
     MusigPartialSignature,
     MusigPubNonce,
@@ -46,8 +46,8 @@ from bitcoin_client.ledger_bitcoin import (  # noqa: E402
     WalletPolicy,
     createClient,
 )
-from bitcoin_client.ledger_bitcoin.client_base import Client  # noqa: E402
-from bitcoin_client.ledger_bitcoin.psbt import PSBT  # noqa: E402
+from ledger_bitcoin import Client  # noqa: E402
+from test_utils.bitcoin.psbt import PSBT  # noqa: E402
 
 from presets import (  # noqa: E402
     build_psbt_from_spec,

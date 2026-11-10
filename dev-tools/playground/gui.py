@@ -100,7 +100,7 @@ def _try_target(target: str, host: str, port: int, chain) -> Optional[str]:
     Returns `None` on success (Bitcoin (Test) app open and reachable), or a
     short human-readable error string on failure.
     """
-    from bitcoin_client.ledger_bitcoin import TransportClient, createClient
+    from ledger_bitcoin import TransportClient, createClient
 
     try:
         if target == "speculos":
@@ -493,7 +493,7 @@ class PlaygroundApp(App):
         )
         chain = CHAIN_BY_NAME[self.chain]
 
-        from bitcoin_client.ledger_bitcoin import TransportClient, createClient
+        from ledger_bitcoin import TransportClient, createClient
 
         client = None
         try:

@@ -23,8 +23,9 @@ All commands assume you're at the repo root (`app-bitcoin/`).
 python3 -m venv .venv
 source .venv/bin/activate
 
-# 2. Install the ledger_bitcoin client library (editable install).
-pip install -e ./bitcoin_client
+# 2. Install the ledger_bitcoin client library (editable install; building it
+#    requires a Rust toolchain).
+pip install -e ./bitcoin_client_rs/bindings/python
 
 # 3. Install the playground's extra dependencies.
 pip install -r dev-tools/playground/requirements.txt
