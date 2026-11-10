@@ -4,6 +4,8 @@ pub mod merkle;
 
 #[cfg(feature = "paranoid_client")]
 mod bip327;
+#[cfg(feature = "paranoid_client")]
+mod sortedmulti_a;
 
 pub mod apdu;
 #[cfg(feature = "client")]
