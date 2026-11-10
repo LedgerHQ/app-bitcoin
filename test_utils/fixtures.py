@@ -156,11 +156,18 @@ def comm(settings, root_directory, hid, headless, model, app_version: str) -> Un
         else:
             lib_params = []
 
+        # SPECULOS_API_PORT runs speculos' REST API on another port than the default 5000 (its APDU
+        # server, which is not used, then gets a free port), e.g. if another instance is running
+        api_port = os.getenv("SPECULOS_API_PORT")
+        port_params = ['--api-port', api_port, '--apdu-port', '0'] if api_port else []
+
         client = SpeculosClient(
             app_binary,
             ['--model', model, '--seed', f'{settings["mnemonic"]}']
             + ["--display", "qt" if not headless else "headless"]
             + lib_params
+            + port_params,
+            **({"api_url": f"http://127.0.0.1:{api_port}"} if api_port else {})
         )
         client.start()
 
