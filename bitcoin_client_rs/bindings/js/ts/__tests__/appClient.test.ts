@@ -15,7 +15,8 @@ import type { Log } from "@ledgerhq/logs";
 
 import { AppClient, DefaultWalletPolicy, PartialSignature, WalletPolicy } from ".."
 
-jest.setTimeout(10000);
+// starting speculos can take several seconds
+jest.setTimeout(60000);
 
 
 /*
@@ -30,6 +31,8 @@ process and all the APDUs exchanged during the tests.
 const repoRootPath = path.resolve(__dirname, '../../../../..')
 
 const speculos_path = process.env.SPECULOS || "speculos.py";
+// the port of speculos' REST API; its APDU server, which the tests do not use, gets a free port
+const speculos_api_port = process.env.SPECULOS_API_PORT || "5000";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -42,7 +45,7 @@ async function openSpeculosAndWait(opts: SpeculosHttpTransportOpts = {}): Promis
     try {
       return await SpeculosTransport.open(opts);
     } catch (e) {
-      if (i > 50) {
+      if (i > 400) {
         throw e;
       }
     }
@@ -53,7 +56,7 @@ async function openSpeculosAndWait(opts: SpeculosHttpTransportOpts = {}): Promis
 // Convenience method to send the kill signal and wait for the process to completely terminate
 async function killProcess(proc: ChildProcessWithoutNullStreams, signal: NodeJS.Signals = 'SIGTERM', timeout = 10000) {
   return new Promise<void>((resolve, reject) => {
-    const pid = proc.pid;
+    const pid = proc.pid as number;
     process.kill(pid, signal);
     let count = 0;
     const intervalHandler = setInterval(() => {
@@ -102,7 +105,9 @@ describe("test AppClient", () => {
   beforeEach(async () => {
     sp = spawn(speculos_path, [
       repoRootPath + "/bin/app.elf",
-      '--display', 'headless'
+      '--display', 'headless',
+      '--api-port', speculos_api_port,
+      '--apdu-port', '0'
     ]);
 
     sp.stdout.on('data', function(data) {
@@ -117,12 +122,13 @@ describe("test AppClient", () => {
       }
     });
 
-    transport = await openSpeculosAndWait();
+    transport = await openSpeculosAndWait({ apiPort: speculos_api_port });
     app = new AppClient(transport);
   });
 
   afterEach(async () => {
-    await transport.close();
+    // also stop speculos when it failed to start
+    await transport?.close();
     await killProcess(sp);
   });
 
