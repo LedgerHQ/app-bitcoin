@@ -1,0 +1,21 @@
+[package]
+name = "ledger_bitcoin_wasm"
+version = "1.0.0"
+authors = ["Ledger"]
+edition = "2021"
+description = "WebAssembly bindings of the Ledger Bitcoin application client"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ledger_bitcoin_client = { path = "../..", default-features = false, features = ["paranoid_client"] }
+ledger_bitcoin_client_bindings = { path = "../common" }
+# must match the version of the wasm-bindgen CLI that generates the JavaScript glue
+wasm-bindgen = "=0.2.105"
+js-sys = "0.3"
+# smaller precomputed tables: about 1 MB less of WebAssembly, for verification code that is
+# not performance-sensitive
+secp256k1 = { version = "0.29", default-features = false, features = ["lowmemory"] }
