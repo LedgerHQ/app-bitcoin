@@ -438,3 +438,37 @@ def test_invalid_miniscript(navigator: Navigator, firmware: Firmware, client: Ra
                          f"{core_xpub_orig4}",
                          f"{core_xpub_orig5}",
                      ])
+
+
+@pytest.mark.timeout(0)  # disable timeout
+def test_e2e_miniscript_20keys(navigator: Navigator, firmware: Firmware, client: RaggerClient,
+                               test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals,
+                               enable_slow_tests: int):
+    # A policy with MAX_N_KEYS_IN_WALLET_POLICY (20) keys, split in two multisig fragments, as a
+    # single multi() is limited to 16 keys. The internal key is the last one (@19).
+
+    # slow test, only run it if --enable_slow_tests is set to a value greater than 0
+    if enable_slow_tests < 1:
+        pytest.skip()
+
+    keys_info = []
+    core_wallet_name = None
+    for i in range(20 - 1):
+        core_wallet_name_i, core_xpub_orig = create_new_wallet()
+        if i == 18:
+            # only key @18 signs with bitcoin-core, so the spend must use the second fragment,
+            # that also requires the signature for the internal key @19
+            core_wallet_name = core_wallet_name_i
+        keys_info.append(core_xpub_orig)
+
+    path = "48'/1'/0'/2'"
+    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
+    keys_info.append(f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}")
+
+    wallet_policy = WalletPolicy(
+        name="20 keys",
+        descriptor_template="wsh(or_d(multi(2,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,@8/**,@9/**),multi(2,@10/**,@11/**,@12/**,@13/**,@14/**,@15/**,@16/**,@17/**,@18/**,@19/**)))",
+        keys_info=keys_info)
+
+    run_test_e2e(navigator, client, wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, speculos_globals,
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
