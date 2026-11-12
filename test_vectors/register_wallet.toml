@@ -360,26 +360,93 @@ wallet_name = "Too many steps"
 error = "INCORRECT_DATA"
 
 [[case]]
-name = "too_many_keys"
-description = "16 key expressions exceed the maximum (15) supported in a wallet policy"
-descriptor_template = "wsh(multi(1,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,@8/**,@9/**,@10/**,@11/**,@12/**,@13/**,@14/**,@15/**))"
+name = "max_keys_wsh"
+description = "20 keys, the maximum supported in a wallet policy (segwit v0 miniscript)"
+descriptor_template = "wsh(or_d(multi(2,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,@8/**,@9/**),multi(2,@10/**,@11/**,@12/**,@13/**,@14/**,@15/**,@16/**,@17/**,@18/**,@19/**)))"
 keys_info = [
     "[f5acc2fd/48'/1'/0'/2']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",
-    "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",
+    "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",
+]
+wallet_name = "Max keys"
+expected_wallet_id = "7fe1acea403b55d8bd6a13f8b1414aff7e003051122e839c79f3a8fe863a01bd"
+expected_wallet_hmac = "c767e7e583cf8e0b47de1539d9316ad0a2d3d3cb490135261a33d840fb91d2fe"
+expected_key_types = ["internal", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external"]
+
+[[case]]
+name = "max_keys_tr"
+description = "20 keys, the maximum supported in a wallet policy (taproot)"
+descriptor_template = "tr(@0/**,{multi_a(2,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,@8/**,@9/**,@10/**),multi_a(2,@11/**,@12/**,@13/**,@14/**,@15/**,@16/**,@17/**,@18/**,@19/**)})"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+    "tpubD6NzVbkrYhZ4WdRE9F3cjU9FxjCJL7LeCWNBAaHu7EJQDvNgDik4K7UgKG8KeVv1etBH96pE1qGk4BMZeKigtUBe9s75qae4ecWv4MSdPy2",
+    "tpubD6NzVbkrYhZ4XPSASAaKiw1Xj1Bp45XxFFQdFoKHssz3W1p2tuRGhUcfDSLXhwACGppGoEAhvoxbrrbNmteko4iYG2F5RZNc4b7mvRVBuHL",
+    "tpubD6NzVbkrYhZ4XoX7BDdT1oQFFJuFbgg554F2jjWPBhaEbUQnnePxY352nmvhDYRXF19TSwbMok3RNqGxsYrSdpZDL4roa8qggCvYSjYnhgQ",
+    "tpubD6NzVbkrYhZ4YNm6aoVhCvh63cjFyLkQumo9QEBhuV5PQLwDBWAkvz1xGqM7rJK6Th86zphLTAwUP82Ep46CXwgFnRr8VhoVX9yqYw6LzQS",
+    "tpubD6NzVbkrYhZ4YYhqtwqawDngokB33acQqTv14mdAapt6Av9kH2keNTNTkCV3n4m4K4MAhvMTXAYqNihwP8GShRQZifivKZ3XkzKPA9qdcpS",
+    "tpubD6NzVbkrYhZ4Xoes7thtWnEkhG8GEfitHapVa4EJExvDqzK8JqAr2gbB2Em7cVA71mjZd4Hc4gkuTAQ13trWp2ph3Go56dNKry2WayJ5X6j",
+    "tpubD6NzVbkrYhZ4YZ5NsYR16q5YxmsuVadLfJ6gDKr1RSQuRuuzuY36zZJZwEXQqAzVwKMcubwAp6SoJD54CMxUMVh3EfyKbDa767bTBiq8pPM",
+    "tpubD6NzVbkrYhZ4XjYjMiY8fydGL5owunCxfHCNpGzryMBYZHJ97g9QoBvcNSkg1iNkmnQLmNNETxhmBF3gCx2s7ApxVgkg2EmD5SAQ96jCCwo",
+    "tpubD6NzVbkrYhZ4YLbuBBsPxYE7o7qoQXTmDDAPHedPUg7uWU5W6wU1DaZxWJ5yu1BdxP12bT1SbFQF2GtBxX4rDuB3artkYzGWjgZcpgCJwmL",
+    "tpubD6NzVbkrYhZ4Xk17rAQKEToD5K8oWWaQi7mo1j5x6WR9yapdENnSovDryok1wHkU9XgCRQ3bMSZtqfgzbcbs4NsJKeSjCvnW8hXrrBhqaa8",
+    "tpubD6NzVbkrYhZ4YCJzhQUN8x99wDjoRM5y1ACcrEzQapvbvLS5nXNZAB9GQeiZRkehWth39dLSycfV516p7gjoMnRSrvEqAYBRDZ6g5NXemsE",
+    "tpubD6NzVbkrYhZ4Y1zz3jGo1RjVGDFW3NepkSnvQmH21CYJUQ6Je1ET7k4vp7Ppx1TVr4H3a38ufPBktVrupiCJh9TTY6zNTBBUTbsH859oJD5",
+    "tpubD6NzVbkrYhZ4WvoFxR1Xk9fRcvoS28SgTdqg6PDadVF7ic8HdxqzQbC2548L4J2GncigkSUkrPMszK3zraEiZRHDq3se9buuhiM9D632V3o",
+    "tpubD6NzVbkrYhZ4Wrpq1Ct7Eer2od1AiLswwxUneSpkz5Nvbmo54Wsr7jmZceScfG71U8Vgb4SXuBGLXUR5ipy6q7KMMKg9KpY3Vo4xh9ZgTNG",
+    "tpubD6NzVbkrYhZ4WimT2JyMXYCEk4LJuEnKohFcM799qrhgbzoYZA6Wx7PZGfZAXpBizcn2VDMfu4YcjygPfcZGmHyCT3KZ5MqhN5eyka3s3iB",
+    "tpubD6NzVbkrYhZ4WkyVSysPe7PSzqr1DBe8YNZA98WWQquocyyRpZeDcjdGCja9Lsqj6MahH37aJonVadZrvnAfqzAkSnuuTeD28WPAxMvAivx",
+    "tpubD6NzVbkrYhZ4Y46Uh8B6iXyDEpDpoJzH1VpxoMQCjTkTDymhb2bZso8rHzt3a99vz9LJGDmhoDY3jjER1JmkLbCUe75XKKpSVzq9KsHzwad",
+    "tpubD6NzVbkrYhZ4YKqdFK3X4Fhj7Pe1mdcQ3B3SFuum35p5o8h6pr5Tfwrpgzr9QmEjaiDMa2pXMBmg8Sthm8moNda4tXpn8hj87t2HMp7donX",
+    "tpubD6NzVbkrYhZ4XEBFPdLoJmUcL6NNJQFjD3GcVPt32RTKHMfmEV9haRK2uS2b4epwyPotsmEdSt4E7cY38wQtbbkYb4b7QG7KS47xygUgxTE",
+]
+wallet_name = "Max keys"
+expected_wallet_id = "70ba47c7c5f85ebae19e57093591f80009f8fb273581b6f418f4a161a7339dce"
+expected_wallet_hmac = "770b4e8cfad15bd8a8bf8439ddc30f90216ca1211de2ca79b6f3f147f0255f6e"
+expected_key_types = ["internal", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external", "external"]
+
+[[case]]
+name = "too_many_keys"
+description = "21 keys exceed the maximum (20) supported in a wallet policy"
+descriptor_template = "wsh(or_d(multi(2,@0/**,@1/**,@2/**,@3/**,@4/**,@5/**,@6/**,@7/**,@8/**,@9/**),multi(2,@10/**,@11/**,@12/**,@13/**,@14/**,@15/**,@16/**,@17/**,@18/**,@19/**,@20/**)))"
+keys_info = [
+    "[f5acc2fd/48'/1'/0'/2']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",
 ]
 wallet_name = "Too many keys"
 error = "NOT_SUPPORTED"
