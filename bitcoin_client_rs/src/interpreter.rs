@@ -1,5 +1,5 @@
 use core::convert::TryFrom;
-use core::fmt::Debug;
+use core::fmt::{self, Debug};
 
 use bitcoin::{
     consensus::encode::{self},
@@ -8,7 +8,7 @@ use bitcoin::{
 
 use crate::protocol::UncheckedVarInt;
 
-use crate::{apdu::ClientCommandCode, merkle::MerkleTree};
+use crate::{apdu::ClientCommandCode, merkle::MerkleTree, wallet::WalletPolicy};
 
 /// Interpreter for the client-side commands.
 /// This struct keeps has methods to keep track of:
@@ -29,6 +29,12 @@ pub struct ClientCommandInterpreter {
     trees: Vec<MerkleTree>,
 }
 
+impl Default for ClientCommandInterpreter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ClientCommandInterpreter {
     pub fn new() -> Self {
         Self {
@@ -37,6 +43,17 @@ impl ClientCommandInterpreter {
             known_preimages: Vec::new(),
             trees: Vec::new(),
         }
+    }
+
+    /// Prepares wallet serialization, keys and descriptor-template preimages.
+    pub fn for_wallet(wallet: &WalletPolicy) -> Self {
+        let mut interpreter = Self::new();
+        interpreter.add_known_preimage(wallet.serialize());
+        let keys: Vec<String> = wallet.keys.iter().map(|key| key.to_string()).collect();
+        interpreter.add_known_list(&keys);
+        // Necessary for protocol version 1 (introduced in app version 2.1.0).
+        interpreter.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
+        interpreter
     }
 
     /// Adds a preimage to the list of known preimages.
@@ -190,7 +207,7 @@ fn get_merkle_leaf_proof(
     let tree = trees
         .iter()
         .find(|tree| tree.root_hash() == root)
-        .ok_or(InterpreterError::UnknownHash)?;
+        .ok_or(InterpreterError::UnknownMerkleRoot)?;
 
     if leaf_index >= tree_size || tree_size.0 != tree.size() as u64 {
         return Err(InterpreterError::InvalidIndexOrSize);
@@ -237,11 +254,12 @@ fn get_merkle_leaf_index(
     let tree = trees
         .iter()
         .find(|tree| tree.root_hash() == root)
-        .ok_or(InterpreterError::UnknownHash)?;
+        .ok_or(InterpreterError::UnknownMerkleRoot)?;
 
-    let leaf_index = tree
-        .get_leaf_index(hash)
-        .ok_or(InterpreterError::UnknownHash)?;
+    let leaf_index = match tree.get_leaf_index(hash) {
+        Some(index) => index,
+        None => return Ok(vec![0, 0]),
+    };
 
     let mut response = 1_u8.to_be_bytes().to_vec();
     response.extend(encode::serialize(&UncheckedVarInt(leaf_index as u64)));
@@ -305,6 +323,7 @@ pub fn get_merkleized_map_commitment(mapping: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> 
     commitment
 }
 
+#[non_exhaustive]
 #[derive(Debug)]
 pub enum InterpreterError {
     EmptyInput,
@@ -314,4 +333,22 @@ pub enum InterpreterError {
     UnknownHash,
     UnknownMerkleRoot,
     UnexpectedQueue,
+}
+
+impl fmt::Display for InterpreterError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyInput => f.write_str("Empty interpreter request"),
+            Self::UnknownCommand(command) => {
+                write!(f, "Unknown interpreter command: {:#04x}", command)
+            }
+            Self::UnsupportedRequest(command) => {
+                write!(f, "Unsupported interpreter request: {:#04x}", command)
+            }
+            Self::InvalidIndexOrSize => f.write_str("Invalid index or size"),
+            Self::UnknownHash => f.write_str("Unknown preimage hash"),
+            Self::UnknownMerkleRoot => f.write_str("Unknown Merkle root"),
+            Self::UnexpectedQueue => f.write_str("Unexpected interpreter queue state"),
+        }
+    }
 }

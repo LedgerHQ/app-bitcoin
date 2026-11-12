@@ -1,12 +1,15 @@
 use core::convert::TryFrom;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+#[cfg(feature = "async")]
 use async_trait::async_trait;
 use bitcoin::hashes::hex::FromHex;
 
+#[cfg(feature = "async")]
+use ledger_bitcoin_client::async_client;
 use ledger_bitcoin_client::{
     apdu::{APDUCommand, StatusWord},
-    async_client, client,
+    client,
 };
 
 #[derive(Default, Clone)]
@@ -75,6 +78,7 @@ impl client::Transport for TransportReplayer {
     }
 }
 
+#[cfg(feature = "async")]
 #[async_trait]
 impl async_client::Transport for TransportReplayer {
     type Error = MockError;

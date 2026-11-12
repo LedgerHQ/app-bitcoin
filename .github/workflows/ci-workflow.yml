@@ -290,9 +290,12 @@ jobs:
       package_directory: "bitcoin_client_js"
 
   job_test_rust_client:
-    name: Tests for rust client library
-    needs: job_build
+    name: Rust client
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: bitcoin_client_rs
 
     container:
       image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
@@ -301,10 +304,53 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
-      - name: Run tests
+      - name: Identify Rust toolchain and Cargo home
+        id: rust
         run: |
-          cd bitcoin_client_rs/
-          cargo test --no-default-features --features="async"
+          echo "version=$(rustc --version)" >> "$GITHUB_OUTPUT"
+          echo "cargo-home=${CARGO_HOME:-$HOME/.cargo}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Cargo downloads and build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ steps.rust.outputs.cargo-home }}/registry/index
+            ${{ steps.rust.outputs.cargo-home }}/registry/cache
+            ${{ steps.rust.outputs.cargo-home }}/git/db
+            bitcoin_client_rs/target
+          key: ${{ runner.os }}-${{ runner.arch }}-rust-client-${{ steps.rust.outputs.version }}-${{ hashFiles('bitcoin_client_rs/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-rust-client-${{ steps.rust.outputs.version }}-
+
+      - name: Install WASM target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Check formatting
+        run: cargo fmt -p ledger_bitcoin_client -- --check
+
+      - name: Test pure protocol including doctests
+        run: cargo test -p ledger_bitcoin_client --no-default-features
+
+      - name: Test pure paranoid protocol including doctests
+        run: cargo test -p ledger_bitcoin_client --no-default-features --features paranoid_client
+
+      - name: Test synchronous client
+        run: cargo test -p ledger_bitcoin_client --no-default-features --features client
+
+      - name: Test asynchronous client
+        run: cargo test -p ledger_bitcoin_client --no-default-features --features async
+
+      - name: Test default features
+        run: cargo test -p ledger_bitcoin_client
+
+      - name: Check pure WASM
+        run: cargo check -p ledger_bitcoin_client --no-default-features --target wasm32-unknown-unknown
+
+      - name: Check paranoid WASM
+        run: cargo check -p ledger_bitcoin_client --no-default-features --features paranoid_client --target wasm32-unknown-unknown
+
+      - name: Clippy
+        run: cargo clippy -p ledger_bitcoin_client --all-targets
 
   deploy_rust_client:
     name: Deploy rust client library
