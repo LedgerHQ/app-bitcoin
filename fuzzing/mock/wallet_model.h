@@ -4,17 +4,20 @@
 #include <stdint.h>
 
 #include "mock_dispatcher.h"
+#include "wallet.h"
 
-/* Match the app, do not mirror a smaller bound: MAX_N_KEYS_IN_WALLET_POLICY is 15
- * and a serialized header allows 252, so a builder capped at 6 could never test the
- * limit. The descriptor cap is deliberately above the app's
- * MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 (512) so the over-length rejection is reachable. */
-#define WM_MAX_KEYS 16
+/* Match the app, do not mirror a smaller bound: a serialized header allows 252 keys,
+ * so a builder capped at a few keys could never test the limit. The descriptor cap is
+ * deliberately above the app's MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 (512) so the
+ * over-length rejection is reachable. */
+
+// One more than the app accepts, so generated descriptors can reach the too-many-keys rejection
+#define WM_MAX_KEYS           (MAX_N_KEYS_IN_WALLET_POLICY + 1)
 #define WM_MAX_DESCRIPTOR_LEN 600
 
 typedef struct {
     uint8_t version;
-    char name[72];   /* app allows MAX_WALLET_NAME_LENGTH = 64 */
+    char name[72]; /* app allows MAX_WALLET_NAME_LENGTH = 64 */
     uint8_t name_len;
 
     char descriptor[WM_MAX_DESCRIPTOR_LEN];
