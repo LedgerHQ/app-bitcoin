@@ -53,7 +53,7 @@
 #error "TEST_VECTORS_PATH must be defined to point at the vectors file"
 #endif
 
-#define MAX_KEYS_PER_CASE 16
+#define MAX_KEYS_PER_CASE (MAX_N_KEYS_IN_WALLET_POLICY + 1)
 #define MAX_KEY_INFO_LEN  (MAX_POLICY_KEY_INFO_LEN + 1)
 #define MAX_TPL_LEN       (MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 + 1)
 /* One slot more than MAX_WALLET_NAME_LENGTH so the over-long-name reject vector

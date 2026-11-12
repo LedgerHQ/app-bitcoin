@@ -51,7 +51,7 @@ _Static_assert(3 + 34 * MAX_PUBKEYS_PER_P2SH_MULTISIG <= 520,
 
 // Maximum number of keys supported for a wallet policy. It is a technical limit to
 // bound the total memory occupation of a wallet policy, and could be increased if necessary.
-#define MAX_N_KEYS_IN_WALLET_POLICY 15
+#define MAX_N_KEYS_IN_WALLET_POLICY 20
 
 // This amount should be enough for many useful policies
 // We do not expect these limits to be reached in practice any time soon, but they can

@@ -7,9 +7,11 @@ from ragger.firmware import Firmware
 from ragger.error import ExceptionRAPDU
 from ragger_bitcoin import RaggerClient
 
+from .conftest import get_pseudorandom_keypair
 from .instructions import register_wallet_instruction_approve, register_wallet_instruction_approve_no_save, register_wallet_instruction_approve_long, register_wallet_instruction_approve_unusual, register_wallet_instruction_reject, Instructions
 import hmac
 from hashlib import sha256
+from typing import List
 
 import pytest
 
@@ -744,3 +746,50 @@ def test_register_wallet_max_depth(navigator: Navigator, firmware: Firmware, cli
             navigator,
             instructions=register_wallet_instruction_approve_no_save(firmware))
         assert wallet_id == wallet.id
+
+
+# limit copied from the app; keep in sync
+MAX_N_KEYS_IN_WALLET_POLICY = 20  # src/common/wallet.h
+
+INTERNAL_KEY = "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK"
+
+
+def keys_info_with_n_keys(n_keys: int) -> List[str]:
+    # one internal key, followed by n_keys - 1 distinct external keys
+    return [INTERNAL_KEY] + [get_pseudorandom_keypair(f"cosigner {i}")[0]
+                             for i in range(1, n_keys)]
+
+
+def keys_list(first: int, last: int) -> str:
+    return ",".join(f"@{i}/**" for i in range(first, last))
+
+
+@pytest.mark.parametrize("descriptor_template", [
+    # multi/multi_a are limited to 16 keys, so the keys are split in two halves
+    f"wsh(or_d(multi(2,{keys_list(0, 10)}),multi(2,{keys_list(10, 20)})))",
+    f"tr(@0/**,{{multi_a(2,{keys_list(1, 11)}),multi_a(2,{keys_list(11, 20)})}})",
+])
+def test_register_wallet_max_keys(navigator: Navigator, firmware: Firmware, client: RaggerClient,
+                                  speculos_globals, descriptor_template: str):
+    run_register_test(navigator, client, speculos_globals, WalletPolicy(
+        name="Max keys",
+        descriptor_template=descriptor_template,
+        keys_info=keys_info_with_n_keys(MAX_N_KEYS_IN_WALLET_POLICY),
+    ),
+        instructions=register_wallet_instruction_approve_no_save(firmware))
+
+
+def test_register_wallet_too_many_keys(client: RaggerClient):
+    n_keys = MAX_N_KEYS_IN_WALLET_POLICY + 1
+    wallet = WalletPolicy(
+        name="Too many keys",
+        descriptor_template=(f"wsh(or_d(multi(2,{keys_list(0, n_keys // 2)}),"
+                             f"multi(2,{keys_list(n_keys // 2, n_keys)})))"),
+        keys_info=keys_info_with_n_keys(n_keys),
+    )
+
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.register_wallet(wallet)
+
+    assert DeviceException.exc.get(e.value.status) == NotSupportedError
+    assert len(e.value.data) == 0
