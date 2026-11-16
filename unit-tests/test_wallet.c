@@ -489,6 +489,11 @@ static void test_failures(void **state) {
     // wpkh can only be inside sh
     assert_true(0 > parse_policy("wsh(wpkh(@0/**)))", out, sizeof(out)));
 
+    // tr can only be top-level
+    assert_true(0 > parse_policy("wsh(tr(@0/**))", out, sizeof(out)));
+    assert_true(0 > parse_policy("sh(tr(@0/**))", out, sizeof(out)));
+    assert_true(0 > parse_policy("sh(wsh(tr(@0/**)))", out, sizeof(out)));
+
     // multi with invalid threshold
     assert_true(0 > parse_policy("multi(6,@0/**,@1/**,@2/**,@3/**,@4/**)",
                                  out,

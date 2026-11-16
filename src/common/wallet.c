@@ -1648,7 +1648,7 @@ static int parse_script(buffer_t *in_buf,
             break;
         }
         case TOKEN_TR: {  // supporting only xpubs
-            if (depth > 1) {
+            if (depth != 0) {
                 return WITH_ERROR(-1, "tr can only be top-level");
             }
 
