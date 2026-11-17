@@ -257,7 +257,8 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           working-directory: bitcoin_client_rs/bindings/python
-          args: --release --out dist
+          # no --release: it would override the size-optimized profile set in pyproject.toml
+          args: --out dist
           manylinux: auto
 
       - name: Upload the wheel
