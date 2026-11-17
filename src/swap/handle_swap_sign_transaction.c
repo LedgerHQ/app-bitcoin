@@ -30,9 +30,15 @@ bool swap_copy_transaction_parameters(create_transaction_parameters_t* sign_tran
     memset(destination_address_extra_data, 0, sizeof(destination_address_extra_data));
     memset(amount, 0, sizeof(amount));
     memset(fees, 0, sizeof(fees));
-    strncpy(destination_address,
-            sign_transaction_params->destination_address,
-            sizeof(destination_address) - 1);
+
+    size_t destination_address_len =
+        strnlen(sign_transaction_params->destination_address, sizeof(destination_address));
+    if (destination_address_len >= sizeof(destination_address)) {
+        return false;
+    }
+    memcpy(destination_address,
+           sign_transaction_params->destination_address,
+           destination_address_len);
 
     if (sign_transaction_params->destination_address_extra_id != NULL) {
         memcpy(destination_address_extra_data,
@@ -41,8 +47,7 @@ bool swap_copy_transaction_parameters(create_transaction_parameters_t* sign_tran
     }
 
     // sanity checks
-    if ((destination_address[sizeof(destination_address) - 1] != '\0') ||
-        (sign_transaction_params->amount_length > 8) ||
+    if ((sign_transaction_params->amount_length > 8) ||
         (sign_transaction_params->fee_amount_length > 8)) {
         return false;
     }
