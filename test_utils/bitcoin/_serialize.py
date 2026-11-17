@@ -22,7 +22,7 @@ from typing import (
     TypeVar,
     Callable,
 )
-from typing_extensions import Protocol
+from typing import Protocol
 
 class Readable(Protocol):
     def read(self, n: int = -1) -> bytes:
