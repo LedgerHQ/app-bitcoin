@@ -32,3 +32,5 @@ Homepage = "https://github.com/LedgerHQ/app-bitcoin"
 python-source = "python"
 module-name = "ledger_bitcoin._native"
 features = ["pyo3/extension-module"]
+# optimized for size, see Cargo.toml at the root of the workspace
+profile = "python-release"

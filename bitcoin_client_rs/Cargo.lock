@@ -410,6 +410,7 @@ dependencies = [
  "ledger_bitcoin_client",
  "ledger_bitcoin_client_bindings",
  "pyo3",
+ "secp256k1",
 ]
 
 [[package]]

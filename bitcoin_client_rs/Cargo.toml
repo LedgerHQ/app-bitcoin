@@ -28,6 +28,15 @@ miniscript = { version = "12.2", optional = true, default-features = false, feat
 [workspace]
 members = ["examples/ledger_hwi", "bindings/common", "bindings/python", "bindings/js"]
 
+# Release builds of the Python bindings, optimized for size (see bindings/python/pyproject.toml).
+# Panics still unwind: PyO3 turns them into Python exceptions instead of aborting the interpreter.
+[profile.python-release]
+inherits = "release"
+lto = true
+codegen-units = 1
+opt-level = "s"
+strip = true
+
 # Dependencies used for tests and examples only.
 [dev-dependencies]
 hex = "0.4.3"
