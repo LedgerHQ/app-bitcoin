@@ -180,3 +180,45 @@ def test_wallet_policy_serialization():
     import hashlib
     assert wallet.id == hashlib.sha256(wallet.serialize()).digest()
     assert wallet.get_descriptor(True).endswith("/1/*))")
+
+
+def _kv(key: bytes, value: bytes) -> bytes:
+    assert len(key) < 0xfd and len(value) < 0xfd
+    return bytes([len(key)]) + key + bytes([len(value)]) + value
+
+
+def _psbt_v2(output_entries: bytes = b"") -> bytes:
+    """A serialized PSBTv2 with one input and one output, with extra (raw) output map entries."""
+    global_map = (_kv(b"\x02", (2).to_bytes(4, "little"))      # PSBT_GLOBAL_TX_VERSION
+                  + _kv(b"\x04", b"\x01")                       # PSBT_GLOBAL_INPUT_COUNT
+                  + _kv(b"\x05", b"\x01")                       # PSBT_GLOBAL_OUTPUT_COUNT
+                  + _kv(b"\xfb", (2).to_bytes(4, "little")))    # PSBT_GLOBAL_VERSION
+    input_map = (_kv(b"\x0e", b"\x01" * 32)                     # PSBT_IN_PREVIOUS_TXID
+                 + _kv(b"\x0f", (0).to_bytes(4, "little")))     # PSBT_IN_OUTPUT_INDEX
+    output_map = (_kv(b"\x03", (1000).to_bytes(8, "little"))    # PSBT_OUT_AMOUNT
+                  + _kv(b"\x04", b"\x6a")                       # PSBT_OUT_SCRIPT
+                  + output_entries)
+    return b"psbt\xff" + global_map + b"\x00" + input_map + b"\x00" + output_map + b"\x00"
+
+
+@pytest.mark.parametrize("as_base64", [False, True])
+@pytest.mark.parametrize("psbt", [
+    # a duplicate key (PSBT_OUT_AMOUNT)
+    _psbt_v2(_kv(b"\x03", (1).to_bytes(8, "little"))),
+    # trailing data
+    _psbt_v2() + b"\x00",
+    # no separator after the last output map
+    _psbt_v2()[:-1],
+    # the value of the last entry of the last output map is truncated, too
+    _psbt_v2()[:-2],
+], ids=["duplicate-key", "trailing-data", "no-final-separator", "truncated-value"])
+def test_sign_psbt_rejects_malformed_psbts_before_any_exchange(psbt: bytes, as_base64: bool):
+    wallet = WalletPolicy("", "wpkh(@0/**)", [
+        "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"])
+    client = Client(ReplayTransport([]))
+    with pytest.raises(ValueError):
+        client.sign_psbt(base64.b64encode(psbt).decode() if as_base64 else psbt, wallet, None)
+
+    # the well-formed PSBT is sent to the device
+    with pytest.raises(AssertionError, match="unexpected APDU"):
+        client.sign_psbt(_psbt_v2(), wallet, None)
