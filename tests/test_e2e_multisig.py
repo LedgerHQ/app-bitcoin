@@ -161,8 +161,7 @@ def test_e2e_multisig_2_of_2(navigator: Navigator, firmware: Firmware, client: R
     )
 
     run_test(navigator, client, wallet_policy, [core_wallet_name], rpc, rpc_test_wallet,
-             speculos_globals, e2e_register_wallet_instruction(
-                 firmware, wallet_policy.n_keys),
+             speculos_globals, e2e_register_wallet_instruction(firmware),
              e2e_sign_psbt_instruction(firmware), test_name)
 
 
@@ -195,22 +194,17 @@ def test_e2e_multisig_multiple_internal_keys(navigator: Navigator, firmware: Fir
 
     run_test(navigator, client, wallet_policy, [core_wallet_name_3],
              rpc, rpc_test_wallet, speculos_globals,
-             e2e_register_wallet_instruction(firmware, wallet_policy.n_keys),
+             e2e_register_wallet_instruction(firmware),
              e2e_sign_psbt_instruction(firmware), test_name)
 
 
-@pytest.mark.timeout(0)  # disable timeout
-def test_e2e_multisig_15keys(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, rpc: AuthServiceProxy, rpc_test_wallet, speculos_globals: SpeculosGlobals, enable_slow_tests: int):
-    # Largest supported quorum in a multisig.
-    # The time for an end-to-end execution on a real Ledger Nano S (including user's input) is about 520 seconds.
-
-    # slow test, only run it if --enable_slow_tests is set to a value greater than 0
-    if enable_slow_tests < 1:
-        pytest.skip()
-
+def run_test_multisig_n_keys(n_keys: int, navigator: Navigator, firmware: Firmware,
+                             client: RaggerClient, test_name: str, rpc: AuthServiceProxy,
+                             rpc_test_wallet, speculos_globals: SpeculosGlobals):
+    # 2-of-n sortedmulti, where one of the keys is internal
     core_wallet_names: List[str] = []
     core_xpub_origs: List[str] = []
-    for _ in range(14):
+    for _ in range(n_keys - 1):
         name, xpub_orig = create_new_wallet()
         core_wallet_names.append(name)
         core_xpub_origs.append(xpub_orig)
@@ -229,5 +223,31 @@ def test_e2e_multisig_15keys(navigator: Navigator, firmware: Firmware, client: R
 
     run_test(navigator, client, wallet_policy, core_wallet_names,
              rpc, rpc_test_wallet, speculos_globals,
-             e2e_register_wallet_instruction(firmware, wallet_policy.n_keys),
+             e2e_register_wallet_instruction(firmware),
              e2e_sign_psbt_instruction(firmware), test_name)
+
+
+@pytest.mark.timeout(0)  # disable timeout
+def test_e2e_multisig_15keys(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, rpc: AuthServiceProxy, rpc_test_wallet, speculos_globals: SpeculosGlobals, enable_slow_tests: int):
+    # Largest multisig that is also supported in legacy P2SH.
+    # The time for an end-to-end execution on a real Ledger Nano S (including user's input) is about 520 seconds.
+
+    # slow test, only run it if --enable_slow_tests is set to a value greater than 0
+    if enable_slow_tests < 1:
+        pytest.skip()
+
+    run_test_multisig_n_keys(15, navigator, firmware, client, test_name, rpc, rpc_test_wallet,
+                             speculos_globals)
+
+
+@pytest.mark.timeout(0)  # disable timeout
+def test_e2e_multisig_16keys(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, rpc: AuthServiceProxy, rpc_test_wallet, speculos_globals: SpeculosGlobals, enable_slow_tests: int):
+    # Largest supported multisig (MAX_PUBKEYS_PER_MULTISIG keys); it is only allowed in segwit,
+    # and it requires MAX_N_KEYS_IN_WALLET_POLICY to be at least 16.
+
+    # slow test, only run it if --enable_slow_tests is set to a value greater than 0
+    if enable_slow_tests < 1:
+        pytest.skip()
+
+    run_test_multisig_n_keys(16, navigator, firmware, client, test_name, rpc, rpc_test_wallet,
+                             speculos_globals)

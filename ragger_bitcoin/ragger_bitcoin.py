@@ -1,4 +1,5 @@
-from typing import Tuple, List, Optional, Union
+from contextlib import contextmanager
+from typing import Iterator, Tuple, List, Optional, Union
 from pathlib import Path
 
 from ledger_bitcoin.common import Chain
@@ -9,7 +10,7 @@ from ledger_bitcoin.psbt import PSBT
 from ledger_bitcoin.client import NewClient
 from ledger_bitcoin.client_base import print_response, print_apdu, ApduException
 
-from ragger.navigator import Navigator
+from ragger.navigator import Navigator, NavInsID
 from ragger_bitcoin.ragger_instructions import Instructions
 from ragger.utils import pack_APDU
 
@@ -58,6 +59,20 @@ class RaggerClient(NewClient):
             sw, response = NewClient._make_request(
                 self, apdu, client_intepreter)
         return sw, response
+
+    @contextmanager
+    def _navigation(self, navigator: Optional[Navigator], testname: str,
+                    instructions: Optional[Instructions]) -> Iterator[None]:
+        # Navigation applies to the requests of this call only: not to the requests of a nested
+        # call without a navigator (e.g. the address check in register_wallet), nor to later calls
+        # if this one raises.
+        saved = (self.navigate, self.navigator, self.testname, self.instructions)
+        self.navigate = navigator is not None
+        self.navigator, self.testname, self.instructions = navigator, testname, instructions
+        try:
+            yield
+        finally:
+            self.navigate, self.navigator, self.testname, self.instructions = saved
 
     def last_async_response(self) -> Tuple[int, bytes]:
         return self.transport_client.last_async_response.status, self.transport_client.last_async_response.data
@@ -123,36 +138,34 @@ class RaggerClient(NewClient):
 
             sw, response, index = self.ragger_navigate(
                 navigator, apdu, instructions, testname, index)
+
+        # A request that succeeds without showing all the expected screens skipped the review.
+        # A final status screen (e.g. "Transaction signed") does not block the APDU, so it is only
+        # navigated if a later APDU happens to still be pending: it is not required.
+        if sw == 0x9000 and instructions:
+            required = len(instructions.data['text'])
+            if required > 0 and all(i == NavInsID.USE_CASE_STATUS_DISMISS
+                                    for i in instructions.data['instruction_on_text'][-1]):
+                required -= 1
+            if index < required:
+                raise RuntimeError(
+                    f"Request completed after {index} of the {required} expected UI interactions")
         return sw, response
 
     def get_extended_pubkey(self, path: str, display: bool = False, navigator: Optional[Navigator] = None,
                             testname: str = "",
                             instructions: Instructions = None) -> str:
 
-        if navigator:
-            self.navigate = True
-            self.navigator = navigator
-            self.testname = testname
-            self.instructions = instructions
-
-        response = NewClient.get_extended_pubkey(self, path, display)
-
-        self.navigate = False
+        with self._navigation(navigator, testname, instructions):
+            response = NewClient.get_extended_pubkey(self, path, display)
 
         return response
 
     def register_wallet(self, wallet: WalletPolicy, navigator: Optional[Navigator] = None,
                         testname: str = "", instructions: Instructions = None) -> Tuple[bytes, bytes]:
 
-        if navigator:
-            self.navigate = True
-            self.navigator = navigator
-            self.testname = testname
-            self.instructions = instructions
-
-        wallet_id, wallet_hmac = NewClient.register_wallet(self, wallet)
-
-        self.navigate = False
+        with self._navigation(navigator, testname, instructions):
+            wallet_id, wallet_hmac = NewClient.register_wallet(self, wallet)
 
         return wallet_id, wallet_hmac
 
@@ -168,16 +181,9 @@ class RaggerClient(NewClient):
         testname: str = ""
     ) -> str:
 
-        if navigator:
-            self.navigate = True
-            self.navigator = navigator
-            self.testname = testname
-            self.instructions = instructions
-
-        result = NewClient.get_wallet_address(
-            self, wallet, wallet_hmac, change, address_index, display)
-
-        self.navigate = False
+        with self._navigation(navigator, testname, instructions):
+            result = NewClient.get_wallet_address(
+                self, wallet, wallet_hmac, change, address_index, display)
 
         return result
 
@@ -185,15 +191,8 @@ class RaggerClient(NewClient):
                   Optional[bytes], navigator: Optional[Navigator] = None,
                   testname: str = "", instructions: Instructions = None) -> List[Tuple[int, PartialSignature]]:
 
-        if navigator:
-            self.navigate = True
-            self.navigator = navigator
-            self.testname = testname
-            self.instructions = instructions
-
-        result = NewClient.sign_psbt(self, psbt, wallet, wallet_hmac)
-
-        self.navigate = False
+        with self._navigation(navigator, testname, instructions):
+            result = NewClient.sign_psbt(self, psbt, wallet, wallet_hmac)
 
         return result
 
@@ -203,15 +202,8 @@ class RaggerClient(NewClient):
                      testname: str = ""
                      ) -> str:
 
-        if navigator:
-            self.navigate = True
-            self.navigator = navigator
-            self.testname = testname
-            self.instructions = instructions
-
-        response = NewClient.sign_message(self, message, bip32_path)
-
-        self.navigate = False
+        with self._navigation(navigator, testname, instructions):
+            response = NewClient.sign_message(self, message, bip32_path)
 
         return response
 

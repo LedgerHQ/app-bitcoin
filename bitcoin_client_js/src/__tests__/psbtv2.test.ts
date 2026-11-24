@@ -1,9 +1,29 @@
+import * as bjs from "bitcoinjs-lib";
+
 import { PsbtV2 } from "../lib/psbtv2";
+
+// A PSBTv0 with one input and one output, with the given (raw) input map entries
+function makePsbtV0(locktime: number, inputEntries: Buffer = Buffer.alloc(0)): Buffer {
+  const tx = new bjs.Transaction();
+  tx.version = 2;
+  tx.locktime = locktime;
+  tx.addInput(Buffer.alloc(32, 1), 0, 0xfffffffe);
+  tx.addOutput(Buffer.from("6a", "hex"), BigInt(1000));
+  const txRaw = tx.toBuffer();
+
+  return Buffer.concat([
+    Buffer.from("70736274ff", "hex"),
+    Buffer.from([0x01, 0x00, txRaw.length]), txRaw, // PSBT_GLOBAL_UNSIGNED_TX
+    Buffer.from([0x00]), // end of global map
+    inputEntries, Buffer.from([0x00]), // end of input map
+    Buffer.from([0x00]), // end of output map
+  ]);
+}
 
 describe("PsbtV2", () => {
   it("deserializes a psbtV2 and reserializes it unchanged", async () => {
     const psbtBuf = Buffer.from(
-      "cHNidP8BAAoBAAAAAAAAAAAAAQIEAgAAAAEDBAAAAAABBAECAQUBAgH7BAIAAAAAAQBxAgAAAAGTarLgEHL3k8/kyXdU3hth/gPn22U2yLLyHdC1dCxIRQEAAAAA/v///wLe4ccAAAAAABYAFOt418QL8QY7Dj/OKcNWW2ichVmrECcAAAAAAAAWABQjGNZvhP71xIdfkzsDjcY4MfjaE/mXHgABAR8QJwAAAAAAABYAFCMY1m+E/vXEh1+TOwONxjgx+NoTIgYDRV7nztyXsLpDW4AGb8ksljo0xgAxeYHRNTMMTuQ6x6MY9azC/VQAAIABAACAAAAAgAAAAAABAAAAAQ4gniz+J/Cth7eKI31ddAXUowZmyjYdWFpGew3+QiYrTbQBDwQBAAAAARAE/f///wESBAAAAAAAAQBxAQAAAAEORx706Sway1HvyGYPjT9pk26pybK/9y/5vIHFHvz0ZAEAAAAAAAAAAAJgrgoAAAAAABYAFDXG4N1tPISxa6iF3Kc6yGPQtZPsrwYyAAAAAAAWABTcKG4M0ua9N86+nsNJ+18IkFZy/AAAAAABAR9grgoAAAAAABYAFDXG4N1tPISxa6iF3Kc6yGPQtZPsIgYCcbW3ea2HCDhYd5e89vDHrsWr52pwnXJPSNLibPh08KAY9azC/VQAAIABAACAAAAAgAEAAAAAAAAAAQ4gr7+uBlkPdB/xr1m2rEYRJjNqTEqC21U99v76tzesM/MBDwQAAAAAARAE/f///wESBAAAAAAAIgICKexHcnEx7SWIogxG7amrt9qm9J/VC6/nC5xappYcTswY9azC/VQAAIABAACAAAAAgAEAAAAKAAAAAQMIqDoGAAAAAAABBBYAFOs4+puBKPgfJule2wxf+uqDaQ/kAAEDCOCTBAAAAAAAAQQiACA/qWbJ3c3C/ZbkpeG8dlufr2zos+tPEQSq1r33cyTlvgA=",
+      "cHNidP8BAAoBAAAAAAAAAAAAAQIEAgAAAAEDBAAAAAABBAECAQUBAgH7BAIAAAAAAQBxAgAAAAGTarLgEHL3k8/kyXdU3hth/gPn22U2yLLyHdC1dCxIRQEAAAAA/v///wLe4ccAAAAAABYAFOt418QL8QY7Dj/OKcNWW2ichVmrECcAAAAAAAAWABQjGNZvhP71xIdfkzsDjcY4MfjaE/mXHgABAR8QJwAAAAAAABYAFCMY1m+E/vXEh1+TOwONxjgx+NoTIgYDRV7nztyXsLpDW4AGb8ksljo0xgAxeYHRNTMMTuQ6x6MY9azC/VQAAIABAACAAAAAgAAAAAABAAAAAQ4gniz+J/Cth7eKI31ddAXUowZmyjYdWFpGew3+QiYrTbQBDwQBAAAAARAE/f///wABAHEBAAAAAQ5HHvTpLBrLUe/IZg+NP2mTbqnJsr/3L/m8gcUe/PRkAQAAAAAAAAAAAmCuCgAAAAAAFgAUNcbg3W08hLFrqIXcpzrIY9C1k+yvBjIAAAAAABYAFNwobgzS5r03zr6ew0n7XwiQVnL8AAAAAAEBH2CuCgAAAAAAFgAUNcbg3W08hLFrqIXcpzrIY9C1k+wiBgJxtbd5rYcIOFh3l7z28MeuxavnanCdck9I0uJs+HTwoBj1rML9VAAAgAEAAIAAAACAAQAAAAAAAAABDiCvv64GWQ90H/GvWbasRhEmM2pMSoLbVT32/vq3N6wz8wEPBAAAAAABEAT9////ACICAinsR3JxMe0liKIMRu2pq7fapvSf1Quv5wucWqaWHE7MGPWswv1UAACAAQAAgAAAAIABAAAACgAAAAEDCKg6BgAAAAAAAQQWABTrOPqbgSj4HybpXtsMX/rqg2kP5AABAwjgkwQAAAAAAAEEIgAgP6lmyd3Nwv2W5KXhvHZbn69s6LPrTxEEqta993Mk5b4A",
       "base64"
     );
 
@@ -29,5 +49,51 @@ describe("PsbtV2", () => {
     psbt.deserialize(psbtV0);
 
     expect(psbt.serialize()).toEqual(psbtV2);
+  });
+
+  it("keeps the unsigned transaction's locktime when converting a psbtV0", async () => {
+    const psbt = new PsbtV2();
+    psbt.deserialize(makePsbtV0(800000));
+
+    expect(psbt.getGlobalFallbackLocktime()).toEqual(800000);
+  });
+
+  it("rejects a psbtV0 with PSBTv2-only fields", async () => {
+    // PSBT_IN_REQUIRED_HEIGHT_LOCKTIME = 1, which would override the fallback locktime
+    const requiredHeightLocktime = Buffer.from("011204" + "01000000", "hex");
+
+    const psbt = new PsbtV2();
+    expect(() => psbt.deserialize(makePsbtV0(800000, requiredHeightLocktime))).toThrow(
+      "PsbtV0 contains fields that are only allowed in PsbtV2"
+    );
+  });
+
+  it("rejects a psbt with a duplicate key", async () => {
+    // PSBT_IN_SIGHASH_TYPE = 3, twice with different values
+    const duplicateSighash = Buffer.from("010304" + "01000000" + "010304" + "02000000", "hex");
+
+    const psbt = new PsbtV2();
+    expect(() => psbt.deserialize(makePsbtV0(0, duplicateSighash))).toThrow(
+      "Duplicate key in PSBT map"
+    );
+  });
+
+  it("can deserialize multiple psbts with the same instance", async () => {
+    const psbt = new PsbtV2();
+    psbt.deserialize(makePsbtV0(800000));
+    const first = psbt.serialize();
+
+    psbt.deserialize(makePsbtV0(800000));
+    expect(psbt.serialize()).toEqual(first);
+
+    psbt.deserialize(makePsbtV0(700000));
+    expect(psbt.getGlobalFallbackLocktime()).toEqual(700000);
+  });
+
+  it("rejects a psbt with trailing data", async () => {
+    const psbt = new PsbtV2();
+    expect(() => psbt.deserialize(Buffer.concat([makePsbtV0(0), Buffer.from([0x00])]))).toThrow(
+      "Unexpected trailing data after the PSBT"
+    );
   });
 });

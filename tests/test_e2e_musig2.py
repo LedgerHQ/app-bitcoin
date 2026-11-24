@@ -134,9 +134,9 @@ def run_test_e2e_musig2(navigator: Navigator, client: RaggerClient, wallet_polic
     psbt_b64 = psbt.serialize()
 
     psbt_stripped = strip_non_musig2_derivations(psbt)
-    hww_yielded: List[Tuple[int, SignPsbtYieldedObject]] = client.sign_psbt(psbt_stripped, wallet_policy, wallet_hmac, navigator,
-                                                                            instructions=instructions_sign_psbt,
-                                                                            testname=f"{test_name}_sign")
+    # Round 1 does not require navigation instructions, since it is silent
+    hww_yielded: List[Tuple[int, SignPsbtYieldedObject]] = client.sign_psbt(
+        psbt_stripped, wallet_policy, wallet_hmac)
 
     for (input_index, yielded) in hww_yielded:
         if isinstance(yielded, MusigPubNonce):
@@ -254,7 +254,7 @@ def test_e2e_musig2_keypath(navigator: Navigator, firmware: Firmware, client: Ra
         ])
 
     run_test_e2e_musig2(navigator, client, wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, speculos_globals,
-                        e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                        e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_e2e_musig2_keypath2(navigator: Navigator, firmware: Firmware, client: RaggerClient,
@@ -276,7 +276,7 @@ def test_e2e_musig2_keypath2(navigator: Navigator, firmware: Firmware, client: R
         ])
 
     run_test_e2e_musig2(navigator, client, wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, speculos_globals,
-                        e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                        e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_e2e_musig2_scriptpath(navigator: Navigator, firmware: Firmware, client: RaggerClient,
@@ -298,7 +298,7 @@ def test_e2e_musig2_scriptpath(navigator: Navigator, firmware: Firmware, client:
         ])
 
     run_test_e2e_musig2(navigator, client, wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, speculos_globals,
-                        e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                        e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_e2e_musig2_multi_a_scriptpath(navigator: Navigator, firmware: Firmware, client: RaggerClient,
@@ -324,7 +324,7 @@ def test_e2e_musig2_multi_a_scriptpath(navigator: Navigator, firmware: Firmware,
         ])
 
     run_test_e2e_musig2(navigator, client, wallet_policy, [core_wallet_name_1, core_wallet_name_2], rpc, rpc_test_wallet, speculos_globals,
-                        e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                        e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_e2e_musig2_3of3keypath_decaying_scriptpath(navigator: Navigator, firmware: Firmware, client: RaggerClient,
@@ -345,7 +345,7 @@ def test_e2e_musig2_3of3keypath_decaying_scriptpath(navigator: Navigator, firmwa
         ])
 
     run_test_e2e_musig2(navigator, client, wallet_policy, [core_wallet_name_1, core_wallet_name_2], rpc, rpc_test_wallet, speculos_globals,
-                        e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                        e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_e2e_musig2_5of5(navigator: Navigator, firmware: Firmware, client: RaggerClient,
@@ -385,7 +385,7 @@ def test_e2e_musig2_5of5(navigator: Navigator, firmware: Firmware, client: Ragge
         ])
 
     run_test_e2e_musig2(navigator, client, wallet_policy, core_wallet_names, rpc, rpc_test_wallet, speculos_globals,
-                        e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+                        e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
 def test_e2e_musig_invalid(client: RaggerClient, speculos_globals: SpeculosGlobals):

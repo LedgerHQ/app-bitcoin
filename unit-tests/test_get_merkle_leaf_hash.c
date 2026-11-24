@@ -956,6 +956,71 @@ static void test_get_leaf_hash_out_of_range_index(void **state) {
     assert_true(call_get_merkle_leaf_hash(dc, root, 0, 0, out) < 0);
 }
 
+/**
+ * Adversarial: every GET_MORE_ELEMENTS response carries zero elements, so it makes no progress.
+ * This must be rejected immediately, otherwise the host could keep the command alive forever.
+ * The response is forged, as the honest handler would fail once its queue is drained; from the
+ * second request on, the hook simulates a communication failure, so that a regression makes the
+ * test fail rather than hang.
+ */
+typedef struct {
+    uint8_t elements_len;
+    int n_empty_responses;
+} empty_more_elements_t;
+
+static int forge_empty_more_elements(const uint8_t *request_buf,
+                                     size_t request_len,
+                                     uint8_t *response_buf,
+                                     size_t *response_len,
+                                     void *user_data) {
+    (void) request_len;
+    empty_more_elements_t *s = user_data;
+
+    if (request_buf[0] != CCMD_GET_MORE_ELEMENTS) {
+        return 0; /* anything else is answered honestly */
+    }
+
+    if (++s->n_empty_responses > 1) {
+        return -1;
+    }
+
+    response_buf[0] = 0; /* n_elements */
+    response_buf[1] = s->elements_len;
+    *response_len = 2;
+    return 1;
+}
+
+static void test_get_leaf_hash_empty_more_elements(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    /* depth 7: 6 proof elements fit in the first response, 1 needs GET_MORE_ELEMENTS */
+    uint8_t data[128][2];
+    const uint8_t *elems[128];
+    size_t lens[128];
+    for (size_t i = 0; i < 128; i++) {
+        data[i][0] = (uint8_t) (i >> 8);
+        data[i][1] = (uint8_t) (i & 0xFF);
+        elems[i] = data[i];
+        lens[i] = 2;
+    }
+
+    uint8_t root[32];
+    build_tree(mock, elems, lens, 128, root);
+
+    empty_more_elements_t forge_state = {.elements_len = 32, .n_empty_responses = 0};
+    mock_dispatcher_set_forge_hook(mock, forge_empty_more_elements, &forge_state);
+
+    uint8_t out[32];
+    memset(out, 0xEE, sizeof(out));
+    dispatcher_context_t *dc = mock_dispatcher_get_dc(mock);
+    int result = call_get_merkle_leaf_hash(dc, root, 128, 0, out);
+
+    /* every error is -1 here, so only the response count tells the rejection from the comm failure */
+    assert_int_equal(result, -1);
+    assert_int_equal(forge_state.n_empty_responses, 1);
+    assert_cleared(out, sizeof(out));
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -978,6 +1043,7 @@ int main(void) {
         T(test_get_leaf_hash_more_comm_failure),
         T(test_get_leaf_hash_truncated_more),
         T(test_get_leaf_hash_more_proof_overflow),
+        T(test_get_leaf_hash_empty_more_elements),
         T(test_get_leaf_hash_internal_node_as_leaf),
         T(test_get_leaf_hash_proof_size_equals_depth),
         T(test_get_leaf_hash_overlong_proof),

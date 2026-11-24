@@ -112,6 +112,13 @@ void app_ticker_event_callback(void) {
 }
 
 void ioe_add_to_response(const void *rdata, size_t rdata_len) {
+    if (G_output_len > IO_APDU_BUFFER_SIZE - 2) {
+        // No room left for the status word
+        G_output_len = IO_APDU_BUFFER_SIZE;
+        write_u16_be(G_io_apdu_buffer, IO_APDU_BUFFER_SIZE - 2, SW_WRONG_RESPONSE_LENGTH);
+        return;
+    }
+
     size_t remaining = (IO_APDU_BUFFER_SIZE - 2) - G_output_len;
 
     if (rdata_len > remaining) {
@@ -126,7 +133,7 @@ void ioe_add_to_response(const void *rdata, size_t rdata_len) {
 }
 
 void ioe_finalize_response(uint16_t sw) {
-    if (G_output_len >= IO_APDU_BUFFER_SIZE - 2) {
+    if (G_output_len > IO_APDU_BUFFER_SIZE - 2) {
         G_output_len = IO_APDU_BUFFER_SIZE;
         write_u16_be(G_io_apdu_buffer, IO_APDU_BUFFER_SIZE - 2, SW_WRONG_RESPONSE_LENGTH);
     } else {

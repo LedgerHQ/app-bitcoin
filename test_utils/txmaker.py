@@ -32,15 +32,7 @@ from embit.script import Script
 from bitcoin_client.ledger_bitcoin._embit.descriptor.miniscript import Miniscript
 from test_utils import bip0340, sha256, hash160
 from test_utils.bip0327 import cbytes, key_agg
-from test_utils.wallet_policy import DescriptorTemplate, KeyPlaceholder, MuSig2KeyPlaceholder, PlainKeyPlaceholder, ShDescriptorTemplate, ShWpkhDescriptorTemplate, ShWshDescriptorTemplate, TrDescriptorTemplate, WshDescriptorTemplate, WpkhDescriptorTemplate, PkhDescriptorTemplate, derive_plain_descriptor, tapleaf_hash
-
-
-# BIP-328 chaincode used by BIP-388 to derive a synthetic xpub from an
-# aggregated musig2 public key. Pinned constant; see the reference
-# implementation in bitcoin_client.ledger_bitcoin.client.aggr_xpub.
-_BIP328_CHAINCODE = bytes.fromhex(
-    "868087ca02a6f974c4598924c36b57762d32cb45717167e300622c7167e38965"
-)
+from test_utils.wallet_policy import BIP328_CHAINCODE, DescriptorTemplate, KeyPlaceholder, MuSig2KeyPlaceholder, PlainKeyPlaceholder, ShDescriptorTemplate, ShWpkhDescriptorTemplate, ShWshDescriptorTemplate, TrDescriptorTemplate, WshDescriptorTemplate, WpkhDescriptorTemplate, PkhDescriptorTemplate, derive_plain_descriptor, tapleaf_hash
 
 
 def _musig_root_aggregate(placeholder: MuSig2KeyPlaceholder, keys_info: List[str]) -> Tuple[bytes, List[bytes]]:
@@ -257,7 +249,7 @@ def get_placeholder_root_key(placeholder: KeyPlaceholder, keys_info: List[str]) 
             0,
             b"\x00\x00\x00\x00",
             0,
-            _BIP328_CHAINCODE,
+            BIP328_CHAINCODE,
             None,
             aggregated_pubkey,
         )

@@ -75,12 +75,20 @@ utxos = list()
 btc_addr = ""
 
 
+def _new_rpc(url: str) -> AuthServiceProxy:
+    rpc = AuthServiceProxy(url)
+    # Use a new connection for each call, as bitcoind closes idle connections after
+    # -rpcservertimeout, and tests can be idle for long while interacting with the device.
+    rpc.reuse_http_connections = False
+    return rpc
+
+
 def get_rpc() -> AuthServiceProxy:
-    return AuthServiceProxy(rpc_url)
+    return _new_rpc(rpc_url)
 
 
 def get_wallet_rpc(wallet_name: str) -> AuthServiceProxy:
-    return AuthServiceProxy(f"{rpc_url}/wallet/{wallet_name}")
+    return _new_rpc(f"{rpc_url}/wallet/{wallet_name}")
 
 
 def setup_node():

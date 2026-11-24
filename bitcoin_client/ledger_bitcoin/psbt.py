@@ -180,7 +180,7 @@ class PartiallySignedInput:
             try:
                 key = deser_string(f)
             except Exception:
-                break
+                raise PSBTSerializationError("Truncated PSBT map")
 
             # Check for separator
             if len(key) == 0:
@@ -416,6 +416,18 @@ class PartiallySignedInput:
 
             key_lookup.add(key)
 
+        # Make sure no PSBTv2-only fields are present in PSBTv0
+        if self.version == 0:
+            for key_type in [
+                PartiallySignedInput.PSBT_IN_PREVIOUS_TXID,
+                PartiallySignedInput.PSBT_IN_OUTPUT_INDEX,
+                PartiallySignedInput.PSBT_IN_SEQUENCE,
+                PartiallySignedInput.PSBT_IN_REQUIRED_TIME_LOCKTIME,
+                PartiallySignedInput.PSBT_IN_REQUIRED_HEIGHT_LOCKTIME,
+            ]:
+                if ser_compact_size(key_type) in key_lookup:
+                    raise PSBTSerializationError(f"Input field of type {key_type:#04x} is not allowed in PSBTv0")
+
         # Make sure required PSBTv2 fields are present
         if self.version >= 2:
             if len(self.prev_txid) == 0:
@@ -599,7 +611,7 @@ class PartiallySignedOutput:
             try:
                 key = deser_string(f)
             except Exception:
-                break
+                raise PSBTSerializationError("Truncated PSBT map")
 
             # Check for separator
             if len(key) == 0:
@@ -688,6 +700,12 @@ class PartiallySignedOutput:
 
             key_lookup.add(key)
 
+        # Make sure no PSBTv2-only fields are present in PSBTv0
+        if self.version == 0:
+            for key_type in [PartiallySignedOutput.PSBT_OUT_AMOUNT, PartiallySignedOutput.PSBT_OUT_SCRIPT]:
+                if ser_compact_size(key_type) in key_lookup:
+                    raise PSBTSerializationError(f"Output field of type {key_type:#04x} is not allowed in PSBTv0")
+
         # Make sure required PSBTv2 fields are present
         if self.version >= 2:
             if self.amount is None:
@@ -772,7 +790,11 @@ class PSBT(object):
     PSBT_GLOBAL_INPUT_COUNT = 0x04
     PSBT_GLOBAL_OUTPUT_COUNT = 0x05
     PSBT_GLOBAL_TX_MODIFIABLE = 0x06
+    PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE = 0x09
     PSBT_GLOBAL_VERSION = 0xFB
+
+    # Proprietary key (BIP-174) with identifier "MUSIG2_SESSION_ID", subtype 0 and no keydata
+    PSBT_GLOBAL_MUSIG2_SESSION_ID_KEY = b"\xfc" + ser_compact_size(17) + b"MUSIG2_SESSION_ID" + ser_compact_size(0)
 
     def __init__(self, tx: Optional[CTransaction] = None) -> None:
         """
@@ -789,6 +811,13 @@ class PSBT(object):
         self.tx_version: Optional[int] = None
         self.fallback_locktime: Optional[int] = None
         self.tx_modifiable: Optional[int] = None
+        # BIP-322: the message of a generic signed message request (allowed in any PSBT version)
+        self.generic_signed_message: Optional[bytes] = None
+        # MuSig2: the session id chosen by the software wallet (allowed in any PSBT version).
+        # A signer identifies its pending MuSig2 session by it, so the PSBT given to a signer in
+        # round 2 must have the value used for that signer in round 1. It is not part of the
+        # transaction: each signer can use its own value, in its own copy of the PSBT.
+        self.musig2_session_id: Optional[bytes] = None
 
         # Assume version 0 PSBT
         self.version = 0
@@ -820,7 +849,7 @@ class PSBT(object):
             try:
                 key = deser_string(f)
             except Exception:
-                break
+                raise PSBTSerializationError("Truncated PSBT map")
 
             # Check for separator
             if len(key) == 0:
@@ -888,6 +917,12 @@ class PSBT(object):
                 if len(v) != 1:
                     raise PSBTSerializationError("Global tx modifiable flags is not 1 bytes")
                 self.tx_modifiable = struct.unpack("<B", v)[0]
+            elif key_type == PSBT.PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE:
+                if key in key_lookup:
+                    raise PSBTSerializationError("Duplicate key, global generic signed message is already provided")
+                elif len(key) > 1:
+                    raise PSBTSerializationError("Global generic signed message key is more than one byte type")
+                self.generic_signed_message = deser_string(f)
             elif key_type == PSBT.PSBT_GLOBAL_VERSION:
                 if key in key_lookup:
                     raise PSBTSerializationError("Duplicate key, global PSBT version is already provided")
@@ -898,6 +933,10 @@ class PSBT(object):
                     raise PSBTSerializationError("Global PSBT version is not 1 bytes")
                 self.version = struct.unpack("<I", v)[0]
                 self.explicit_version = True
+            elif key == PSBT.PSBT_GLOBAL_MUSIG2_SESSION_ID_KEY:
+                if key in key_lookup:
+                    raise PSBTSerializationError("Duplicate key, global MuSig2 session id is already provided")
+                self.musig2_session_id = deser_string(f)
             else:
                 if key in self.unknown:
                     raise PSBTSerializationError("Duplicate key, key for unknown value already provided")
@@ -974,6 +1013,9 @@ class PSBT(object):
         if len(self.outputs) != output_count:
             raise PSBTSerializationError("Outputs provided does not match the number of outputs in transaction")
 
+        if f.tell() != end:
+            raise PSBTSerializationError("Unexpected trailing data after the PSBT")
+
         self.cache_unsigned_tx_pieces()
 
     def serialize(self) -> str:
@@ -1018,9 +1060,17 @@ class PSBT(object):
                 r += ser_string(ser_compact_size(PSBT.PSBT_GLOBAL_TX_MODIFIABLE))
                 r += ser_string(struct.pack("<B", self.tx_modifiable))
 
+        if self.generic_signed_message is not None:
+            r += ser_string(ser_compact_size(PSBT.PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE))
+            r += ser_string(self.generic_signed_message)
+
         if self.version > 0 or self.explicit_version:
             r += ser_string(ser_compact_size(PSBT.PSBT_GLOBAL_VERSION))
             r += ser_string(struct.pack("<I", self.version))
+
+        if self.musig2_session_id is not None:
+            r += ser_string(PSBT.PSBT_GLOBAL_MUSIG2_SESSION_ID_KEY)
+            r += ser_string(self.musig2_session_id)
 
         # unknowns
         for key, value in sorted(self.unknown.items()):
@@ -1051,7 +1101,7 @@ class PSBT(object):
         """
         # To make things easier, we split up the global transaction
         # and use the PSBTv2 fields for PSBTv0
-        if self.tx is not None:
+        if self.version == 0:
             self.setup_from_tx(self.tx)
 
     def setup_from_tx(self, tx: CTransaction):
@@ -1121,14 +1171,15 @@ class PSBT(object):
 
         tx = CTransaction()
         tx.nVersion = self.tx_version
-        self.nLockTime = self.compute_lock_time()
+        tx.nLockTime = self.compute_lock_time()
 
         for psbt_in in self.inputs:
             assert psbt_in.prev_txid is not None
             assert psbt_in.prev_out is not None
-            assert psbt_in.sequence is not None
 
-            txin = CTxIn(COutPoint(uint256_from_str(psbt_in.prev_txid), psbt_in.prev_out), b"", psbt_in.sequence)
+            # If omitted, the sequence number is assumed to be the final sequence number
+            sequence = psbt_in.sequence if psbt_in.sequence is not None else 0xffffffff
+            txin = CTxIn(COutPoint(uint256_from_str(psbt_in.prev_txid), psbt_in.prev_out), b"", sequence)
             tx.vin.append(txin)
 
         for psbt_out in self.outputs:
@@ -1155,6 +1206,10 @@ class PSBT(object):
         if self.version == 0:
             # make sure fields that PSBT version 0 fields are not present
             self.setup_from_tx(self.tx)
+            # the locktime of a PSBTv0 is the one of the unsigned transaction
+            for psbt_in in self.inputs:
+                psbt_in.time_locktime = None
+                psbt_in.height_locktime = None
 
         self._convert_version(2)
 
@@ -1163,6 +1218,9 @@ class PSBT(object):
         Sets this PSBT to version 0
         """
 
+        # Build the unsigned transaction before stripping the v2 fields
+        tx = self.get_unsigned_tx()
+
         if self.version == 2:
             # strip PSBT version 2 fields
             self.tx_version = None
@@ -1170,7 +1228,7 @@ class PSBT(object):
             self.tx_modifiable = None
 
         self._convert_version(0)
-        self.tx = self.get_unsigned_tx()
+        self.tx = tx
         self.explicit_version = False
 
 

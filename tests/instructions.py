@@ -20,6 +20,30 @@ def message_instruction_approve(model: Firmware, save_screenshot=True) -> Instru
     return instructions
 
 
+def bip322_instruction_approve(model: Firmware, save_screenshot=True, *,
+                               has_unverifiedwarning: bool = False) -> Instructions:
+    # Navigation for the BIP-322 message review (account/address/message pairs, then sign),
+    # optionally preceded by the warning for segwitv0 inputs missing the non-witness utxo.
+    # The message is streamed from the client between the warning and the review, so they are
+    # in separate request groups.
+    instructions = Instructions(model)
+
+    if model.name.startswith("nano"):
+        if has_unverifiedwarning:
+            instructions.new_request("Continue anyway", save_screenshot=save_screenshot)
+        instructions.nano_skip_screen("Address", save_screenshot=save_screenshot)
+        instructions.same_request("Sign message", save_screenshot=save_screenshot)
+    else:
+        if has_unverifiedwarning:
+            instructions.new_request("Continue anyway", NavInsID.USE_CASE_REVIEW_TAP,
+                                     NavInsID.USE_CASE_CHOICE_REJECT,
+                                     save_screenshot=save_screenshot)
+        instructions.review_message(save_screenshot=save_screenshot)
+        instructions.confirm_message(save_screenshot=save_screenshot)
+
+    return instructions
+
+
 def message_instruction_approve_long(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
@@ -116,8 +140,6 @@ def register_wallet_instruction_approve(model: Firmware, save_screenshot=True) -
         instructions.new_request("Register account", save_screenshot=save_screenshot)
     else:
         instructions.choice_confirm(save_screenshot=save_screenshot)
-        instructions.choice_confirm(save_screenshot=save_screenshot)
-        instructions.choice_confirm(save_screenshot=save_screenshot)
     return instructions
 
 
@@ -127,8 +149,6 @@ def register_wallet_instruction_approve_no_save(model: Firmware) -> Instructions
     if model.name.startswith("nano"):
         instructions.new_request("Register account", save_screenshot=False)
     else:
-        instructions.choice_confirm(save_screenshot=False)
-        instructions.choice_confirm(save_screenshot=False)
         instructions.choice_confirm(save_screenshot=False)
     return instructions
 
@@ -140,9 +160,6 @@ def register_wallet_instruction_approve_long(model: Firmware, save_screenshot=Tr
         instructions.new_request("Register account", save_screenshot=save_screenshot)
     else:
         instructions.choice_confirm(save_screenshot=save_screenshot)
-        instructions.choice_confirm(save_screenshot=save_screenshot)
-        instructions.choice_confirm(save_screenshot=save_screenshot)
-        instructions.choice_confirm(save_screenshot=save_screenshot)
     return instructions
 
 
@@ -152,7 +169,6 @@ def register_wallet_instruction_approve_unusual(model: Firmware) -> Instructions
     if model.name.startswith("nano"):
         instructions.new_request("Register account")
     else:
-        instructions.choice_confirm()
         instructions.choice_confirm()
     return instructions
 
@@ -310,15 +326,13 @@ def sign_psbt_instruction_approve_generic(model: Firmware, output_count: int, sa
     return instructions
 
 
-def e2e_register_wallet_instruction(model: Firmware, n_keys) -> Instructions:
+def e2e_register_wallet_instruction(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
         instructions.new_request("Register account", save_screenshot=False)
     else:
-        for _ in range(n_keys + 1):
-            instructions.choice_confirm(save_screenshot=False)
-            instructions.choice_confirm(save_screenshot=False)
+        instructions.choice_confirm(save_screenshot=False)
     return instructions
 
 

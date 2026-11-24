@@ -16,11 +16,13 @@ Python dependencies are listed in [requirements.txt](../requirements.txt), insta
 pip install -r requirements.txt
 ```
 
-Some tests require the `bitcoind 22.0` binary to be in the `$PATH` variable, or alternatively to be set as the `BITCOIND` environment variable in the shell running the tests:
+Some tests require the `bitcoind` binary from [Bitcoin Core](https://bitcoincore.org/) (the CI uses version 32.1). It must be in the `$PATH` variable, or alternatively be set as the `BITCOIND` environment variable in the shell running the tests:
 
 ```
 export BITCOIND=/path/to/my/bitcoind
 ```
+
+The [setup_script.sh](setup_script.sh) script downloads, verifies and installs the same pinned release used by the CI (in `/opt` by default, or in `$BITCOIN_CORE_INSTALL_PREFIX` if set), and prints the command to add it to your `PATH`.
 
 ## Launch with Speculos
 

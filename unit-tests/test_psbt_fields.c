@@ -197,6 +197,151 @@ static void test_fallback_locktime_over_buffer_is_error_not_absent(void **state)
     assert_int_equal(got, 0xCAFEBABEu);
 }
 
+/* ---------- PSBT_IN_REQUIRED_{TIME,HEIGHT}_LOCKTIME (optional) ---------- */
+
+static void test_required_time_locktime_present(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    /* 1657048460 little-endian */
+    const uint8_t value[] = {0x8C, 0x8D, 0xC4, 0x62};
+    merkleized_map_commitment_t map;
+    map_with_one_field(mock, PSBT_IN_REQUIRED_TIME_LOCKTIME, value, sizeof(value), &map);
+
+    uint32_t got = 0;
+    psbt_field_status_t status =
+        psbt_get_input_required_time_locktime(mock_dispatcher_get_dc(mock), &map, &got);
+
+    assert_int_equal(status, PSBT_FIELD_PRESENT);
+    assert_int_equal(got, 1657048460u);
+}
+
+static void test_required_time_locktime_absent(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    merkleized_map_commitment_t map;
+    map_without_field(mock, &map);
+
+    uint32_t got = 0xCAFEBABEu;
+    psbt_field_status_t status =
+        psbt_get_input_required_time_locktime(mock_dispatcher_get_dc(mock), &map, &got);
+
+    assert_int_equal(status, PSBT_FIELD_ABSENT);
+    assert_int_equal(got, 0xCAFEBABEu);
+}
+
+static void test_required_time_locktime_wrong_length_is_error(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    const uint8_t too_short[] = {0x01, 0x02, 0x03};
+    merkleized_map_commitment_t map;
+    map_with_one_field(mock, PSBT_IN_REQUIRED_TIME_LOCKTIME, too_short, sizeof(too_short), &map);
+
+    uint32_t got = 0xCAFEBABEu;
+    psbt_field_status_t status =
+        psbt_get_input_required_time_locktime(mock_dispatcher_get_dc(mock), &map, &got);
+
+    assert_int_equal(status, PSBT_FIELD_ERROR);
+    assert_int_equal(got, 0xCAFEBABEu);
+}
+
+static void test_required_height_locktime_present(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    /* 10000 little-endian */
+    const uint8_t value[] = {0x10, 0x27, 0x00, 0x00};
+    merkleized_map_commitment_t map;
+    map_with_one_field(mock, PSBT_IN_REQUIRED_HEIGHT_LOCKTIME, value, sizeof(value), &map);
+
+    uint32_t got = 0;
+    psbt_field_status_t status =
+        psbt_get_input_required_height_locktime(mock_dispatcher_get_dc(mock), &map, &got);
+
+    assert_int_equal(status, PSBT_FIELD_PRESENT);
+    assert_int_equal(got, 10000u);
+}
+
+static void test_required_height_locktime_absent(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    merkleized_map_commitment_t map;
+    map_without_field(mock, &map);
+
+    uint32_t got = 0xCAFEBABEu;
+    psbt_field_status_t status =
+        psbt_get_input_required_height_locktime(mock_dispatcher_get_dc(mock), &map, &got);
+
+    assert_int_equal(status, PSBT_FIELD_ABSENT);
+    assert_int_equal(got, 0xCAFEBABEu);
+}
+
+static void test_required_height_locktime_wrong_length_is_error(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    const uint8_t too_short[] = {0x01, 0x02, 0x03};
+    merkleized_map_commitment_t map;
+    map_with_one_field(mock, PSBT_IN_REQUIRED_HEIGHT_LOCKTIME, too_short, sizeof(too_short), &map);
+
+    uint32_t got = 0xCAFEBABEu;
+    psbt_field_status_t status =
+        psbt_get_input_required_height_locktime(mock_dispatcher_get_dc(mock), &map, &got);
+
+    assert_int_equal(status, PSBT_FIELD_ERROR);
+    assert_int_equal(got, 0xCAFEBABEu);
+}
+
+/** A value too long for the 4-byte read must be an error, not absent. See the analogous case for
+ * PSBT_GLOBAL_FALLBACK_LOCKTIME above. */
+static void test_required_height_locktime_over_buffer_is_error_not_absent(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    uint8_t very_long[12];
+    memset(very_long, 0x77, sizeof(very_long));
+
+    merkleized_map_commitment_t map;
+    map_with_one_field(mock, PSBT_IN_REQUIRED_HEIGHT_LOCKTIME, very_long, sizeof(very_long), &map);
+
+    uint32_t got = 0xCAFEBABEu;
+    psbt_field_status_t status =
+        psbt_get_input_required_height_locktime(mock_dispatcher_get_dc(mock), &map, &got);
+
+    assert_int_equal(status, PSBT_FIELD_ERROR);
+    assert_int_equal(got, 0xCAFEBABEu);
+}
+
+/**
+ * The two accessors must each read their own key. They are one-line delegations differing only in
+ * the key type, so a copy-paste would otherwise go unnoticed: with both keys in the map, swapping
+ * them still yields PRESENT and a plausible value.
+ */
+static void test_required_locktimes_read_their_own_key(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    const uint8_t time_key[] = {PSBT_IN_REQUIRED_TIME_LOCKTIME};
+    const uint8_t height_key[] = {PSBT_IN_REQUIRED_HEIGHT_LOCKTIME};
+    const uint8_t time_value[] = {0x8C, 0x8D, 0xC4, 0x62};   /* 1657048460 */
+    const uint8_t height_value[] = {0x10, 0x27, 0x00, 0x00}; /* 10000 */
+
+    const uint8_t *keys[] = {time_key, height_key};
+    const size_t key_lens[] = {sizeof(time_key), sizeof(height_key)};
+    const uint8_t *values[] = {time_value, height_value};
+    const size_t value_lens[] = {sizeof(time_value), sizeof(height_value)};
+
+    merkleized_map_commitment_t map;
+    mock_dispatcher_add_map(mock, keys, key_lens, values, value_lens, 2, &map);
+
+    uint32_t got_time = 0;
+    uint32_t got_height = 0;
+    assert_int_equal(
+        psbt_get_input_required_time_locktime(mock_dispatcher_get_dc(mock), &map, &got_time),
+        PSBT_FIELD_PRESENT);
+    assert_int_equal(
+        psbt_get_input_required_height_locktime(mock_dispatcher_get_dc(mock), &map, &got_height),
+        PSBT_FIELD_PRESENT);
+
+    assert_int_equal(got_time, 1657048460u);
+    assert_int_equal(got_height, 10000u);
+}
+
 /* ---------- Mandatory fields ---------- */
 
 static void test_prevout_txid_present(void **state) {
@@ -414,8 +559,11 @@ static void test_redeem_script_present(void **state) {
 
     uint8_t got[64];
     size_t got_len = 0;
-    psbt_field_status_t status =
-        psbt_get_input_redeem_script(mock_dispatcher_get_dc(mock), &map, got, sizeof(got), &got_len);
+    psbt_field_status_t status = psbt_get_input_redeem_script(mock_dispatcher_get_dc(mock),
+                                                              &map,
+                                                              got,
+                                                              sizeof(got),
+                                                              &got_len);
 
     assert_int_equal(status, PSBT_FIELD_PRESENT);
     assert_int_equal(got_len, sizeof(script));
@@ -485,6 +633,104 @@ static void test_witness_utxo_amount_too_short_is_error(void **state) {
     assert_int_equal(got, 0xCAFEBABEu);
 }
 
+/* ---------- MUSIG2_SESSION_ID (optional, proprietary key) ---------- */
+
+static const uint8_t MUSIG2_SESSION_ID_KEY[] = {0xFC, 0x11, 'M', 'U', 'S', 'I', 'G',
+                                                '2',  '_',  'S', 'E', 'S', 'S', 'I',
+                                                'O',  'N',  '_', 'I', 'D', 0x00};
+
+/** Registers a map holding a single MUSIG2_SESSION_ID field and returns its commitment. */
+static void map_with_musig2_session_id(mock_dispatcher_t *mock,
+                                       const uint8_t *value,
+                                       size_t value_len,
+                                       merkleized_map_commitment_t *out) {
+    const uint8_t *keys[] = {MUSIG2_SESSION_ID_KEY};
+    const size_t key_lens[] = {sizeof(MUSIG2_SESSION_ID_KEY)};
+    const uint8_t *values[] = {value};
+    const size_t value_lens[] = {value_len};
+
+    mock_dispatcher_add_map(mock, keys, key_lens, values, value_lens, 1, out);
+}
+
+static void test_musig2_session_id_key(void **state) {
+    (void) state;
+
+    assert_true(
+        psbt_is_global_musig2_session_id_key(MUSIG2_SESSION_ID_KEY, sizeof(MUSIG2_SESSION_ID_KEY)));
+
+    /* keydata, a different subtype, or a truncated key are not the MUSIG2_SESSION_ID key */
+    uint8_t key[sizeof(MUSIG2_SESSION_ID_KEY) + 1];
+    memcpy(key, MUSIG2_SESSION_ID_KEY, sizeof(MUSIG2_SESSION_ID_KEY));
+    key[sizeof(MUSIG2_SESSION_ID_KEY)] = 0x00;
+    assert_false(psbt_is_global_musig2_session_id_key(key, sizeof(key)));
+    key[sizeof(MUSIG2_SESSION_ID_KEY) - 1] = 0x01;
+    assert_false(psbt_is_global_musig2_session_id_key(key, sizeof(MUSIG2_SESSION_ID_KEY)));
+    assert_false(psbt_is_global_musig2_session_id_key(MUSIG2_SESSION_ID_KEY,
+                                                      sizeof(MUSIG2_SESSION_ID_KEY) - 1));
+}
+
+static void test_musig2_session_id_present(void **state) {
+    mock_dispatcher_t *mock = *state;
+
+    for (size_t len = 1; len <= MAX_MUSIG2_SESSION_ID_LEN; len += MAX_MUSIG2_SESSION_ID_LEN - 1) {
+        merkleized_map_commitment_t map;
+        uint8_t value[MAX_MUSIG2_SESSION_ID_LEN];
+        memset(value, 0x42, sizeof(value));
+        map_with_musig2_session_id(mock, value, len, &map);
+
+        uint8_t got[MAX_MUSIG2_SESSION_ID_LEN];
+        size_t got_len = 0;
+        psbt_field_status_t status =
+            psbt_get_global_musig2_session_id(mock_dispatcher_get_dc(mock), &map, got, &got_len);
+        assert_int_equal(status, PSBT_FIELD_PRESENT);
+        assert_int_equal(got_len, len);
+        assert_memory_equal(got, value, len);
+    }
+}
+
+static void test_musig2_session_id_absent(void **state) {
+    mock_dispatcher_t *mock = *state;
+    merkleized_map_commitment_t map;
+    map_without_field(mock, &map);
+
+    uint8_t got[MAX_MUSIG2_SESSION_ID_LEN];
+    size_t got_len = 0;
+    psbt_field_status_t status =
+        psbt_get_global_musig2_session_id(mock_dispatcher_get_dc(mock), &map, got, &got_len);
+    assert_int_equal(status, PSBT_FIELD_ABSENT);
+    assert_int_equal(got_len, 0);
+}
+
+static void test_musig2_session_id_empty_is_error(void **state) {
+    mock_dispatcher_t *mock = *state;
+    merkleized_map_commitment_t map;
+    map_with_musig2_session_id(mock, (const uint8_t *) "", 0, &map);
+
+    uint8_t got[MAX_MUSIG2_SESSION_ID_LEN];
+    size_t got_len = 0;
+    psbt_field_status_t status =
+        psbt_get_global_musig2_session_id(mock_dispatcher_get_dc(mock), &map, got, &got_len);
+    assert_int_equal(status, PSBT_FIELD_ERROR);
+    assert_int_equal(got_len, 0);
+}
+
+static void test_musig2_session_id_too_long_is_error(void **state) {
+    mock_dispatcher_t *mock = *state;
+    merkleized_map_commitment_t map;
+    uint8_t too_long[MAX_MUSIG2_SESSION_ID_LEN + 1];
+    memset(too_long, 0x42, sizeof(too_long));
+    map_with_musig2_session_id(mock, too_long, sizeof(too_long), &map);
+
+    uint8_t got[MAX_MUSIG2_SESSION_ID_LEN];
+    memset(got, 0xAA, sizeof(got));
+    size_t got_len = 0;
+    psbt_field_status_t status =
+        psbt_get_global_musig2_session_id(mock_dispatcher_get_dc(mock), &map, got, &got_len);
+    assert_int_equal(status, PSBT_FIELD_ERROR);
+    assert_int_equal(got_len, 0);
+    assert_cleared(got, sizeof(got));
+}
+
 /* ---------- Main ---------- */
 
 int main(void) {
@@ -498,6 +744,14 @@ int main(void) {
         T(test_fallback_locktime_absent),
         T(test_fallback_locktime_wrong_length_is_error),
         T(test_fallback_locktime_over_buffer_is_error_not_absent),
+        T(test_required_time_locktime_present),
+        T(test_required_time_locktime_absent),
+        T(test_required_time_locktime_wrong_length_is_error),
+        T(test_required_height_locktime_present),
+        T(test_required_height_locktime_absent),
+        T(test_required_height_locktime_wrong_length_is_error),
+        T(test_required_height_locktime_over_buffer_is_error_not_absent),
+        T(test_required_locktimes_read_their_own_key),
         T(test_prevout_txid_present),
         T(test_prevout_txid_absent),
         T(test_prevout_txid_short_is_error),
@@ -514,6 +768,11 @@ int main(void) {
         T(test_witness_utxo_amount_present),
         T(test_witness_utxo_amount_absent),
         T(test_witness_utxo_amount_too_short_is_error),
+        T(test_musig2_session_id_key),
+        T(test_musig2_session_id_present),
+        T(test_musig2_session_id_absent),
+        T(test_musig2_session_id_empty_is_error),
+        T(test_musig2_session_id_too_long_is_error),
     };
 #undef T
 

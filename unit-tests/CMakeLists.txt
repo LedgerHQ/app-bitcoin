@@ -332,6 +332,20 @@ if(SPECULOS AND SPECULOS_SRC)
   target_link_libraries(test_script PRIVATE cmocka app_crypto)
   add_test(test_script test_script)
 
+  # test_bip322 exercises the BIP-322 primitives of src/common/bip322.c (message hash, to_spend
+  # serialization and txid) against the vectors of the BIP (specs/bip322/, rendered into
+  # bip322_vectors.inc.c by gen.py).
+  add_executable(test_bip322 test_bip322.c ../src/common/bip322.c)
+  app_apply_real_sdk_config(test_bip322)
+  target_link_libraries(test_bip322 PRIVATE cmocka app_crypto write)
+  add_test(test_bip322 test_bip322)
+
+  # test_musig exercises src/musig/musig.c against the BIP-327 test vectors.
+  add_executable(test_musig test_musig.c)
+  app_apply_real_sdk_config(test_musig)
+  target_link_libraries(test_musig PRIVATE cmocka app_crypto)
+  add_test(test_musig test_musig)
+
   # test_sighash exercises classify_sighash (src/common/sighash.h), which only
   # depends on constants.h (and therefore the real SDK headers). No app object
   # code or syscalls are needed, so it just links cmocka.
@@ -339,6 +353,13 @@ if(SPECULOS AND SPECULOS_SRC)
   app_apply_real_sdk_config(test_sighash)
   target_link_libraries(test_sighash PRIVATE cmocka)
   add_test(test_sighash test_sighash)
+
+  # test_locktime exercises the BIP-0370 lock time determination
+  # (src/common/locktime.h). Only links with cmocka as it is pure logic.
+  add_executable(test_locktime test_locktime.c)
+  app_apply_real_sdk_config(test_locktime)
+  target_link_libraries(test_locktime PRIVATE cmocka)
+  add_test(test_locktime test_locktime)
 
   add_executable(test_wallet test_wallet.c)
   app_apply_real_sdk_config(test_wallet)

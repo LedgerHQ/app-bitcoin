@@ -13,10 +13,12 @@ Verifies that:
 import pytest
 from pathlib import Path
 from ledger_bitcoin import WalletPolicy
+from ledger_bitcoin.client_command import ClientCommandInterpreter
 from ledger_bitcoin.exception.errors import NotSupportedError, SecurityStatusNotSatisfiedError
 from ledger_bitcoin.exception.device_exception import DeviceException
 from ledger_bitcoin.psbt import PSBT
 from test_utils import bip0340
+from ragger.backend import BackendInterface
 from ragger.navigator import Navigator, NavInsID, NavIns
 from ragger.error import ExceptionRAPDU
 from ragger.firmware import Firmware
@@ -103,6 +105,47 @@ def test_sighash_none_rejected_by_default(navigator: Navigator, firmware: Firmwa
 
     # Verify the on-device rejection screen is shown to the user
     assert_disabled_sighash_screen(navigator, default_screenshot_path, test_name)
+
+
+def test_sighash_rejected_status_not_dismissed_by_next_command(
+        backend: BackendInterface, client: RaggerClient, monkeypatch: pytest.MonkeyPatch):
+    """Regression test: if the "Processing..." spinner was shown before the rejection, the
+    rejection status replaces it. A subsequent command that has no UI of its own must not
+    dismiss the status by returning to the dashboard, as it would if the app still believed
+    that the spinner was on screen.
+    """
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-sign.psbt")
+
+    # Hold the first client command response until the spinner is shown (the app shows it
+    # after the command has been running for about 1s), so that the rejection happens after it
+    original_execute = ClientCommandInterpreter.execute
+    spinner_shown = False
+
+    def execute_after_spinner(self, hw_response: bytes) -> bytes:
+        nonlocal spinner_shown
+        if not spinner_shown:
+            backend.wait_for_text_on_screen("Loading")
+            spinner_shown = True
+        return original_execute(self, hw_response)
+
+    monkeypatch.setattr(ClientCommandInterpreter, "execute", execute_after_spinner)
+
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.sign_psbt(psbt, tr_wallet, None)
+    assert spinner_shown
+    assert e.value.status == SW_SECURITY_STATUS_NOT_SATISFIED
+    assert int.from_bytes(e.value.data, 'big') == EC_SIGN_PSBT_NONDEFAULT_SIGHASH_NOT_ALLOWED
+
+    # wait for the rejection screen to appear, since non-standard sighash is disabled
+    backend.wait_for_text_on_screen(".*disabled")
+
+    # Pause the ticker so that the status cannot time out while we check it is still on screen
+    backend.pause_ticker()
+    try:
+        client.get_master_fingerprint()
+        assert backend.compare_screen_with_text(".*disabled")
+    finally:
+        backend.resume_ticker()
 
 
 def test_sighash_single_rejected_by_default(navigator: Navigator, firmware: Firmware,

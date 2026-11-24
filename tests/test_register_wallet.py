@@ -7,9 +7,11 @@ from ragger.firmware import Firmware
 from ragger.error import ExceptionRAPDU
 from ragger_bitcoin import RaggerClient
 
+from .conftest import get_pseudorandom_keypair
 from .instructions import register_wallet_instruction_approve, register_wallet_instruction_approve_no_save, register_wallet_instruction_approve_long, register_wallet_instruction_approve_unusual, register_wallet_instruction_reject, Instructions
 import hmac
 from hashlib import sha256
+from typing import List
 
 import pytest
 
@@ -227,6 +229,80 @@ def test_register_wallet_unsupported_policy(navigator: Navigator, firmware: Firm
     assert len(e.value.data) == 0
 
 
+def test_register_wallet_musig_multiple_internal_keys(client: RaggerClient):
+    # The device can only produce one partial signature per musig() key expression, therefore
+    # musig() key expressions with more than one internal key are not supported.
+
+    # defined in error_codes.h
+    EC_REGISTER_WALLET_MUSIG_WITH_MULTIPLE_INTERNAL_KEYS = 0x0003
+
+    keys_info = [
+        # @0 and @1 are both internal
+        "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+        "tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+    ]
+
+    for descriptor_template in [
+        "tr(musig(@0,@1)/**,pk(@2/**))",
+        "tr(musig(@2,@0,@1)/**)",
+        "tr(@0/**,pk(musig(@1,@2,@0)/**))",
+        "tr(@2/**,multi_a(1,@0/<2;3>/*,musig(@0,@1)/**))",
+    ]:
+        with pytest.raises(ExceptionRAPDU) as e:
+            client.register_wallet(WalletPolicy(
+                name="Musig with 2 internal keys",
+                descriptor_template=descriptor_template,
+                keys_info=keys_info,
+            ))
+
+        assert DeviceException.exc.get(e.value.status) == NotSupportedError
+        assert len(e.value.data) == 2
+        error_code = int.from_bytes(e.value.data, 'big')
+        assert error_code == EC_REGISTER_WALLET_MUSIG_WITH_MULTIPLE_INTERNAL_KEYS
+
+
+def test_register_wallet_too_many_internal_key_expressions(client: RaggerClient):
+    # The same internal key can appear in many key expressions (with disjoint derivations), but
+    # signing supports at most MAX_INTERNAL_KEY_EXPRESSIONS (8) key expressions with internal keys,
+    # counting musig() key expressions that contain an internal key. Registration must reject
+    # policies with more of them.
+
+    # defined in error_codes.h
+    EC_REGISTER_WALLET_TOO_MANY_INTERNAL_KEY_EXPRESSIONS = 0x0004
+
+    internal_key = "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK"
+    external_key = "tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF"
+
+    # @0/<2;3>/*, @0/<4;5>/*, ..., @0/<16;17>/*
+    keys = [f"@0/<{2*i};{2*i+1}>/*" for i in range(1, 9)]
+    leaves = [f"pk({k})" for k in keys]
+    tree = (f"{{{{{{{leaves[0]},{leaves[1]}}},{{{leaves[2]},{leaves[3]}}}}},"
+            f"{{{{{leaves[4]},{leaves[5]}}},{{{leaves[6]},{leaves[7]}}}}}}}")
+
+    for descriptor_template, keys_info in [
+        # key path + 8 leaves
+        (f"tr(@0/<0;1>/*,{tree})", [internal_key]),
+        # 9 key expressions in a single leaf
+        (f"tr(@1/**,multi_a(1,@0/<0;1>/*,{','.join(keys)}))", [internal_key, external_key]),
+        # a musig() with an internal key counts as an internal key expression
+        (f"tr(musig(@0,@1)/<0;1>/*,multi_a(1,{','.join(keys)}))", [internal_key, external_key]),
+        # same in segwit v0
+        (f"wsh(multi(1,@0/<0;1>/*,{','.join(keys)}))", [internal_key]),
+    ]:
+        with pytest.raises(ExceptionRAPDU) as e:
+            client.register_wallet(WalletPolicy(
+                name="Too many internal keys",
+                descriptor_template=descriptor_template,
+                keys_info=keys_info,
+            ))
+
+        assert DeviceException.exc.get(e.value.status) == NotSupportedError
+        assert len(e.value.data) == 2
+        error_code = int.from_bytes(e.value.data, 'big')
+        assert error_code == EC_REGISTER_WALLET_TOO_MANY_INTERNAL_KEY_EXPRESSIONS
+
+
 def test_register_miniscript_long_policy(navigator: Navigator, firmware: Firmware, client:
                                          RaggerClient, test_name: str, speculos_globals):
     # This test makes sure that policies longer than 256 bytes work as expected on all devices
@@ -423,8 +499,67 @@ def test_register_wallet_not_sane_policy(navigator: Navigator, firmware: Firmwar
         assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
 
 
-    # TODO: we can probably not trigger stack and ops limits with the current limits we have on the
-    # miniscript policy size; otherwise it would be worth to add tests for them, too.
+    # Miniscript policy exceeding the 201 ops limit only when satisfying the multi in the second branch
+    # of the or_d. The ops of that branch are only accounted for if the dissatisfaction of the 'u:'
+    # wrapper (via its constant 0 branch) is.
+    keys = ",".join(f"@{i}/**" for i in range(10))
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.register_wallet(WalletPolicy(
+            name="Too many ops",
+            descriptor_template=f"wsh(or_d(utv:or_i(jjjjjjjjjj:pk(@10/**),jjjjjjjjjj:pk(@11/**)),or_i(jjjjjjjjjjjjj:multi(1,{keys}),jjjjjjjjjjjjj:pk(@12/**))))",
+            keys_info=[
+                "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+                "tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+                "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
+                "tpubDF6JT5K4izwALMpFv7fQrpWr5bGUMEoWphkzTVJH8jTfgirNEgGZnxsWJDCCxhg2UnW5RcD9Tx8aVAdoM734X5bnRGmJUujz26uQ5gAC1nE",
+                "tpubDF4kujkh5dAhC1pFgBToZybXdvJFXXGX4BWdDxWqP7EUpG8gxkfMQeDjGPDnTr9e4NrkFmDM1ocav3Jz6x79CRZbxGr9dzFokJLuvDDnyRh",
+                "tpubDDcwGjxKph1xkiAnzvpgdnTeaEhVnH9d766yqvd16JN7EmPW9qSwnbco7kZwPd7UbyEwRojYGUaHT1UULbdqAjGQzeCy3qdZEwZLRmpzwZV",
+                "tpubDD7LLJNCVTKQiB41FH3NyJPzMUNroRtzzY3WFAzKZDikrMpw9PJTi6A2Yes5Tamin4wsgJ4JLsj2AVUSvQqP2T6q3bztu7obRuU3Lrh4eTw",
+                "tpubDCDraP1C24GGX6BHCewLBWbKQRNGACfz8JjyKXYoZjEJWeGV5Ng43FL31MryaiqeBjdC5dPUZD2zqnmMe6gqrYEstnu8pmJZYp3AQmhzQ6G",
+                "tpubDCczwGSwQAF9Z5gTqL3tjznCFC9De5kFBLGdJJuj3UogVyYXVG7HuFdNsvJ9oDtvn4waeawS8XvRpBfbAZaDv1pGRiZdc9qnQhLKTS8eWXH",
+                "tpubD6NzVbkrYhZ4YAPXpMw61GrdqXJJEiYhHo6wxVkfwZgUged5qXm6Df4NLf8ZTFXxW1UhxDKGeKdAVxZtmodC8KfR7SqmW6LGQfDGfnFLmQ6",
+                "tpubD6NzVbkrYhZ4WLczPJWReQycCJdd6YVWXubbVUFnJ5KgU5MDQrD998ZJLSmaB7GVcCnJSDWprxmrGkJ6SvgQC6QAffVpqSvonXmeizXcrkN",
+                "tpubDFY2NoEHyYsp4J98UCMAaRT5LzRYeXjWqh2txK2RsxPAR5YWKWyTeZBBncRJ7z5nL5RUQPEgycbgbbmywbeLaH9yWK6rnFAYQn28HyiYc1Y",
+                "tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW",
+            ]),
+            navigator,
+            testname=test_name
+        )
+    assert DeviceException.exc.get(e.value.status) == NotSupportedError
+    assert len(e.value.data) == 2
+    error_code = int.from_bytes(e.value.data, 'big')
+    assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
+
+    # Miniscript policy exceeding the 201 ops limit only when satisfying the multi in the Z branch
+    # of the andor. The ops of that branch are only accounted for if the dissatisfaction of X (rather
+    # than of Y, which can't be dissatisfied) is used for that satisfaction path.
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.register_wallet(WalletPolicy(
+            name="Too many ops",
+            descriptor_template=f"wsh(t:andor(pk(@10/**),v:or_i(jjjjjjjjjjj:pk(@11/**),jjjjjjjjjjj:pk(@12/**)),v:or_i(jjjjjjjjjjj:multi(1,{keys}),jjjjjjjjjjj:pk(@13/**))))",
+            keys_info=[
+                "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+                "tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+                "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
+                "tpubDF6JT5K4izwALMpFv7fQrpWr5bGUMEoWphkzTVJH8jTfgirNEgGZnxsWJDCCxhg2UnW5RcD9Tx8aVAdoM734X5bnRGmJUujz26uQ5gAC1nE",
+                "tpubDF4kujkh5dAhC1pFgBToZybXdvJFXXGX4BWdDxWqP7EUpG8gxkfMQeDjGPDnTr9e4NrkFmDM1ocav3Jz6x79CRZbxGr9dzFokJLuvDDnyRh",
+                "tpubDDcwGjxKph1xkiAnzvpgdnTeaEhVnH9d766yqvd16JN7EmPW9qSwnbco7kZwPd7UbyEwRojYGUaHT1UULbdqAjGQzeCy3qdZEwZLRmpzwZV",
+                "tpubDD7LLJNCVTKQiB41FH3NyJPzMUNroRtzzY3WFAzKZDikrMpw9PJTi6A2Yes5Tamin4wsgJ4JLsj2AVUSvQqP2T6q3bztu7obRuU3Lrh4eTw",
+                "tpubDCDraP1C24GGX6BHCewLBWbKQRNGACfz8JjyKXYoZjEJWeGV5Ng43FL31MryaiqeBjdC5dPUZD2zqnmMe6gqrYEstnu8pmJZYp3AQmhzQ6G",
+                "tpubDCczwGSwQAF9Z5gTqL3tjznCFC9De5kFBLGdJJuj3UogVyYXVG7HuFdNsvJ9oDtvn4waeawS8XvRpBfbAZaDv1pGRiZdc9qnQhLKTS8eWXH",
+                "tpubD6NzVbkrYhZ4YAPXpMw61GrdqXJJEiYhHo6wxVkfwZgUged5qXm6Df4NLf8ZTFXxW1UhxDKGeKdAVxZtmodC8KfR7SqmW6LGQfDGfnFLmQ6",
+                "tpubD6NzVbkrYhZ4WLczPJWReQycCJdd6YVWXubbVUFnJ5KgU5MDQrD998ZJLSmaB7GVcCnJSDWprxmrGkJ6SvgQC6QAffVpqSvonXmeizXcrkN",
+                "tpubDFY2NoEHyYsp4J98UCMAaRT5LzRYeXjWqh2txK2RsxPAR5YWKWyTeZBBncRJ7z5nL5RUQPEgycbgbbmywbeLaH9yWK6rnFAYQn28HyiYc1Y",
+                "tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW",
+                "tpubDE7NQymr4AFtcJXi9TaWZtrhAdy8QyKmT4U6b9qYByAxCzoyMJ8zw5d8xVLVpbTRAEqP8pVUxjLE2vDt1rSFjaiS8DSz1QcNZ8D1qxUMx1g",
+            ]),
+            navigator,
+            testname=test_name
+        )
+    assert DeviceException.exc.get(e.value.status) == NotSupportedError
+    assert len(e.value.data) == 2
+    error_code = int.from_bytes(e.value.data, 'big')
+    assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
 
 
 def test_register_unusual_singlesig_accounts(navigator: Navigator, firmware: Firmware, client:
@@ -611,3 +746,50 @@ def test_register_wallet_max_depth(navigator: Navigator, firmware: Firmware, cli
             navigator,
             instructions=register_wallet_instruction_approve_no_save(firmware))
         assert wallet_id == wallet.id
+
+
+# limit copied from the app; keep in sync
+MAX_N_KEYS_IN_WALLET_POLICY = 20  # src/common/wallet.h
+
+INTERNAL_KEY = "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK"
+
+
+def keys_info_with_n_keys(n_keys: int) -> List[str]:
+    # one internal key, followed by n_keys - 1 distinct external keys
+    return [INTERNAL_KEY] + [get_pseudorandom_keypair(f"cosigner {i}")[0]
+                             for i in range(1, n_keys)]
+
+
+def keys_list(first: int, last: int) -> str:
+    return ",".join(f"@{i}/**" for i in range(first, last))
+
+
+@pytest.mark.parametrize("descriptor_template", [
+    # multi/multi_a are limited to 16 keys, so the keys are split in two halves
+    f"wsh(or_d(multi(2,{keys_list(0, 10)}),multi(2,{keys_list(10, 20)})))",
+    f"tr(@0/**,{{multi_a(2,{keys_list(1, 11)}),multi_a(2,{keys_list(11, 20)})}})",
+])
+def test_register_wallet_max_keys(navigator: Navigator, firmware: Firmware, client: RaggerClient,
+                                  speculos_globals, descriptor_template: str):
+    run_register_test(navigator, client, speculos_globals, WalletPolicy(
+        name="Max keys",
+        descriptor_template=descriptor_template,
+        keys_info=keys_info_with_n_keys(MAX_N_KEYS_IN_WALLET_POLICY),
+    ),
+        instructions=register_wallet_instruction_approve_no_save(firmware))
+
+
+def test_register_wallet_too_many_keys(client: RaggerClient):
+    n_keys = MAX_N_KEYS_IN_WALLET_POLICY + 1
+    wallet = WalletPolicy(
+        name="Too many keys",
+        descriptor_template=(f"wsh(or_d(multi(2,{keys_list(0, n_keys // 2)}),"
+                             f"multi(2,{keys_list(n_keys // 2, n_keys)})))"),
+        keys_info=keys_info_with_n_keys(n_keys),
+    )
+
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.register_wallet(wallet)
+
+    assert DeviceException.exc.get(e.value.status) == NotSupportedError
+    assert len(e.value.data) == 0

@@ -21,6 +21,7 @@
 #include "display.h"
 #include "merkle.h"
 #include "musig_sessions.h"
+#include "psbt_fields.h"
 
 // common info that applies to either the current input or the current output
 typedef struct {
@@ -50,6 +51,8 @@ typedef struct {
     bool has_nonWitnessUtxo;
     bool has_redeemScript;
     bool has_sighash_type;
+    bool has_required_time_locktime;    // PSBT_IN_REQUIRED_TIME_LOCKTIME (0x11)
+    bool has_required_height_locktime;  // PSBT_IN_REQUIRED_HEIGHT_LOCKTIME (0x12)
 
     uint64_t prevout_amount;  // the value of the prevout of the current input
 
@@ -105,6 +108,21 @@ typedef struct {
     uint8_t tapleaf_hash[32];
 } keyexpr_info_t;
 
+// State for BIP-322 message signing, used when the PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE field
+// is present in the PSBT. The message itself is not stored in the signing state, and rather
+// streamed from the client when needed.
+typedef struct {
+    bool is_message_signing;  // true iff PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE is present
+    bool message_printable;   // short enough and printable ASCII => shown in full
+    uint64_t message_length;
+    uint8_t message_hash[32];    // BIP0322-signed-message tagged hash of the message
+    uint8_t message_sha256[32];  // plain sha256(message), shown when not printable
+    // the scriptPubKey whose ownership is being proven (BIP-322's message_challenge);
+    // copied at validation time as it is needed again to show the address at display time
+    uint8_t challenge_script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+    size_t challenge_script_len;
+} bip322_state_t;
+
 // Cache for partial hashes during signing (avoid quadratic hashing for segwit transactions)
 typedef struct tx_hashes_s {
     uint8_t sha_prevouts[32];
@@ -148,7 +166,16 @@ typedef struct {
 typedef struct {
     uint32_t master_key_fingerprint;
     uint32_t tx_version;
+
+    // PSBT_GLOBAL_FALLBACK_LOCKTIME, or 0 if absent. Per BIP-0370 this is used *only* when no
+    // input declares a required locktime; it is never a lower bound on one.
+    uint32_t fallback_locktime;
+
+    // The nLockTime that every signature commits to. Determined per BIP-0370 at the end of
+    // preprocess_inputs, and only there; it is not meaningful before that, which is what
+    // locktime_determined records.
     uint32_t locktime;
+    bool locktime_determined;
 
     merkleized_map_commitment_t global_map;
 
@@ -184,6 +211,14 @@ typedef struct {
     // set to true if at least a PSBT_IN_MUSIG2_PUB_NONCE field is present in the PSBT
     bool has_musig2_pub_nonces;
 
+    // set to true if the MUSIG2_SESSION_ID global field is present in the PSBT
+    bool has_musig2_session_id;
+
+    // The value of the MUSIG2_SESSION_ID global field in the PSBT
+    // musig2_session_id_len is 0 if absent.
+    uint8_t musig2_session_id[MAX_MUSIG2_SESSION_ID_LEN];
+    size_t musig2_session_id_len;
+
     // aggregate info on outputs
     struct {
         uint64_t total_amount;         // amount of all the outputs (external + change)
@@ -200,5 +235,8 @@ typedef struct {
     account_ctx_t account;
 
     tx_ux_warning_t warnings;
+
+    // BIP-322 message signing state; bip322.is_message_signing is false for normal transactions.
+    bip322_state_t bip322;
 
 } sign_psbt_state_t;

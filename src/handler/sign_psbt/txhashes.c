@@ -162,6 +162,9 @@ static int hash_outputs(dispatcher_context_t *dc,
 bool __attribute__((noinline)) compute_tx_hashes(dispatcher_context_t *dc,
                                                  sign_psbt_state_t *st,
                                                  tx_hashes_t *hashes) {
+    // st->locktime must have been computed by now
+    LEDGER_ASSERT(st->locktime_determined, "locktime not determined");
+
     {
         // compute sha_prevouts and sha_sequences
         cx_sha256_t sha_prevouts_context, sha_sequences_context;

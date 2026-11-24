@@ -18,6 +18,12 @@
 // No key in the wallet policy was recognized as internal.
 #define EC_REGISTER_WALLET_POLICY_HAS_NO_INTERNAL_KEY 0x0002
 
+// A musig() key expression in the wallet policy has more than one internal key.
+#define EC_REGISTER_WALLET_MUSIG_WITH_MULTIPLE_INTERNAL_KEYS 0x0003
+
+// The wallet policy has more key expressions with internal keys than supported for signing.
+#define EC_REGISTER_WALLET_TOO_MANY_INTERNAL_KEY_EXPRESSIONS 0x0004
+
 /**
  * SIGN_PSBT
  */
@@ -67,6 +73,47 @@
 // Non-standard sighash types are not allowed unless the user has explicitly enabled them
 // in the application settings. Enable "Allow non-standard sighash" in the app settings to proceed.
 #define EC_SIGN_PSBT_NONDEFAULT_SIGHASH_NOT_ALLOWED 0x000d
+
+// At least one input only accepts a height-based lock time (it has
+// PSBT_IN_REQUIRED_HEIGHT_LOCKTIME but not PSBT_IN_REQUIRED_TIME_LOCKTIME) while another only
+// accepts a time-based one, so no nLockTime satisfies every input. The inputs must be reconciled.
+// See BIP-0370, "Determining Lock Time".
+#define EC_SIGN_PSBT_UNDETERMINABLE_LOCKTIME 0x000e
+
+// An input declares a required lock time whose value is out of range:
+// - a PSBT_IN_REQUIRED_HEIGHT_LOCKTIME must be in [1, 499999999];
+// - a PSBT_IN_REQUIRED_TIME_LOCKTIME must be at least 500000000.
+#define EC_SIGN_PSBT_REQUIRED_LOCKTIME_OUT_OF_RANGE 0x000f
+
+// The PSBT has the PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE field, but the transaction does not have
+// the structure mandated by BIP-322 for a to_sign transaction.
+// Note: the app cannot verify whether the additional inputs of a proof of funds spend real coins.
+// Therefore, it is not possible to prevent the app from producing invalid BIP-322 signatures.
+#define EC_SIGN_PSBT_BIP322_INVALID_STRUCTURE 0x0010
+
+// The first input of the BIP-322 to_sign transaction does not spend the to_spend transaction.
+// For a proof-of-funds, this includes a missing message_challenge input (BIP-322 v2.0.0).
+#define EC_SIGN_PSBT_BIP322_TOSPEND_MISMATCH 0x0011
+
+// BIP-322 requires all signatures to use SIGHASH_ALL (or SIGHASH_DEFAULT for taproot inputs).
+#define EC_SIGN_PSBT_BIP322_FORBIDDEN_SIGHASH 0x0012
+
+// The PSBT uses unsupported features (non-zero locktime, non-zero sequence of the first input,
+// or a relative timelock on a proof-of-funds input).
+#define EC_SIGN_PSBT_BIP322_UNSUPPORTED 0x0013
+
+// BIP-322 message signing is not allowed when called from the Exchange app.
+#define EC_SIGN_PSBT_BIP322_NOT_ALLOWED_IN_SWAP 0x0014
+
+// All the inputs of a BIP-322 proof-of-funds must belong to the wallet policy: the total
+// proven amount shown to the user must be trustworthy, and external inputs cannot be signed.
+#define EC_SIGN_PSBT_BIP322_EXTERNAL_INPUTS 0x0015
+
+// The MUSIG2_SESSION_ID global field is present, but its value is empty or longer than 32 bytes.
+#define EC_SIGN_PSBT_INVALID_MUSIG2_SESSION_ID 0x0016
+
+// The PSBT contains MuSig2 pubnonces, but the device has no corresponding MuSig2 session for it
+#define EC_SIGN_PSBT_MUSIG2_SESSION_NOT_FOUND 0x0017
 
 /**
  * Swap
@@ -120,6 +167,8 @@
 #define EC_SWAP_ERROR_GENERIC_UNKNOWN_MODE 0xFF01
 // handle_swap_sign_transaction.c::copy_transaction_parameters failed.
 #define EC_SWAP_ERROR_GENERIC_COPY_TRANSACTION_PARAMETERS_FAILED 0xFF02
+// generic failure in sign_psbt
+#define EC_SWAP_ERROR_GENERIC_SIGN_PSBT_FAILED 0xFF03
 
 // Checking the match for the SWAP error codes with the SDK ones
 #ifdef HAVE_SWAP
@@ -150,5 +199,6 @@ ASSERT_SWAP_ERR_CODE(EC_SWAP_ERROR_GENERIC, SWAP_EC_ERROR_GENERIC);
 ASSERT_SWAP_ERR_CODE(EC_SWAP_ERROR_GENERIC_UNKNOWN_MODE, SWAP_EC_ERROR_GENERIC);
 ASSERT_SWAP_ERR_CODE(EC_SWAP_ERROR_GENERIC_COPY_TRANSACTION_PARAMETERS_FAILED,
                      SWAP_EC_ERROR_GENERIC);
+ASSERT_SWAP_ERR_CODE(EC_SWAP_ERROR_GENERIC_SIGN_PSBT_FAILED, SWAP_EC_ERROR_GENERIC);
 
 #endif /* HAVE_SWAP */

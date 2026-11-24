@@ -70,6 +70,25 @@ psbt_field_status_t psbt_get_global_fallback_locktime(dispatcher_context_t *dc,
                                                       const merkleized_map_commitment_t *global_map,
                                                       uint32_t *out);
 
+// Maximum length of the value of the MUSIG2_SESSION_ID field
+#define MAX_MUSIG2_SESSION_ID_LEN 32
+
+/**
+ * Returns true if `key` is the key of the MUSIG2_SESSION_ID field: the proprietary key with
+ * identifier "MUSIG2_SESSION_ID", subtype 0 and no keydata.
+ */
+bool psbt_is_global_musig2_session_id_key(const uint8_t *key, size_t key_len);
+
+/**
+ * MUSIG2_SESSION_ID: optional proprietary field, between 1 and MAX_MUSIG2_SESSION_ID_LEN bytes,
+ * chosen by the software wallet to identify the MuSig2 signing session. See doc/musig.md.
+ * An empty or too long value is reported as PSBT_FIELD_ERROR.
+ */
+psbt_field_status_t psbt_get_global_musig2_session_id(dispatcher_context_t *dc,
+                                                      const merkleized_map_commitment_t *global_map,
+                                                      uint8_t out[static MAX_MUSIG2_SESSION_ID_LEN],
+                                                      size_t *out_len);
+
 /* -------------------------------------------------------------------------- */
 /* Input map                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -93,6 +112,30 @@ psbt_field_status_t psbt_get_input_prevout_index(dispatcher_context_t *dc,
 psbt_field_status_t psbt_get_input_sequence(dispatcher_context_t *dc,
                                             const merkleized_map_commitment_t *input_map,
                                             uint32_t *out);
+
+/**
+ * PSBT_IN_REQUIRED_TIME_LOCKTIME: optional 4-byte little-endian UNIX timestamp, the earliest time
+ * at which this input can be spent. Used to derive the transaction's nLockTime (BIP-0370).
+ *
+ * This accessor only guarantees "present and exactly 4 bytes"; other validity conditions must be
+ * checked by the caller.
+ */
+psbt_field_status_t psbt_get_input_required_time_locktime(
+    dispatcher_context_t *dc,
+    const merkleized_map_commitment_t *input_map,
+    uint32_t *out);
+
+/**
+ * PSBT_IN_REQUIRED_HEIGHT_LOCKTIME: optional 4-byte little-endian block height, the earliest
+ * height at which this input can be spent.
+ *
+ * This accessor only guarantees "present and exactly 4 bytes"; other validity conditions must be
+ * checked by the caller.
+ */
+psbt_field_status_t psbt_get_input_required_height_locktime(
+    dispatcher_context_t *dc,
+    const merkleized_map_commitment_t *input_map,
+    uint32_t *out);
 
 /**
  * PSBT_IN_SIGHASH_TYPE: 4-byte little-endian sighash type. Callers that only read it once
