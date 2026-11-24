@@ -31,7 +31,7 @@
     "doc:json": "typedoc src/ --exclude **/*.test.ts --json build/docs/typedoc.json"
   },
   "engines": {
-    "node": ">=18.14"
+    "node": ">=20.19.0"
   },
   "dependencies": {
     "@bitcoinerlab/descriptors": "3.1.7",
