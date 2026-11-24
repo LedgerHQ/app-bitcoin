@@ -505,6 +505,10 @@ export class PsbtV2 {
         )
       );
     }
+    // discard any previous content, so that it does not mix with the new PSBT's
+    this.globalMap = new Map();
+    this.inputMaps = [];
+    this.outputMaps = [];
     this.setGlobalPsbtVersion(2);
     this.setGlobalTxVersion(psbtBJS.version);
     this.setGlobalInputCount(psbtBJS.data.inputs.length);

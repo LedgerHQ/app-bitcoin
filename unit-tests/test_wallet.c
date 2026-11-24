@@ -434,6 +434,32 @@ static void test_parse_keyexpr_multipath_hardened_boundary(void **state) {
     assert_true(0 > parse_policy("pkh(@0/<0;2147483648>/*)", out, sizeof(out)));
 }
 
+static int parse_key_info(const char *key_info, policy_map_key_info_t *out) {
+    buffer_t buf = buffer_create((void *) key_info, strlen(key_info));
+    return parse_policy_map_key_info(&buf, out, WALLET_POLICY_VERSION_V2);
+}
+
+static void test_parse_key_info_xpub_decoded_length(void **state) {
+    (void) state;
+
+    policy_map_key_info_t key_info;
+
+    // valid xpub (82 bytes once decoded)
+    assert_int_equal(
+        0,
+        parse_key_info("xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8"
+                       "idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB",
+                       &key_info));
+
+    // 111 characters, but it decodes to only 81 bytes: a 78-byte body followed by the first 3
+    // bytes of its checksum. The missing 4th checksum byte would be 0x00, so this must be rejected
+    // based on the decoded length, not on the content of the uninitialized/zeroed last byte.
+    assert_true(
+        0 > parse_key_info("2YGYd2tX7ShcXpAQkuP61HugWNERM3iuRDVZHsQTQmHJgWtvyWyJcnCzpfEMSRmCWt67XEE"
+                           "mwGSCQo65RkWvwn5aCE5wZZBBsycGncMyhCMRjt6",
+                           &key_info));
+}
+
 static void test_failures(void **state) {
     (void) state;
 
@@ -462,6 +488,11 @@ static void test_failures(void **state) {
 
     // wpkh can only be inside sh
     assert_true(0 > parse_policy("wsh(wpkh(@0/**)))", out, sizeof(out)));
+
+    // tr can only be top-level
+    assert_true(0 > parse_policy("wsh(tr(@0/**))", out, sizeof(out)));
+    assert_true(0 > parse_policy("sh(tr(@0/**))", out, sizeof(out)));
+    assert_true(0 > parse_policy("sh(wsh(tr(@0/**)))", out, sizeof(out)));
 
     // multi with invalid threshold
     assert_true(0 > parse_policy("multi(6,@0/**,@1/**,@2/**,@3/**,@4/**)",
@@ -1171,6 +1202,7 @@ int main() {
         cmocka_unit_test(test_get_policy_segwit_version),
         cmocka_unit_test(test_parse_unsigned_decimal_overflow),
         cmocka_unit_test(test_parse_keyexpr_multipath_hardened_boundary),
+        cmocka_unit_test(test_parse_key_info_xpub_decoded_length),
         cmocka_unit_test(test_failures),
         cmocka_unit_test(test_miniscript_types),
         cmocka_unit_test(test_traverse_single_leaf),

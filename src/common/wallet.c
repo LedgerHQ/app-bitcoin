@@ -371,10 +371,11 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
     }
 
     serialized_extended_pubkey_check_t ext_pubkey_check;
+    memset(&ext_pubkey_check, 0, sizeof(ext_pubkey_check));
     if (base58_decode(ext_pubkey_str,
                       ext_pubkey_len,
                       (uint8_t *) &ext_pubkey_check,
-                      sizeof(ext_pubkey_check)) < 0) {
+                      sizeof(ext_pubkey_check)) != (int) sizeof(ext_pubkey_check)) {
         return WITH_ERROR(-1, "Error decoding serialized extended pubkey");
     }
 
@@ -1647,7 +1648,7 @@ static int parse_script(buffer_t *in_buf,
             break;
         }
         case TOKEN_TR: {  // supporting only xpubs
-            if (depth > 1) {
+            if (depth != 0) {
                 return WITH_ERROR(-1, "tr can only be top-level");
             }
 
