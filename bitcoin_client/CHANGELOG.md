@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [0.4.3] - 24-11-2026
+
+### Added
+
+- `PSBT.musig2_session_id`: support for the proprietary global field with identifier `MUSIG2_SESSION_ID` (subtype 0, no keydata), in both PSBT versions. It lets a software wallet run parallel MuSig2 signing sessions for the same wallet policy. This is supported from version 2.6.0 of the Ledger Bitcoin app.
+
+### Fixed
+
+- Stricter PSBT parsing in `sign_psbt` and `PSBT.deserialize`: reject duplicate keys, truncated maps, missing map separators, trailing data after the PSBT maps, and PSBTv2-only fields in a PSBTv0. Previously, such malformed PSBTs could be silently accepted.
+- `PSBT.convert_to_v2()` clears the required time/height locktimes of the inputs when converting from a PSBTv0: the locktime of a PSBTv0 is defined by its unsigned transaction.
+
+
 ## [0.4.2] - 29-09-2026
 
 ### Added
