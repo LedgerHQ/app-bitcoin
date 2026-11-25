@@ -275,10 +275,15 @@ jobs:
           name: bitcoin-testnet-app-nanosp
           path: bin
 
-      - name: Run tests
+      - name: Build
         run: |
           cd bitcoin_client_js
           yarn install --immutable
+          yarn build
+
+      - name: Run tests
+        run: |
+          cd bitcoin_client_js
           LOG_SPECULOS=1 LOG_APDUS=1 SPECULOS="speculos" yarn test
 
   deploy_js_client:
