@@ -1,16 +1,121 @@
 name: Swap functional tests
 
+# Runs the Bitcoin tests of the Exchange app's swap test suite, where Exchange starts this app as a library.
+#
+# Only the apps needed by these tests are built: this one (mainnet), Exchange, and Ethereum (which Exchange calls
+# to check the payout address of the swaps to ETH); the libraries of the other coins are skipped with ragger's
+# --ignore-missing-binaries.
+#
+# Run from app-bitcoin, it uses the public LedgerHQ/app-exchange (develop) and LedgerHQ/app-ethereum
+# (master). Run from app-bitcoin-dev, it uses LedgerHQ/app-exchange-dev and LedgerHQ/app-ethereum-dev
+# (develop), cloned with the CI_BOT_TOKEN secret.
+
 on:
   workflow_dispatch:
   push:
     branches:
-    - master
-    - develop
+      - master
+      - develop
   pull_request:
 
 jobs:
-  job_functional_tests:
-    uses: LedgerHQ/app-exchange/.github/workflows/reusable_swap_functional_tests.yml@develop
+  select_repositories:
+    name: Select the Exchange and Ethereum repositories
+    runs-on: ubuntu-latest
+    outputs:
+      exchange_repository: ${{ steps.select.outputs.exchange_repository }}
+      exchange_branch: ${{ steps.select.outputs.exchange_branch }}
+      ethereum_repository: ${{ steps.select.outputs.ethereum_repository }}
+      ethereum_branch: ${{ steps.select.outputs.ethereum_branch }}
+    steps:
+      - name: Select the repositories
+        id: select
+        run: |
+          if [[ "${GITHUB_REPOSITORY}" == *-dev ]]; then
+            {
+              echo "exchange_repository=LedgerHQ/app-exchange-dev"
+              echo "exchange_branch=develop"
+              echo "ethereum_repository=LedgerHQ/app-ethereum-dev"
+              echo "ethereum_branch=develop"
+            } >> "${GITHUB_OUTPUT}"
+          else
+            {
+              echo "exchange_repository=LedgerHQ/app-exchange"
+              echo "exchange_branch=develop"
+              echo "ethereum_repository=LedgerHQ/app-ethereum"
+              echo "ethereum_branch=master"
+            } >> "${GITHUB_OUTPUT}"
+          fi
+          cat "${GITHUB_OUTPUT}"
+
+  build_bitcoin:
+    name: Build Bitcoin
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_build.yml@v1
     with:
-      branch_for_bitcoin: ${{ github.ref }}
+      flags: "COIN=bitcoin"
+      upload_app_binaries_artifact: libraries_binaries-bitcoin
+      upload_as_lib_artifact: bitcoin
+      builder: ledger-app-builder
+      build_comparison: false
+      enable_stack_consumption: false
+    secrets:
+      token: ${{ secrets.CI_BOT_TOKEN }}
+
+  build_ethereum:
+    name: Build Ethereum
+    needs: select_repositories
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_build.yml@v1
+    with:
+      app_repository: ${{ needs.select_repositories.outputs.ethereum_repository }}
+      app_branch_name: ${{ needs.select_repositories.outputs.ethereum_branch }}
+      # Same flags as in the Exchange app's swap workflow
+      flags: "COIN=ethereum CHAIN=ethereum CAL_TEST_KEY=1 DOMAIN_NAME_TEST_KEY=1 SET_PLUGIN_TEST_KEY=1 NFT_TEST_KEY=1 TRUSTED_NAME_TEST_KEY=1"
+      upload_app_binaries_artifact: libraries_binaries-ethereum
+      upload_as_lib_artifact: ethereum
+      builder: ledger-app-builder
+      build_comparison: false
+      enable_stack_consumption: false
+    secrets:
+      token: ${{ secrets.CI_BOT_TOKEN }}
+
+  merge_libraries:
+    name: Merge the libraries
+    needs: [build_bitcoin, build_ethereum]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/upload-artifact/merge@v7
+        with:
+          name: libraries_binaries
+          pattern: libraries_binaries-*
+          delete-merged: true
+
+  build_exchange:
+    name: Build Exchange
+    needs: select_repositories
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_build.yml@v1
+    with:
+      app_repository: ${{ needs.select_repositories.outputs.exchange_repository }}
+      app_branch_name: ${{ needs.select_repositories.outputs.exchange_branch }}
+      # Same flags as in the Exchange app's swap workflow
+      flags: "TESTING=1 TEST_PUBLIC_KEY=1 TRUSTED_NAME_TEST_KEY=1 DEBUG=1"
+      upload_app_binaries_artifact: exchange_binaries
+      build_comparison: false
+      enable_stack_consumption: false
+    secrets:
+      token: ${{ secrets.CI_BOT_TOKEN }}
+
+  swap_tests:
+    name: job_functional_tests / Run ragger tests
+    needs: [select_repositories, build_exchange, merge_libraries]
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@v1
+    with:
+      app_repository: ${{ needs.select_repositories.outputs.exchange_repository }}
+      app_branch_name: ${{ needs.select_repositories.outputs.exchange_branch }}
+      download_app_binaries_artifact: exchange_binaries
+      lib_binaries_artifact: libraries_binaries
+      lib_binaries_artifact_dir: test/python/lib_binaries/
       test_filter: '"btc or bitcoin or Bitcoin"'
+      test_options: "--ignore-missing-binaries"
+      post_stack_consumption: false
+    secrets:
+      token: ${{ secrets.CI_BOT_TOKEN }}
