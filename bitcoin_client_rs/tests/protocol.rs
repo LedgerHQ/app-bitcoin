@@ -428,3 +428,58 @@ fn interpreter_rejects_malformed_requests() {
         Err(InterpreterError::UnsupportedRequest(code)) if code == ClientCommandCode::GetPreimage as u8
     ));
 }
+
+#[test]
+fn preimages_cannot_be_requested_while_a_previous_answer_is_queued() {
+    use ledger_bitcoin_client::interpreter::InterpreterError;
+    let mut interpreter = ClientCommandInterpreter::new();
+    let long = vec![0x55; 300];
+    interpreter.add_known_preimage(long.clone());
+    interpreter.add_known_preimage(b"short".to_vec());
+    let get_preimage = |preimage: &[u8]| {
+        let mut request = vec![ClientCommandCode::GetPreimage as u8, SHA256_HASH_TYPE];
+        request.extend(hash(preimage));
+        request
+    };
+    // The end of the long preimage is queued.
+    interpreter.execute(get_preimage(&long)).unwrap();
+    assert_eq!(
+        interpreter.execute(get_preimage(b"short")),
+        Err(InterpreterError::UnexpectedQueue)
+    );
+    interpreter
+        .execute(vec![ClientCommandCode::GetMoreElements as u8])
+        .unwrap();
+    assert!(interpreter.execute(get_preimage(b"short")).is_ok());
+}
+
+#[test]
+fn interpreter_rejects_trailing_bytes() {
+    use ledger_bitcoin_client::interpreter::InterpreterError;
+    let mut interpreter = ClientCommandInterpreter::new();
+    let root = interpreter.add_known_list(&[b"hello"]);
+    // In a tree with a single leaf, the root is the leaf hash.
+    let mut get_leaf_index = vec![ClientCommandCode::GetMerkleLeafIndex as u8];
+    get_leaf_index.extend(root);
+    get_leaf_index.extend(root);
+    assert!(interpreter.execute(get_leaf_index.clone()).is_ok());
+    get_leaf_index.push(0);
+    assert!(matches!(
+        interpreter.execute(get_leaf_index),
+        Err(InterpreterError::UnsupportedRequest(code))
+            if code == ClientCommandCode::GetMerkleLeafIndex as u8
+    ));
+
+    // Fill the queue with the end of a long preimage.
+    let preimage = vec![0x55; 300];
+    interpreter.add_known_preimage(preimage.clone());
+    let mut get_preimage = vec![ClientCommandCode::GetPreimage as u8, SHA256_HASH_TYPE];
+    get_preimage.extend(hash(&preimage));
+    interpreter.execute(get_preimage).unwrap();
+    let get_more_elements = ClientCommandCode::GetMoreElements as u8;
+    assert!(matches!(
+        interpreter.execute(vec![get_more_elements, 0]),
+        Err(InterpreterError::UnsupportedRequest(code)) if code == get_more_elements
+    ));
+    assert!(interpreter.execute(vec![get_more_elements]).is_ok());
+}

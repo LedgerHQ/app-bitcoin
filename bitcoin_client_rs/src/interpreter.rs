@@ -127,7 +127,9 @@ impl ClientCommandInterpreter {
             Ok(ClientCommandCode::GetMerkleLeafIndex) => {
                 get_merkle_leaf_index(&self.trees, &command[1..])
             }
-            Ok(ClientCommandCode::GetMoreElements) => get_more_elements(&mut self.queue),
+            Ok(ClientCommandCode::GetMoreElements) => {
+                get_more_elements(&mut self.queue, &command[1..])
+            }
             Err(()) => Err(InterpreterError::UnknownCommand(command[0])),
         }
     }
@@ -143,6 +145,10 @@ fn get_preimage_command(
     known_preimages: &[([u8; 32], Vec<u8>)],
     request: &[u8],
 ) -> Result<Vec<u8>, InterpreterError> {
+    // The device must first fetch the rest of a previous answer with GET_MORE_ELEMENTS.
+    if !queue.is_empty() {
+        return Err(InterpreterError::UnexpectedQueue);
+    }
     if request.len() != 33 || request[0] != b'\0' {
         return Err(InterpreterError::UnsupportedRequest(
             ClientCommandCode::GetPreimage as u8,
@@ -241,7 +247,7 @@ fn get_merkle_leaf_index(
     trees: &[MerkleTree],
     request: &[u8],
 ) -> Result<Vec<u8>, InterpreterError> {
-    if request.len() < 64 {
+    if request.len() != 64 {
         return Err(InterpreterError::UnsupportedRequest(
             ClientCommandCode::GetMerkleLeafIndex as u8,
         ));
@@ -264,7 +270,15 @@ fn get_merkle_leaf_index(
     Ok(response)
 }
 
-fn get_more_elements(queue: &mut Vec<Vec<u8>>) -> Result<Vec<u8>, InterpreterError> {
+fn get_more_elements(
+    queue: &mut Vec<Vec<u8>>,
+    request: &[u8],
+) -> Result<Vec<u8>, InterpreterError> {
+    if !request.is_empty() {
+        return Err(InterpreterError::UnsupportedRequest(
+            ClientCommandCode::GetMoreElements as u8,
+        ));
+    }
     if queue.is_empty() {
         return Err(InterpreterError::UnexpectedQueue);
     }

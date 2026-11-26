@@ -18,6 +18,8 @@ This release exposes the protocol without the transport, for applications that o
 - `apdu::Cla`, `BitcoinCommandCode`, `FrameworkCommandCode` and `ClientCommandCode` are `#[non_exhaustive]`, as the app and its client commands can gain new codes.
 - The minimum supported Rust version is 1.78, declared as `rust-version` in Cargo.toml. The README claimed 1.60, which the dependencies no longer support.
 - An unknown Merkle root in the GET_MERKLE_LEAF_PROOF and GET_MERKLE_LEAF_INDEX client commands is reported as `InterpreterError::UnknownMerkleRoot` instead of `UnknownHash`.
+- Client commands with unexpected trailing bytes (GET_MERKLE_LEAF_INDEX, GET_MORE_ELEMENTS) are rejected with `InterpreterError::UnsupportedRequest`, like the other client commands.
+- A GET_PREIMAGE client command is rejected with `InterpreterError::UnexpectedQueue` while elements of a previous answer are still queued, as GET_MERKLE_LEAF_PROOF already was.
 
 ### Added
 
