@@ -469,4 +469,103 @@ mod tests {
         // a key length that runs past the end of the buffer
         assert!(split_maps(b"psbt\xff\x08\x01\x02", 1).is_none());
     }
+
+    /// Unknown and proprietary fields reach the app unchanged, in every map.
+    #[test]
+    fn unknown_and_proprietary_fields_survive_in_every_map() {
+        const UNKNOWN_KEY_TYPE: u8 = 0x70;
+        const PSBT_PROPRIETARY: u8 = 0xfc;
+        let mut psbt = unsigned_psbt();
+        let unknown = raw::Key {
+            type_value: UNKNOWN_KEY_TYPE,
+            key: vec![9],
+        };
+        let proprietary = raw::ProprietaryKey {
+            prefix: b"hw".to_vec(),
+            subtype: 1,
+            key: vec![9],
+        };
+        psbt.unknown.insert(unknown.clone(), vec![1]);
+        psbt.inputs[0].unknown.insert(unknown.clone(), vec![2]);
+        psbt.outputs[0].unknown.insert(unknown, vec![3]);
+        psbt.proprietary.insert(proprietary.clone(), vec![4]);
+        psbt.inputs[0]
+            .proprietary
+            .insert(proprietary.clone(), vec![5]);
+        psbt.outputs[0].proprietary.insert(proprietary, vec![6]);
+        let maps = get_v2_maps(&psbt).unwrap();
+        // The proprietary key: type, prefix length, prefix, subtype, key data.
+        let proprietary_key = vec![PSBT_PROPRIETARY, 2, b'h', b'w', 1, 9];
+        for (i, map) in [&maps.global, &maps.inputs[0], &maps.outputs[0]]
+            .iter()
+            .enumerate()
+        {
+            assert!(map.contains(&(vec![UNKNOWN_KEY_TYPE, 9], vec![i as u8 + 1])));
+            assert!(map.contains(&(proprietary_key.clone(), vec![i as u8 + 4])));
+        }
+    }
+
+    /// A PSBTv0 carrying any of the fields synthesized from its unsigned transaction is rejected:
+    /// the PSBTv2-only ones by `reject_v2_fields`, `PSBT_GLOBAL_VERSION` by `push_v2_field`.
+    #[test]
+    fn every_synthesized_v2_field_is_rejected() {
+        for (map_index, key_types) in [
+            (
+                0,
+                &[
+                    PSBT_GLOBAL_TX_VERSION,
+                    PSBT_GLOBAL_FALLBACK_LOCKTIME,
+                    PSBT_GLOBAL_INPUT_COUNT,
+                    PSBT_GLOBAL_OUTPUT_COUNT,
+                    PSBT_GLOBAL_VERSION,
+                ][..],
+            ),
+            (
+                1,
+                &[
+                    PSBT_IN_PREVIOUS_TXID,
+                    PSBT_IN_OUTPUT_INDEX,
+                    PSBT_IN_SEQUENCE,
+                ][..],
+            ),
+            (2, &[PSBT_OUT_AMOUNT, PSBT_OUT_SCRIPT][..]),
+        ] {
+            for &key_type in key_types {
+                let mut psbt = unsigned_psbt();
+                let map = match map_index {
+                    0 => &mut psbt.unknown,
+                    1 => &mut psbt.inputs[0].unknown,
+                    _ => &mut psbt.outputs[0].unknown,
+                };
+                map.insert(keyless(key_type), vec![42]);
+                assert_eq!(
+                    get_v2_maps(&psbt).err(),
+                    Some(PsbtV2Error::UnexpectedV2Field(key_type))
+                );
+            }
+        }
+    }
+
+    /// `PSBT_GLOBAL_TX_MODIFIABLE` is not synthesized, but BIP-370 excludes it from PSBTv0 too.
+    #[test]
+    fn tx_modifiable_is_rejected() {
+        let mut psbt = unsigned_psbt();
+        psbt.unknown
+            .insert(keyless(PSBT_GLOBAL_TX_MODIFIABLE), vec![0]);
+        assert_eq!(
+            get_v2_maps(&psbt).err(),
+            Some(PsbtV2Error::UnexpectedV2Field(PSBT_GLOBAL_TX_MODIFIABLE))
+        );
+    }
+
+    /// The PSBT must have as many input maps as its unsigned transaction has inputs.
+    #[test]
+    fn an_input_count_mismatch_is_rejected() {
+        let mut psbt = unsigned_psbt();
+        psbt.inputs.clear();
+        assert_eq!(
+            get_v2_maps(&psbt).err(),
+            Some(PsbtV2Error::TxMapCountMismatch)
+        );
+    }
 }

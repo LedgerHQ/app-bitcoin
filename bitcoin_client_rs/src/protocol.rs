@@ -405,30 +405,51 @@ mod tests {
     }
 
     #[test]
-    fn parse_musig_pubnonce_truncated_input_is_error() {
-        // Truncate so the participant pubkey is missing entirely.
-        let full = build_musig_pubnonce(0, false);
-        // tag(5) + input_index(1) + pubnonce(66) = 72 bytes; cut everything after that.
-        let truncated = &full[..72];
-        assert!(matches!(
-            parse_sign_psbt_yielded(truncated),
-            Err(PartialSignatureError::InvalidLength)
-        ));
+    fn musig_variants_reject_truncation_and_invalid_keys() {
+        // The tag, the input index, the value, then the participant's public key.
+        for (builder, tag, value_len) in [
+            (
+                build_musig_pubnonce as fn(u64, bool) -> Vec<u8>,
+                CCMD_YIELD_MUSIG_PUBNONCE_TAG,
+                66,
+            ),
+            (
+                build_musig_partial_sig as fn(u64, bool) -> Vec<u8>,
+                CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG,
+                32,
+            ),
+        ] {
+            for tapleaf in [false, true] {
+                let input_index = 2;
+                let mut payload = builder(input_index, tapleaf);
+                assert!(matches!(
+                    parse_sign_psbt_yielded(&payload[..payload.len() - 1]),
+                    Err(PartialSignatureError::InvalidLength)
+                ));
+                let participant_offset = serialize(&UncheckedVarInt(tag)).len()
+                    + serialize(&UncheckedVarInt(input_index)).len()
+                    + value_len;
+                payload[participant_offset] = 0xff;
+                assert!(matches!(
+                    parse_sign_psbt_yielded(&payload),
+                    Err(PartialSignatureError::PubKey(_))
+                ));
+            }
+        }
     }
 
     #[test]
-    fn parse_musig_pubnonce_invalid_participant_pubkey_is_error() {
-        // Replace the participant pubkey (33 bytes after the 66-byte nonce) with all
-        // zeros, which is not a valid encoded compressed pubkey.
-        let mut payload = build_musig_pubnonce(0, false);
-        // tag(5 bytes for 0xFFFFFFFF) + input_index(1) + pubnonce(66) = 72.
-        let pubkey_offset = 72;
-        for b in &mut payload[pubkey_offset..pubkey_offset + 33] {
-            *b = 0x00;
+    fn legacy_signature_encodings_reject_malformed_keys_and_signatures() {
+        // The input index (0), the key length, the key, then the signature.
+        for malformed in [vec![0], vec![0, 64, 1], vec![0, 32], vec![0, 33, 0, 0]] {
+            assert!(parse_sign_psbt_yielded(&malformed).is_err());
         }
+        let mut payload = vec![0, 32];
+        payload.extend(XONLY);
+        payload.extend([0xaa; 63]); // One byte short of a Schnorr signature.
         assert!(matches!(
             parse_sign_psbt_yielded(&payload),
-            Err(PartialSignatureError::PubKey(_))
+            Err(PartialSignatureError::TaprootSig(_))
         ));
     }
 }
