@@ -31,3 +31,4 @@ This release exposes the protocol without the transport, for applications that o
 - PSBTv2-only fields in a PSBTv0 are rejected when converting it for `sign_psbt`, as they would acquire meaning after the conversion.
 - Signing an empty message, or a PSBT without inputs or outputs, panicked while building the Merkle tree of an empty list.
 - A GET_MERKLE_LEAF_INDEX client command for a leaf that is not in a known tree is answered as not found, instead of failing.
+- `WalletPolicy::get_descriptor` looped forever on a descriptor template with an unterminated `/<`, and panicked on one with a `>` before a `/<`. The former is now a `WalletError::InvalidPolicy` error, and the latter is expanded like any other template.

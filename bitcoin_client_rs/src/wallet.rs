@@ -152,14 +152,16 @@ impl WalletPolicy {
 
         // For every "/<M;N>" expression, replace with M if not change, or with N if change
         while let Some(start) = desc.find("/<") {
-            if let Some(end) = desc.find(">") {
-                let nums: Vec<&str> = desc[start + 2..end].split(";").collect();
-                if nums.len() == 2 {
-                    let replacement = if change { nums[1] } else { nums[0] };
-                    desc = format!("{}{}{}", &desc[..start + 1], replacement, &desc[end + 1..]);
-                } else {
-                    return Err(WalletError::InvalidPolicy);
-                }
+            let end = desc[start..]
+                .find('>')
+                .map(|offset| start + offset)
+                .ok_or(WalletError::InvalidPolicy)?;
+            let nums: Vec<&str> = desc[start + 2..end].split(';').collect();
+            if nums.len() == 2 {
+                let replacement = if change { nums[1] } else { nums[0] };
+                desc = format!("{}{}{}", &desc[..start + 1], replacement, &desc[end + 1..]);
+            } else {
+                return Err(WalletError::InvalidPolicy);
             }
         }
 
@@ -337,6 +339,32 @@ mod tests {
         );
         assert_eq!(key.inner, Xpub::from_str("tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW").unwrap());
         assert_eq!(key.multipath, Some("/**".to_string()));
+    }
+
+    #[test]
+    fn malformed_multipath_expressions_are_rejected() {
+        fn policy(template: &str) -> WalletPolicy {
+            let key = WalletPubKey::from_str(KEY_EXAMPLE.trim_end_matches("/**")).unwrap();
+            WalletPolicy::new("".into(), Version::V2, template.into(), [key])
+        }
+        // An unterminated expression used to loop forever: check it on a thread with a
+        // deadline, so that a regression fails instead of hanging.
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let result = policy("wsh(pk(@0/<0;1/*))").get_descriptor(false);
+            let _ = sender.send(matches!(result, Err(WalletError::InvalidPolicy)));
+        });
+        let rejected = receiver
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("get_descriptor did not return");
+        assert!(rejected);
+        assert!(matches!(
+            policy("wsh(pk(@0/<0;1;2>/*))").get_descriptor(false),
+            Err(WalletError::InvalidPolicy)
+        ));
+        // A '>' before the expression used to cause a panic.
+        let descriptor = policy("wsh(pk(@0>/<0;1>/*))").get_descriptor(true).unwrap();
+        assert!(descriptor.ends_with(">/1/*))"));
     }
 
     #[test]
