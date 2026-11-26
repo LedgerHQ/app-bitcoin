@@ -15,16 +15,18 @@ pub struct RecordStore {
 }
 
 impl RecordStore {
-    pub fn new(exchanges: &Vec<String>) -> RecordStore {
+    pub fn new(exchanges: &[String]) -> RecordStore {
         let mut store = RecordStore::default();
         let mut command: Vec<u8> = Vec::new();
         for (i, exchange) in exchanges.iter().enumerate() {
             let exchange = exchange.replace(" ", "");
             if let Some(cmd) = exchange.strip_prefix("=>") {
-                command = Vec::from_hex(cmd).expect(&format!("Wrong tests data {}: {}", i, cmd));
+                command = Vec::from_hex(cmd)
+                    .unwrap_or_else(|_| panic!("Wrong tests data {}: {}", i, cmd));
             }
             if let Some(resp) = exchange.strip_prefix("<=") {
-                let resp = Vec::from_hex(resp).expect(&format!("Wrong tests data {}: {}", i, resp));
+                let resp = Vec::from_hex(resp)
+                    .unwrap_or_else(|_| panic!("Wrong tests data {}: {}", i, resp));
                 store.queue.push((command.clone(), resp));
             }
         }
@@ -100,6 +102,7 @@ impl async_client::Transport for TransportReplayer {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)] // The fields are only read through Debug, when a test fails.
 pub enum MockError {
     ExchangeNotFound(usize, String),
 }

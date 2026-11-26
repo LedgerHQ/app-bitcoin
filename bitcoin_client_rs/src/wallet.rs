@@ -108,7 +108,7 @@ impl WalletPolicy {
         res.extend_from_slice(&(self.name.len() as u8).to_be_bytes());
         res.extend_from_slice(self.name.as_bytes());
         res.extend(encode::serialize(&UncheckedVarInt(
-            self.descriptor_template.as_bytes().len() as u64,
+            self.descriptor_template.len() as u64,
         )));
 
         if self.version == Version::V2 {
@@ -329,7 +329,7 @@ mod tests {
     #[test]
     fn test_walletpubkey_tostr() {
         let key = WalletPubKey::from_str(KEY_EXAMPLE).unwrap();
-        assert_eq!(key.to_string(), format!("{}", KEY_EXAMPLE));
+        assert_eq!(key.to_string(), KEY_EXAMPLE);
     }
 
     #[test]

@@ -96,7 +96,7 @@ async fn test_get_extended_pubkey() {
         let derivation_path: DerivationPath = case
             .get("derivation_path")
             .map(|v| v.as_str().unwrap())
-            .map(|s| DerivationPath::from_str(&s).unwrap())
+            .map(|s| DerivationPath::from_str(s).unwrap())
             .unwrap();
 
         let display: bool = case
