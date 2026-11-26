@@ -21,6 +21,7 @@ This release exposes the protocol without the transport, for applications that o
 - Client commands with unexpected trailing bytes (GET_MERKLE_LEAF_INDEX, GET_MORE_ELEMENTS) are rejected with `InterpreterError::UnsupportedRequest`, like the other client commands.
 - A GET_PREIMAGE client command is rejected with `InterpreterError::UnexpectedQueue` while elements of a previous answer are still queued, as GET_MERKLE_LEAF_PROOF already was.
 - `PartialSignatureError` has a new variant, `InvalidInputIndex`, and is `#[non_exhaustive]`.
+- `SignPsbtYieldedObject::Unknown` is a non-exhaustive struct variant with the object's `tag`, and the `data` that follows the input index. It previously had only the data, so the tag was lost.
 
 ### Added
 

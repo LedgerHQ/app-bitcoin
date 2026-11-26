@@ -132,8 +132,10 @@ pub enum SignPsbtYieldedObject {
     MusigPubNonce(MusigPubNonce),
     /// A MuSig2 partial signature (round 2).
     MusigPartialSignature(MusigPartialSignature),
-    /// An unknown payload with an unrecognized tag; the original bytes are included for reference.
-    Unknown(Vec<u8>),
+    /// An object with a tag in the reserved range that this version does not know: the tag, and
+    /// the data that follows the input index.
+    #[non_exhaustive]
+    Unknown { tag: u64, data: Vec<u8> },
 }
 
 fn checked_input_index(index: u64) -> Result<usize, PartialSignatureError> {
@@ -224,7 +226,7 @@ pub fn parse_sign_psbt_yielded(
         // Reserved tag range used by the protocol for non-input-index payloads.
         // Tags in this range that are not explicitly handled above are unknown to this client version, and reserved
         // for future use.
-        tag_value if tag_value >= 0x80000000 => {
+        tag if tag >= 0x80000000 => {
             // Future tags are expected to follow the same layout, using the first varint to refer to the input index
             let (UncheckedVarInt(input_index), j): (UncheckedVarInt, usize) =
                 deserialize_partial(&data[i..])
@@ -232,7 +234,10 @@ pub fn parse_sign_psbt_yielded(
             let rest = &data[i + j..];
             Ok((
                 checked_input_index(input_index)?,
-                SignPsbtYieldedObject::Unknown(rest.to_vec()),
+                SignPsbtYieldedObject::Unknown {
+                    tag,
+                    data: rest.to_vec(),
+                },
             ))
         }
         // Otherwise the leading varint is the input index and the remainder is a regular partial signature.
@@ -374,8 +379,8 @@ mod tests {
     #[test]
     fn parse_unknown_reserved_tag() {
         // Any tag in the reserved range (>= 0x80000000) that this client version does
-        // not explicitly handle must surface as `Unknown` while preserving input_index
-        // and the trailing payload verbatim.
+        // not explicitly handle must surface as `Unknown` while preserving the tag, the
+        // input_index and the trailing payload verbatim.
         const UNKNOWN_TAG: u64 = 0x89AB_CDEF;
         let trailer = hex!("deadbeef");
 
@@ -386,7 +391,10 @@ mod tests {
         let (idx, obj) = parse_ok(&payload);
         assert_eq!(idx, 11);
         match obj {
-            SignPsbtYieldedObject::Unknown(bytes) => assert_eq!(bytes, trailer),
+            SignPsbtYieldedObject::Unknown { tag, data } => {
+                assert_eq!(tag, UNKNOWN_TAG);
+                assert_eq!(data, trailer);
+            }
             other => panic!("expected Unknown, got {:?}", other),
         }
     }
