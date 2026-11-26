@@ -353,6 +353,22 @@ fn eight_sibling_proof_continuations_reconstruct_and_reset_the_queue() {
 }
 
 #[test]
+fn empty_lists_have_the_zero_root_and_no_leaves() {
+    use ledger_bitcoin_client::interpreter::InterpreterError;
+    let mut interpreter = ClientCommandInterpreter::new();
+    let root = interpreter.add_known_list(&[] as &[&[u8]]);
+    assert_eq!(root, [0; 32]);
+    let mut request = vec![ClientCommandCode::GetMerkleLeafProof as u8];
+    request.extend(root);
+    request.extend(varint(0)); // Tree size.
+    request.extend(varint(0)); // Leaf index.
+    assert!(matches!(
+        interpreter.execute(request),
+        Err(InterpreterError::InvalidIndexOrSize)
+    ));
+}
+
+#[test]
 fn interpreter_rejects_malformed_requests() {
     use ledger_bitcoin_client::interpreter::InterpreterError;
     let mut interpreter = ClientCommandInterpreter::default();

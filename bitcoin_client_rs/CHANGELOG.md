@@ -26,3 +26,4 @@ This release exposes the protocol without the transport, for applications that o
 ### Fixed
 
 - PSBTv2-only fields in a PSBTv0 are rejected when converting it for `sign_psbt`, as they would acquire meaning after the conversion.
+- Signing an empty message, or a PSBT without inputs or outputs, panicked while building the Merkle tree of an empty list.
