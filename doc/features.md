@@ -114,7 +114,7 @@ build is named **Bitcoin Test**. They are ***separate applications***.
 
 The **Bitcoin Test** app can be used for all test networks, including Bitcoin Core's regtest.
 Note, however, that SegWit (and taproot) addresses are shown on-screen and returned to the
-host using the human readable part `tb1`, while bitcoin-core uses `bcrt`.
+host using the human-readable part `tb`, while Bitcoin Core's regtest uses `bcrt`.
 
 ## Version and feature compatibility
 

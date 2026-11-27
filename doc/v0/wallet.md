@@ -1,5 +1,5 @@
 
-This page described the wallet plicies used in the _deprecated_ version 0 of the protocol, as implemented in the v2.0.0 of the Bitcoin app. This protocol is still supported at this time, but we encourage integrations to switch to the [wallet policies in version 1 of the protocol](../wallet.md).
+This page describes the wallet policies used in the _deprecated_ version 0 of the protocol, as implemented in the v2.0.0 of the Bitcoin app. This protocol is still supported at this time, but we encourage integrations to switch to the [wallet policies in version 1 of the protocol](../wallet.md).
 
 # Wallet policy
 

@@ -82,7 +82,7 @@ This guarantees the following security property (except on default accounts):
   inform the user about the involved account.
 
 This is particularly important for accounts involving multiple parties (multisig,
-miniscript, etc).
+miniscript, etc.).
 
 ## Registration and the HMAC
 

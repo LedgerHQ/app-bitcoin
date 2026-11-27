@@ -17,7 +17,7 @@ MuSig2 is a 2-round multi-signature scheme compatible with the public keys and s
 
 ## State minimization
 
-This section describes implementation details that allow to minimize the amount of statefor each MuSig2 signing session, allowing secure support for multiple parallel MuSig2 on embedded device with limited storage.
+This section describes implementation details that allow to minimize the amount of state for each MuSig2 signing session, allowing secure support for multiple parallel MuSig2 signing sessions on embedded devices with limited storage.
 
 ### Introduction
 
@@ -27,7 +27,7 @@ In the typical signing flow of a wallet, it's more logical to consider a _sessio
 
 Therefore, in the flow of BIP-0327, you would expect at least _one MuSig2 signing session per input_ to be active at the same time. In the context of hardware signing device support, that's somewhat problematic: it would require to persist state for an unbounded number of signing sessions, for example for a wallet that received a large number of small UTXOs. Persistent storage is often a scarce resource in embedded signing devices, and a naive approach would likely impose a maximum limit on the number of inputs of the transactions, depending on the hardware limitations.
 
-This document describes an approach that is compatible with and builds on top of BIP-0327 to define a _psbt-level session_ with only a small amount of state persisted on the device. Each psbt-level session allows to manage in parallel all the MuSig2 sessions involved in signing a transaction (typically, at least one for each input). Each psbt-level session only requires 64 bytes of storage for the entire transaction, regardless of the amount of inputs.
+This document describes an approach that is compatible with and builds on top of BIP-0327 to define a _psbt-level session_ with only a small amount of state persisted on the device. Each psbt-level session allows to manage in parallel all the MuSig2 sessions involved in signing a transaction (typically, at least one for each input). Each psbt-level session only requires 64 bytes of storage for the entire transaction, regardless of the number of inputs.
 
 ### Signing flow with synthetic randomness
 
@@ -37,11 +37,11 @@ This section presents the core idea, while the next section makes it more precis
 
 In BIP-0327, the internal state that is kept by the signing device is essentially the *secnonce*, which in turn is computed from a random number _rand'_, and optionally from other parameters of _NonceGen_ which depend on the transaction being signed.
 
-The core idea for state minimization is to compute a global random `rand_root`; then, for the *i*-th input and for the *j*-th `musig()`  key that the device is signing for in the [wallet policy](https://github.com/bitcoin/bips/blob/master/bip-0388.mediawiki), one defines the *rand'* in _NonceGen_ as:
+The core idea for state minimization is to compute a global random `rand_root`; then, for the *i*-th input and for the *j*-th `musig()` key that the device is signing for in the [wallet policy](https://github.com/bitcoin/bips/blob/master/bip-0388.mediawiki), one defines the *rand'* in _NonceGen_ as:
 
-$\qquad rand_{i,j} = SHA256(rand\_{root} \| i \| j)$
+$`\qquad rand_{i,j} = SHA256(rand\_{root} \| i \| j)`$
 
-In the concatenation, a fixed-length encoding of $i$ and $j$ is used in order to avoid collisions. That is used as the *rand'* value in the *NonceGen* algorithm for that input/KEY pair.
+In the concatenation, a fixed-length encoding of $i$ and $j$ is used in order to avoid collisions. That is used as the *rand'* value in the *NonceGen* algorithm for that input/key pair.
 
 The *j* parameter allows to handle wallet policies that contain more than one `musig()` key expression involving the signing device.
 
@@ -65,10 +65,10 @@ The term *persistent memory* refers to secure storage that is not wiped out when
 **Phase 1: pubnonce generation:** A PSBT is sent to the signing device, and it does not contain any pubnonce.
 - If a session already exists, it is deleted from the persistent memory.
 - A new session is created in volatile memory.
-- The device produces a fresh random number $rand\_{root}$, and saves it in the current session.
-- The device generates the randomness for the $i$-th input and for the $j$-th key as: $rand_{i,j} = SHA256(rand\_{root} \| i \| j)$.
+- The device produces a fresh random number $`rand\_{root}`$, and saves it in the current session.
+- The device generates the randomness for the $i$-th input and for the $j$-th key as: $`rand_{i,j} = SHA256(rand\_{root} \| i \| j)`$.
 - Compute each *(secnonce, pubnonce)* as per the `NonceGen` algorithm, with the arguments described above.
-- At completion (after all the pubnonces are returned), the session secret $rand\_{root}$ is copied into the persistent memory.
+- At completion (after all the pubnonces are returned), the session secret $`rand\_{root}`$ is copied into the persistent memory.
 
 **Phase 2: partial signature generation:** A PSBT containing all the pubnonces is sent to the device.
 - *A copy of the session is stored in the volatile memory, and the session is deleted from the persistent memory*.
@@ -78,15 +78,18 @@ The term *persistent memory* refers to secure storage that is not wiped out when
   - Continue the signing flow as per BIP-0327, generating the partial signature.
 
 ### Security considerations
+
 #### State reuse avoidance
+
 Storing the session in persistent memory only at the end of Phase 1, and deleting it before beginning Phase 2 simplifies auditing and making sure that there is no reuse of state across signing sessions.
 
 #### Security of synthetic randomness
 
-Generating $rand_{i, j}$ synthetically is not a problem, since the $rand\_{root}$ value is kept secret and never leaves the device. This ensures that all the values produced for different $i$ and $j$ are not predictable for an attacker.
+Generating $rand_{i, j}$ synthetically is not a problem, since the $`rand\_{root}`$ value is kept secret and never leaves the device. This ensures that all the values produced for different $i$ and $j$ are not predictable for an attacker.
 
 #### Optional arguments of NonceGen
-In BIP-0327, *aggpk*, *msg* and *extra_in* are optional arguments of _NonceGen_. They only add entropy, as a defense in depth against a faulty source of randomness. They are not needed for the uniqueness of the nonces, which comes from $rand\_{root}$ being generated by the hardware RNG, and from the $(i, j)$ domain separation in $rand_{i,j}$.
+
+In BIP-0327, *aggpk*, *msg* and *extra_in* are optional arguments of _NonceGen_. They only add entropy, as a defense in depth against a faulty source of randomness. They are not needed for the uniqueness of the nonces, which comes from $`rand\_{root}`$ being generated by the hardware RNG, and from the $(i, j)$ domain separation in $rand_{i,j}$.
 
 BIP-0327 suggests using the tweaked aggregate key as *aggpk*. Using the untweaked one instead is what makes the pubnonces independent of the transaction, and of the (change, address index) of the UTXO being spent. Since none of the arguments depend on the PSBT, a malicious software wallet can't affect the _secnonce_/_pubnonce_ pairs in any way. A PSBT whose pubnonces were not produced by the current session makes Phase 2 fail, as the recomputed _pubnonce_ does not match the one in the PSBT.
 
@@ -94,11 +97,11 @@ BIP-0327 suggests using the tweaked aggregate key as *aggpk*. Using the untweake
 
 The approach described above assumes that no attempt to sign a PSBT for a wallet policy containing `musig()` keys is initiated while a session is already in progress.
 
-In order to generalize this to multiple parallel signing sessions, each signing session is identified by a `psbt_session_id`, which must be identical between Round 1 and Round 2 of the protocol. The device computes it as:
+In order to generalize this to multiple parallel signing sessions, each signing session is identified by a `psbt_session_id`, which must be identical between Phase 1 and Phase 2 of the protocol. The device computes it as:
 
-$\qquad psbt\_session\_id = H_{PsbtSessionId}(descriptor\_template\_hash \| keys\_info\_merkle\_root \| len(session\_id) \| session\_id)$
+$`\qquad psbt\_session\_id = H_{PsbtSessionId}(descriptor\_template\_hash \| keys\_info\_merkle\_root \| len(session\_id) \| session\_id)`$
 
-where $H_{tag}$ is the BIP-0340 tagged hash, the first two arguments are the hash of the descriptor template and the root of the Merkle tree of the keys information of the wallet policy, $session\_id$ is the value of the [`MUSIG2_SESSION_ID`](#the-musig2_session_id-psbt-field) field (empty if the PSBT does not contain the field), and $len(session\_id)$ is its length as a single byte (`0x00` if the field is absent). The name of the wallet policy is not committed to, as it plays no role in signing.
+where $H_{tag}$ is the BIP-0340 tagged hash, the first two arguments are the hash of the descriptor template and the root of the Merkle tree of the keys information of the wallet policy, $`session\_id`$ is the value of the [`MUSIG2_SESSION_ID`](#the-musig2_session_id-psbt-field) field (empty if the PSBT does not contain the field), and $`len(session\_id)`$ is its length as a single byte (`0x00` if the field is absent). The name of the wallet policy is not committed to, as it plays no role in signing.
 
 The `psbt_session_id` deliberately depends only on the wallet policy and on the `MUSIG2_SESSION_ID`, and not on the transaction; together with the transaction-independent arguments of _NonceGen_, this is what allows [pre-generating the pubnonces](#pre-generating-the-pubnonces). The tradeoff is that, without a `MUSIG2_SESSION_ID`, at most one session can be pending for each wallet policy.
 
