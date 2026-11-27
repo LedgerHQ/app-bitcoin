@@ -6,10 +6,10 @@
 //! serialization/deserialization logic to rust-psbt (for known fields), and propagating unknown
 //! fields unchanged.
 
-use core::fmt;
+use core::{convert::TryFrom, fmt};
 
 use bitcoin::{
-    consensus::encode::{serialize, Decodable},
+    consensus::encode::{deserialize, serialize, Decodable},
     ecdsa,
     hashes::Hash,
     key::{FromSliceError as KeyError, TweakedPublicKey},
@@ -17,7 +17,7 @@ use bitcoin::{
     secp256k1::{self, XOnlyPublicKey},
     taproot,
     taproot::TapLeafHash,
-    PublicKey, ScriptBuf,
+    PublicKey, ScriptBuf, Transaction,
 };
 
 use crate::protocol::UncheckedVarInt;
@@ -72,6 +72,13 @@ pub enum PsbtV2Error {
     /// A map has this key more than once. rust-bitcoin serializes such a PSBT when an `unknown`
     /// field has the key of a field that it knows.
     DuplicateKey(Vec<u8>),
+    /// The serialization does not start with the `psbt` magic and its `0xff` separator.
+    InvalidMagic,
+    /// The global `PSBT_GLOBAL_VERSION` is neither 0 nor 2.
+    UnsupportedVersion(u32),
+    /// A field required by the PSBT's version is missing (the v0 unsigned transaction, or the
+    /// v2 input or output count), or its value cannot be decoded. Holds the global key type.
+    InvalidGlobalField(u8),
 }
 
 impl core::fmt::Display for PsbtV2Error {
@@ -87,6 +94,11 @@ impl core::fmt::Display for PsbtV2Error {
             Self::DuplicateKey(key) => {
                 f.write_str("Duplicate PSBT key ")?;
                 key.iter().try_for_each(|byte| write!(f, "{:02x}", byte))
+            }
+            Self::InvalidMagic => f.write_str("Invalid PSBT magic bytes"),
+            Self::UnsupportedVersion(version) => write!(f, "Unsupported PSBT version {}", version),
+            Self::InvalidGlobalField(key_type) => {
+                write!(f, "Missing or invalid global PSBT field {:#04x}", key_type)
             }
         }
     }
@@ -107,9 +119,82 @@ pub fn get_v2_maps(psbt: &Psbt) -> Result<PsbtV2Maps, PsbtV2Error> {
     let mut maps = split_maps(&psbt.serialize(), 1 + n_inputs + n_outputs)
         .ok_or(PsbtV2Error::MalformedSerialization)?;
 
-    let mut outputs = maps.split_off(1 + n_inputs);
-    let mut inputs = maps.split_off(1);
-    let mut global = maps.pop().ok_or(PsbtV2Error::MalformedSerialization)?;
+    let outputs = maps.split_off(1 + n_inputs);
+    let inputs = maps.split_off(1);
+    let global = maps.pop().ok_or(PsbtV2Error::MalformedSerialization)?;
+
+    lower_v0_maps(global, inputs, outputs, &psbt.unsigned_tx)
+}
+
+/// Returns the PSBTv2 maps of a serialized PSBT of version 0 or 2.
+///
+/// Unlike [`get_v2_maps`], the PSBT is not parsed into a [`Psbt`]: every key-value pair reaches
+/// the maps byte for byte, so the device sees exactly the fields the caller serialized, whether
+/// or not rust-bitcoin knows (or accepts) them. Only the fields needed to find the maps are
+/// decoded: the unsigned transaction of a v0 PSBT, which is then lowered to its v2 fields like
+/// [`get_v2_maps`] does, or the input and output counts of a v2 PSBT.
+pub fn get_v2_maps_from_bytes(bytes: &[u8]) -> Result<PsbtV2Maps, PsbtV2Error> {
+    let mut d = match bytes.get(..PSBT_MAGIC_LEN) {
+        Some(b"psbt\xff") => &bytes[PSBT_MAGIC_LEN..],
+        _ => return Err(PsbtV2Error::InvalidMagic),
+    };
+    let mut global = read_map(&mut d)?;
+    // before reading any global field, so that a duplicate cannot be dropped unnoticed (an
+    // explicit version 0 is removed below)
+    reject_duplicate_keys(&global)?;
+
+    let version = match global_value(&global, PSBT_GLOBAL_VERSION) {
+        None => 0,
+        Some(value) => <[u8; 4]>::try_from(value)
+            .map(u32::from_le_bytes)
+            .map_err(|_| PsbtV2Error::InvalidGlobalField(PSBT_GLOBAL_VERSION))?,
+    };
+
+    match version {
+        0 => {
+            let tx: Transaction = global_value(&global, PSBT_GLOBAL_UNSIGNED_TX)
+                .and_then(|value| deserialize(value).ok())
+                .ok_or(PsbtV2Error::InvalidGlobalField(PSBT_GLOBAL_UNSIGNED_TX))?;
+            let inputs = read_maps(&mut d, tx.input.len())?;
+            let outputs = read_maps(&mut d, tx.output.len())?;
+            if !d.is_empty() {
+                return Err(PsbtV2Error::MalformedSerialization);
+            }
+            // an explicit version 0 is replaced by the synthesized version 2
+            global.retain(|(key, _)| key.as_slice() != [PSBT_GLOBAL_VERSION]);
+            lower_v0_maps(global, inputs, outputs, &tx)
+        }
+        2 => {
+            let n_inputs = global_count(&global, PSBT_GLOBAL_INPUT_COUNT)?;
+            let n_outputs = global_count(&global, PSBT_GLOBAL_OUTPUT_COUNT)?;
+            let inputs = read_maps(&mut d, n_inputs)?;
+            let outputs = read_maps(&mut d, n_outputs)?;
+            if !d.is_empty() {
+                return Err(PsbtV2Error::MalformedSerialization);
+            }
+            for map in inputs.iter().chain(&outputs) {
+                reject_duplicate_keys(map)?;
+            }
+            Ok(PsbtV2Maps {
+                global,
+                inputs,
+                outputs,
+            })
+        }
+        version => Err(PsbtV2Error::UnsupportedVersion(version)),
+    }
+}
+
+/// Replaces the unsigned transaction of v0 maps with the equivalent PSBTv2 fields.
+fn lower_v0_maps(
+    mut global: PsbtMap,
+    mut inputs: Vec<PsbtMap>,
+    mut outputs: Vec<PsbtMap>,
+    tx: &Transaction,
+) -> Result<PsbtV2Maps, PsbtV2Error> {
+    if tx.input.len() != inputs.len() || tx.output.len() != outputs.len() {
+        return Err(PsbtV2Error::TxMapCountMismatch);
+    }
 
     // The keys of each map are a Merkle tree that the app requires to be strictly sorted.
     for map in core::iter::once(&global).chain(&inputs).chain(&outputs) {
@@ -149,22 +234,22 @@ pub fn get_v2_maps(psbt: &Psbt) -> Result<PsbtV2Maps, PsbtV2Error> {
     push_v2_field(
         &mut global,
         PSBT_GLOBAL_TX_VERSION,
-        psbt.unsigned_tx.version.0.to_le_bytes().to_vec(),
+        tx.version.0.to_le_bytes().to_vec(),
     )?;
     push_v2_field(
         &mut global,
         PSBT_GLOBAL_FALLBACK_LOCKTIME,
-        serialize(&psbt.unsigned_tx.lock_time),
+        serialize(&tx.lock_time),
     )?;
     push_v2_field(
         &mut global,
         PSBT_GLOBAL_INPUT_COUNT,
-        serialize(&UncheckedVarInt(n_inputs as u64)),
+        serialize(&UncheckedVarInt(inputs.len() as u64)),
     )?;
     push_v2_field(
         &mut global,
         PSBT_GLOBAL_OUTPUT_COUNT,
-        serialize(&UncheckedVarInt(n_outputs as u64)),
+        serialize(&UncheckedVarInt(outputs.len() as u64)),
     )?;
     push_v2_field(
         &mut global,
@@ -172,7 +257,7 @@ pub fn get_v2_maps(psbt: &Psbt) -> Result<PsbtV2Maps, PsbtV2Error> {
         2_u32.to_le_bytes().to_vec(),
     )?;
 
-    for (map, txin) in inputs.iter_mut().zip(psbt.unsigned_tx.input.iter()) {
+    for (map, txin) in inputs.iter_mut().zip(tx.input.iter()) {
         push_v2_field(
             map,
             PSBT_IN_PREVIOUS_TXID,
@@ -186,7 +271,7 @@ pub fn get_v2_maps(psbt: &Psbt) -> Result<PsbtV2Maps, PsbtV2Error> {
         push_v2_field(map, PSBT_IN_SEQUENCE, serialize(&txin.sequence))?;
     }
 
-    for (map, txout) in outputs.iter_mut().zip(psbt.unsigned_tx.output.iter()) {
+    for (map, txout) in outputs.iter_mut().zip(tx.output.iter()) {
         push_v2_field(
             map,
             PSBT_OUT_AMOUNT,
@@ -227,6 +312,41 @@ fn reject_v2_fields(map: &PsbtMap, key_types: &[u8]) -> Result<(), PsbtV2Error> 
     }
 }
 
+/// The value of the keyless global field `key_type`, if present.
+fn global_value(global: &PsbtMap, key_type: u8) -> Option<&[u8]> {
+    global
+        .iter()
+        .find(|(key, _)| key.as_slice() == [key_type])
+        .map(|(_, value)| value.as_slice())
+}
+
+/// Decodes the compact-size count held by the global field `key_type`.
+fn global_count(global: &PsbtMap, key_type: u8) -> Result<usize, PsbtV2Error> {
+    let mut value =
+        global_value(global, key_type).ok_or(PsbtV2Error::InvalidGlobalField(key_type))?;
+    let count = UncheckedVarInt::consensus_decode(&mut value)
+        .map_err(|_| PsbtV2Error::InvalidGlobalField(key_type))?;
+    if !value.is_empty() {
+        return Err(PsbtV2Error::InvalidGlobalField(key_type));
+    }
+    usize::try_from(count.0).map_err(|_| PsbtV2Error::InvalidGlobalField(key_type))
+}
+
+/// Reads `n_maps` maps. `n_maps` comes from untrusted input, so nothing is preallocated for it:
+/// a count larger than the data fails once the data runs out.
+fn read_maps(d: &mut &[u8], n_maps: usize) -> Result<Vec<PsbtMap>, PsbtV2Error> {
+    let mut maps = Vec::new();
+    for _ in 0..n_maps {
+        maps.push(read_map(d)?);
+    }
+    Ok(maps)
+}
+
+/// Reads one map up to its separator.
+fn read_map(d: &mut &[u8]) -> Result<PsbtMap, PsbtV2Error> {
+    read_map_pairs(d).ok_or(PsbtV2Error::MalformedSerialization)
+}
+
 /// Adds a keyless PSBTv2 field synthesized from the v0 unsigned transaction, erroring if the
 /// PSBT already carries that key.
 ///
@@ -247,21 +367,25 @@ fn split_maps(bytes: &[u8], n_maps: usize) -> Option<Vec<PsbtMap>> {
 
     let mut maps = Vec::with_capacity(n_maps);
     for _ in 0..n_maps {
-        let mut pairs: PsbtMap = Vec::new();
-        loop {
-            // <map> := <keypair>* 0x00, and a key is never empty, so a zero length is the
-            // separator rather than a pair.
-            if *d.first()? == 0x00 {
-                d = &d[1..];
-                break;
-            }
-            let key = read_prefixed(&mut d)?;
-            let value = read_prefixed(&mut d)?;
-            pairs.push((key, value));
-        }
-        maps.push(pairs);
+        maps.push(read_map_pairs(&mut d)?);
     }
     Some(maps)
+}
+
+/// Reads the key-value pairs of one map and its separator, advancing `d` past them.
+fn read_map_pairs(d: &mut &[u8]) -> Option<PsbtMap> {
+    let mut pairs: PsbtMap = Vec::new();
+    loop {
+        // <map> := <keypair>* 0x00, and a key is never empty, so a zero length is the
+        // separator rather than a pair.
+        if *d.first()? == 0x00 {
+            *d = &d[1..];
+            return Some(pairs);
+        }
+        let key = read_prefixed(d)?;
+        let value = read_prefixed(d)?;
+        pairs.push((key, value));
+    }
 }
 
 /// Reads one `<compact size length> <bytes>` field, advancing `d` past it.
@@ -741,6 +865,185 @@ mod tests {
         assert_eq!(
             get_v2_maps(&psbt).err(),
             Some(PsbtV2Error::TxMapCountMismatch)
+        );
+    }
+
+    fn push_prefixed(out: &mut Vec<u8>, bytes: &[u8]) {
+        out.extend(serialize(&UncheckedVarInt(bytes.len() as u64)));
+        out.extend_from_slice(bytes);
+    }
+
+    /// Serializes maps the way a PSBT does: the magic, then each map as length-prefixed pairs
+    /// ended by a separator.
+    fn serialize_maps<'a>(maps: impl IntoIterator<Item = &'a PsbtMap>) -> Vec<u8> {
+        let mut out = b"psbt\xff".to_vec();
+        for map in maps {
+            for (key, value) in map {
+                push_prefixed(&mut out, key);
+                push_prefixed(&mut out, value);
+            }
+            out.push(0x00);
+        }
+        out
+    }
+
+    fn all_maps(maps: &PsbtV2Maps) -> Vec<&PsbtMap> {
+        let mut all = vec![&maps.global];
+        all.extend(maps.inputs.iter());
+        all.extend(maps.outputs.iter());
+        all
+    }
+
+    fn assert_same_maps(a: &PsbtV2Maps, b: &PsbtV2Maps) {
+        assert_eq!(all_maps(a), all_maps(b));
+    }
+
+    #[test]
+    fn raw_v0_is_lowered_like_a_parsed_psbt() {
+        let mut psbt = unsigned_psbt();
+        psbt.inputs[0].unknown.insert(keyless(0x30), vec![1, 2, 3]);
+        let from_bytes = get_v2_maps_from_bytes(&psbt.serialize()).unwrap();
+        assert_same_maps(&from_bytes, &get_v2_maps(&psbt).unwrap());
+    }
+
+    /// Like [`get_v2_maps`], the raw path rejects the fields that BIP-370 excludes from PSBTv0.
+    #[test]
+    fn raw_v0_rejects_v2_only_fields() {
+        for key_type in [
+            PSBT_IN_REQUIRED_TIME_LOCKTIME,
+            PSBT_IN_REQUIRED_HEIGHT_LOCKTIME,
+        ] {
+            let mut psbt = unsigned_psbt();
+            psbt.inputs[0]
+                .unknown
+                .insert(keyless(key_type), 1_u32.to_le_bytes().to_vec());
+            assert_eq!(
+                get_v2_maps_from_bytes(&psbt.serialize()).err(),
+                Some(PsbtV2Error::UnexpectedV2Field(key_type))
+            );
+        }
+    }
+
+    #[test]
+    fn raw_v0_rejects_a_duplicate_explicit_version() {
+        let psbt = unsigned_psbt();
+        let maps = split_maps(&psbt.serialize(), 3).unwrap();
+        let mut global = maps[0].clone();
+        global.push((vec![PSBT_GLOBAL_VERSION], 0_u32.to_le_bytes().to_vec()));
+        global.push((vec![PSBT_GLOBAL_VERSION], 0_u32.to_le_bytes().to_vec()));
+        let bytes = serialize_maps([&global, &maps[1], &maps[2]]);
+        assert_eq!(
+            get_v2_maps_from_bytes(&bytes).err(),
+            Some(PsbtV2Error::DuplicateKey(vec![PSBT_GLOBAL_VERSION]))
+        );
+    }
+
+    #[test]
+    fn raw_v0_with_explicit_version_zero_is_lowered() {
+        let psbt = unsigned_psbt();
+        let maps = split_maps(&psbt.serialize(), 3).unwrap();
+        let mut global = maps[0].clone();
+        global.push((vec![PSBT_GLOBAL_VERSION], 0_u32.to_le_bytes().to_vec()));
+        let bytes = serialize_maps([&global, &maps[1], &maps[2]]);
+        let from_bytes = get_v2_maps_from_bytes(&bytes).unwrap();
+        assert_same_maps(&from_bytes, &get_v2_maps(&psbt).unwrap());
+    }
+
+    /// A v2 PSBT is forwarded byte for byte, including values that a parser would reject.
+    #[test]
+    fn raw_v2_maps_are_forwarded_unchanged() {
+        let mut maps = get_v2_maps(&unsigned_psbt()).unwrap();
+        // not a valid sequence (too short), and an unknown key type
+        maps.inputs[0].retain(|(key, _)| key.as_slice() != [PSBT_IN_SEQUENCE]);
+        maps.inputs[0].push((vec![PSBT_IN_SEQUENCE], vec![1, 2]));
+        maps.outputs[0].push((vec![0x77, 1], vec![]));
+        // no fallback locktime at all
+        maps.global
+            .retain(|(key, _)| key.as_slice() != [PSBT_GLOBAL_FALLBACK_LOCKTIME]);
+
+        let bytes = serialize_maps(all_maps(&maps));
+        assert_same_maps(&get_v2_maps_from_bytes(&bytes).unwrap(), &maps);
+    }
+
+    #[test]
+    fn raw_parsing_rejects_malformed_psbts() {
+        let maps = get_v2_maps(&unsigned_psbt()).unwrap();
+        let v2 = serialize_maps(all_maps(&maps));
+        assert_eq!(
+            get_v2_maps_from_bytes(&v2[1..]).err(),
+            Some(PsbtV2Error::InvalidMagic)
+        );
+
+        let mut trailing = v2.clone();
+        trailing.push(0x00);
+        assert_eq!(
+            get_v2_maps_from_bytes(&trailing).err(),
+            Some(PsbtV2Error::MalformedSerialization)
+        );
+        assert_eq!(
+            get_v2_maps_from_bytes(&v2[..v2.len() - 1]).err(),
+            Some(PsbtV2Error::MalformedSerialization)
+        );
+
+        let with_global = |f: &dyn Fn(&mut PsbtMap)| {
+            let mut global = maps.global.clone();
+            f(&mut global);
+            let mut all = vec![&global];
+            all.extend(maps.inputs.iter());
+            all.extend(maps.outputs.iter());
+            get_v2_maps_from_bytes(&serialize_maps(all)).err()
+        };
+        let set = |global: &mut PsbtMap, key_type: u8, value: Vec<u8>| {
+            global.retain(|(key, _)| key.as_slice() != [key_type]);
+            global.push((vec![key_type], value));
+        };
+
+        assert_eq!(
+            with_global(&|g| set(g, PSBT_GLOBAL_VERSION, 1_u32.to_le_bytes().to_vec())),
+            Some(PsbtV2Error::UnsupportedVersion(1))
+        );
+        assert_eq!(
+            with_global(&|g| set(g, PSBT_GLOBAL_VERSION, vec![2])),
+            Some(PsbtV2Error::InvalidGlobalField(PSBT_GLOBAL_VERSION))
+        );
+        assert_eq!(
+            with_global(&|g| g.retain(|(key, _)| key.as_slice() != [PSBT_GLOBAL_INPUT_COUNT])),
+            Some(PsbtV2Error::InvalidGlobalField(PSBT_GLOBAL_INPUT_COUNT))
+        );
+        assert_eq!(
+            with_global(&|g| set(g, PSBT_GLOBAL_OUTPUT_COUNT, vec![1, 0])),
+            Some(PsbtV2Error::InvalidGlobalField(PSBT_GLOBAL_OUTPUT_COUNT))
+        );
+        // a huge count fails when the maps run out, without trying to allocate for it
+        assert_eq!(
+            with_global(&|g| set(g, PSBT_GLOBAL_INPUT_COUNT, vec![0xff; 9])),
+            Some(PsbtV2Error::MalformedSerialization)
+        );
+        assert_eq!(
+            with_global(&|g| g.push((vec![0x70], vec![]))),
+            None,
+            "an unknown key is fine"
+        );
+        assert_eq!(
+            with_global(&|g| {
+                g.push((vec![0x70], vec![]));
+                g.push((vec![0x70], vec![1]));
+            }),
+            Some(PsbtV2Error::DuplicateKey(vec![0x70]))
+        );
+
+        // a v0 PSBT without (or with an undecodable) unsigned transaction
+        let v0 = split_maps(&unsigned_psbt().serialize(), 3).unwrap();
+        let mut global = v0[0].clone();
+        global.retain(|(key, _)| key.as_slice() != [PSBT_GLOBAL_UNSIGNED_TX]);
+        assert_eq!(
+            get_v2_maps_from_bytes(&serialize_maps([&global, &v0[1], &v0[2]])).err(),
+            Some(PsbtV2Error::InvalidGlobalField(PSBT_GLOBAL_UNSIGNED_TX))
+        );
+        global.push((vec![PSBT_GLOBAL_UNSIGNED_TX], vec![1, 2, 3]));
+        assert_eq!(
+            get_v2_maps_from_bytes(&serialize_maps([&global, &v0[1], &v0[2]])).err(),
+            Some(PsbtV2Error::InvalidGlobalField(PSBT_GLOBAL_UNSIGNED_TX))
         );
     }
 }
