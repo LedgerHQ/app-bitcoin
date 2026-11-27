@@ -295,9 +295,16 @@ jobs:
       package_directory: "bitcoin_client_js"
 
   job_test_rust_client:
-    name: Tests for rust client library
-    needs: job_build
+    name: Rust client
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: bitcoin_client_rs
+
+    env:
+      CARGO_INCREMENTAL: 0
 
     container:
       image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
@@ -306,10 +313,72 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
-      - name: Run tests
+      - name: Install WASM target
+        run: rustup target add wasm32-unknown-unknown
+
+      # Each `cargo test` also runs the doctests.
+      - name: Test without features
+        run: cargo test --locked -p ledger_bitcoin_client --no-default-features
+
+      - name: Test paranoid_client
+        run: cargo test --locked -p ledger_bitcoin_client --no-default-features --features paranoid_client
+
+      - name: Test client
+        run: cargo test --locked -p ledger_bitcoin_client --no-default-features --features client
+
+      - name: Test client and paranoid_client
+        run: cargo test --locked -p ledger_bitcoin_client --no-default-features --features client,paranoid_client
+
+      - name: Test async
+        run: cargo test --locked -p ledger_bitcoin_client --no-default-features --features async
+
+      - name: Test default features (async and paranoid_client)
+        run: cargo test --locked -p ledger_bitcoin_client
+
+      - name: Check pure WASM
+        run: cargo check --locked -p ledger_bitcoin_client --no-default-features --target wasm32-unknown-unknown
+
+      - name: Check paranoid WASM
+        run: cargo check --locked -p ledger_bitcoin_client --no-default-features --features paranoid_client --target wasm32-unknown-unknown
+
+  # Separate from the tests, which the release depends on: a new lint in the image's toolchain
+  # fails this job, but does not block a release.
+  job_lint_rust_client:
+    name: Rust client lints
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: bitcoin_client_rs
+
+    env:
+      CARGO_INCREMENTAL: 0
+      RUSTDOCFLAGS: -D warnings
+
+    container:
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Check formatting
+        run: cargo fmt -p ledger_bitcoin_client -- --check
+
+      - name: Clippy, denying warnings in every feature combination
         run: |
-          cd bitcoin_client_rs/
-          cargo test --no-default-features --features="async"
+          for features in "" paranoid_client client client,paranoid_client async async,paranoid_client; do
+            echo "Features: ${features:-none}"
+            cargo clippy --locked -p ledger_bitcoin_client --all-targets --no-default-features --features "$features" -- -D warnings
+          done
+
+      - name: Check documentation in every feature combination
+        run: |
+          for features in "" paranoid_client client client,paranoid_client async async,paranoid_client; do
+            echo "Features: ${features:-none}"
+            cargo doc --locked -p ledger_bitcoin_client --no-deps --no-default-features --features "$features"
+          done
 
   deploy_rust_client:
     name: Deploy rust client library

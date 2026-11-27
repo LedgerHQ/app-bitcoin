@@ -1,15 +1,19 @@
+//! This implementation of Merkle Trees makes usage of a
+//! simple and opinionated data structure.
+//! The Tree is only created once and does not require
+//! multiple manipulation like new leaf insertion at a choosen index.
+//! In fact the client uses merkle trees for read only commands:
+//!  - get_merkle_leaf_proof: provide the proof the hash of the leaf
+//!    with index i
+//!  - get_merkle_leaf_index: provide the index of the leaf with hash.
+
 use bitcoin::hashes::{sha256, Hash, HashEngine};
 
-///! This implementation of Merkle Trees makes usage of a
-///! simple and opinionated data structure.
-///! The Tree is only created once and does not require
-///! multiple manipulation like new leaf insertion at a choosen index.
-///! In fact the client uses merkle trees for read only commands:
-///!  - get_merkle_leaf_proof: provide the proof the hash of the leaf
-///!    with index i
-///!  - get_merkle_leaf_index: provide the index of the leaf with hash.
+/// The root of the Merkle tree of an empty list: 32 zero bytes (this differs from RFC 6962).
+const EMPTY_ROOT: [u8; 32] = [0; 32];
 
 /// MerkleTree is containing a merkle tree generated from a list of items.
+#[derive(Debug)]
 pub struct MerkleTree {
     root: Tree,
     leaves: Vec<[u8; 32]>,
@@ -27,12 +31,9 @@ impl MerkleTree {
         self.leaves.len()
     }
 
-    /// Returns the root hash of the Merkle tree.
+    /// Returns the root hash of the Merkle tree, or [`EMPTY_ROOT`] if it has no leaves.
     pub fn root_hash(&self) -> &[u8; 32] {
-        match &self.root {
-            Tree::Node { value, .. } => value,
-            Tree::Leaf(idx) => &self.leaves[*idx],
-        }
+        self.root.value(&self.leaves)
     }
 
     /// Returns the leaf value at index i.
@@ -56,8 +57,10 @@ impl MerkleTree {
     }
 }
 
-/// Tree is either a Node with children trees or a Leaf with only a given value.
+/// Tree is either a Node with children trees, a Leaf with only a given value, or the empty tree.
+#[derive(Debug)]
 enum Tree {
+    Empty,
     Node {
         value: [u8; 32],
         left: Box<Tree>,
@@ -70,6 +73,9 @@ enum Tree {
 
 impl Tree {
     fn new(leaves: &[[u8; 32]], start: usize, size: usize) -> Self {
+        if size == 0 {
+            return Tree::Empty;
+        }
         if size == 1 {
             return Tree::Leaf(start);
         }
@@ -95,6 +101,7 @@ impl Tree {
 
     fn value<'a>(&'a self, leaves: &'a [[u8; 32]]) -> &'a [u8; 32] {
         match self {
+            Self::Empty => &EMPTY_ROOT,
             Self::Node { value, .. } => value,
             Self::Leaf(idx) => &leaves[*idx],
         }
@@ -103,24 +110,21 @@ impl Tree {
     fn height(&self) -> usize {
         match self {
             Self::Node { height, .. } => *height,
-            Self::Leaf(_) => 0,
+            Self::Empty | Self::Leaf(_) => 0,
         }
     }
 
     /// get the merkle proof of a leaf with the given index in the leaves array.
     fn get_proof(&self, leaves: &[[u8; 32]], index: usize) -> Vec<Vec<u8>> {
         match self {
-            Self::Leaf(_) => Vec::new(),
+            Self::Empty | Self::Leaf(_) => Vec::new(),
             Self::Node { left, right, .. } => {
                 let (mut proof, sibling) = if index < pow2(left.height()) {
                     (left.get_proof(leaves, index), right)
                 } else {
                     (right.get_proof(leaves, index - pow2(left.height())), left)
                 };
-                match **sibling {
-                    Self::Node { value, .. } => proof.push(value.to_vec()),
-                    Self::Leaf(idx) => proof.push(leaves[idx].to_vec()),
-                }
+                proof.push(sibling.value(leaves).to_vec());
                 proof
             }
         }
@@ -219,5 +223,15 @@ mod tests {
         assert_eq!(tree.get_leaf_proof(2), Some(vec![value.to_vec()]));
 
         let _tree = MerkleTree::new(leaves.to_vec());
+    }
+
+    #[test]
+    fn empty_tree() {
+        let tree = MerkleTree::new(Vec::new());
+        assert_eq!(tree.size(), 0);
+        assert_eq!(tree.root_hash(), &[0; 32]);
+        assert_eq!(tree.get_leaf(0), None);
+        assert_eq!(tree.get_leaf_index(&[0; 32]), None);
+        assert_eq!(tree.get_leaf_proof(0), None);
     }
 }

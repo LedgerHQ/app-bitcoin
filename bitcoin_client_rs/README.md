@@ -8,7 +8,8 @@ If you wish to contribute to this library, please read
 
 ## Minimum Supported Rust Version
 
-`bitcoin_client_rs` should always compile using **Rust 1.60**.
+`bitcoin_client_rs` compiles with **Rust 1.78** or newer, as declared by
+`rust-version` in Cargo.toml.
 
 ## Getting started
 
@@ -21,9 +22,9 @@ pub struct BitcoinClient<T: Transport> {...}
 impl<T: Transport> BitcoinClient<T> {
     pub fn get_extended_pubkey(
         &self,
-        path: &bitcoin::util::bip32::DerivationPath,
+        path: &bitcoin::bip32::DerivationPath,
         display: bool,
-    ) -> Result<bitcoin::util::bip32::ExtendedPubKey, BitcoinClientError<T::Error>>;
+    ) -> Result<bitcoin::bip32::Xpub, BitcoinClientError<T::Error>>;
 }
 ```
 
@@ -41,6 +42,30 @@ In order to satisfy this Trait, it is possible to import the
 `ledger-transport-hid` crate from https://github.com/Zondax/ledger-rs.
 Please, read the `examples/ledger_hwi/src/transport.rs` file to find an example.
 
+## Transport-free protocol use
+
+The default features are `client`, `async` and `paranoid_client`. With
+`default-features = false`, the crate exposes the protocol without the
+convenience clients, in the `apdu`, `command`, `interpreter`, `protocol`,
+`psbt` and `wallet` modules. This lets an application that owns the device I/O
+reuse the protocol implementation.
+
+Each command has a `protocol::prepare_*` function returning a `Request` (in a
+`Result` for `prepare_sign_psbt`, as converting the PSBT can fail), which
+answers the client commands of the device in `Request::step`, and a
+`protocol::parse_*` function for its result: the final response, or for
+SIGN_PSBT, the values yielded during the request. The documentation of
+`protocol::Request` shows the exchange loop.
+
+The `paranoid_client` feature, which does not require either client, adds
+`WalletPolicy::check_address`: it derives a wallet policy's address
+independently, to verify the one returned by the device. The documentation of
+`protocol::prepare_register_wallet` shows how the clients use it to verify a
+newly registered wallet policy.
+
+Enable `client` for the synchronous `BitcoinClient`, or `async` for both
+clients.
+
 ## The `async` feature
 
 The optional feature `async` adds the `async_client` module to the crate
@@ -56,9 +81,12 @@ pub trait Transport {
 }
 ```
 
-## The `no-std` support
+## WASM and `no_std`
 
-Work in progress.
+The transport-free build, with or without `paranoid_client`, supports
+`wasm32-unknown-unknown`. It remains **std-based**, as on native targets.
+Disabling the convenience clients does not make this crate `no_std`;
+`no_std` targets are not supported.
 
 ## Example
 

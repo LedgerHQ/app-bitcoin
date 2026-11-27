@@ -6,16 +6,18 @@
 //! serialization/deserialization logic to rust-psbt (for known fields), and propagating unknown
 //! fields unchanged.
 
+use core::fmt;
+
 use bitcoin::{
     consensus::encode::{serialize, Decodable},
     ecdsa,
     hashes::Hash,
-    key::FromSliceError as KeyError,
+    key::{FromSliceError as KeyError, TweakedPublicKey},
     psbt::Psbt,
     secp256k1::{self, XOnlyPublicKey},
     taproot,
     taproot::TapLeafHash,
-    PublicKey,
+    PublicKey, ScriptBuf,
 };
 
 use crate::protocol::UncheckedVarInt;
@@ -47,6 +49,7 @@ const PSBT_MAGIC_LEN: usize = 5;
 pub type PsbtMap = Vec<(Vec<u8>, Vec<u8>)>;
 
 /// The key-value maps of a PSBT, translated to PSBTv2.
+#[derive(Debug)]
 pub struct PsbtV2Maps {
     pub global: PsbtMap,
     /// One map per PSBT input, in order.
@@ -55,7 +58,8 @@ pub struct PsbtV2Maps {
     pub outputs: Vec<PsbtMap>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PsbtV2Error {
     /// The number of inputs or outputs of the unsigned transaction differs from the number of
     /// input or output maps, which BIP-174 requires to be equal.
@@ -65,7 +69,30 @@ pub enum PsbtV2Error {
     MalformedSerialization,
     /// An unexpected PSBTv2 field was encountered in a Psbtv0.
     UnexpectedV2Field(u8),
+    /// A map has this key more than once. rust-bitcoin serializes such a PSBT when an `unknown`
+    /// field has the key of a field that it knows.
+    DuplicateKey(Vec<u8>),
 }
+
+impl core::fmt::Display for PsbtV2Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::TxMapCountMismatch => {
+                f.write_str("The number of input or output maps differs from the transaction")
+            }
+            Self::MalformedSerialization => f.write_str("Malformed PSBT serialization"),
+            Self::UnexpectedV2Field(key_type) => {
+                write!(f, "Unexpected PSBTv2 field {:#04x} in a PSBTv0", key_type)
+            }
+            Self::DuplicateKey(key) => {
+                f.write_str("Duplicate PSBT key ")?;
+                key.iter().try_for_each(|byte| write!(f, "{:02x}", byte))
+            }
+        }
+    }
+}
+
+impl std::error::Error for PsbtV2Error {}
 
 /// Returns the PSBTv2 maps for `psbt`: the global map, then one map per input, then one per
 /// output.
@@ -83,6 +110,11 @@ pub fn get_v2_maps(psbt: &Psbt) -> Result<PsbtV2Maps, PsbtV2Error> {
     let mut outputs = maps.split_off(1 + n_inputs);
     let mut inputs = maps.split_off(1);
     let mut global = maps.pop().ok_or(PsbtV2Error::MalformedSerialization)?;
+
+    // The keys of each map are a Merkle tree that the app requires to be strictly sorted.
+    for map in core::iter::once(&global).chain(&inputs).chain(&outputs) {
+        reject_duplicate_keys(map)?;
+    }
 
     // Fields that BIP-370 excludes from PSBTv0 would acquire meaning after the conversion
     // (e.g. the required locktimes override the fallback locktime), so they are rejected.
@@ -174,6 +206,16 @@ pub fn get_v2_maps(psbt: &Psbt) -> Result<PsbtV2Maps, PsbtV2Error> {
     })
 }
 
+/// Errors if `map` has a key more than once.
+fn reject_duplicate_keys(map: &PsbtMap) -> Result<(), PsbtV2Error> {
+    let mut keys: Vec<&[u8]> = map.iter().map(|(key, _)| key.as_slice()).collect();
+    keys.sort_unstable();
+    match keys.windows(2).find(|pair| pair[0] == pair[1]) {
+        Some(pair) => Err(PsbtV2Error::DuplicateKey(pair[0].to_vec())),
+        None => Ok(()),
+    }
+}
+
 /// Errors if `map` has a key of any of `key_types`, whatever its keydata.
 fn reject_v2_fields(map: &PsbtMap, key_types: &[u8]) -> Result<(), PsbtV2Error> {
     match map
@@ -241,6 +283,78 @@ pub enum PartialSignature {
     TapScriptSig(XOnlyPublicKey, Option<TapLeafHash>, taproot::Signature),
 }
 
+/// An error applying a signature with [`apply_partial_signature`].
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ApplySignatureError {
+    /// The PSBT has no input with this index.
+    #[non_exhaustive]
+    InputIndexOutOfBounds { input_index: usize },
+    /// For a taproot key-path signature: the input has no `witness_utxo`.
+    MissingWitnessUtxo,
+    /// For a taproot key-path signature: the output spent by the input is not a P2TR output with
+    /// the signature's key as its output key.
+    OutputKeyMismatch,
+}
+
+impl fmt::Display for ApplySignatureError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InputIndexOutOfBounds { input_index } => {
+                write!(f, "PSBT input index {} is out of bounds", input_index)
+            }
+            Self::MissingWitnessUtxo => f.write_str("The input has no witness UTXO"),
+            Self::OutputKeyMismatch => {
+                f.write_str("The key-path signature is not for the output key of the spent output")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ApplySignatureError {}
+
+/// Adds a signature yielded by SIGN_PSBT to the input with index `input_index`, replacing any
+/// signature already stored for the same key. On error, the PSBT is unchanged.
+///
+/// A taproot key-path signature (`TapScriptSig(key, None, _)`) is applied only if the input's
+/// `witness_utxo` is a P2TR output whose output key is `key`: the device signs with the tweaked
+/// key, and yields it. The `non_witness_utxo` is not used: the device requires the
+/// `witness_utxo` of every segwit input, and the taproot sighash commits to it.
+///
+/// MuSig2 nonces and partial signatures are not supported.
+pub fn apply_partial_signature(
+    psbt: &mut Psbt,
+    input_index: usize,
+    signature: PartialSignature,
+) -> Result<(), ApplySignatureError> {
+    if input_index >= psbt.inputs.len() {
+        return Err(ApplySignatureError::InputIndexOutOfBounds { input_index });
+    }
+    if let PartialSignature::TapScriptSig(key, None, _) = &signature {
+        let spent_output = psbt.inputs[input_index]
+            .witness_utxo
+            .as_ref()
+            .ok_or(ApplySignatureError::MissingWitnessUtxo)?;
+        let output_key = TweakedPublicKey::dangerous_assume_tweaked(*key);
+        if spent_output.script_pubkey != ScriptBuf::new_p2tr_tweaked(output_key) {
+            return Err(ApplySignatureError::OutputKeyMismatch);
+        }
+    }
+    let input = &mut psbt.inputs[input_index];
+    match signature {
+        PartialSignature::Sig(key, signature) => {
+            input.partial_sigs.insert(key, signature);
+        }
+        PartialSignature::TapScriptSig(key, Some(leaf), signature) => {
+            input.tap_script_sigs.insert((key, leaf), signature);
+        }
+        PartialSignature::TapScriptSig(_, None, signature) => {
+            input.tap_key_sig = Some(signature);
+        }
+    }
+    Ok(())
+}
+
 impl PartialSignature {
     pub fn from_slice(slice: &[u8]) -> Result<Self, PartialSignatureError> {
         let key_augment_byte = slice
@@ -274,15 +388,35 @@ impl PartialSignature {
     }
 }
 
+#[non_exhaustive]
+#[derive(Debug)]
 pub enum PartialSignatureError {
     BadKeyAugmentLength,
     InvalidLength,
+    InvalidInputIndex,
     XOnlyPubKey(secp256k1::Error),
     PubKey(KeyError),
     EcdsaSig(ecdsa::Error),
     TaprootSig(taproot::SigFromSliceError),
     TapLeaf(bitcoin::hashes::FromSliceError),
 }
+
+impl core::fmt::Display for PartialSignatureError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::BadKeyAugmentLength => f.write_str("Invalid key augment length"),
+            Self::InvalidLength => f.write_str("Invalid length"),
+            Self::InvalidInputIndex => f.write_str("Input index out of range"),
+            Self::XOnlyPubKey(e) => write!(f, "Invalid x-only public key: {}", e),
+            Self::PubKey(e) => write!(f, "Invalid public key: {}", e),
+            Self::EcdsaSig(e) => write!(f, "Invalid ECDSA signature: {}", e),
+            Self::TaprootSig(e) => write!(f, "Invalid taproot signature: {}", e),
+            Self::TapLeaf(e) => write!(f, "Invalid tapleaf hash: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for PartialSignatureError {}
 
 #[cfg(test)]
 mod tests {
@@ -417,6 +551,47 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_duplicate_key_is_rejected() {
+        const PSBT_IN_SIGHASH_TYPE: u8 = 0x03;
+        // the unsigned transaction, which every PSBTv0 has
+        let mut psbt = unsigned_psbt();
+        psbt.unknown
+            .insert(keyless(PSBT_GLOBAL_UNSIGNED_TX), vec![0x00]);
+        assert_eq!(
+            get_v2_maps(&psbt).err(),
+            Some(PsbtV2Error::DuplicateKey(vec![PSBT_GLOBAL_UNSIGNED_TX]))
+        );
+
+        let mut psbt = unsigned_psbt();
+        psbt.inputs[0].sighash_type = Some(bitcoin::EcdsaSighashType::All.into());
+        psbt.inputs[0]
+            .unknown
+            .insert(keyless(PSBT_IN_SIGHASH_TYPE), 1_u32.to_le_bytes().to_vec());
+        assert_eq!(
+            get_v2_maps(&psbt).err(),
+            Some(PsbtV2Error::DuplicateKey(vec![PSBT_IN_SIGHASH_TYPE]))
+        );
+
+        // not next to each other in the serialization: witness utxo, sighash type, then the
+        // unknown field
+        const PSBT_IN_WITNESS_UTXO: u8 = 0x01;
+        let mut psbt = unsigned_psbt();
+        psbt.inputs[0].witness_utxo = Some(psbt.unsigned_tx.output[0].clone());
+        psbt.inputs[0].sighash_type = Some(bitcoin::EcdsaSighashType::All.into());
+        psbt.inputs[0]
+            .unknown
+            .insert(keyless(PSBT_IN_WITNESS_UTXO), vec![0x00]);
+        assert_eq!(
+            get_v2_maps(&psbt).err(),
+            Some(PsbtV2Error::DuplicateKey(vec![PSBT_IN_WITNESS_UTXO]))
+        );
+        assert_eq!(
+            PsbtV2Error::DuplicateKey(vec![PSBT_IN_SIGHASH_TYPE, 0xab]).to_string(),
+            "Duplicate PSBT key 03ab"
+        );
+    }
+
     /// A v0 PSBT that already re-encodes part of its unsigned transaction as a v2 field is a
     /// hybrid whose two encodings may disagree. It is rejected rather than resolved: emitting
     /// both would also duplicate a key, which the app rejects, since a map's keys must be
@@ -468,5 +643,104 @@ mod tests {
         );
         // a key length that runs past the end of the buffer
         assert!(split_maps(b"psbt\xff\x08\x01\x02", 1).is_none());
+    }
+
+    /// Unknown and proprietary fields reach the app unchanged, in every map.
+    #[test]
+    fn unknown_and_proprietary_fields_survive_in_every_map() {
+        const UNKNOWN_KEY_TYPE: u8 = 0x70;
+        const PSBT_PROPRIETARY: u8 = 0xfc;
+        let mut psbt = unsigned_psbt();
+        let unknown = raw::Key {
+            type_value: UNKNOWN_KEY_TYPE,
+            key: vec![9],
+        };
+        let proprietary = raw::ProprietaryKey {
+            prefix: b"hw".to_vec(),
+            subtype: 1,
+            key: vec![9],
+        };
+        psbt.unknown.insert(unknown.clone(), vec![1]);
+        psbt.inputs[0].unknown.insert(unknown.clone(), vec![2]);
+        psbt.outputs[0].unknown.insert(unknown, vec![3]);
+        psbt.proprietary.insert(proprietary.clone(), vec![4]);
+        psbt.inputs[0]
+            .proprietary
+            .insert(proprietary.clone(), vec![5]);
+        psbt.outputs[0].proprietary.insert(proprietary, vec![6]);
+        let maps = get_v2_maps(&psbt).unwrap();
+        // The proprietary key: type, prefix length, prefix, subtype, key data.
+        let proprietary_key = vec![PSBT_PROPRIETARY, 2, b'h', b'w', 1, 9];
+        for (i, map) in [&maps.global, &maps.inputs[0], &maps.outputs[0]]
+            .iter()
+            .enumerate()
+        {
+            assert!(map.contains(&(vec![UNKNOWN_KEY_TYPE, 9], vec![i as u8 + 1])));
+            assert!(map.contains(&(proprietary_key.clone(), vec![i as u8 + 4])));
+        }
+    }
+
+    /// A PSBTv0 carrying any of the fields synthesized from its unsigned transaction is rejected:
+    /// the PSBTv2-only ones by `reject_v2_fields`, `PSBT_GLOBAL_VERSION` by `push_v2_field`.
+    #[test]
+    fn every_synthesized_v2_field_is_rejected() {
+        for (map_index, key_types) in [
+            (
+                0,
+                &[
+                    PSBT_GLOBAL_TX_VERSION,
+                    PSBT_GLOBAL_FALLBACK_LOCKTIME,
+                    PSBT_GLOBAL_INPUT_COUNT,
+                    PSBT_GLOBAL_OUTPUT_COUNT,
+                    PSBT_GLOBAL_VERSION,
+                ][..],
+            ),
+            (
+                1,
+                &[
+                    PSBT_IN_PREVIOUS_TXID,
+                    PSBT_IN_OUTPUT_INDEX,
+                    PSBT_IN_SEQUENCE,
+                ][..],
+            ),
+            (2, &[PSBT_OUT_AMOUNT, PSBT_OUT_SCRIPT][..]),
+        ] {
+            for &key_type in key_types {
+                let mut psbt = unsigned_psbt();
+                let map = match map_index {
+                    0 => &mut psbt.unknown,
+                    1 => &mut psbt.inputs[0].unknown,
+                    _ => &mut psbt.outputs[0].unknown,
+                };
+                map.insert(keyless(key_type), vec![42]);
+                assert_eq!(
+                    get_v2_maps(&psbt).err(),
+                    Some(PsbtV2Error::UnexpectedV2Field(key_type))
+                );
+            }
+        }
+    }
+
+    /// `PSBT_GLOBAL_TX_MODIFIABLE` is not synthesized, but BIP-370 excludes it from PSBTv0 too.
+    #[test]
+    fn tx_modifiable_is_rejected() {
+        let mut psbt = unsigned_psbt();
+        psbt.unknown
+            .insert(keyless(PSBT_GLOBAL_TX_MODIFIABLE), vec![0]);
+        assert_eq!(
+            get_v2_maps(&psbt).err(),
+            Some(PsbtV2Error::UnexpectedV2Field(PSBT_GLOBAL_TX_MODIFIABLE))
+        );
+    }
+
+    /// The PSBT must have as many input maps as its unsigned transaction has inputs.
+    #[test]
+    fn an_input_count_mismatch_is_rejected() {
+        let mut psbt = unsigned_psbt();
+        psbt.inputs.clear();
+        assert_eq!(
+            get_v2_maps(&psbt).err(),
+            Some(PsbtV2Error::TxMapCountMismatch)
+        );
     }
 }

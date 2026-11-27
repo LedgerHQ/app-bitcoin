@@ -1,3 +1,5 @@
+#![cfg(feature = "client")]
+
 mod utils;
 use std::str::FromStr;
 
@@ -6,10 +8,18 @@ use bitcoin::{
     hashes::{hex::FromHex, Hash},
     psbt::Psbt,
 };
+#[cfg(feature = "async")]
+use ledger_bitcoin_client::async_client;
 use ledger_bitcoin_client::{
-    async_client, client, psbt::PartialSignature, wallet, MusigPartialSignature, MusigPubNonce,
+    client, psbt::PartialSignature, wallet, MusigPartialSignature, MusigPubNonce,
     SignPsbtYieldedObject,
 };
+
+// Instruction codes of the Bitcoin app, independent of the production constants.
+const GET_MASTER_FINGERPRINT_INS: u8 = 0x05;
+#[cfg(feature = "paranoid_client")]
+const GET_WALLET_ADDRESS_INS: u8 = 0x03;
+const SIGN_MESSAGE_INS: u8 = 0x10;
 
 fn test_cases(path: &str) -> Vec<serde_json::Value> {
     let data = std::fs::read_to_string(path).expect("Unable to read file");
@@ -33,19 +43,24 @@ async fn test_get_version() {
     assert_eq!(version, "2.1.0".to_string());
     assert_eq!(flags, vec![0x00]);
 
-    let (name, version, flags) =
-        async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-            .get_version()
-            .await
-            .unwrap();
+    #[cfg(feature = "async")]
+    {
+        let (name, version, flags) =
+            async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                .get_version()
+                .await
+                .unwrap();
 
-    assert_eq!(name, "Bitcoin Test".to_string());
-    assert_eq!(version, "2.1.0".to_string());
-    assert_eq!(flags, vec![0x00]);
+        assert_eq!(name, "Bitcoin Test".to_string());
+        assert_eq!(version, "2.1.0".to_string());
+        assert_eq!(flags, vec![0x00]);
+    }
 }
 
 #[tokio::test]
 async fn test_sign_message() {
+    const EXPECTED_SIGNATURE: &str =
+        "IL3u9GLAzgG5BdtSBqUe0Fo2Zx0UlKwSsYx2TbuVX0VULFgZYRBQCW0W7QOlsB/JgGwWNhl3eYYjXtdfyR7pM+Y=";
     let exchanges: Vec<String> = vec![
         "=> e110000132048000002c800000018000000000000000058a2a5c9b768827de5a9552c38a044c66959c68f6d2f21b5260af54d2f87db827".into(),
         "<= 418a2a5c9b768827de5a9552c38a044c66959c68f6d2f21b5260af54d2f87db8270100e000".into(),
@@ -65,24 +80,21 @@ async fn test_sign_message() {
     assert_eq!(header, 0x20);
     let mut sig = vec![header];
     sig.extend(ecdsa_sig.serialize_compact());
-    assert_eq!(
-        "IL3u9GLAzgG5BdtSBqUe0Fo2Zx0UlKwSsYx2TbuVX0VULFgZYRBQCW0W7QOlsB/JgGwWNhl3eYYjXtdfyR7pM+Y=",
-        base64::encode(sig)
-    );
+    assert_eq!(EXPECTED_SIGNATURE, base64::encode(sig));
 
-    let (header, ecdsa_sig) =
-        async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-            .sign_message("hello".as_bytes(), &path)
-            .await
-            .unwrap();
+    #[cfg(feature = "async")]
+    {
+        let (header, ecdsa_sig) =
+            async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                .sign_message("hello".as_bytes(), &path)
+                .await
+                .unwrap();
 
-    assert_eq!(header, 0x20);
-    let mut sig = vec![header];
-    sig.extend(ecdsa_sig.serialize_compact());
-    assert_eq!(
-        "IL3u9GLAzgG5BdtSBqUe0Fo2Zx0UlKwSsYx2TbuVX0VULFgZYRBQCW0W7QOlsB/JgGwWNhl3eYYjXtdfyR7pM+Y=",
-        base64::encode(sig)
-    );
+        assert_eq!(header, 0x20);
+        let mut sig = vec![header];
+        sig.extend(ecdsa_sig.serialize_compact());
+        assert_eq!(EXPECTED_SIGNATURE, base64::encode(sig));
+    }
 }
 
 #[tokio::test]
@@ -96,7 +108,7 @@ async fn test_get_extended_pubkey() {
         let derivation_path: DerivationPath = case
             .get("derivation_path")
             .map(|v| v.as_str().unwrap())
-            .map(|s| DerivationPath::from_str(&s).unwrap())
+            .map(|s| DerivationPath::from_str(s).unwrap())
             .unwrap();
 
         let display: bool = case
@@ -116,12 +128,16 @@ async fn test_get_extended_pubkey() {
 
         assert_eq!(key.to_string(), xpk_str);
 
-        let key = async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-            .get_extended_pubkey(&derivation_path, display)
-            .await
-            .unwrap();
+        #[cfg(feature = "async")]
+        {
+            let key =
+                async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                    .get_extended_pubkey(&derivation_path, display)
+                    .await
+                    .unwrap();
 
-        assert_eq!(key.to_string(), xpk_str);
+            assert_eq!(key.to_string(), xpk_str);
+        }
     }
 }
 
@@ -171,6 +187,18 @@ async fn test_register_wallet() {
 
         let wallet = wallet::WalletPolicy::new(name, version, policy, keys);
 
+        // The paranoid client verifies the registration by requesting an address. These exchanges
+        // are synthetic: a single GET_WALLET_ADDRESS exchange answered with the expected address,
+        // without the client commands that a real device would send.
+        #[cfg(feature = "paranoid_client")]
+        let exchanges = {
+            let mut exchanges = exchanges;
+            exchanges.extend(
+                serde_json::from_value::<Vec<String>>(case["address_exchanges"].clone()).unwrap(),
+            );
+            exchanges
+        };
+
         let store = utils::RecordStore::new(&exchanges);
         let (_id, hmac) = client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
             .register_wallet(&wallet)
@@ -178,13 +206,16 @@ async fn test_register_wallet() {
 
         assert_eq!(hmac, <[u8; 32]>::from_hex(&hmac_result).unwrap());
 
-        let (_id, hmac) =
-            async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-                .register_wallet(&wallet)
-                .await
-                .unwrap();
+        #[cfg(feature = "async")]
+        {
+            let (_id, hmac) =
+                async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                    .register_wallet(&wallet)
+                    .await
+                    .unwrap();
 
-        assert_eq!(hmac, <[u8; 32]>::from_hex(&hmac_result).unwrap());
+            assert_eq!(hmac, <[u8; 32]>::from_hex(&hmac_result).unwrap());
+        }
     }
 }
 
@@ -255,13 +286,16 @@ async fn test_get_wallet_address() {
 
         assert_eq!(address.assume_checked().to_string(), address_result);
 
-        let address =
-            async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-                .get_wallet_address(&wallet, hmac.as_ref(), change, address_index, display)
-                .await
-                .unwrap();
+        #[cfg(feature = "async")]
+        {
+            let address =
+                async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                    .get_wallet_address(&wallet, hmac.as_ref(), change, address_index, display)
+                    .await
+                    .unwrap();
 
-        assert_eq!(address.assume_checked().to_string(), address_result);
+            assert_eq!(address.assume_checked().to_string(), address_result);
+        }
     }
 }
 
@@ -478,11 +512,217 @@ async fn test_sign_psbt() {
 
         check_results(&sigs, &musig_pub_nonces, &musig_partial_signatures, &res);
 
-        let res = async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
-            .sign_psbt(&psbt, &wallet, hmac.as_ref())
-            .await
-            .unwrap();
+        #[cfg(feature = "async")]
+        {
+            let res =
+                async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                    .sign_psbt(&psbt, &wallet, hmac.as_ref())
+                    .await
+                    .unwrap();
 
-        check_results(&sigs, &musig_pub_nonces, &musig_partial_signatures, &res);
+            check_results(&sigs, &musig_pub_nonces, &musig_partial_signatures, &res);
+        }
+    }
+}
+
+#[tokio::test]
+async fn empty_message_signature_is_an_unexpected_result() {
+    use ledger_bitcoin_client::error::BitcoinClientError;
+    let path = DerivationPath::from_str("m/44'/1'/0'/0").unwrap();
+    let exchanges = vec![
+        "=> e110000132048000002c800000018000000000000000058a2a5c9b768827de5a9552c38a044c66959c68f6d2f21b5260af54d2f87db827".into(),
+        "<= 9000".into(),
+    ];
+    let store = utils::RecordStore::new(&exchanges);
+    let result = client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+        .sign_message(b"hello", &path);
+    assert!(
+        matches!(result, Err(BitcoinClientError::UnexpectedResult { command: SIGN_MESSAGE_INS, data, .. }) if data.is_empty())
+    );
+    #[cfg(feature = "async")]
+    {
+        let result = async_client::BitcoinClient::new(utils::TransportReplayer::new(store))
+            .sign_message(b"hello", &path)
+            .await;
+        assert!(
+            matches!(result, Err(BitcoinClientError::UnexpectedResult { command: SIGN_MESSAGE_INS, data, .. }) if data.is_empty())
+        );
+    }
+}
+
+#[tokio::test]
+async fn request_errors_keep_the_original_instruction_and_category() {
+    use ledger_bitcoin_client::{
+        apdu::StatusWord, command, error::BitcoinClientError, interpreter::InterpreterError,
+        protocol::prepare_sign_message,
+    };
+    const SW_INTERRUPTED: [u8; 2] = [0xe0, 0x00];
+    const SW_DENY: [u8; 2] = [0x69, 0x85];
+    const YIELD: u8 = 0x10;
+    const UNKNOWN_CLIENT_COMMAND: u8 = 0xff;
+    const ERROR_CODE: [u8; 2] = [0x00, 0x17];
+    let with_status = |data: &[u8], status: [u8; 2]| [data, &status[..]].concat();
+
+    let path = DerivationPath::from_str("m/44'/1'/0'/0").unwrap();
+    let message = b"hello";
+    let sign_message = prepare_sign_message(message, &path).command().encode();
+    let continue_after_yield = command::continue_interrupted(vec![]).encode();
+    // Two yields, then either an error status or a client command that is not understood.
+    for (last_response, interpreter_error) in [
+        (with_status(&ERROR_CODE, SW_DENY), false),
+        (with_status(&[UNKNOWN_CLIENT_COMMAND], SW_INTERRUPTED), true),
+    ] {
+        let store = utils::RecordStore {
+            queue: vec![
+                (
+                    sign_message.clone(),
+                    with_status(&[YIELD, 1, 2], SW_INTERRUPTED),
+                ),
+                (
+                    continue_after_yield.clone(),
+                    with_status(&[YIELD, 3, 4], SW_INTERRUPTED),
+                ),
+                (continue_after_yield.clone(), last_response),
+            ],
+        };
+        let check = |result| {
+            if interpreter_error {
+                assert!(matches!(
+                    result,
+                    Err(BitcoinClientError::Interpreter(
+                        InterpreterError::UnknownCommand(UNKNOWN_CLIENT_COMMAND)
+                    ))
+                ));
+            } else {
+                assert!(matches!(
+                    result,
+                    Err(BitcoinClientError::Device {
+                        command: SIGN_MESSAGE_INS,
+                        status: StatusWord::Deny,
+                        data,
+                        ..
+                    }) if data == ERROR_CODE
+                ));
+            }
+        };
+        check(
+            client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                .sign_message(message, &path),
+        );
+        #[cfg(feature = "async")]
+        check(
+            async_client::BitcoinClient::new(utils::TransportReplayer::new(store))
+                .sign_message(message, &path)
+                .await,
+        );
+    }
+
+    // A command that is never interrupted fails on an interruption.
+    let store = utils::RecordStore {
+        queue: vec![(
+            command::get_master_fingerprint().encode(),
+            with_status(&[YIELD], SW_INTERRUPTED),
+        )],
+    };
+    assert!(matches!(
+        client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+            .get_master_fingerprint(),
+        Err(BitcoinClientError::Device {
+            command: GET_MASTER_FINGERPRINT_INS,
+            status: StatusWord::InterruptedExecution,
+            ..
+        })
+    ));
+    #[cfg(feature = "async")]
+    assert!(matches!(
+        async_client::BitcoinClient::new(utils::TransportReplayer::new(store))
+            .get_master_fingerprint()
+            .await,
+        Err(BitcoinClientError::Device {
+            command: GET_MASTER_FINGERPRINT_INS,
+            status: StatusWord::InterruptedExecution,
+            ..
+        })
+    ));
+}
+
+#[cfg(feature = "paranoid_client")]
+#[tokio::test]
+async fn registration_followup_failures_do_not_return_a_hmac() {
+    use ledger_bitcoin_client::{error::BitcoinClientError, interpreter::InterpreterError};
+    let cases = test_cases("./tests/data/register_wallet.json");
+    let case = cases
+        .iter()
+        .find(|case| case["version"].as_u64() == Some(wallet::Version::V2 as u64))
+        .unwrap();
+    let keys: Vec<_> = case["keys"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|key| wallet::WalletPubKey::from_str(key.as_str().unwrap()).unwrap())
+        .collect();
+    let wallet = wallet::WalletPolicy::new(
+        case["name"].as_str().unwrap().into(),
+        wallet::Version::V2,
+        case["policy"].as_str().unwrap().into(),
+        keys,
+    );
+    let wrong_address = "tb1pws8wvnj99ca6acf8kq7pjk7vyxknah0d9mexckh5s0vu2ccy68js9am6u7";
+    type RegistrationResult = Result<([u8; 32], [u8; 32]), BitcoinClientError<utils::MockError>>;
+    type Check = fn(RegistrationResult) -> bool;
+    // The last response, to the address request, is replaced with each of these.
+    let responses: [(String, Check); 4] = [
+        (
+            format!("<= {}9000", hex::encode(wrong_address.as_bytes())),
+            |result| matches!(result, Err(BitcoinClientError::InvalidResponse(_))),
+        ),
+        // An empty address.
+        ("<= 9000".into(), |result| {
+            matches!(
+                result,
+                Err(BitcoinClientError::UnexpectedResult {
+                    command: GET_WALLET_ADDRESS_INS,
+                    ..
+                })
+            )
+        }),
+        ("<= 6985".into(), |result| {
+            matches!(
+                result,
+                Err(BitcoinClientError::Device {
+                    command: GET_WALLET_ADDRESS_INS,
+                    status: ledger_bitcoin_client::apdu::StatusWord::Deny,
+                    ..
+                })
+            )
+        }),
+        // A GET_PREIMAGE client command for an unknown hash.
+        (format!("<= 4000{}e000", "00".repeat(32)), |result| {
+            matches!(
+                result,
+                Err(BitcoinClientError::Interpreter(
+                    InterpreterError::UnknownHash
+                ))
+            )
+        }),
+    ];
+    for (response, expected) in &responses {
+        let mut exchanges: Vec<String> = serde_json::from_value(case["exchanges"].clone()).unwrap();
+        exchanges.extend(
+            serde_json::from_value::<Vec<String>>(case["address_exchanges"].clone()).unwrap(),
+        );
+        *exchanges.last_mut().unwrap() = response.clone();
+        let store = utils::RecordStore::new(&exchanges);
+        let check = |result: RegistrationResult| assert!(expected(result));
+        check(
+            client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                .register_wallet(&wallet),
+        );
+        #[cfg(feature = "async")]
+        check(
+            async_client::BitcoinClient::new(utils::TransportReplayer::new(store))
+                .register_wallet(&wallet)
+                .await,
+        );
     }
 }

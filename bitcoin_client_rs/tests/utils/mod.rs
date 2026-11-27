@@ -1,12 +1,14 @@
-use core::convert::TryFrom;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+#[cfg(feature = "async")]
 use async_trait::async_trait;
 use bitcoin::hashes::hex::FromHex;
 
+#[cfg(feature = "async")]
+use ledger_bitcoin_client::async_client;
 use ledger_bitcoin_client::{
     apdu::{APDUCommand, StatusWord},
-    async_client, client,
+    client,
 };
 
 #[derive(Default, Clone)]
@@ -15,16 +17,18 @@ pub struct RecordStore {
 }
 
 impl RecordStore {
-    pub fn new(exchanges: &Vec<String>) -> RecordStore {
+    pub fn new(exchanges: &[String]) -> RecordStore {
         let mut store = RecordStore::default();
         let mut command: Vec<u8> = Vec::new();
         for (i, exchange) in exchanges.iter().enumerate() {
             let exchange = exchange.replace(" ", "");
             if let Some(cmd) = exchange.strip_prefix("=>") {
-                command = Vec::from_hex(cmd).expect(&format!("Wrong tests data {}: {}", i, cmd));
+                command = Vec::from_hex(cmd)
+                    .unwrap_or_else(|_| panic!("Wrong tests data {}: {}", i, cmd));
             }
             if let Some(resp) = exchange.strip_prefix("<=") {
-                let resp = Vec::from_hex(resp).expect(&format!("Wrong tests data {}: {}", i, resp));
+                let resp = Vec::from_hex(resp)
+                    .unwrap_or_else(|_| panic!("Wrong tests data {}: {}", i, resp));
                 store.queue.push((command.clone(), resp));
             }
         }
@@ -36,6 +40,22 @@ impl RecordStore {
 pub struct TransportReplayer {
     store: RecordStore,
     current: AtomicUsize,
+}
+
+/// Every recorded exchange must be replayed: a test fails if the client skips some of them.
+impl Drop for TransportReplayer {
+    fn drop(&mut self) {
+        let replayed = self.current.load(Ordering::Relaxed);
+        if !std::thread::panicking() {
+            assert_eq!(
+                replayed,
+                self.store.queue.len(),
+                "Only {} of the {} recorded exchanges were replayed",
+                replayed,
+                self.store.queue.len()
+            );
+        }
+    }
 }
 
 impl TransportReplayer {
@@ -59,10 +79,7 @@ impl TransportReplayer {
             buff.copy_from_slice(&res[res.len() - 2..res.len()]);
             let sw = u16::from_be_bytes(buff);
             let answer = &res[0..res.len() - 2];
-            return Ok((
-                StatusWord::try_from(sw).expect("Wrong tests data"),
-                answer.to_vec(),
-            ));
+            return Ok((StatusWord::from(sw), answer.to_vec()));
         }
         Err(MockError::ExchangeNotFound(current, hex::encode(payload)))
     }
@@ -75,6 +92,7 @@ impl client::Transport for TransportReplayer {
     }
 }
 
+#[cfg(feature = "async")]
 #[async_trait]
 impl async_client::Transport for TransportReplayer {
     type Error = MockError;
@@ -84,6 +102,7 @@ impl async_client::Transport for TransportReplayer {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)] // The fields are only read through Debug, when a test fails.
 pub enum MockError {
     ExchangeNotFound(usize, String),
 }

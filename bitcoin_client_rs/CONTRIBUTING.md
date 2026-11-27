@@ -31,7 +31,10 @@ as this makes review difficult. Instead, prefer opening different focused pull r
 
 ## Minimum Supported Rust Version
 
-`bitcoin_client_rs` should always compile using **Rust 1.60**
+`bitcoin_client_rs` must compile with **Rust 1.78**, the `rust-version` declared in
+Cargo.toml.
+
+The tests need **Rust 1.85**, which their `hex-literal` dependency requires.
 
 ## Style
 

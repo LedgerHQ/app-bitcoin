@@ -1,5 +1,9 @@
-/// APDU commands  for the Bitcoin application.
-///
+//! APDU commands for the Bitcoin application.
+//!
+//! The builders do not check the sizes of their inputs. The encoding cannot represent more than
+//! 255 bytes of APDU data, or derivation paths of more than 255 steps: longer inputs produce
+//! malformed commands, which the app rejects. The app's own limits are much lower.
+
 use bitcoin::{
     bip32::{ChildNumber, DerivationPath},
     consensus::encode::{self},
