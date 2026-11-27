@@ -59,7 +59,7 @@ pub struct PsbtV2Maps {
 }
 
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PsbtV2Error {
     /// The number of inputs or outputs of the unsigned transaction differs from the number of
     /// input or output maps, which BIP-174 requires to be equal.
@@ -69,6 +69,9 @@ pub enum PsbtV2Error {
     MalformedSerialization,
     /// An unexpected PSBTv2 field was encountered in a Psbtv0.
     UnexpectedV2Field(u8),
+    /// A map has this key more than once. rust-bitcoin serializes such a PSBT when an `unknown`
+    /// field has the key of a field that it knows.
+    DuplicateKey(Vec<u8>),
 }
 
 impl core::fmt::Display for PsbtV2Error {
@@ -80,6 +83,10 @@ impl core::fmt::Display for PsbtV2Error {
             Self::MalformedSerialization => f.write_str("Malformed PSBT serialization"),
             Self::UnexpectedV2Field(key_type) => {
                 write!(f, "Unexpected PSBTv2 field {:#04x} in a PSBTv0", key_type)
+            }
+            Self::DuplicateKey(key) => {
+                f.write_str("Duplicate PSBT key ")?;
+                key.iter().try_for_each(|byte| write!(f, "{:02x}", byte))
             }
         }
     }
@@ -103,6 +110,11 @@ pub fn get_v2_maps(psbt: &Psbt) -> Result<PsbtV2Maps, PsbtV2Error> {
     let mut outputs = maps.split_off(1 + n_inputs);
     let mut inputs = maps.split_off(1);
     let mut global = maps.pop().ok_or(PsbtV2Error::MalformedSerialization)?;
+
+    // The keys of each map are a Merkle tree that the app requires to be strictly sorted.
+    for map in core::iter::once(&global).chain(&inputs).chain(&outputs) {
+        reject_duplicate_keys(map)?;
+    }
 
     // Fields that BIP-370 excludes from PSBTv0 would acquire meaning after the conversion
     // (e.g. the required locktimes override the fallback locktime), so they are rejected.
@@ -192,6 +204,16 @@ pub fn get_v2_maps(psbt: &Psbt) -> Result<PsbtV2Maps, PsbtV2Error> {
         inputs,
         outputs,
     })
+}
+
+/// Errors if `map` has a key more than once.
+fn reject_duplicate_keys(map: &PsbtMap) -> Result<(), PsbtV2Error> {
+    let mut keys: Vec<&[u8]> = map.iter().map(|(key, _)| key.as_slice()).collect();
+    keys.sort_unstable();
+    match keys.windows(2).find(|pair| pair[0] == pair[1]) {
+        Some(pair) => Err(PsbtV2Error::DuplicateKey(pair[0].to_vec())),
+        None => Ok(()),
+    }
 }
 
 /// Errors if `map` has a key of any of `key_types`, whatever its keydata.
@@ -527,6 +549,47 @@ mod tests {
                 Some(PsbtV2Error::UnexpectedV2Field(key_type))
             );
         }
+    }
+
+    #[test]
+    fn a_duplicate_key_is_rejected() {
+        const PSBT_IN_SIGHASH_TYPE: u8 = 0x03;
+        // the unsigned transaction, which every PSBTv0 has
+        let mut psbt = unsigned_psbt();
+        psbt.unknown
+            .insert(keyless(PSBT_GLOBAL_UNSIGNED_TX), vec![0x00]);
+        assert_eq!(
+            get_v2_maps(&psbt).err(),
+            Some(PsbtV2Error::DuplicateKey(vec![PSBT_GLOBAL_UNSIGNED_TX]))
+        );
+
+        let mut psbt = unsigned_psbt();
+        psbt.inputs[0].sighash_type = Some(bitcoin::EcdsaSighashType::All.into());
+        psbt.inputs[0]
+            .unknown
+            .insert(keyless(PSBT_IN_SIGHASH_TYPE), 1_u32.to_le_bytes().to_vec());
+        assert_eq!(
+            get_v2_maps(&psbt).err(),
+            Some(PsbtV2Error::DuplicateKey(vec![PSBT_IN_SIGHASH_TYPE]))
+        );
+
+        // not next to each other in the serialization: witness utxo, sighash type, then the
+        // unknown field
+        const PSBT_IN_WITNESS_UTXO: u8 = 0x01;
+        let mut psbt = unsigned_psbt();
+        psbt.inputs[0].witness_utxo = Some(psbt.unsigned_tx.output[0].clone());
+        psbt.inputs[0].sighash_type = Some(bitcoin::EcdsaSighashType::All.into());
+        psbt.inputs[0]
+            .unknown
+            .insert(keyless(PSBT_IN_WITNESS_UTXO), vec![0x00]);
+        assert_eq!(
+            get_v2_maps(&psbt).err(),
+            Some(PsbtV2Error::DuplicateKey(vec![PSBT_IN_WITNESS_UTXO]))
+        );
+        assert_eq!(
+            PsbtV2Error::DuplicateKey(vec![PSBT_IN_SIGHASH_TYPE, 0xab]).to_string(),
+            "Duplicate PSBT key 03ab"
+        );
     }
 
     /// A v0 PSBT that already re-encodes part of its unsigned transaction as a v2 field is a

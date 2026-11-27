@@ -27,6 +27,7 @@ This release exposes the protocol without the transport, for applications that o
 - `StatusWord` is a newtype over the raw status word, so that statuses without a name are no longer lost. Build it with `StatusWord::from(u16)` instead of `TryFrom`, and read it with `u16::from` or `.0` instead of `as u16`. The named statuses are associated constants with the same names as the former variants (so `StatusWord::Deny` still works, in patterns too), plus `DeviceLocked` (0x5515), `SecurityStatusNotSatisfied` (0x6982), `SwapFail` (0x6B00) and `WrongResponseLength` (0xB000).
 - `BitcoinClientError::Device` contains the response data, which is the app's 2-byte error code when it reports one; the variant is `#[non_exhaustive]`.
 - When a value yielded during `sign_psbt` cannot be parsed, the `UnexpectedResult` error contains that value. Previously, if any value had at most one byte, it contained all the yielded values concatenated.
+- `PsbtV2Error` no longer implements `Copy`, as its new `DuplicateKey` variant contains the key.
 
 ### Removed
 
@@ -54,5 +55,6 @@ This release exposes the protocol without the transport, for applications that o
 - A GET_MERKLE_LEAF_INDEX client command for a leaf that is not in a known tree is answered as not found, instead of failing.
 - `WalletPolicy::get_descriptor` looped forever on a descriptor template with an unterminated `/<`, and panicked on one with a `>` before a `/<`. The former is now a `WalletError::InvalidPolicy` error, and the latter is expanded like any other template.
 - Input indices yielded by `sign_psbt` must fit in a `u32`; larger well-encoded indices are rejected with `PartialSignatureError::InvalidInputIndex`, instead of being truncated on 32-bit targets and accepted on 64-bit ones. Malformed CompactSize encodings still return `InvalidLength`.
+- A PSBT with a duplicate key in one of its maps is rejected: `prepare_sign_psbt` returns `PsbtV2Error::DuplicateKey`, and the clients' `sign_psbt` returns `InvalidPsbt`. rust-bitcoin serializes such a PSBT when an `unknown` field has the key of a field that it knows. The device rejected it with an unclear error, except for a duplicate of the unsigned transaction's key, which was silently ignored.
 - An empty response to SIGN_MESSAGE caused a panic; it is now an `UnexpectedResult` error.
 - `get_version` accepts the dashboard's response, which has no flags.
