@@ -172,7 +172,7 @@ Get a receive or change a address for a registered or default wallet, after vali
 
 | Length      | Description     |
 |-------------|-----------------|
-| <variable>  | The wallet address for the given change/address_index |
+| `<variable>` | The wallet address for the given change/address_index |
 
 #### Description
 

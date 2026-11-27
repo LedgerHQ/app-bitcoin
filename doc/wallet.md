@@ -13,7 +13,7 @@ is a pair of:
 The key origin information is compulsory for xpubs controlled by the device. Without it, the xpub
 will be considered external, and the device will not sign for any key derived by it.
 
-Wallet policies are registered with a short readable *account name* provided by the host wallet, which is shown on-screen.
+Wallet policies are registered with a short readable *wallet name* provided by the host wallet, which is shown on-screen.
 
 For a higher-level explanation of wallet policies, registration, and the security model,
 see [integration.md](integration.md).
