@@ -19,7 +19,10 @@ use crate::{
     apdu::{APDUCommand, StatusWord},
     command,
     interpreter::{get_merkleized_map_commitment, ClientCommandInterpreter, InterpreterError},
-    psbt::{get_v2_maps, PartialSignature, PartialSignatureError, PsbtV2Error},
+    psbt::{
+        get_v2_maps, get_v2_maps_from_bytes, PartialSignature, PartialSignatureError, PsbtV2Error,
+        PsbtV2Maps,
+    },
     wallet::WalletPolicy,
 };
 
@@ -276,8 +279,32 @@ pub fn prepare_sign_psbt(
     wallet: &WalletPolicy,
     hmac: Option<&[u8; 32]>,
 ) -> Result<Request, PsbtV2Error> {
+    Ok(prepare_sign_psbt_maps(&get_v2_maps(psbt)?, wallet, hmac))
+}
+
+/// Like [`prepare_sign_psbt`], for a serialized PSBT of version 0 or 2.
+///
+/// The PSBT is not parsed into a [`Psbt`]: its key-value pairs are sent to the device exactly as
+/// serialized, see [`get_v2_maps_from_bytes`].
+pub fn prepare_sign_psbt_bytes(
+    psbt: &[u8],
+    wallet: &WalletPolicy,
+    hmac: Option<&[u8; 32]>,
+) -> Result<Request, PsbtV2Error> {
+    Ok(prepare_sign_psbt_maps(
+        &get_v2_maps_from_bytes(psbt)?,
+        wallet,
+        hmac,
+    ))
+}
+
+/// Prepares SIGN_PSBT for PSBTv2 maps that were checked by `get_v2_maps*`.
+fn prepare_sign_psbt_maps(
+    maps: &PsbtV2Maps,
+    wallet: &WalletPolicy,
+    hmac: Option<&[u8; 32]>,
+) -> Request {
     let mut interpreter = ClientCommandInterpreter::for_wallet(wallet);
-    let maps = get_v2_maps(psbt)?;
     interpreter.add_known_mapping(&maps.global);
     let global_commitment = get_merkleized_map_commitment(&maps.global);
     let mut input_commitments = Vec::with_capacity(maps.inputs.len());
@@ -301,7 +328,7 @@ pub fn prepare_sign_psbt(
         wallet,
         hmac,
     );
-    Ok(Request::with_interpreter(command, interpreter))
+    Request::with_interpreter(command, interpreter)
 }
 
 /// Prepares SIGN_MESSAGE, with the message chunks known to the interpreter.

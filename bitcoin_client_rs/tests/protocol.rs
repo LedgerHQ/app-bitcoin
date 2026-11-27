@@ -1064,15 +1064,13 @@ fn psbt_preparation_delegates_custom_values_and_propagates_map_errors() {
 fn public_psbt_preparation_replays_recorded_delegated_exchanges() {
     use ledger_bitcoin_client::{
         apdu::StatusWord,
-        protocol::{parse_sign_psbt_results, prepare_sign_psbt, Step},
+        protocol::{parse_sign_psbt_results, prepare_sign_psbt, prepare_sign_psbt_bytes, Step},
     };
     let cases: Vec<serde_json::Value> =
         serde_json::from_str(include_str!("data/sign_psbt.json")).unwrap();
     for case in cases {
-        let psbt = bitcoin::psbt::Psbt::deserialize(
-            &base64::decode(case["psbt"].as_str().unwrap()).unwrap(),
-        )
-        .unwrap();
+        let psbt_bytes = base64::decode(case["psbt"].as_str().unwrap()).unwrap();
+        let psbt = bitcoin::psbt::Psbt::deserialize(&psbt_bytes).unwrap();
         let keys: Vec<_> = case["keys"]
             .as_array()
             .unwrap()
@@ -1090,52 +1088,57 @@ fn public_psbt_preparation_replays_recorded_delegated_exchanges() {
             bytes.copy_from_slice(&hex::decode(value).unwrap());
             bytes
         });
-        let mut request = prepare_sign_psbt(&psbt, &wallet, hmac.as_ref()).unwrap();
-        let mut command = request.command().clone();
-        let mut exchanges = case["exchanges"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|exchange| exchange.as_str().unwrap());
-        let mut done = false;
-        while let Some(sent) = exchanges.next() {
-            assert!(!done, "no exchange is expected after the final response");
-            let received = exchanges.next().expect("every command has a response");
-            let sent = hex::decode(sent.trim_start_matches("=> ")).unwrap();
-            assert_eq!(command.encode(), sent);
-            let mut response = hex::decode(received.trim_start_matches("<= ")).unwrap();
-            let status = response.split_off(response.len() - 2);
-            let status = StatusWord::from(u16::from_be_bytes([status[0], status[1]]));
-            match request.step(status, response).unwrap() {
-                Step::Continue(next) => command = next,
-                Step::Done(_) => done = true,
-            }
-        }
-        assert!(done);
-        let results = parse_sign_psbt_results(request.into_yielded()).unwrap();
-        // Compare with the expected values of each kind, in the test data's format.
-        for kind in ["sigs", "musig_pub_nonces", "musig_partial_signatures"] {
-            let actual: Vec<_> = results
-                .iter()
-                .map(|(_, object)| yielded_object_json(object))
-                .filter(|(object_kind, _)| *object_kind == kind)
-                .map(|(_, object)| object)
-                .collect();
-            let expected: Vec<_> = case[kind]
+        // the parsed and the serialized PSBT must produce the same exchanges
+        for mut request in [
+            prepare_sign_psbt(&psbt, &wallet, hmac.as_ref()).unwrap(),
+            prepare_sign_psbt_bytes(&psbt_bytes, &wallet, hmac.as_ref()).unwrap(),
+        ] {
+            let mut command = request.command().clone();
+            let mut exchanges = case["exchanges"]
                 .as_array()
-                .cloned()
-                .unwrap_or_default()
-                .into_iter()
-                .map(|mut object| {
-                    // An absent tapleaf hash may be written as null.
-                    object
-                        .as_object_mut()
-                        .unwrap()
-                        .retain(|_, value| !value.is_null());
-                    object
-                })
-                .collect();
-            assert_eq!(actual, expected, "{}", kind);
+                .unwrap()
+                .iter()
+                .map(|exchange| exchange.as_str().unwrap());
+            let mut done = false;
+            while let Some(sent) = exchanges.next() {
+                assert!(!done, "no exchange is expected after the final response");
+                let received = exchanges.next().expect("every command has a response");
+                let sent = hex::decode(sent.trim_start_matches("=> ")).unwrap();
+                assert_eq!(command.encode(), sent);
+                let mut response = hex::decode(received.trim_start_matches("<= ")).unwrap();
+                let status = response.split_off(response.len() - 2);
+                let status = StatusWord::from(u16::from_be_bytes([status[0], status[1]]));
+                match request.step(status, response).unwrap() {
+                    Step::Continue(next) => command = next,
+                    Step::Done(_) => done = true,
+                }
+            }
+            assert!(done);
+            let results = parse_sign_psbt_results(request.into_yielded()).unwrap();
+            // Compare with the expected values of each kind, in the test data's format.
+            for kind in ["sigs", "musig_pub_nonces", "musig_partial_signatures"] {
+                let actual: Vec<_> = results
+                    .iter()
+                    .map(|(_, object)| yielded_object_json(object))
+                    .filter(|(object_kind, _)| *object_kind == kind)
+                    .map(|(_, object)| object)
+                    .collect();
+                let expected: Vec<_> = case[kind]
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|mut object| {
+                        // An absent tapleaf hash may be written as null.
+                        object
+                            .as_object_mut()
+                            .unwrap()
+                            .retain(|_, value| !value.is_null());
+                        object
+                    })
+                    .collect();
+                assert_eq!(actual, expected, "{}", kind);
+            }
         }
     }
 }
