@@ -1,14 +1,273 @@
 //! This module contains types that are specific to the Ledger Bitcoin application protocol.
 
+use core::convert::TryFrom;
+use core::{fmt, str::FromStr};
+
 use bitcoin::{
+    address::NetworkUnchecked,
+    bip32::{DerivationPath, Fingerprint, Xpub},
     consensus::encode::{deserialize_partial, Decodable, Encodable, Error as EncodeError},
     hashes::Hash,
     io::{Read, Write},
+    psbt::Psbt,
+    secp256k1::ecdsa::Signature,
     taproot::TapLeafHash,
-    PublicKey,
+    Address, PublicKey,
 };
 
-use crate::psbt::{PartialSignature, PartialSignatureError};
+use crate::{
+    apdu::{APDUCommand, StatusWord},
+    command,
+    interpreter::{get_merkleized_map_commitment, ClientCommandInterpreter, InterpreterError},
+    psbt::{get_v2_maps, PartialSignature, PartialSignatureError, PsbtV2Error},
+    wallet::WalletPolicy,
+};
+
+/// Prepares wallet registration and its delegated wallet preimages and key tree.
+pub fn prepare_register_wallet(wallet: &WalletPolicy) -> (APDUCommand, ClientCommandInterpreter) {
+    (
+        command::register_wallet(wallet),
+        ClientCommandInterpreter::for_wallet(wallet),
+    )
+}
+
+/// Prepares an address request and its delegated wallet preimages and key tree.
+/// This does not independently verify the returned address; call `WalletPolicy::check_address`
+/// when the `paranoid_client` feature is enabled.
+pub fn prepare_get_wallet_address(
+    wallet: &WalletPolicy,
+    hmac: Option<&[u8; 32]>,
+    change: bool,
+    address_index: u32,
+    display: bool,
+) -> (APDUCommand, ClientCommandInterpreter) {
+    (
+        command::get_wallet_address(wallet, hmac, change, address_index, display),
+        ClientCommandInterpreter::for_wallet(wallet),
+    )
+}
+
+/// The next action after a device response, without performing transport I/O.
+pub enum Step {
+    Continue(APDUCommand),
+    Done(Vec<u8>),
+}
+
+/// A device-status or delegated-request failure, independent of the transport.
+#[non_exhaustive]
+#[derive(Debug)]
+pub enum RequestError {
+    Device { command: u8, status: StatusWord },
+    Interpreter(InterpreterError),
+}
+
+impl fmt::Display for RequestError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Device { command, status } => {
+                write!(f, "Command {:#04x} failed: {:?}", command, status)
+            }
+            Self::Interpreter(error) => error.fmt(f),
+        }
+    }
+}
+
+/// Handles one response to the original request or one of its CONTINUE commands.
+///
+/// Pass the original instruction on every call, including after continuations.
+/// Success moves the response into `Done`. Interrupted execution requires an
+/// interpreter; without one it is a device error, like every other failure status.
+/// Response data must exclude the status bytes. The caller performs exchanges.
+pub fn handle_response(
+    command: u8,
+    status: StatusWord,
+    data: Vec<u8>,
+    interpreter: Option<&mut ClientCommandInterpreter>,
+) -> Result<Step, RequestError> {
+    match (status, interpreter) {
+        (StatusWord::OK, _) => Ok(Step::Done(data)),
+        (StatusWord::InterruptedExecution, Some(interpreter)) => {
+            let response = interpreter
+                .execute(data)
+                .map_err(RequestError::Interpreter)?;
+            Ok(Step::Continue(command::continue_interrupted(response)))
+        }
+        _ => Err(RequestError::Device { command, status }),
+    }
+}
+
+/// Lowers a PSBT to v2 maps and prepares their delegated Merkle commitments.
+pub fn prepare_sign_psbt(
+    psbt: &Psbt,
+    wallet: &WalletPolicy,
+    hmac: Option<&[u8; 32]>,
+) -> Result<(APDUCommand, ClientCommandInterpreter), PsbtV2Error> {
+    let mut interpreter = ClientCommandInterpreter::for_wallet(wallet);
+    let maps = get_v2_maps(psbt)?;
+    interpreter.add_known_mapping(&maps.global);
+    let global_commitment = get_merkleized_map_commitment(&maps.global);
+    let mut input_commitments = Vec::with_capacity(maps.inputs.len());
+    for map in &maps.inputs {
+        interpreter.add_known_mapping(map);
+        input_commitments.push(get_merkleized_map_commitment(map));
+    }
+    let input_root = interpreter.add_known_list(&input_commitments);
+    let mut output_commitments = Vec::with_capacity(maps.outputs.len());
+    for map in &maps.outputs {
+        interpreter.add_known_mapping(map);
+        output_commitments.push(get_merkleized_map_commitment(map));
+    }
+    let output_root = interpreter.add_known_list(&output_commitments);
+    let command = command::sign_psbt(
+        &global_commitment,
+        psbt.inputs.len(),
+        &input_root,
+        psbt.outputs.len(),
+        &output_root,
+        wallet,
+        hmac,
+    );
+    Ok((command, interpreter))
+}
+
+/// Prepares a message command and the delegated state for its 64-byte chunks.
+pub fn prepare_sign_message(
+    message: &[u8],
+    path: &DerivationPath,
+) -> (APDUCommand, ClientCommandInterpreter) {
+    let chunks: Vec<&[u8]> = message.chunks(64).collect();
+    let mut interpreter = ClientCommandInterpreter::new();
+    let root = interpreter.add_known_list(&chunks);
+    (
+        command::sign_message(message.len(), &root, path),
+        interpreter,
+    )
+}
+
+/// An encoding error in an ordinary device response; no response bytes are retained.
+/// Pure consumers retain detailed field/decoding diagnostics. Convenience clients
+/// deliberately map these errors to their existing `UnexpectedResult` category.
+#[non_exhaustive]
+#[derive(Debug)]
+pub enum ResponseError {
+    Truncated {
+        field: &'static str,
+    },
+    InvalidFormat {
+        field: &'static str,
+    },
+    InvalidLength {
+        field: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    Decode {
+        field: &'static str,
+        source: EncodeError,
+    },
+}
+
+impl fmt::Display for ResponseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Truncated { field } => write!(f, "Truncated {}", field),
+            Self::InvalidFormat { field } => write!(f, "Invalid {} format", field),
+            Self::InvalidLength {
+                field,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "Invalid {} length: expected {}, got {}",
+                field, expected, actual
+            ),
+            Self::Decode { field, source } => write!(f, "Failed to decode {}: {}", field, source),
+        }
+    }
+}
+
+/// Parses GET_VERSION app name, version and flags, accepting trailing bytes.
+pub fn parse_version(data: &[u8]) -> Result<(String, String, Vec<u8>), ResponseError> {
+    match data.first() {
+        None => return Err(ResponseError::Truncated { field: "format" }),
+        Some(1) => (),
+        Some(_) => return Err(ResponseError::InvalidFormat { field: "format" }),
+    }
+    let (name, i): (String, usize) =
+        deserialize_partial(&data[1..]).map_err(|source| ResponseError::Decode {
+            field: "name",
+            source,
+        })?;
+    let (version, j): (String, usize) =
+        deserialize_partial(&data[1 + i..]).map_err(|source| ResponseError::Decode {
+            field: "version",
+            source,
+        })?;
+    let (flags, _): (Vec<u8>, usize) =
+        deserialize_partial(&data[1 + i + j..]).map_err(|source| ResponseError::Decode {
+            field: "flags",
+            source,
+        })?;
+    Ok((name, version, flags))
+}
+
+/// Parses GET_MASTER_FINGERPRINT, using the first four bytes and accepting trailing bytes.
+pub fn parse_master_fingerprint(data: &[u8]) -> Result<Fingerprint, ResponseError> {
+    let bytes = data.get(..4).ok_or(ResponseError::InvalidLength {
+        field: "fingerprint",
+        expected: 4,
+        actual: data.len(),
+    })?;
+    let mut fingerprint = [0; 4];
+    fingerprint.copy_from_slice(bytes);
+    Ok(fingerprint.into())
+}
+
+/// Parses GET_EXTENDED_PUBKEY's full lossy-UTF8 response, without trimming.
+pub fn parse_extended_pubkey(data: &[u8]) -> Result<Xpub, ResponseError> {
+    Xpub::from_str(&String::from_utf8_lossy(data)).map_err(|_| ResponseError::InvalidFormat {
+        field: "extended pubkey",
+    })
+}
+
+/// Parses GET_WALLET_ADDRESS's full lossy-UTF8 response, without trimming or checking its network.
+pub fn parse_wallet_address(data: &[u8]) -> Result<Address<NetworkUnchecked>, ResponseError> {
+    Address::from_str(&String::from_utf8_lossy(data)).map_err(|_| ResponseError::InvalidFormat {
+        field: "wallet address",
+    })
+}
+
+/// Parses REGISTER_WALLET, using the first 64 bytes for the wallet ID and HMAC
+/// and accepting trailing bytes.
+pub fn parse_wallet_registration(data: &[u8]) -> Result<([u8; 32], [u8; 32]), ResponseError> {
+    let bytes = data.get(..64).ok_or(ResponseError::InvalidLength {
+        field: "wallet registration",
+        expected: 64,
+        actual: data.len(),
+    })?;
+    let mut id = [0; 32];
+    id.copy_from_slice(&bytes[..32]);
+    let mut hmac = [0; 32];
+    hmac.copy_from_slice(&bytes[32..]);
+    Ok((id, hmac))
+}
+
+/// Parses SIGN_MESSAGE's compact ECDSA signature and returns its header unchanged.
+/// This checks the encoding, not the signed digest.
+pub fn parse_message_signature(data: &[u8]) -> Result<(u8, Signature), ResponseError> {
+    if data.len() != 65 {
+        return Err(ResponseError::InvalidLength {
+            field: "message signature",
+            expected: 65,
+            actual: data.len(),
+        });
+    }
+    let signature =
+        Signature::from_compact(&data[1..]).map_err(|_| ResponseError::InvalidFormat {
+            field: "message signature",
+        })?;
+    Ok((data[0], signature))
+}
 
 /// A variable-length unsigned integer using the same wire encoding as
 /// Bitcoin's `CompactSize`, but without the upper-bound limit enforced by the
@@ -134,9 +393,65 @@ pub enum SignPsbtYieldedObject {
     Unknown(Vec<u8>),
 }
 
+/// A SIGN_PSBT yield failure with the bytes used by client compatibility errors.
+pub struct SignPsbtResultsError {
+    pub data: Vec<u8>,
+    pub source: PartialSignatureError,
+}
+
+impl fmt::Debug for SignPsbtResultsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SignPsbtResultsError")
+            .field("data_len", &self.data.len())
+            .field("source", &self.source)
+            .finish()
+    }
+}
+
+impl fmt::Display for SignPsbtResultsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Invalid SIGN_PSBT yielded response")
+    }
+}
+
+/// Parses all SIGN_PSBT yields, preserving their order.
+///
+/// A payload of at most one byte takes precedence over any other parsing failure:
+/// its error contains all yielded bytes concatenated. Otherwise the error owns
+/// only the offending yield and its typed parsing reason. Empty lists succeed.
+/// The terminal successful response is not a yield and must not be included.
+pub fn parse_sign_psbt_results(
+    yielded: Vec<Vec<u8>>,
+) -> Result<Vec<(usize, SignPsbtYieldedObject)>, SignPsbtResultsError> {
+    if yielded.iter().any(|data| data.len() <= 1) {
+        let mut data = Vec::with_capacity(yielded.iter().map(Vec::len).sum());
+        for result in yielded {
+            data.extend(result);
+        }
+        return Err(SignPsbtResultsError {
+            data,
+            source: PartialSignatureError::InvalidLength,
+        });
+    }
+    let mut results = Vec::with_capacity(yielded.len());
+    for data in yielded {
+        let result = parse_sign_psbt_yielded(&data)
+            .map_err(|source| SignPsbtResultsError { data, source })?;
+        results.push(result);
+    }
+    Ok(results)
+}
+
+fn checked_input_index(index: u64) -> Result<usize, PartialSignatureError> {
+    u32::try_from(index)
+        .map(|index| index as usize)
+        .map_err(|_| PartialSignatureError::InvalidInputIndex)
+}
+
 /// Parses a single payload yielded by the device during `sign_psbt`.
 ///
 /// On success returns the input index together with the decoded object.
+/// Input indices must fit in a `u32`, independently of the host pointer width.
 pub fn parse_sign_psbt_yielded(
     data: &[u8],
 ) -> Result<(usize, SignPsbtYieldedObject), PartialSignatureError> {
@@ -169,7 +484,7 @@ pub fn parse_sign_psbt_yielded(
                 None
             };
             Ok((
-                input_index as usize,
+                checked_input_index(input_index)?,
                 SignPsbtYieldedObject::MusigPubNonce(MusigPubNonce {
                     participant_pubkey,
                     aggregate_pubkey,
@@ -203,7 +518,7 @@ pub fn parse_sign_psbt_yielded(
                 None
             };
             Ok((
-                input_index as usize,
+                checked_input_index(input_index)?,
                 SignPsbtYieldedObject::MusigPartialSignature(MusigPartialSignature {
                     participant_pubkey,
                     aggregate_pubkey,
@@ -222,14 +537,14 @@ pub fn parse_sign_psbt_yielded(
                     .map_err(|_| PartialSignatureError::InvalidLength)?;
             let rest = &data[i + j..];
             Ok((
-                input_index as usize,
+                checked_input_index(input_index)?,
                 SignPsbtYieldedObject::Unknown(rest.to_vec()),
             ))
         }
         // Otherwise the leading varint is the input index and the remainder is a regular partial signature.
         // These are the only payloads that were used in protocol versions prior to the introduction of the tags.
         _ => {
-            let input_index = tag as usize;
+            let input_index = checked_input_index(tag)?;
             let ps = PartialSignature::from_slice(&data[i..])?;
             Ok((input_index, SignPsbtYieldedObject::Partial(ps)))
         }
@@ -429,6 +744,110 @@ mod tests {
         assert!(matches!(
             parse_sign_psbt_yielded(&payload),
             Err(PartialSignatureError::PubKey(_))
+        ));
+    }
+
+    #[test]
+    fn yielded_input_indices_have_platform_independent_u32_bounds() {
+        for tag in [
+            CCMD_YIELD_MUSIG_PUBNONCE_TAG,
+            CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG,
+            0x8000_0000,
+            u64::MAX,
+        ] {
+            for index in [u32::MAX as u64, u32::MAX as u64 + 1, u64::MAX] {
+                let payload = match tag {
+                    CCMD_YIELD_MUSIG_PUBNONCE_TAG => build_musig_pubnonce(index, false),
+                    CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG => build_musig_partial_sig(index, false),
+                    _ => [
+                        serialize(&UncheckedVarInt(tag)),
+                        serialize(&UncheckedVarInt(index)),
+                    ]
+                    .concat(),
+                };
+                let parsed = parse_sign_psbt_yielded(&payload);
+                if index == u32::MAX as u64 {
+                    assert_eq!(parsed.unwrap().0, u32::MAX as usize);
+                } else {
+                    assert!(matches!(
+                        parsed,
+                        Err(PartialSignatureError::InvalidInputIndex)
+                    ));
+                }
+            }
+        }
+        const MAX_UNTAGGED_INPUT_INDEX: u64 = 0x7fff_ffff;
+        let mut regular = serialize(&UncheckedVarInt(MAX_UNTAGGED_INPUT_INDEX));
+        regular.push(32);
+        regular.extend(XONLY);
+        regular.extend([0xaa; 64]);
+        assert_eq!(parse_ok(&regular).0, MAX_UNTAGGED_INPUT_INDEX as usize);
+    }
+
+    #[test]
+    fn malformed_compact_size_is_not_an_out_of_range_index() {
+        for malformed in [
+            vec![],
+            vec![0xfd],
+            vec![0xfd, 1, 0],
+            vec![0xfe, 0, 1, 0, 0],
+            vec![0xff, 0, 0, 0, 0, 0, 0, 0, 0],
+        ] {
+            assert!(matches!(
+                parse_sign_psbt_yielded(&malformed),
+                Err(PartialSignatureError::InvalidLength)
+            ));
+            for tag in [
+                CCMD_YIELD_MUSIG_PUBNONCE_TAG,
+                CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG,
+                u64::MAX,
+            ] {
+                let mut payload = serialize(&UncheckedVarInt(tag));
+                payload.extend(&malformed);
+                assert!(matches!(
+                    parse_sign_psbt_yielded(&payload),
+                    Err(PartialSignatureError::InvalidLength)
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn musig_variants_reject_truncation_and_invalid_keys() {
+        for (builder, value_len) in [
+            (build_musig_pubnonce as fn(u64, bool) -> Vec<u8>, 66),
+            (build_musig_partial_sig as fn(u64, bool) -> Vec<u8>, 32),
+        ] {
+            for tapleaf in [false, true] {
+                let mut payload = builder(2, tapleaf);
+                assert!(matches!(
+                    parse_sign_psbt_yielded(&payload[..payload.len() - 1]),
+                    Err(PartialSignatureError::InvalidLength)
+                ));
+                let tag_and_index_len = serialize(&UncheckedVarInt(CCMD_YIELD_MUSIG_PUBNONCE_TAG))
+                    .len()
+                    + serialize(&UncheckedVarInt(2)).len();
+                let participant_offset = tag_and_index_len + value_len;
+                payload[participant_offset] = 0xff;
+                assert!(matches!(
+                    parse_sign_psbt_yielded(&payload),
+                    Err(PartialSignatureError::PubKey(_))
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn legacy_signature_encodings_reject_malformed_keys_and_signatures() {
+        for malformed in [vec![0], vec![0, 64, 1], vec![0, 32], vec![0, 33, 0, 0]] {
+            assert!(parse_sign_psbt_yielded(&malformed).is_err());
+        }
+        let mut payload = vec![0, 32];
+        payload.extend(XONLY);
+        payload.extend([0xaa; 63]);
+        assert!(matches!(
+            parse_sign_psbt_yielded(&payload),
+            Err(PartialSignatureError::TaprootSig(_))
         ));
     }
 }
