@@ -250,12 +250,14 @@ fn interpreter_answers_preimages_and_yields() {
     let mut request = vec![ClientCommandCode::GetPreimage as u8, SHA256_HASH_TYPE];
     request.extend(leaf);
     assert_eq!(interpreter.execute(request).unwrap(), b"\x06\x06\0hello");
+    assert_eq!(interpreter.yielded_count(), 0);
     assert_eq!(
         interpreter
             .execute(vec![ClientCommandCode::Yield as u8, 1, 2])
             .unwrap(),
         Vec::<u8>::new()
     );
+    assert_eq!(interpreter.yielded_count(), 1);
     assert_eq!(interpreter.yielded(), vec![vec![1, 2]]);
 }
 
@@ -827,6 +829,7 @@ fn steps_answer_client_commands_until_the_queue_is_empty() {
         interrupted(yield_command),
         Err(RequestError::Finished)
     ));
+    assert_eq!(request.yielded_count(), 1);
     assert_eq!(request.into_yielded(), vec![yielded]);
 
     const UNKNOWN_CLIENT_COMMAND: u8 = 0xff;

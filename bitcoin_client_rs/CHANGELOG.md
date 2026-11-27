@@ -49,6 +49,7 @@ This release exposes the protocol without the transport, for applications that o
 - `psbt::apply_partial_signature`: adds an ECDSA or Schnorr signature yielded by `sign_psbt` to a PSBT, with an `ApplySignatureError`. A key-path signature is only added if the input's `witness_utxo` is a P2TR output with the signature's key as output key.
 - `psbt::get_v2_maps_from_bytes`: the PSBTv2 maps of a serialized PSBT of version 0 or 2, without parsing it into a rust-bitcoin `Psbt`, so that every key-value pair reaches the device exactly as serialized. A PSBTv0 is converted like `get_v2_maps` does. Malformed serializations are reported with the new `PsbtV2Error` variants `InvalidMagic`, `UnsupportedVersion` and `InvalidGlobalField`.
 - `protocol::prepare_sign_psbt_bytes`: prepares SIGN_PSBT for a serialized PSBT of version 0 or 2, using `psbt::get_v2_maps_from_bytes`.
+- `protocol::Request::yielded_count` and `ClientCommandInterpreter::yielded_count`: the number of values yielded so far, to report progress while SIGN_PSBT is running.
 
 ### Fixed
 

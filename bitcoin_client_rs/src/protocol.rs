@@ -124,6 +124,14 @@ impl Request {
         step
     }
 
+    /// The number of values that the device yielded so far, e.g. to report signing progress
+    /// while the request is in progress.
+    pub fn yielded_count(&self) -> usize {
+        self.interpreter
+            .as_ref()
+            .map_or(0, ClientCommandInterpreter::yielded_count)
+    }
+
     /// Consumes the request and returns the values that the device yielded while executing it.
     ///
     /// They are complete only if the request is done: after an error, they are the values
