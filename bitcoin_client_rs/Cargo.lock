@@ -377,6 +377,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ledger_bitcoin_client_bindings"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "bitcoin",
+ "hex",
+ "ledger_bitcoin_client",
+ "serde_json",
+]
+
+[[package]]
 name = "ledger_hwi"
 version = "0.1.0"
 dependencies = [
