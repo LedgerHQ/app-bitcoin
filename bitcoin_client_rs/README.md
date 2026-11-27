@@ -22,9 +22,9 @@ pub struct BitcoinClient<T: Transport> {...}
 impl<T: Transport> BitcoinClient<T> {
     pub fn get_extended_pubkey(
         &self,
-        path: &bitcoin::util::bip32::DerivationPath,
+        path: &bitcoin::bip32::DerivationPath,
         display: bool,
-    ) -> Result<bitcoin::util::bip32::ExtendedPubKey, BitcoinClientError<T::Error>>;
+    ) -> Result<bitcoin::bip32::Xpub, BitcoinClientError<T::Error>>;
 }
 ```
 
