@@ -76,11 +76,7 @@ const BIP_328_CHAINCODE: [u8; 32] = [
 /// NOTE: this does not work with nested musig() expressions, which are not supported anyway.
 pub(crate) fn replace_musigs(desc: &str) -> Result<String, String> {
     let mut desc = desc.to_string();
-    loop {
-        let musig_start = match desc.find("musig(") {
-            Some(pos) => pos,
-            None => break,
-        };
+    while let Some(musig_start) = desc.find("musig(") {
         let musig_end = match desc[musig_start..].find(')') {
             Some(pos) => musig_start + pos,
             None => return Err("Invalid descriptor: unmatched musig(".to_string()),

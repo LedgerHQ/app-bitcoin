@@ -16,7 +16,7 @@ import pytest
 from ledger_bitcoin import WalletPolicy
 from ledger_bitcoin.exception.errors import IncorrectDataError
 from ledger_bitcoin.exception.device_exception import DeviceException
-from ledger_bitcoin.psbt import PSBT
+from test_utils.bitcoin.psbt import PSBT
 from ragger.error import ExceptionRAPDU
 from ragger.firmware import Firmware
 from ragger.navigator import Navigator

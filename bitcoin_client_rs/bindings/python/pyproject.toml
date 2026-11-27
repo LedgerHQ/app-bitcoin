@@ -1,0 +1,36 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "ledger_bitcoin"
+dynamic = ["version"]
+description = "Client for Ledger Nano Bitcoin application"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Ledger", email = "hello@ledger.fr" }]
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "ledgercomm>=1.1.0",
+    "packaging>=21.3",
+]
+
+[project.optional-dependencies]
+hid = ["hidapi>=0.9.0.post3"]
+
+[project.urls]
+Homepage = "https://github.com/LedgerHQ/app-bitcoin"
+"Bug Tracker" = "https://github.com/LedgerHQ/app-bitcoin/issues"
+
+[tool.maturin]
+python-source = "python"
+module-name = "ledger_bitcoin._native"
+features = ["pyo3/extension-module"]
+# optimized for size, see Cargo.toml at the root of the workspace
+profile = "python-release"

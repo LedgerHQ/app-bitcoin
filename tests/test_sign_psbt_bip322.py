@@ -8,10 +8,10 @@ from ledger_bitcoin import MultisigWallet, WalletPolicy, AddressType, PartialSig
 from ledger_bitcoin.exception.errors import (DenyError, IncorrectDataError, NotSupportedError,
                                              SecurityStatusNotSatisfiedError)
 from ledger_bitcoin.exception.device_exception import DeviceException
-from ledger_bitcoin.key import ExtendedKey
-from ledger_bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
-from ledger_bitcoin.tx import CTxIn, CTxOut, COutPoint
-from ledger_bitcoin._embit.descriptor.miniscript import Miniscript
+from test_utils.bitcoin.key import ExtendedKey
+from test_utils.bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
+from test_utils.bitcoin.tx import CTxIn, CTxOut, COutPoint
+from test_utils.bitcoin._embit.descriptor.miniscript import Miniscript
 
 from ragger.navigator import Navigator
 from ragger.error import ExceptionRAPDU

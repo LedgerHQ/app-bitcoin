@@ -1,4 +1,6 @@
 use core::convert::From;
+#[cfg(feature = "paranoid_client")]
+use core::fmt;
 use core::iter::IntoIterator;
 use core::str::FromStr;
 
@@ -108,7 +110,7 @@ impl WalletPolicy {
         res.extend_from_slice(&(self.name.len() as u8).to_be_bytes());
         res.extend_from_slice(self.name.as_bytes());
         res.extend(encode::serialize(&UncheckedVarInt(
-            self.descriptor_template.as_bytes().len() as u64,
+            self.descriptor_template.len() as u64,
         )));
 
         if self.version == Version::V2 {
@@ -152,18 +154,51 @@ impl WalletPolicy {
 
         // For every "/<M;N>" expression, replace with M if not change, or with N if change
         while let Some(start) = desc.find("/<") {
-            if let Some(end) = desc.find(">") {
-                let nums: Vec<&str> = desc[start + 2..end].split(";").collect();
-                if nums.len() == 2 {
-                    let replacement = if change { nums[1] } else { nums[0] };
-                    desc = format!("{}{}{}", &desc[..start + 1], replacement, &desc[end + 1..]);
-                } else {
-                    return Err(WalletError::InvalidPolicy);
-                }
+            let end = desc[start..]
+                .find('>')
+                .map(|offset| start + offset)
+                .ok_or(WalletError::InvalidPolicy)?;
+            let nums: Vec<&str> = desc[start + 2..end].split(';').collect();
+            if nums.len() == 2 {
+                let replacement = if change { nums[1] } else { nums[0] };
+                desc = format!("{}{}{}", &desc[..start + 1], replacement, &desc[end + 1..]);
+            } else {
+                return Err(WalletError::InvalidPolicy);
             }
         }
 
         Ok(desc)
+    }
+
+    /// Independently verifies a policy address by scriptPubKey, including BIP-327
+    /// MuSig substitution and `sortedmulti_a()`. Equivalent scripts on different networks are
+    /// accepted.
+    #[cfg(feature = "paranoid_client")]
+    pub fn check_address(
+        &self,
+        change: bool,
+        address_index: u32,
+        address: &bitcoin::Address<bitcoin::address::NetworkUnchecked>,
+    ) -> Result<(), AddressCheckError> {
+        use miniscript::{Descriptor, DescriptorPublicKey};
+        let descriptor = self
+            .get_descriptor(change)
+            .map_err(|_| AddressCheckError::GetDescriptor)?;
+        // rust-miniscript does not yet support musig() and sortedmulti_a() expressions.
+        let descriptor =
+            crate::bip327::replace_musigs(&descriptor).map_err(AddressCheckError::Musig)?;
+        let descriptor = crate::sortedmulti_a::replace_sortedmulti_a(&descriptor, address_index)?;
+        let descriptor = Descriptor::<DescriptorPublicKey>::from_str(&descriptor)
+            .map_err(|_| AddressCheckError::Descriptor)?;
+        if descriptor
+            .at_derivation_index(address_index)
+            .map_err(|_| AddressCheckError::Derivation)?
+            .script_pubkey()
+            != address.assume_checked_ref().script_pubkey()
+        {
+            return Err(AddressCheckError::Mismatch);
+        }
+        Ok(())
     }
 
     pub fn id(&self) -> [u8; 32] {
@@ -173,12 +208,53 @@ impl WalletPolicy {
     }
 }
 
+/// An error verifying an address with [`WalletPolicy::check_address`].
+#[cfg(feature = "paranoid_client")]
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AddressCheckError {
+    GetDescriptor,
+    Musig(String),
+    Descriptor,
+    Derivation,
+    Mismatch,
+}
+
+#[cfg(feature = "paranoid_client")]
+impl fmt::Display for AddressCheckError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::GetDescriptor => f.write_str("Failed to get descriptor"),
+            Self::Musig(error) => write!(f, "Failed to process musig keys: {}", error),
+            Self::Descriptor => f.write_str("Failed to parse descriptor"),
+            Self::Derivation => f.write_str("Failed to derive descriptor"),
+            Self::Mismatch => f.write_str("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin"),
+        }
+    }
+}
+
+#[cfg(feature = "paranoid_client")]
+impl std::error::Error for AddressCheckError {}
+
+#[non_exhaustive]
 #[derive(Debug)]
 pub enum WalletError {
     InvalidThreshold,
     UnsupportedAddressType,
     InvalidPolicy,
 }
+
+impl core::fmt::Display for WalletError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InvalidThreshold => f.write_str("Invalid threshold"),
+            Self::UnsupportedAddressType => f.write_str("Unsupported address type"),
+            Self::InvalidPolicy => f.write_str("Invalid wallet policy"),
+        }
+    }
+}
+
+impl std::error::Error for WalletError {}
 
 #[derive(PartialEq, Eq)]
 pub struct WalletPubKey {
@@ -327,9 +403,35 @@ mod tests {
     }
 
     #[test]
+    fn malformed_multipath_expressions_are_rejected() {
+        fn policy(template: &str) -> WalletPolicy {
+            let key = WalletPubKey::from_str(KEY_EXAMPLE.trim_end_matches("/**")).unwrap();
+            WalletPolicy::new("".into(), Version::V2, template.into(), [key])
+        }
+        // An unterminated expression used to loop forever: check it on a thread with a
+        // deadline, so that a regression fails instead of hanging.
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let result = policy("wsh(pk(@0/<0;1/*))").get_descriptor(false);
+            let _ = sender.send(matches!(result, Err(WalletError::InvalidPolicy)));
+        });
+        let rejected = receiver
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("get_descriptor did not return");
+        assert!(rejected);
+        assert!(matches!(
+            policy("wsh(pk(@0/<0;1;2>/*))").get_descriptor(false),
+            Err(WalletError::InvalidPolicy)
+        ));
+        // A '>' before the expression used to cause a panic.
+        let descriptor = policy("wsh(pk(@0>/<0;1>/*))").get_descriptor(true).unwrap();
+        assert!(descriptor.ends_with(">/1/*))"));
+    }
+
+    #[test]
     fn test_walletpubkey_tostr() {
         let key = WalletPubKey::from_str(KEY_EXAMPLE).unwrap();
-        assert_eq!(key.to_string(), format!("{}", KEY_EXAMPLE));
+        assert_eq!(key.to_string(), KEY_EXAMPLE);
     }
 
     #[test]

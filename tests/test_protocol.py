@@ -1,11 +1,14 @@
 import pytest
 
-from ledger_bitcoin.command_builder import BitcoinCommandBuilder, BitcoinInsType, CURRENT_PROTOCOL_VERSION
 from ledger_bitcoin.exception.errors import WrongP1P2Error
 from ledger_bitcoin.exception.device_exception import DeviceException
 
 from ragger.error import ExceptionRAPDU
 from ragger_bitcoin import RaggerClient
+
+CLA_BITCOIN = 0xE1
+INS_GET_MASTER_FINGERPRINT = 0x05
+CURRENT_PROTOCOL_VERSION = 1
 
 
 def test_high_p1_allowed(client: RaggerClient):
@@ -15,8 +18,8 @@ def test_high_p1_allowed(client: RaggerClient):
     # We can't use the client to send this apdu, so we use raw transport.
     # We're only testing that no exception is raised.
     client.transport_client.exchange(
-        cla=BitcoinCommandBuilder.CLA_BITCOIN,
-        ins=BitcoinInsType.GET_MASTER_FINGERPRINT,
+        cla=CLA_BITCOIN,
+        ins=INS_GET_MASTER_FINGERPRINT,
         p1=0xff,
         p2=CURRENT_PROTOCOL_VERSION,
         data=b''
@@ -28,8 +31,8 @@ def test_p2_too_high(client: RaggerClient):
     with pytest.raises(ExceptionRAPDU) as e:
         # We can't use the client to send this apdu, so we use raw transport
         client.transport_client.exchange(
-            cla=BitcoinCommandBuilder.CLA_BITCOIN,
-            ins=BitcoinInsType.GET_MASTER_FINGERPRINT,
+            cla=CLA_BITCOIN,
+            ins=INS_GET_MASTER_FINGERPRINT,
             p1=0,
             p2=CURRENT_PROTOCOL_VERSION + 1,
             data=b''

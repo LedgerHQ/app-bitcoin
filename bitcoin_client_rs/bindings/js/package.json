@@ -1,0 +1,81 @@
+{
+  "name": "@ledgerhq/ledger-bitcoin",
+  "version": "1.0.0",
+  "description": "Ledger Hardware Wallet Bitcoin Application Client",
+  "main": "build/main/index.js",
+  "module": "build/module/index.js",
+  "types": "build/main/index.d.ts",
+  "typings": "build/main/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./build/main/index.d.ts",
+      "node": "./build/main/index.js",
+      "import": "./build/module/index.js",
+      "default": "./build/main/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LedgerHQ/app-bitcoin.git"
+  },
+  "license": "Apache-2.0",
+  "keywords": [
+    "Ledger",
+    "LedgerWallet",
+    "btc",
+    "Bitcoin",
+    "NanoS",
+    "NanoX",
+    "Hardware Wallet"
+  ],
+  "scripts": {
+    "build": "run-s build:wasm build:ts",
+    "build:wasm": "sh scripts/build-wasm.sh",
+    "build:ts": "sh scripts/build-ts.sh",
+    "clean": "rm -rf build ts/wasm .tsbuildinfo",
+    "fix": "run-s fix:*",
+    "fix:prettier": "prettier \"ts/**/*.ts\" --write",
+    "fix:lint": "eslint ts --ext .ts --fix",
+    "lint": "eslint ts --ext .ts",
+    "test": "jest --detectOpenHandles --verbose",
+    "test:replay": "jest --verbose replay",
+    "doc": "run-s doc:html && open-cli build/docs/index.html",
+    "doc:html": "typedoc ts/index.ts --out build/docs"
+  },
+  "engines": {
+    "node": ">=18.14"
+  },
+  "dependencies": {
+    "@ledgerhq/hw-transport": "^6.31.13"
+  },
+  "devDependencies": {
+    "@ledgerhq/hw-transport-node-speculos-http": "^6.31.0",
+    "@ledgerhq/logs": "^6.13.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.17.10",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/parser": "^5.62.0",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^8.10.0",
+    "eslint-plugin-eslint-comments": "^3.2.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-jest": "^27.9.0",
+    "jest": "^30.2.0",
+    "npm-run-all": "^4.1.5",
+    "open-cli": "^7.2.0",
+    "prettier": "^2.8.8",
+    "ts-jest": "^29.4.6",
+    "typedoc": "^0.28.17",
+    "typescript": "^5.9.3"
+  },
+  "files": [
+    "build/main/",
+    "build/module/",
+    "README.md",
+    "package.json"
+  ],
+  "prettier": {
+    "singleQuote": true
+  }
+}

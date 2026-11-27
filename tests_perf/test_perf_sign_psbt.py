@@ -6,7 +6,7 @@ import hmac
 import pytest
 
 from ledger_bitcoin import WalletPolicy, Client
-from ledger_bitcoin.psbt import PSBT
+from test_utils.bitcoin.psbt import PSBT
 
 from test_utils import SpeculosGlobals, txmaker
 

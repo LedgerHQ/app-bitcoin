@@ -12,7 +12,7 @@ if _REPO_ROOT not in sys.path:
 from mnemonic import Mnemonic
 from bip32 import BIP32
 
-from bitcoin_client.ledger_bitcoin.wallet import WalletPolicy, WalletType
+from ledger_bitcoin.wallet import WalletPolicy, WalletType
 
 from .slip21 import Slip21Node
 

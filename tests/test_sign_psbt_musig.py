@@ -11,9 +11,9 @@ from ragger.error import ExceptionRAPDU
 
 from ledger_bitcoin.exception.errors import BadStateError, IncorrectDataError
 from ledger_bitcoin.exception.device_exception import DeviceException
-from ledger_bitcoin.client_base import Client, MusigPartialSignature, MusigPubNonce
-from ledger_bitcoin.key import ExtendedKey, KeyOriginInfo
-from ledger_bitcoin.psbt import PSBT
+from ledger_bitcoin import Client, MusigPartialSignature, MusigPubNonce
+from test_utils.bitcoin.key import ExtendedKey, KeyOriginInfo
+from test_utils.bitcoin.psbt import PSBT
 from ragger.navigator import Navigator
 from ragger.firmware import Firmware
 

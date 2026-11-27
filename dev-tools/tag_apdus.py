@@ -5,9 +5,35 @@ from dataclasses import dataclass
 
 from typing import List, Mapping, Optional
 
-from bitcoin_client.ledger_bitcoin.client_command import ClientCommandCode
-from bitcoin_client.ledger_bitcoin.command_builder import BitcoinInsType, FrameworkInsType, BitcoinCommandBuilder
-from bitcoin_client.ledger_bitcoin.common import ByteStreamParser, sha256
+from enum import IntEnum
+
+from test_utils.bitcoin.common import ByteStreamParser, sha256
+
+
+class BitcoinCommandBuilder:
+    CLA_BITCOIN = 0xE1
+    CLA_FRAMEWORK = 0xF8
+
+
+class BitcoinInsType(IntEnum):
+    GET_EXTENDED_PUBKEY = 0x00
+    REGISTER_WALLET = 0x02
+    GET_WALLET_ADDRESS = 0x03
+    SIGN_PSBT = 0x04
+    GET_MASTER_FINGERPRINT = 0x05
+    SIGN_MESSAGE = 0x10
+
+
+class FrameworkInsType(IntEnum):
+    CONTINUE_INTERRUPTED = 0x01
+
+
+class ClientCommandCode(IntEnum):
+    YIELD = 0x10
+    GET_PREIMAGE = 0x40
+    GET_MERKLE_LEAF_PROOF = 0x41
+    GET_MERKLE_LEAF_INDEX = 0x42
+    GET_MORE_ELEMENTS = 0xA0
 
 """
 Parses from standard input a transcript of a complete APDU exchange with the app, formatted as following:
